@@ -102,7 +102,7 @@ class WeWorkRemotely:
     provider = "official_rss_v1"
 
     async def batches(self, query: SearchQuery) -> AsyncIterator[list[Candidate]]:
-        text = await fetch("https://weworkremotely.com/remote-jobs.rss")
+        text = await fetch("https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss")
         root = ElementTree.fromstring(text)
         if root.tag != "rss":
             raise ProviderError("El formato RSS ha cambiado")
@@ -125,7 +125,7 @@ class PublicJSON:
         self.code, self.name, self.url, self.key, self.ttl = code, name, url, key, ttl
 
     async def batches(self, query):
-        data = json.loads(await fetch(self.url, ttl=self.ttl))
+        data = json.loads(await fetch(self.url, params={"category": "sales"} if self.code == "remotive" else None, ttl=self.ttl))
         rows = data.get(self.key) if self.key and isinstance(data, dict) else data
         if not isinstance(rows, list):
             raise ProviderError("El proveedor ha cambiado su formato JSON")

@@ -1,6 +1,6 @@
 # Fuentes y búsquedas para WDC
 
-Actualizado: 2026-09-22. Integración local, independiente de Scalix.
+Actualizado: 2026-09-22. La revisión vigente de métodos, filtros y 51 referencias del Excel está en [SOURCE_ACQUISITION](SOURCE_ACQUISITION.md). El catálogo actual contiene 35 entradas; los recuentos históricos inferiores se conservan como contexto. Integración local, independiente de Scalix.
 
 ## Uso
 

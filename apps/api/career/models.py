@@ -92,7 +92,21 @@ class SavedSearch(BaseModel):
     query: SearchQuery
 
 
+class SourceSearch(BaseModel):
+    name: str
+    url: str
+    language: str
+    preferred: bool
+
+
 class SourceInfo(BaseModel):
+    suggested_searches: list[SourceSearch] = Field(default_factory=list)
+    acquisition_method: str = ""
+    upstream_filters: list[str] = Field(default_factory=list)
+    acquisition_note: str = ""
+    validation_status: str = ""
+    provider_candidates: list[str] = Field(default_factory=list)
+    checked_at: str = ""
     code: str
     name: str
     available: bool

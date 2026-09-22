@@ -1,5 +1,13 @@
 # Estado
 
+## Fuentes filtradas y referencias del Excel — 2026-09-22
+
+- Catálogo de 35 entradas con método, filtros en origen y estado explícito. Candidatos revisados para 20 rutas adicionales; nueve rutas sin proveedor verificado. No se presentan metadatos como extracción validada.
+- 51 referencias del Excel WDC disponibles en el asistente por fuente y organización: español primero; no se convierten automáticamente en conexiones ni ofertas. Añadidos Jooble y SimplyHired.
+- El asistente muestra filtros aplicados/pendientes e Input exacto, preserva URLs filtradas, evita defaults de ubicación ajenos, rechaza pérdida silenciosa de keywords, reparte límites por consulta y desactiva enriquecimientos opcionales reconocidos.
+- Remotive consulta categoría sales; WWR RSS de ventas y marketing. Facebook grupos usa proveedor específico público, fecha relativa diez días y límite; keyword en origen no garantizada. Contratación explícita en posts reconocida sin convertir autopromoción en ofertas.
+- Validación: 71 backend, 10 Playwright, build/TypeScript y Ruff PASS; preparaciones reales InfoJobs/Facebook con metadatos, sin lanzar scrapers ni IA. Preview reiniciado conservando DB. Detalles y pendientes en SOURCE_ACQUISITION.md.
+
 ## Prioridad España y cobertura conjunta — 2026-09-22
 
 - Recogida Himalayas consulta España antes del pool mundial; se elimina el corte global de 180 registros y una página duplicada ya no detiene la paginación. Límite operativo de tres páginas por término/mercado, caché y timeout conservados: no se afirma cobertura exhaustiva de internet.

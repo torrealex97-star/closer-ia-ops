@@ -85,6 +85,7 @@ async def check_apify():
 
 class PrepareSource(BaseModel):
     source: str = "custom"
+    location: str = Field(default="Spain", max_length=100)
     urls: list[str] = Field(default_factory=list, max_length=10)
     keywords: list[str] = Field(default_factory=lambda: list(KEYWORDS), max_length=12)
     max_items: int = Field(default=25, ge=5, le=100)
@@ -124,10 +125,10 @@ async def public_metadata(path, params=None):
 
 def prepare_input(schema, body):
     props = schema.get("properties", {})
-    safe_defaults = {"country", "location", "language", "locale", "proxyConfiguration", "withDetails", "includeDetails"}
+    safe_defaults = {"proxyConfiguration", "withDetails", "includeDetails"}
     result = {key: value["default"] for key, value in props.items() if key in safe_defaults and "default" in value and not value.get("isSecret")}
-    url_key = next((k for k in ["startUrls", "urls", "searchUrls", "searchUrl", "startUrl"] if k in props), None)
-    keyword_key = next((k for k in ["keywords", "searchQueries", "searchTerm", "query", "keyword"] if k in props), None)
+    url_key = next((k for k in ["startUrls", "urls", "searchUrls", "searchUrl", "startUrl", "target_urls", "targetUrls", "rawUrl"] if k in props), None)
+    keyword_key = next((k for k in ["keywords", "searchQueries", "searchTerm", "searchQuery", "query", "keyword", "titles", "queries", "searches", "searchTerms", "titleSearch", "jobKeywords", "position"] if k in props), None)
     mode = "objects"
     if body.urls:
         if not url_key:
@@ -140,13 +141,39 @@ def prepare_input(schema, body):
     elif keyword_key:
         spec = props[keyword_key]
         # Do not concatenate unrelated keywords into a single AND query.
+        if spec.get("type") != "array" and len(body.keywords) > 1:
+            raise ValueError("Este scraper acepta un solo término. Elige una palabra clave o pega enlaces de búsquedas filtradas; no descartaremos los demás términos en silencio.")
         result[keyword_key] = body.keywords if spec.get("type") == "array" else body.keywords[0]
     else:
         raise ValueError("Pega un enlace de búsqueda para preparar esta fuente")
-    limit_key = next((k for k in ["maxItems", "maxJobs", "count", "limit", "results_wanted", "maxResults"] if k in props), None)
+    limit_key = next((k for k in ["maxItems", "maxJobs", "count", "limit", "results_wanted", "maxResults", "max_items", "maxRows", "maxPosts", "maxPostsCount", "resultsLimit", "resultsCount", "limitPerSource", "maxItemsPerSearch"] if k in props), None)
     if not limit_key:
         raise ValueError("No se pudo verificar un límite de resultados para este scraper")
-    result[limit_key] = body.max_items
+    partitions = len(body.urls) if body.urls else len(body.keywords) if props.get(keyword_key, {}).get('type') == 'array' else 1
+    if limit_key in {'limitPerSource', 'maxItemsPerSearch'} and partitions > body.max_items:
+        raise ValueError("Demasiadas búsquedas para el límite total. Reduce términos o enlaces.")
+    result[limit_key] = max(1, body.max_items // partitions) if limit_key in {'limitPerSource', 'maxItemsPerSearch'} else body.max_items
+    if result[limit_key] < props[limit_key].get('minimum', 0):
+        raise ValueError("El límite mínimo del proveedor supera el presupuesto de registros por búsqueda. Reduce términos o enlaces.")
+    # Avoid optional detail enrichment, comments, profiles and model calls.
+    for key in ['scrapeComments', 'includeComments', 'scrapeReactions', 'includeMedia', 'includeMediaLinks',
+                'scrapeCompany', 'companyProfile', 'enrichCompany', 'includeCompanyDetails',
+                'withAiSummary', 'withAiSkills', 'withAiTranslate', 'aiAnalysis',
+                'sentiment_analysis', 'content_analysis', 'includeOwnerDetails']:
+        if props.get(key, {}).get('type') == 'boolean':
+            result[key] = False
+    # Location text is only sent to a declared string field; enums must match.
+    location_key = next((k for k in ['location', 'country', 'locations', 'countries', 'locationSearch'] if props.get(k, {}).get('type') in {'string', 'array'}), None)
+    if location_key and body.location.strip() and not body.urls:
+        array_location = props[location_key].get('type') == 'array'
+        options = props[location_key].get('items', {}).get('enum') if array_location else props[location_key].get('enum')
+        choices = [body.location.strip()]
+        if body.location.strip().lower() in {'spain', 'espana', 'españa', 'es'}:
+            choices = ['Spain', 'España', 'ES', 'es', 'spain']
+        chosen = next((v for v in choices if not options or v in options), None)
+        if chosen is None:
+            raise ValueError("El proveedor exige otro formato de ubicación. Usa una URL filtrada del sitio.")
+        result[location_key] = [chosen] if array_location else chosen
     if "onlyTeleworking" in props:
         result["onlyTeleworking"] = True
     missing = [k for k in schema.get("required", []) if k not in result or result[k] in [None, "", []]]
@@ -167,18 +194,26 @@ async def prepare(body: PrepareSource):
     if source not in CATALOG_BY_CODE:
         raise HTTPException(422, "Elige una fuente del catálogo")
     query = (CATALOG_BY_CODE[source][1].split(" · ")[0] if source != "custom" else (urlsplit(body.urls[0]).hostname if body.urls else "jobs")) + " jobs scraper"
-    candidates = [PREFERRED[source]] if source in PREFERRED else []
+    from .source_strategy import audit, actor_matches
+    verified = [c['actor'] for c in audit().get(source, {}).get('candidates', [])]
+    candidates = list(dict.fromkeys(([PREFERRED[source]] if source in PREFERRED else []) + verified))
+    if source == 'facebook' and any('/groups/' in url for url in body.urls):
+        candidates.insert(0, 'apify/facebook-groups-scraper')
     try:
         store = await public_metadata("store", {"search": query, "limit": 5})
         for item in store.get("items", []):
             actor = f'{item.get("username", "")}/{item.get("name", "")}'
-            if actor not in candidates and item.get("notice", "NONE") not in {"DEPRECATED", "UNDER_MAINTENANCE"}:
+            if actor_matches(source, actor) and actor not in candidates and item.get("notice", "NONE") not in {"DEPRECATED", "UNDER_MAINTENANCE"}:
                 candidates.append(actor)
     except (ProviderError, ValueError):
         if not candidates:
             raise HTTPException(422, "El catálogo no responde. Prueba más tarde o usa la conexión avanzada.") from None
 
+    preparation_errors = []
+
     async def inspect(actor):
+        if source == 'facebook' and any('/groups/' in url for url in body.urls) and 'groups' not in actor:
+            return None
         if not re.fullmatch(r"[\w-]+/[\w-]+", actor):
             return None
         try:
@@ -188,6 +223,10 @@ async def prepare(body: PrepareSource):
             schema = build.get("inputSchema") or build.get("actorDefinition", {}).get("input", {})
             schema = json.loads(schema) if isinstance(schema, str) else schema
             actor_input, url_key, mode = prepare_input(schema, body)
+            if actor == 'apify/facebook-groups-scraper':
+                actor_input['onlyPostsNewerThan'] = '10 days'
+                actor_input['viewOption'] = 'CHRONOLOGICAL'
+                actor_input['resultsLimit'] = max(1, body.max_items // max(1, len(body.urls)))
             ConnectionInput.safe_input(actor_input)
             pricing = [p for p in metadata.get("pricingInfos", []) if p.get("startedAt", "") <= now()]
             pricing = sorted(pricing, key=lambda p: p.get("startedAt", ""))
@@ -198,15 +237,21 @@ async def prepare(body: PrepareSource):
             if actor == "haketa/infojobs-scraper":
                 mapping.update(company="company", locations="city", published_at="publishedAt", work_mode="teleworking")
             value = ConnectionInput(name=CATALOG_BY_CODE[source][1], source=source, actor_id=actor, urls=body.urls, url_field=url_key, url_format=mode, actor_input=actor_input, mapping=mapping, max_items=body.max_items, max_charge_usd=body.max_charge_usd, auto_mapping=True, build=build["buildNumber"])
-            return {"connection": value.model_dump(exclude={"token"}), "actor_title": metadata.get("title", actor), "pricing_model": price.get("pricingModel"), "pricing": price, "build": build["buildNumber"], "actor_url": "https://apify.com/" + actor, "message": "Configuración preparada a partir del esquema del proveedor. Se comprobará la salida al terminar la primera extracción."}
-        except (ProviderError, ValueError, KeyError, TypeError):
+            return {"connection": value.model_dump(exclude={"token"}), "actor_title": metadata.get("title", actor), "pricing_model": price.get("pricingModel"), "pricing": price, "build": build["buildNumber"], "actor_url": "https://apify.com/" + actor, "message": "Configuración preparada a partir del esquema del proveedor. Se comprobará la salida al terminar la primera extracción.",
+                    "filters_applied": (["Enlaces de búsqueda: se usarán los filtros incluidos en las URLs"] if body.urls else ["Palabras clave: " + ", ".join(body.keywords)]) + (["Ubicación: " + str(actor_input[k]) for k in ['location', 'country', 'locations', 'countries', 'locationSearch'] if k in actor_input] if not body.urls else []) + (["Solo teletrabajo o híbrido"] if actor_input.get('onlyTeleworking') else []),
+                    "filters_pending": (["Facebook público: búsqueda por keyword limitada por el proveedor; se leen publicaciones recientes del grupo y se filtran localmente"] if actor == 'apify/facebook-groups-scraper' else []) + ["Español, perfil y vigencia se validan también al importar"] + (["Modalidad sin filtro verificado en origen: utiliza una URL filtrada para reducir descartes"] if not actor_input.get('onlyTeleworking') else []) + (["Ubicación no aplicada en origen: utiliza una URL con país o ciudad"] if not body.urls and not any(k in actor_input for k in ['location', 'country', 'locations', 'countries', 'locationSearch']) else []),
+                    "prepared_input": actor_input}
+        except ValueError as exc:
+            preparation_errors.append(str(exc))
+            return None
+        except (ProviderError, KeyError, TypeError):
             return None
     plan = await inspect(candidates[0]) if candidates else None
     if not plan:
         inspected = await asyncio.gather(*(inspect(actor) for actor in candidates[1:3]))
         plan = next((value for value in inspected if value), None)
     if not plan:
-        raise HTTPException(422, "No encontramos un scraper compatible con límites verificables para estos enlaces. Prueba un enlace de búsqueda más específico; la conexión avanzada sigue disponible.")
+        raise HTTPException(422, preparation_errors[0] if preparation_errors else "No encontramos un scraper compatible con límites verificables para estos enlaces. Prueba un enlace de búsqueda más específico; la conexión avanzada sigue disponible.")
     plan_id = uid()
     plan.update(id=plan_id, expires_at=(datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat())
     with connect() as db:

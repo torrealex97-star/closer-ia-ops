@@ -2330,6 +2330,12 @@
             "title": "Source",
             "default": "custom"
           },
+          "location": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Location",
+            "default": "Spain"
+          },
           "urls": {
             "items": {
               "type": "string"
@@ -2603,6 +2609,47 @@
       },
       "SourceInfo": {
         "properties": {
+          "suggested_searches": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSearch"
+            },
+            "type": "array",
+            "title": "Suggested Searches"
+          },
+          "acquisition_method": {
+            "type": "string",
+            "title": "Acquisition Method",
+            "default": ""
+          },
+          "upstream_filters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Upstream Filters"
+          },
+          "acquisition_note": {
+            "type": "string",
+            "title": "Acquisition Note",
+            "default": ""
+          },
+          "validation_status": {
+            "type": "string",
+            "title": "Validation Status",
+            "default": ""
+          },
+          "provider_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provider Candidates"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At",
+            "default": ""
+          },
           "code": {
             "type": "string",
             "title": "Code"
@@ -2703,6 +2750,34 @@
           "name"
         ],
         "title": "SourceProgress"
+      },
+      "SourceSearch": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "preferred": {
+            "type": "boolean",
+            "title": "Preferred"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url",
+          "language",
+          "preferred"
+        ],
+        "title": "SourceSearch"
       },
       "StarRequest": {
         "properties": {

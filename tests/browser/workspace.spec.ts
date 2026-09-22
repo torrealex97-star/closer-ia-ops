@@ -171,3 +171,16 @@ test('daily collection budget controls are separate from saved catalog search', 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('WDC workbook searches are available in the source assistant without executing scrapers', async ({ page }) => {
+  await page.goto('/admin');
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
+  await page.getByRole('button', { name: 'Añadir fuente', exact: true }).click();
+  await page.getByLabel('1. ¿Dónde quieres buscar?').selectOption('facebook');
+  await expect(page.getByLabel('Búsquedas y comunidades de WDC')).toBeVisible();
+  await expect(page.getByLabel('Búsquedas y comunidades de WDC').locator('option')).toHaveCount(28);
+  await expect(page.getByLabel('2. Pega enlaces de búsqueda o páginas')).toHaveValue(/facebook.com\/groups/);
+  await page.getByLabel('1. ¿Dónde quieres buscar?').selectOption('infojobs');
+  await expect(page.getByLabel('2. Pega enlaces de búsqueda o páginas')).toHaveValue(/teleworkingIds=2/);
+  await expect(page.getByLabel('2. Pega enlaces de búsqueda o páginas')).not.toHaveValue(/page=3/);
+});

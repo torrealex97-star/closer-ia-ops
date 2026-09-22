@@ -42,6 +42,11 @@ def language_evidence(description):
 
 def professional_role(title, description):
     title, body = fold(title), fold(description)
+    if title == 'publicacion de comunidad':
+        hiring = re.search(r'\b(?:busco|buscamos|necesitamos|contratamos|se busca|estamos buscando)\b(?:\s+\w+){0,4}\s+(closer|setter|cerrador[ae]?|appointment setter|cold caller)\b', body)
+        if not hiring:
+            return None
+        title = hiring.group(1)
     if re.search(r'\b(?:cold caller|cold calling|llamadas en frio|prospector[ae]? telefonic[oa])\b', title):
         return 'cold_caller'
     if re.search(r'\b(?:setter|appointment setting|agendador[ae]?|booking specialist|lead qualifier)\b', title):

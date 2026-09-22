@@ -826,6 +826,11 @@ export interface components {
              * @default custom
              */
             source: string;
+            /**
+             * Location
+             * @default Spain
+             */
+            location: string;
             /** Urls */
             urls?: string[];
             /** Keywords */
@@ -950,6 +955,32 @@ export interface components {
         };
         /** SourceInfo */
         SourceInfo: {
+            /** Suggested Searches */
+            suggested_searches?: components["schemas"]["SourceSearch"][];
+            /**
+             * Acquisition Method
+             * @default
+             */
+            acquisition_method: string;
+            /** Upstream Filters */
+            upstream_filters?: string[];
+            /**
+             * Acquisition Note
+             * @default
+             */
+            acquisition_note: string;
+            /**
+             * Validation Status
+             * @default
+             */
+            validation_status: string;
+            /** Provider Candidates */
+            provider_candidates?: string[];
+            /**
+             * Checked At
+             * @default
+             */
+            checked_at: string;
             /** Code */
             code: string;
             /** Name */
@@ -1004,6 +1035,17 @@ export interface components {
              * @default 0
              */
             cost: number;
+        };
+        /** SourceSearch */
+        SourceSearch: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+            /** Language */
+            language: string;
+            /** Preferred */
+            preferred: boolean;
         };
         /** StarRequest */
         StarRequest: {

@@ -150,7 +150,7 @@ def match(item: dict, query: SearchQuery):
     # A passing mention of a sales team is not a sales vacancy. Without an LLM,
     # accept description-only evidence only in explicit hiring language.
     hiring_match = any(re.search(
-        r"\b(?:hiring|seeking|looking for|buscamos|estamos buscando|se busca|necesitamos|contratamos|puesto de)\b(?:\s+\w+){0,4}\s+"
+        r"\b(?:hiring|seeking|looking for|busco|buscamos|estoy buscando|estamos buscando|se busca|necesitamos|contratamos|puesto de)\b(?:\s+\w+){0,4}\s+"
         + re.escape(term) + r"(?!\w)", body[:3000]) for term in terms)
     if not title_match and not hiring_match:
         return None

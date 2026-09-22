@@ -1,0 +1,465 @@
+{
+  "organization": "local-wdc",
+  "workbook": "WDC_EXECUTION_SYSTEM.xlsx",
+  "searches": [
+    {
+      "source": "facebook",
+      "name": "Closer de ventas principiantes",
+      "url": "https://www.facebook.com/groups/1395506754506668",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B2",
+      "original_url": "https://www.facebook.com/groups/1395506754506668"
+    },
+    {
+      "source": "facebook",
+      "name": "Closer de Ventas de Alto Valor",
+      "url": "https://www.facebook.com/groups/719085275327684/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B3",
+      "original_url": "https://www.facebook.com/groups/719085275327684/"
+    },
+    {
+      "source": "facebook",
+      "name": "Trabajo Closer de Ventas Remoto – Vacantes Diarias",
+      "url": "https://www.facebook.com/groups/empleocloserdeventas/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B4",
+      "original_url": "https://www.facebook.com/groups/empleocloserdeventas/"
+    },
+    {
+      "source": "facebook",
+      "name": "Setters, Closers y Agencias de Marketing LATAM",
+      "url": "https://www.facebook.com/groups/emprendedoresyemresarioslatinos/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B5",
+      "original_url": "https://www.facebook.com/groups/emprendedoresyemresarioslatinos/"
+    },
+    {
+      "source": "facebook",
+      "name": "SETTERS Y CLOSERS DE VENTA",
+      "url": "https://www.facebook.com/groups/720430409904628/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B6",
+      "original_url": "https://www.facebook.com/groups/720430409904628/"
+    },
+    {
+      "source": "facebook",
+      "name": "Closer de Ventas Mexico",
+      "url": "https://www.facebook.com/groups/562319769693968/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B7",
+      "original_url": "https://www.facebook.com/groups/562319769693968/"
+    },
+    {
+      "source": "facebook",
+      "name": "Closer y setter de ventas Mexico",
+      "url": "https://www.facebook.com/groups/closerysetterventasmexico/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B8",
+      "original_url": "https://www.facebook.com/groups/closerysetterventasmexico/"
+    },
+    {
+      "source": "facebook",
+      "name": "Setters, Closers y Agencias de Marketing LATAM",
+      "url": "https://www.facebook.com/groups/setterscloserslatam/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B9",
+      "original_url": "https://www.facebook.com/groups/setterscloserslatam/"
+    },
+    {
+      "source": "facebook",
+      "name": "Empleos en VENTAS / CLOSER / appointment setter",
+      "url": "https://www.facebook.com/groups/4114127215485370/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B10",
+      "original_url": "https://www.facebook.com/groups/4114127215485370/"
+    },
+    {
+      "source": "facebook",
+      "name": "Closer de ventas Colombia",
+      "url": "https://www.facebook.com/groups/769202395425443/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B11",
+      "original_url": "https://www.facebook.com/groups/769202395425443/"
+    },
+    {
+      "source": "facebook",
+      "name": "AGENCIA CLOSER DE VENTAS CERTIFICADOS",
+      "url": "https://www.facebook.com/groups/880493333412352/",
+      "language": "Español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B12",
+      "original_url": "https://www.facebook.com/groups/880493333412352/"
+    },
+    {
+      "source": "facebook",
+      "name": "High Ticket Closers",
+      "url": "https://www.facebook.com/groups/highticketsclosers/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B13",
+      "original_url": "https://www.facebook.com/groups/highticketsclosers/"
+    },
+    {
+      "source": "facebook",
+      "name": "Grupo inglés sin nombre 1",
+      "url": "https://www.facebook.com/groups/749952232258240/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B14",
+      "original_url": "https://www.facebook.com/groups/749952232258240/"
+    },
+    {
+      "source": "facebook",
+      "name": "Grupo inglés sin nombre 2",
+      "url": "https://www.facebook.com/groups/1298455287415252/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B15",
+      "original_url": "https://www.facebook.com/groups/1298455287415252/"
+    },
+    {
+      "source": "facebook",
+      "name": "High Ticket Sales - Closer Opportunities Job Board",
+      "url": "https://www.facebook.com/groups/highticketsalesca/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B16",
+      "original_url": "https://www.facebook.com/groups/highticketsalesca/"
+    },
+    {
+      "source": "facebook",
+      "name": "Grupo inglés sin nombre 3",
+      "url": "https://www.facebook.com/groups/555294539537383/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B17",
+      "original_url": "https://www.facebook.com/groups/555294539537383/"
+    },
+    {
+      "source": "facebook",
+      "name": "Grupo inglés sin nombre 4",
+      "url": "https://www.facebook.com/groups/1319696752476712/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B18",
+      "original_url": "https://www.facebook.com/groups/1319696752476712/"
+    },
+    {
+      "source": "facebook",
+      "name": "Grupo inglés sin nombre 5",
+      "url": "https://www.facebook.com/groups/1332590381026002/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B19",
+      "original_url": "https://www.facebook.com/groups/1332590381026002/"
+    },
+    {
+      "source": "facebook",
+      "name": "Grupo inglés sin nombre 6",
+      "url": "https://www.facebook.com/groups/935965877542616/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B20",
+      "original_url": "https://www.facebook.com/groups/935965877542616/"
+    },
+    {
+      "source": "facebook",
+      "name": "HIGH-TICKET SALES: Setters & Closers ($10K+ Job Network)",
+      "url": "https://www.facebook.com/groups/highticketsalesnetwork/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B21",
+      "original_url": "https://www.facebook.com/groups/highticketsalesnetwork/"
+    },
+    {
+      "source": "facebook",
+      "name": "High ticket sales / remote closer - Setter & Closer opportunities",
+      "url": "https://www.facebook.com/groups/740475501578891/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B22",
+      "original_url": "https://www.facebook.com/groups/740475501578891/"
+    },
+    {
+      "source": "facebook",
+      "name": "High Ticket Closing - Free Job Opportunities - Entrepreneur Fraternity",
+      "url": "https://www.facebook.com/groups/1399625620810584/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B23",
+      "original_url": "https://www.facebook.com/groups/1399625620810584/"
+    },
+    {
+      "source": "facebook",
+      "name": "Remote Sales Jobs / Sales People to Hire",
+      "url": "https://www.facebook.com/groups/438319006594632/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B24",
+      "original_url": "https://www.facebook.com/groups/438319006594632/"
+    },
+    {
+      "source": "facebook",
+      "name": "High Ticket Remote Sales Jobs & Staffing for Agencies and Coaches",
+      "url": "https://www.facebook.com/groups/thesalesagency/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B25",
+      "original_url": "https://www.facebook.com/groups/thesalesagency/"
+    },
+    {
+      "source": "facebook",
+      "name": "Remote Sales Jobs | Appointment Setter and High Ticket Closer Opportunities",
+      "url": "https://www.facebook.com/groups/7figuresalespros/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B26",
+      "original_url": "https://www.facebook.com/groups/7figuresalespros/"
+    },
+    {
+      "source": "facebook",
+      "name": "Closer de ventas digitales",
+      "url": "https://www.facebook.com/groups/595198080307625",
+      "language": "español",
+      "preferred": true,
+      "reference": "Facebook Grupos!B27",
+      "original_url": "https://www.facebook.com/groups/595198080307625"
+    },
+    {
+      "source": "facebook",
+      "name": "Remote Sales Jobs Available Commission Only",
+      "url": "https://www.facebook.com/groups/349725851137199/",
+      "language": "Inglés",
+      "preferred": false,
+      "reference": "Facebook Grupos!B28",
+      "original_url": "https://www.facebook.com/groups/349725851137199/"
+    },
+    {
+      "source": "skool",
+      "name": "Bolsa de trabajo - Growing",
+      "url": "https://www.skool.com/bolsa-de-trabajo-growing",
+      "language": "Sin confirmar",
+      "preferred": true,
+      "reference": "Skool Grupos!B3",
+      "original_url": "https://www.skool.com/bolsa-de-trabajo-growing"
+    },
+    {
+      "source": "skool",
+      "name": "Elite Setter Community",
+      "url": "https://www.skool.com/mlagency-9853",
+      "language": "Sin confirmar",
+      "preferred": true,
+      "reference": "Skool Grupos!B4",
+      "original_url": "https://www.skool.com/mlagency-9853"
+    },
+    {
+      "source": "infojobs",
+      "name": "Infojob",
+      "url": "https://www.infojobs.net/ofertas-trabajo/closer?keyword=Comercial+de+ventas&normalizedJobTitleIds=3322_ij002&teleworkingIds=2&sortBy=RELEVANCE&onlyForeignCountry=false&sinceDate=ANY",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B2",
+      "original_url": "https://www.infojobs.net/ofertas-trabajo/closer?keyword=Comercial%20de%20ventas&normalizedJobTitleIds=3322_ij002&referer=search-filtered&teleworkingIds=2&segmentId=&page=3&sortBy=RELEVANCE&onlyForeignCountry=false&sinceDate=ANY"
+    },
+    {
+      "source": "linkedin",
+      "name": "Linkedin",
+      "url": "https://www.linkedin.com/jobs/closer-empleos/",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B3",
+      "original_url": "https://www.linkedin.com/jobs/closer-empleos/?currentJobId=4408245750&originalSubdomain=es"
+    },
+    {
+      "source": "freelancer",
+      "name": "Freelancer",
+      "url": "https://www.freelancer.es/job-search/closer/",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B4",
+      "original_url": "https://www.freelancer.es/job-search/closer/"
+    },
+    {
+      "source": "upwork",
+      "name": "Upwork",
+      "url": "https://www.upwork.com/nx/search/jobs/?category2_uid=531770282580668422&q=closer&sort=relevance%2Bdesc",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B5",
+      "original_url": "https://www.upwork.com/nx/search/jobs/?category2_uid=531770282580668422&q=closer&sort=relevance%2Bdesc"
+    },
+    {
+      "source": "indeed",
+      "name": "Indeed",
+      "url": "https://es.indeed.com/q-closer-empleos.html",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B6",
+      "original_url": "https://es.indeed.com/q-closer-empleos.html?vjk=faca3c176a08165b"
+    },
+    {
+      "source": "jobtoday",
+      "name": "Job Today",
+      "url": "https://jobtoday.com/es/trabajos-closer-venta",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B7",
+      "original_url": "https://jobtoday.com/es/trabajos-closer-venta"
+    },
+    {
+      "source": "jooble",
+      "name": "Jooble",
+      "url": "https://es.jooble.org/SearchResult?loc=2&ukw=closer+de+ventas",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B8",
+      "original_url": "https://es.jooble.org/SearchResult?loc=2&ukw=closer%20de%20ventas"
+    },
+    {
+      "source": "simplyhired",
+      "name": "Simplyhired",
+      "url": "https://www.simplyhired.es/search?q=closer+ventas",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B9",
+      "original_url": "https://www.simplyhired.es/search?q=closer+ventas"
+    },
+    {
+      "source": "workana",
+      "name": "Workana",
+      "url": "https://www.workana.com/es/jobs?category=sales-marketing&language=es&subcategory=televentas%2Csales-executive",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Portales Trabajo!B10",
+      "original_url": "https://www.workana.com/es/jobs?category=sales-marketing&language=es&subcategory=televentas%2Csales-executive"
+    },
+    {
+      "source": "telegram",
+      "name": "Comizzion",
+      "url": "https://t.me/comizzion",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B3",
+      "original_url": "https://t.me/comizzion"
+    },
+    {
+      "source": "telegram",
+      "name": "Afiliados Fórmula de Lanzamiento",
+      "url": "https://t.me/afiliados_formula_de_lanzamiento",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B4",
+      "original_url": "https://t.me/afiliados_formula_de_lanzamiento"
+    },
+    {
+      "source": "telegram",
+      "name": "Vacantes Remotas",
+      "url": "https://t.me/vacantesremotas",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B5",
+      "original_url": "https://t.me/vacantesremotas"
+    },
+    {
+      "source": "telegram",
+      "name": "Trabajos Remotos LATAM",
+      "url": "https://t.me/trabajos_remotos_latam",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B6",
+      "original_url": "https://t.me/trabajos_remotos_latam"
+    },
+    {
+      "source": "telegram",
+      "name": "Vivir de tu Pasión (Alejandro Novás)",
+      "url": "https://t.me/alejandronovas",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B7",
+      "original_url": "https://t.me/alejandronovas"
+    },
+    {
+      "source": "telegram",
+      "name": "Hotmart Galaxy (Mauricio Duque)",
+      "url": "https://t.me/mauricioduque",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B8",
+      "original_url": "https://t.me/mauricioduque"
+    },
+    {
+      "source": "telegram",
+      "name": "Conviértemas (Vilma Núñez)",
+      "url": "https://t.me/conviertemas",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B9",
+      "original_url": "https://t.me/conviertemas"
+    },
+    {
+      "source": "telegram",
+      "name": "Instituto de Negocios",
+      "url": "https://t.me/empezarnegocio",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B10",
+      "original_url": "https://t.me/empezarnegocio"
+    },
+    {
+      "source": "telegram",
+      "name": "Afiliados Digital Academy",
+      "url": "https://t.me/afiliadosvelas",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B11",
+      "original_url": "https://t.me/afiliadosvelas"
+    },
+    {
+      "source": "telegram",
+      "name": "Empleos Oriente (Ventas)",
+      "url": "https://t.me/empleosmaturin",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B12",
+      "original_url": "https://t.me/empleosmaturin"
+    },
+    {
+      "source": "telegram",
+      "name": "Ofertas de Teletrabajo",
+      "url": "https://t.me/ofertasteletrabajo",
+      "language": "Español · referencia WDC",
+      "preferred": true,
+      "reference": "Telegram!B13",
+      "original_url": "https://t.me/ofertasteletrabajo"
+    },
+    {
+      "source": "skool",
+      "name": "Comunidad Women Digital Closers",
+      "url": "https://www.skool.com/women-digital-closers-1053",
+      "language": "Sin confirmar",
+      "preferred": true,
+      "reference": "Pipeline Closers!C2",
+      "original_url": "https://www.skool.com/women-digital-closers-1053"
+    },
+    {
+      "source": "company",
+      "name": "Portal de empleo Nuclio",
+      "url": "https://nuclio.school/portal-de-empleo-nuclio/",
+      "language": "Sin confirmar",
+      "preferred": true,
+      "reference": "Pipeline Closers!C3",
+      "original_url": "https://nuclio.school/portal-de-empleo-nuclio/"
+    }
+  ]
+}

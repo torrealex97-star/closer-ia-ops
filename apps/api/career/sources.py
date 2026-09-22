@@ -20,6 +20,8 @@ APIFY_BASE = "https://api.apify.com/v2/"
 router = APIRouter(prefix="/v1")
 # These are discovery routes, not assertions that every site is scrapeable anonymously.
 CATALOG = [
+    ("jooble", "Jooble", "España", "https://es.jooble.org", "https://apify.com/store?search=jooble", "Búsqueda española aportada por WDC. Validar descripción, duplicados y scraper."),
+    ("simplyhired", "SimplyHired", "España", "https://www.simplyhired.es", "https://apify.com/store?search=simplyhired", "Búsqueda de closer y ventas aportada por WDC. Validar cobertura del proveedor."),
     ("infojobs", "InfoJobs", "España", "https://www.infojobs.net", "https://apify.com/haketa/infojobs-scraper", "Portal español. Seleccionar teletrabajo o híbrido en el proveedor."),
     ("computrabajo", "Computrabajo", "LATAM", "https://www.computrabajo.com", "https://apify.com/haketa/computrabajo-scraper", "Portales por país. Activar descripción completa y modalidad."),
     ("workana", "Workana", "LATAM", "https://www.workana.com", "https://apify.com/automation-lab/workana-freelance-projects-scraper", "Proyectos freelance; revisar si presupuesto es por proyecto u hora."),
@@ -363,6 +365,13 @@ def source_infos(organization):
                "website": c.url if hasattr(c, "url") else "https://himalayas.app" if c.code == "himalayas" else "https://weworkremotely.com"} for c in REGISTRY.values()]
     public += [{"code": c[0], "name": c[1], "category": c[2], "website": c[3], "setup_url": c[4] or "https://apify.com/store?search=web%20scraper", "note": c[5], "available": False} for c in CATALOG]
     public += [{"code": v["id"], "name": v["name"], "category": "Mis conexiones", "available": (v["enabled"] and bool(v["dataset_id"] or v["actor_id"])) or v["id"] in saved_sources, "note": "Catálogo local · consulta sin lanzar un nuevo scraper"} for v in connections(organization)]
+    from .source_strategy import strategy, discovery_url, suggested_searches
+    for entry in public:
+        if entry["category"] != "Mis conexiones":
+            entry.update(strategy(entry["code"]))
+            entry["suggested_searches"] = suggested_searches(entry["code"], organization)
+            if not entry.get("setup_url") or entry["setup_url"] == "https://apify.com/store?search=web%20scraper":
+                entry["setup_url"] = discovery_url(entry["name"])
     return public
 
 

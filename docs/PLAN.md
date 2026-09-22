@@ -18,6 +18,8 @@ Preview de alumna adelantado de P06B: `/` centrado en elección profesional, per
 
 Prioridad de cobertura España aplicada: consultas públicas ES antes del pool global y vista inicial de todos los perfiles; pendiente obtener resultados válidos de InfoJobs y medir rendimiento de las conexiones nuevas. La ausencia de datos no se suple ampliando a países incompatibles.
 
+Referencias WDC y adquisición por fuente organizadas en [SOURCE_ACQUISITION](SOURCE_ACQUISITION.md). Próximo paso de cobertura: validar pequeñas extracciones de los proveedores elegidos dentro del presupuesto existente; implementar rutas específicas donde no hay Actor compatible, con atención a comunidades privadas.
+
 ## Próximos incrementos, en orden
 
 | Orden | Fase | Resultado y dependencia |
