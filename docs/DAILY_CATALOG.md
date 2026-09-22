@@ -32,3 +32,7 @@ La migración usa la primera captura existente sin alterar los raws. Los histór
 Tablas v4: catalog_entries, collection_runs, scrape_budget. El worker independiente procesa el lote; la cola de búsquedas no espera al scraping. Las conexiones ya existentes se conservan. La automatización de mantenimiento de Codex no ejecuta estos lotes ni gestiona el presupuesto.
 
 Referencias verificadas el 2026-09-22: [límite por ejecución PPE](https://docs.apify.com/actors/publishing/monetize/pay-per-event), [API Run Actor](https://docs.apify.com/api/v2/actors-runs-post), [cambio BCE](https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml).
+
+## Experiencia de alumna
+
+La página inicial muestra la selección en español con perfiles Closer, Setter y Cold Caller. Bilingües requieren opción expresa; el español secundario no habilita una oferta solo en inglés. Detalles y compensación usan evidencia, sin inventar fijo, periodicidad, idioma de trabajo confirmado o relación directa con WDC. La gestión de recogida y presupuesto está en `/admin`. Esa separación local no sustituye autenticación: guardadas siguen perteneciendo a la organización hasta implementar acceso individual.

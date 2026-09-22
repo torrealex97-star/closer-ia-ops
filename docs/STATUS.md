@@ -1,5 +1,15 @@
 # Estado
 
+## Oportunidades para la alumna — 2026-09-22
+
+- Inicio `/` sustituido por la experiencia de alumna: Closer, Setter y Cold Caller, carga inicial de ofertas, guardadas, tarjetas de condiciones y siguiente paso hacia la publicación original. Gestión local conservada en `/admin`, sin controles operativos en la navegación de alumna.
+- POST `/v1/opportunities/search` devuelve DTO permitido con empresa, perfil, compensación, modalidad, ubicación, idioma, jornada, experiencia, contrato y atribución. No expone raw_id, provider, score, coste ni configuración. Sin uso de IA o scraping al buscar.
+- Se excluyen anuncios solo en inglés, trabajo declarado exclusivamente/principalmente en inglés y español opcional/secundario. Por defecto la alumna ve anuncios en español; bilingües con requisito real de español requieren marcar la opción. Reglas deterministas conservadoras, no clasificación lingüística perfecta.
+- Remuneración extraída con contexto literal: fijo/variable, sin convertir promedios en garantías ni inventar periodicidad. Las cifras ausentes siguen como no publicadas. Roles comerciales solo se presentan como Closer cuando hay evidencia de cierre; título Setter/Cold Caller tiene prioridad.
+- Cold Caller incorporado a consultas públicas, asistentes y palabras clave de la conexión InfoJobs existente para su siguiente recogida. Sin lanzar Actor ni generar consumo adicional.
+- Validación: 61 backend PASS, 9 Playwright PASS, build/TypeScript y Ruff PASS; revisión visual escritorio/móvil y consulta real con cuatro ofertas en español. Pruebas adicionales de presentación tras pulido de compensación.
+- Es preview local de la experiencia, no portal multiusuario: `/admin` separado visualmente no es autorización por rol. Guardadas sigue por organización local; Auth/RLS/membresías y guardadas por alumna pendientes. No se afirma relación directa con las empresas ni candidatura enviada.
+
 ## Catálogo diario y presupuesto — 2026-09-22
 
 - Recogida automática local a las 08:00 Europe/Madrid; presupuesto inicial 1 € de scraping, ajustable a 2 €, pausa y botón idempotente de recogida del día. Todos los conectores públicos y conexiones activas se incorporan al lote; una conexión añadida tras cerrarse el lote entra al siguiente día.

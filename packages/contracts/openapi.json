@@ -969,6 +969,56 @@
         }
       }
     },
+    "/v1/opportunities/search": {
+      "post": {
+        "summary": "Search",
+        "operationId": "search_v1_opportunities_search_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpportunityQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "summary": "Health",
@@ -2086,6 +2136,194 @@
         ],
         "title": "Job"
       },
+      "Opportunity": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "closer",
+              "setter",
+              "cold_caller"
+            ],
+            "title": "Role"
+          },
+          "role_label": {
+            "type": "string",
+            "title": "Role Label"
+          },
+          "original_title": {
+            "type": "string",
+            "title": "Original Title"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "compensation": {
+            "type": "string",
+            "title": "Compensation"
+          },
+          "compensation_note": {
+            "type": "string",
+            "title": "Compensation Note"
+          },
+          "modality": {
+            "type": "string",
+            "title": "Modality"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "experience": {
+            "type": "string",
+            "title": "Experience"
+          },
+          "schedule": {
+            "type": "string",
+            "title": "Schedule"
+          },
+          "contract": {
+            "type": "string",
+            "title": "Contract"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "starred": {
+            "type": "boolean",
+            "title": "Starred"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "role_label",
+          "original_title",
+          "company",
+          "compensation",
+          "compensation_note",
+          "modality",
+          "location",
+          "language",
+          "experience",
+          "schedule",
+          "contract",
+          "description",
+          "published_at",
+          "expires_at",
+          "source_name",
+          "source_url",
+          "starred"
+        ],
+        "title": "Opportunity"
+      },
+      "OpportunityList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Opportunity"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "OpportunityList"
+      },
+      "OpportunityQuery": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "closer",
+                  "setter",
+                  "cold_caller"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "default": "closer"
+          },
+          "market": {
+            "type": "string",
+            "enum": [
+              "any",
+              "ES",
+              "EU",
+              "LATAM",
+              "US"
+            ],
+            "title": "Market",
+            "default": "any"
+          },
+          "days": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Days",
+            "default": 10
+          },
+          "include_bilingual": {
+            "type": "boolean",
+            "title": "Include Bilingual",
+            "default": false
+          },
+          "starred_only": {
+            "type": "boolean",
+            "title": "Starred Only",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "OpportunityQuery"
+      },
       "PrepareSource": {
         "properties": {
           "source": {
@@ -2190,6 +2428,7 @@
               "sales",
               "closer",
               "setter",
+              "cold_caller",
               "sdr",
               "account_executive",
               "custom"

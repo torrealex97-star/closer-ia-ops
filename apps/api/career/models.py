@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class SearchQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    role: Literal["digital_sales", "sales", "closer", "setter", "sdr", "account_executive", "custom"] = "sales"
+    role: Literal["digital_sales", "sales", "closer", "setter", "cold_caller", "sdr", "account_executive", "custom"] = "sales"
     keywords: str = Field(default="", max_length=120)
     market: Literal["any", "ES", "EU", "LATAM", "US"] = "any"
     language: Literal["any", "es", "en"] = "any"

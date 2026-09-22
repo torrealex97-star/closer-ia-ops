@@ -12,6 +12,10 @@ MVP administrativo local: seis feeds públicos, catálogo de fuentes, Apify guia
 
 Entregado antes de continuar P05A: recogida diaria de las fuentes conectadas, búsqueda exclusivamente local y ventana de diez días. Presupuesto inicial de scraping 1 €/día, ajustable a 2 €, reservas globales, conversión BCE con margen y actores PPE compatibles. Ver [ADR-008](decisions/ADR-008-daily-catalog.md) y [operación](DAILY_CATALOG.md). La automatización de mantenimiento de código sigue siendo independiente del worker de recogida.
 
+## Ajuste de experiencia solicitado — 2026-09-22
+
+Preview de alumna adelantado de P06B: `/` centrado en elección profesional, perfiles Closer/Setter/Cold Caller, español por defecto y condiciones visibles; gestión en `/admin`. DTO de presentación permitido ya implementado sobre el catálogo local. P01B/P05B/P06B completos siguen pendientes: clasificación/verificación editorial, dominio versionado, matching real y autorización multiusuario no quedan resueltos por esta separación visual. Ver STATUS.
+
 ## Próximos incrementos, en orden
 
 | Orden | Fase | Resultado y dependencia |

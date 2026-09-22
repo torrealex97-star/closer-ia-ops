@@ -60,7 +60,8 @@ class Himalayas:
 
     async def batches(self, query: SearchQuery) -> AsyncIterator[list[Candidate]]:
         terms = {
-            "digital_sales": ["closer", "setter", "comercial", "cerrador", "venta de alto valor"],
+            "digital_sales": ["closer", "setter", "cold caller", "comercial", "cerrador", "venta de alto valor"],
+            "cold_caller": ["cold caller", "cold calling", "llamadas en frio"],
             "closer": ["closer", "cerrador", "venta de alto valor"],
             "setter": ["appointment setter", "appointment setting"],
             "sdr": ["sales development", "business development representative"],

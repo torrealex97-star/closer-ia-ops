@@ -10,7 +10,7 @@ export default function SourceAssistant({ source, sources, onClose, onConnected,
   const [urls, setUrls] = useState('');
   const [limit, setLimit] = useState(25);
   const [budget, setBudget] = useState(1);
-  const [keywords, setKeywords] = useState('closer de ventas, closer digital, high ticket closer, appointment setter, setter, comercial digital, cerrador, venta de alto valor');
+  const [keywords, setKeywords] = useState('closer de ventas, closer digital, high ticket closer, appointment setter, setter, cold caller, llamadas en frío, comercial digital, cerrador, venta de alto valor');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [plan, setPlan] = useState<Plan | null>(null);

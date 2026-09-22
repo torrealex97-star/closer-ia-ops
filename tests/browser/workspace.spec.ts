@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('operator can configure search, inspect sources and use mobile navigation', async ({ page }) => {
   await page.route('**/api/backend/source-connections', route => route.fulfill({ json: [] }));
-  await page.goto('/');
+  await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Su próximo paso empieza aquí.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Buscar oportunidades', exact: true })).toBeEnabled();
   await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('closer');
@@ -34,7 +34,7 @@ test('source setup preloads Spanish keywords, preserves secret and edits URLs', 
       await route.fulfill({ json: saved[0] });
     } else await route.fulfill({ json: saved });
   });
-  await page.goto('/');
+  await page.goto('/admin');
   await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await page.getByLabel('Buscar fuente').fill('InfoJobs');
   await page.getByRole('button', { name: 'Conectar', exact: true }).click();
@@ -69,7 +69,7 @@ test('guided setup needs no actor IDs or JSON and saves a server plan', async ({
     accepted = true;
     await route.fulfill({ json: { id: 'guided-test' } });
   });
-  await page.goto('/');
+  await page.goto('/admin');
   await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await page.getByLabel('Buscar fuente').fill('InfoJobs');
   await page.getByRole('button', { name: 'Conectar', exact: true }).click();
@@ -95,7 +95,7 @@ test('offer AI analysis displays persisted result and token usage', async ({ pag
   await page.route('**/api/backend/search-runs/run-ui', route => route.fulfill({ json: run }));
   await page.route('**/api/backend/ai/jobs/job-ui', route => route.fulfill({ json: requested ? analysis : null }));
   await page.route('**/api/backend/ai/analyses', route => { requested = true; return route.fulfill({ json: analysis }); });
-  await page.goto('/');
+  await page.goto('/admin');
   await page.getByRole('button', { name: 'Historial', exact: true }).click();
   await page.locator('.history-row').first().click();
   await page.getByRole('button', { name: 'Closer digital', exact: true }).click();
@@ -119,7 +119,7 @@ test('Groq is visible and switching provider never carries the typed key', async
       await route.fulfill({ json: { ...config, ...body, has_token: false } });
     } else await route.fulfill({ json: config });
   });
-  await page.goto('/');
+  await page.goto('/admin');
   await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await page.getByText('Motor de IA · Groq', { exact: false }).first().click();
   await expect(page.getByLabel('Proveedor de IA')).toHaveValue('groq');
@@ -155,7 +155,7 @@ test('daily collection budget controls are separate from saved catalog search', 
     }
     return route.fulfill({ json: [] });
   });
-  await page.goto('/');
+  await page.goto('/admin');
   await expect(page.getByText('6 en catálogo')).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Publicación', exact: true })).toHaveValue('10');
   await page.getByRole('button', { name: 'Buscar oportunidades', exact: true }).click();

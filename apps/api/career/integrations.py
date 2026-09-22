@@ -14,7 +14,7 @@ from .sources import (CATALOG_BY_CODE, ConnectionInput, _save_connection, apify_
                       read_token, secret_path)
 
 router = APIRouter(prefix="/v1")
-KEYWORDS = ["closer de ventas", "closer digital", "high ticket closer", "appointment setter", "setter", "comercial digital", "cerrador", "venta de alto valor"]
+KEYWORDS = ["closer de ventas", "closer digital", "high ticket closer", "appointment setter", "setter", "cold caller", "llamadas en frío", "comercial digital", "cerrador", "venta de alto valor"]
 PREFERRED = {"infojobs": "haketa/infojobs-scraper", "computrabajo": "haketa/computrabajo-scraper", "linkedin": "curious_coder/linkedin-jobs-scraper", "workana": "automation-lab/workana-freelance-projects-scraper", "getonbrd": "scrapers_lat/getonbrd-scraper"}
 FIELDS = {
     "title": ["title", "jobTitle", "position", "job_title"],

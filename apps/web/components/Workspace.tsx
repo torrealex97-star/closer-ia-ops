@@ -13,7 +13,7 @@ type Job = components['schemas']['Job'];
 type Config = components['schemas']['Configuration'];
 type Saved = components['schemas']['SavedSearch'];
 const defaults: Query = { role: 'digital_sales', keywords: '', market: 'any', language: 'es', require_spanish: true, work_mode: 'remote_hybrid', days: 10, salary_min: 0, salary_currency: 'EUR', salary_mode: 'prefer', include_unknown: true, sources: ['himalayas', 'weworkremotely', 'remotive', 'remoteok', 'arbeitnow', 'getonbrd-public'] };
-const roles = { digital_sales: 'Closers, setters y comercial online', sales: 'Ventas · búsqueda amplia', closer: 'Closer de ventas', setter: 'Appointment setter', sdr: 'SDR / BDR', account_executive: 'Account executive', custom: 'Otro puesto' };
+const roles = { digital_sales: 'Closers, setters y comercial online', sales: 'Ventas · búsqueda amplia', closer: 'Closer de ventas', setter: 'Appointment setter', cold_caller: 'Cold Caller', sdr: 'SDR / BDR', account_executive: 'Account executive', custom: 'Otro puesto' };
 const statuses: Record<string, string> = { queued: 'En cola', running: 'Buscando', completed: 'Completada', partial: 'Resultados parciales', failed: 'No disponible', cancelled: 'Cancelada' };
 const date = (value?: string | null) => value ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(value)) : 'Fecha sin confirmar';
 const active = (run: Run | null) => !!run && ['queued', 'running'].includes(run.status);

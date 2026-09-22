@@ -19,3 +19,30 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .collection-panel > button { display: inline-flex; align-items: center; gap: 8px; }
 .collection-panel details { margin-top: 16px; }
 .collection-panel .panel-title { flex-wrap: wrap; gap: 8px; }
+
+/* Student decisions: company and remuneration lead; operational controls live in /admin. */
+.student-tag,.student-freshness{font-size:12px;color:var(--secondary)}
+.student-search{margin-bottom:32px}
+.student-preferences{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:20px;color:var(--secondary);font-size:12px}
+.student-results{margin-top:32px}
+.opportunity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.opportunity-card{background:var(--sheet);border:1px solid var(--line);border-radius:var(--radius);padding:24px;display:flex;flex-direction:column;min-width:0}
+.opportunity-company{display:flex;align-items:center;gap:12px}
+.opportunity-company>div:nth-child(2){flex:1;min-width:0}
+.opportunity-company p{font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.opportunity-company span{display:block;color:var(--accent);font-size:13px;font-weight:600;margin-top:4px}
+.opportunity-pay{margin:24px 0;padding:20px;background:var(--accent-soft);border-radius:8px}
+.opportunity-pay>span{font-size:9px;letter-spacing:1.2px;color:var(--accent);font-weight:650}
+.opportunity-pay h3{font-size:20px;font-weight:600;line-height:1.4;margin:8px 0;text-wrap:pretty;overflow-wrap:anywhere}
+.opportunity-pay p{font-size:11px;color:var(--secondary);line-height:1.5}
+.opportunity-facts{display:grid;gap:16px;margin:0 0 24px}
+.opportunity-facts dt{font-size:10px;color:var(--secondary);margin-bottom:4px}
+.opportunity-facts dd{display:flex;gap:6px;align-items:baseline;margin:0;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.opportunity-footer{margin-top:auto;display:flex;align-items:end;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line)}
+.opportunity-footer small,.opportunity-footer a{display:block;color:var(--secondary);font-size:10px}
+.opportunity-footer a{margin-top:4px;text-underline-offset:3px}
+.opportunity-footer button{white-space:nowrap}
+.student-shell .footnote{margin-top:28px}
+.student-shell .sidebar-note{padding-top:40px}
+@media(max-width:1100px){.opportunity-grid{grid-template-columns:1fr}.student-tag{display:none}}
+@media(max-width:700px){.opportunity-card{padding:20px}.opportunity-pay{padding:16px}.opportunity-footer{flex-wrap:wrap}.student-freshness{display:none}.student-shell .page-heading h1{font-size:36px}.student-preferences{gap:12px}.student-preferences .check-label{font-size:11px}.student-shell .topbar{min-height:56px}}

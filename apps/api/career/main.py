@@ -38,6 +38,8 @@ app.include_router(integrations_router)
 app.include_router(ai_router)
 from .collection import router as collection_router  # noqa: E402
 app.include_router(collection_router)
+from .opportunities import router as opportunities_router  # noqa: E402
+app.include_router(opportunities_router)
 
 
 @app.get("/health/live")

@@ -297,6 +297,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/opportunities/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search */
+        post: operations["search_v1_opportunities_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -725,6 +742,86 @@ export interface components {
              */
             starred: boolean;
         };
+        /** Opportunity */
+        Opportunity: {
+            /** Id */
+            id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "closer" | "setter" | "cold_caller";
+            /** Role Label */
+            role_label: string;
+            /** Original Title */
+            original_title: string;
+            /** Company */
+            company: string;
+            /** Compensation */
+            compensation: string;
+            /** Compensation Note */
+            compensation_note: string;
+            /** Modality */
+            modality: string;
+            /** Location */
+            location: string;
+            /** Language */
+            language: string;
+            /** Experience */
+            experience: string;
+            /** Schedule */
+            schedule: string;
+            /** Contract */
+            contract: string;
+            /** Description */
+            description: string;
+            /** Published At */
+            published_at: string | null;
+            /** Expires At */
+            expires_at: string;
+            /** Source Name */
+            source_name: string;
+            /** Source Url */
+            source_url: string;
+            /** Starred */
+            starred: boolean;
+        };
+        /** OpportunityList */
+        OpportunityList: {
+            /** Items */
+            items: components["schemas"]["Opportunity"][];
+            /** Total */
+            total: number;
+        };
+        /** OpportunityQuery */
+        OpportunityQuery: {
+            /**
+             * Role
+             * @default closer
+             */
+            role: ("closer" | "setter" | "cold_caller") | null;
+            /**
+             * Market
+             * @default any
+             * @enum {string}
+             */
+            market: "any" | "ES" | "EU" | "LATAM" | "US";
+            /**
+             * Days
+             * @default 10
+             */
+            days: number;
+            /**
+             * Include Bilingual
+             * @default false
+             */
+            include_bilingual: boolean;
+            /**
+             * Starred Only
+             * @default false
+             */
+            starred_only: boolean;
+        };
         /** PrepareSource */
         PrepareSource: {
             /**
@@ -773,7 +870,7 @@ export interface components {
              * @default sales
              * @enum {string}
              */
-            role: "digital_sales" | "sales" | "closer" | "setter" | "sdr" | "account_executive" | "custom";
+            role: "digital_sales" | "sales" | "closer" | "setter" | "cold_caller" | "sdr" | "account_executive" | "custom";
             /**
              * Keywords
              * @default
@@ -1626,6 +1723,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CollectionStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_v1_opportunities_search_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpportunityQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityList"];
                 };
             };
             /** @description Validation Error */

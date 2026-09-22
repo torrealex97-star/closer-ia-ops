@@ -47,7 +47,7 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
     if (!connection && !advanced) { setForm(null); setWizard(source); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     setWizard(null);
     const value: Input = connection ? { ...fresh(), ...connection, token: '', clear_token: false } : { ...fresh(), source, name: config.sources.find(s => s.code === source)?.name || 'Mi fuente', actor_id: presets[source] || '' };
-    if (!connection && source === 'infojobs') { value.actor_input = { keywords: ['closer de ventas', 'closer digital', 'high ticket closer', 'appointment setter', 'setter', 'comercial digital', 'cerrador', 'venta de alto valor'], onlyTeleworking: true, maxItems: 100 }; value.mapping = { ...mapping, company: 'company', locations: 'city', published_at: 'publishedAt', work_mode: 'teleworking' }; }
+    if (!connection && source === 'infojobs') { value.actor_input = { keywords: ['closer de ventas', 'closer digital', 'high ticket closer', 'appointment setter', 'setter', 'cold caller', 'llamadas en frío', 'comercial digital', 'cerrador', 'venta de alto valor'], onlyTeleworking: true, maxItems: 100 }; value.mapping = { ...mapping, company: 'company', locations: 'city', published_at: 'publishedAt', work_mode: 'teleworking' }; }
     setForm(value); setEditing(connection?.id || null); setUrls((value.urls || []).join('\n'));
     setInputJSON(JSON.stringify(value.actor_input || {}, null, 2)); setMappingJSON(JSON.stringify(value.mapping || mapping, null, 2)); setError(''); setMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });

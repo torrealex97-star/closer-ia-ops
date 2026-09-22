@@ -10,13 +10,14 @@ from .db import connect, now, uid
 from .models import Job, SearchQuery
 
 ALIASES = {
+    "cold_caller": ["cold caller", "cold calling", "llamadas en frio", "prospector telefonico", "prospectora telefonica"],
     "closer": ["closer", "cerrador", "cerradora", "venta de alto valor", "ventas de alto valor", "closing specialist", "enrollment advisor", "enrollment specialist", "sales consultant"],
     "setter": ["appointment setter", "appoitment setter", "appointment setting", "agendador", "agendadora", "booking specialist", "lead qualifier", "dm setter", "outbound setter", "setter"],
     "sdr": ["sdr", "bdr", "sales development", "business development representative", "cold caller"],
     "account_executive": ["account executive", "ejecutivo comercial", "ejecutivo de ventas", "comercial digital", "asesor comercial", "asesora comercial"],
 }
 ALIASES["sales"] = list(dict.fromkeys(sum(ALIASES.values(), []) + ["sales", "ventas", "comercial", "business development"]))
-ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ["comercial", "asesor de ventas", "asesora de ventas"]))
+ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ALIASES["cold_caller"] + ["comercial", "asesor de ventas", "asesora de ventas"]))
 LATAM = {"mexico", "méxico", "argentina", "colombia", "chile", "peru", "perú", "ecuador", "uruguay", "paraguay", "bolivia", "venezuela", "costa rica", "panama", "panamá", "guatemala", "honduras", "el salvador", "nicaragua", "dominican republic", "república dominicana", "brazil", "brasil", "latin america", "latam"}
 
 
@@ -203,13 +204,9 @@ def match(item: dict, query: SearchQuery):
             warnings.append("Países permitidos sin confirmar: remoto no implica global")
     elif not locations:
         warnings.append("La fuente no especifica países permitidos")
-    spanish_mention = bool(re.search(r"\b(spanish(?:[- ]speaking)?|espanol|castellano|hispanohablante)\b", text))
-    # Shared Portuguese words (experiencia, clientes, requisitos) aren't evidence of Spanish.
-    spanish_text = len(set(re.findall(r"\b(?:ventas|ofrecemos|equipo|remuneracion|comisiones|trabajar|puesto|funciones|formacion)\b", text))) >= 2
-    spanish_negative = bool(re.search(r"\b(?:english only|solo ingles|spanish (?:is )?not (?:required|needed)|no (?:se )?requiere espanol)\b", text))
-    spanish_evidence = (spanish_mention or spanish_text) and not spanish_negative
     if query.require_spanish:
-        if not spanish_evidence:
+        from .presentation import language_evidence
+        if not language_evidence(item['description'])['eligible']:
             return None
         reasons.append("Oferta redactada en español o con español mencionado")
         warnings.append("Confirmar idioma de trabajo y nivel de inglés si es bilingüe")
