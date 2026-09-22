@@ -66,6 +66,9 @@ async def execute(run_id, organization, query, registry=None):
 
 async def main():
     initialize()
+    from .ai import ai_loop
+    ai_task = asyncio.create_task(ai_loop())
+    ai_task.add_done_callback(lambda task: task.result() if not task.cancelled() else None)
     # Single consumer in local mode. Restarts replay idempotently from the durable queue.
     with connect() as db:
         db.execute("UPDATE search_runs SET status='queued' WHERE status='running'")

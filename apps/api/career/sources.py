@@ -12,8 +12,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from .connectors import Candidate, ProviderError, REGISTRY
-from .db import ROOT, connect, org, uid
+from .db import ROOT, connect, org, uid, now
 from .pipeline import normalize_mapped
+
+APIFY_BASE = "https://api.apify.com/v2/"
 
 router = APIRouter(prefix="/v1")
 # These are discovery routes, not assertions that every site is scrapeable anonymously.
@@ -63,6 +65,8 @@ class ConnectionInput(BaseModel):
     url_format: str = Field(default="objects", pattern=r"^(objects|strings|single)$")
     actor_input: dict = Field(default_factory=dict)
     mapping: dict[str, str] = Field(default_factory=lambda: dict(DEFAULT_MAPPING))
+    build: str = Field(default="latest", pattern=r"^[a-zA-Z0-9_.-]{1,80}$")
+    auto_mapping: bool = False
     max_items: int = Field(default=100, ge=1, le=500)
     max_charge_usd: float = Field(default=1, ge=0.1, le=10)
 
@@ -138,7 +142,7 @@ def connections(organization):
 
 
 def public_connection(value, organization):
-    return {**value, "has_token": bool(read_token(organization, value["id"]))}
+    return {**value, "has_token": bool(connection_token(organization, value["id"]))}
 
 
 @router.get("/source-connections")
@@ -163,6 +167,11 @@ def _save_connection(connection_id, body, new=False):
     if previous.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
         raise HTTPException(409, "Comprueba la ejecución pendiente antes de modificar esta conexión")
     value = {**previous, **body.model_dump(exclude={"token", "clear_token"}), "id": connection_id}
+    if previous.get("dataset_id") != body.dataset_id or previous.get("actor_id") != body.actor_id:
+        for key in ["run_id", "run_status", "actual_cost_usd", "last_completed_at", "last_fingerprint"]:
+            value.pop(key, None)
+    if body.url_format == "single" and len(body.urls) > 1:
+        raise HTTPException(422, "Este proveedor admite un solo enlace por conexión")
     if body.source not in CATALOG_BY_CODE:
         raise HTTPException(422, "Fuente no reconocida")
     if body.token and body.token.get_secret_value():
@@ -180,11 +189,15 @@ def _save_connection(connection_id, body, new=False):
     return public_connection(value, org())
 
 
+def connection_token(organization, connection_id):
+    return read_token(organization, connection_id) or read_token(organization, "account-apify")
+
+
 async def apify_request(method, path, token, *, payload=None, params=None):
     # Fixed host, no redirects, secrets only in Authorization. No retry of billable POST.
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
-            async with client.stream(method, "https://api.apify.com/v2/" + path,
+            async with client.stream(method, APIFY_BASE + path,
                                      headers={"Authorization": "Bearer " + token}, json=payload, params=params) as response:
                 if response.status_code >= 300:
                     raise ProviderError(f"Apify respondió {response.status_code}. Revisa token, ID y permisos en su consola.")
@@ -210,10 +223,16 @@ async def scrape(connection_id: str):
         value = json.loads(row["payload"])
         if value.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
             raise HTTPException(409, "Ya hay una ejecución pendiente. Comprueba su estado.")
-        token = read_token(organization, connection_id)
+        token = connection_token(organization, connection_id)
         if not token or not value["actor_id"] or not value["enabled"]:
             raise HTTPException(422, "Guarda un Actor, token y conexión activa antes de ejecutar")
-        value.update(run_status="STARTING", run_id=None)
+        fingerprint = hashlib.sha256(json.dumps({k: value.get(k) for k in ["actor_id", "actor_input", "urls", "url_field", "url_format", "max_items", "build"]}, sort_keys=True).encode()).hexdigest()
+        if value.get("last_fingerprint") == fingerprint and value.get("last_completed_at"):
+            from datetime import datetime, timezone
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(value["last_completed_at"])).total_seconds()
+            if age < 21600 and value.get("dataset_id"):
+                return {**public_connection(value, organization), "message": "Reutilizamos la extracción de las últimas 6 horas. No se ha lanzado ni cobrado otro scraper."}
+        value.update(run_status="STARTING", run_id=None, last_fingerprint=fingerprint, last_completed_at=None)
         db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=?", (json.dumps(value), connection_id, organization))
     payload = dict(value["actor_input"])
     urls = value["urls"]
@@ -221,7 +240,7 @@ async def scrape(connection_id: str):
         payload[value["url_field"]] = ([{"url": u} for u in urls] if value["url_format"] == "objects" else urls if value["url_format"] == "strings" else urls[0])
     try:
         data = await apify_request("POST", f'acts/{value["actor_id"].replace("/", "~")}/runs', token,
-                                   payload=payload, params={"timeout": 90, "maxItems": value["max_items"], "maxTotalChargeUsd": value["max_charge_usd"]})
+                                   payload=payload, params={"build": value.get("build", "latest"), "timeout": 90, "maxItems": value["max_items"], "maxTotalChargeUsd": value["max_charge_usd"]})
         run = data["data"]
         value.update(run_id=run["id"], run_status=run["status"])
     except Exception:
@@ -235,7 +254,15 @@ async def scrape(connection_id: str):
 @router.post("/source-connections/{connection_id}/check")
 async def check(connection_id: str):
     value = get_connection(connection_id, org())
-    token = read_token(org(), connection_id)
+    token = connection_token(org(), connection_id)
+    original = json.dumps(value)
+    def update_checked():
+        nonlocal original
+        with connect() as db:
+            result = db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=? AND payload=?", (json.dumps(value), connection_id, org(), original))
+            if not result.rowcount:
+                raise HTTPException(409, "La conexión cambió durante la comprobación. Vuelve a comprobar.")
+        original = json.dumps(value)
     try:
         if value.get("run_id"):
             run = (await apify_request("GET", f'actor-runs/{value["run_id"]}', token))["data"]
@@ -243,18 +270,27 @@ async def check(connection_id: str):
             value["actual_cost_usd"] = run.get("usageTotalUsd")
             if run["status"] == "SUCCEEDED":
                 value["dataset_id"] = run["defaultDatasetId"]
-            put_connection(value, org())
+                value["last_completed_at"] = value.get("last_completed_at") or now()
+            update_checked()
             if run["status"] != "SUCCEEDED":
                 return {"connection": public_connection(value, org()), "message": "Estado de Apify: " + run["status"]}
         if not value["dataset_id"]:
             raise ProviderError("Indica un dataset o ejecuta el Actor. Si el lanzamiento quedó incierto, compruébalo en Apify.")
         rows = await apify_request("GET", f'datasets/{value["dataset_id"]}/items', token, params={"limit": 5, "clean": "true"})
+        if not isinstance(rows, list):
+            raise ProviderError("Apify no devolvió una lista de publicaciones. Revisa el dataset.")
+        if value.get("auto_mapping") and rows:
+            from .integrations import infer_mapping
+            value["mapping"] = infer_mapping([r for r in rows if isinstance(r, dict)])
         valid = sum(bool(normalize_mapped(r, value["mapping"])["source_url"]) for r in rows if isinstance(r, dict))
         if rows and not valid:
             raise ProviderError("Hay registros, pero el mapeo de enlace no coincide. Corrige source_url.")
+        update_checked()
         return {"connection": public_connection(value, org()), "message": f"Dataset accesible: {len(rows)} registros de muestra, {valid} con enlace válido. Los filtros de búsqueda se aplican al importar."}
     except ProviderError as exc:
         raise HTTPException(422, str(exc)) from None
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(422, "Apify devolvió un formato inesperado. Revisa el estado en su consola.") from None
 
 
 class ApifyDataset:
@@ -274,14 +310,14 @@ class ApifyDataset:
     async def batches(self, query):
         if not self.value["enabled"] or not self.value["dataset_id"]:
             raise ProviderError("Conexión sin dataset disponible")
-        token = read_token(self.organization, self.code)
+        token = connection_token(self.organization, self.code)
         for offset in range(0, self.value["max_items"], 50):
             rows = await apify_request("GET", f'datasets/{self.value["dataset_id"]}/items', token,
                                         params={"offset": offset, "limit": min(50, self.value["max_items"] - offset), "clean": "true"})
             if not isinstance(rows, list):
                 raise ProviderError("El dataset no contiene una lista de registros")
             batch = []
-            for row in rows:
+            for row in rows[:min(50, self.value["max_items"] - offset)]:
                 if not isinstance(row, dict):
                     continue
                 normalized = self.normalize(row)

@@ -41,8 +41,19 @@ Automatización «Mejora diaria WDC» activa a las 09:00 (hora local), vinculada
 
 ## Próximo incremento
 
+### Entrega de integraciones guiadas e IA — 2026-09-22
+
+- Cuenta Apify compartida desde Fuentes: guardar, comprobar sin ejecutar y desconectar. Asistente por fuente/enlaces/términos, descubrimiento de Actor, inspección de esquema y precio, versión fijada y preparación persistida con caducidad. Configuración avanzada como alternativa cuando el esquema no es compatible.
+- OpenAI conectable desde Fuentes; análisis de una oferta bajo demanda con evidencia literal, requisitos y preguntas. Cola durable, resultados persistidos, caché por contenido/modelo/prompt, consumo de tokens registrado y límite diario. No se incorpora IA al filtrado masivo ni se considera validada su precisión.
+- Eficiencia: 25 resultados y límite solicitado de 1 USD por defecto en asistente; reutilización durante seis horas de extracciones idénticas completadas. IA: 6.000 caracteres de entrada, 600 tokens máximos de salida y 20 solicitudes diarias por defecto. Sin reintentos automáticos de llamadas de pago inciertas.
+- Corregidos estados atascados por datasets inválidos, recuperación accidental del dataset anterior al editar, sobrescrituras de estado concurrentes y pérdida de selección de fuentes. Histórico lee únicamente las columnas necesarias.
+- Migración local aditiva versionada v2 implementada y probada conservando evidencia existente. No equivale a la migración futura a Postgres/RLS.
+- Validación: 40 pruebas backend, cinco Playwright, Ruff y build con TypeScript PASS. Integraciones recorren HTTP real contra servidor de contrato local, API, SQLite y worker; cubren errores, caché, límites, aislamiento y evidencia inventada. Revisión visual en navegador local.
+- Preparación InfoJobs verificada contra metadatos públicos reales de Apify (Actor haketa/infojobs-scraper, build 0.1.1); no se ejecutó scraper ni generación real de pago. Pendiente prueba con credenciales propias WDC. No se usaron secretos de Scalix.
+- Detalles de operación y límites: INTEGRATIONS.md.
+
 1. Medir calidad de consultas Closer España, Setter LATAM y ventas hispanohablantes; mejorar taxonomía con fixtures reales anonimizados. No presentar score como probabilidad.
-2. Extraer esquema local a migraciones versionadas y preparar transición Postgres antes de funciones multiusuario. El aislamiento local actual no equivale a RLS.
+2. Ampliar las migraciones locales versionadas ya incorporadas y preparar transición Postgres antes de funciones multiusuario. El aislamiento local actual no equivale a RLS.
 3. Añadir dedupe conservador entre fuentes y corrección manual; hoy solo hay dedupe por source/external_id.
 4. Validar Actors de InfoJobs/Computrabajo/LinkedIn cuando el operador conecte credenciales. Ampliar plantillas con esquemas comprobados, versionar configuración por búsqueda y mejorar paginación; no dar por operativa una fuente solo por figurar en el catálogo.
 5. Mejorar estabilidad de arranque local y paginación/histórico antes de ampliar módulos.

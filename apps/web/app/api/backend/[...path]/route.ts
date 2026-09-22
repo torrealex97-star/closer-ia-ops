@@ -19,7 +19,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       method: request.method,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.text(),
-      cache: 'no-store', signal: AbortSignal.timeout(20000),
+      cache: 'no-store', signal: AbortSignal.timeout(path[0] === 'source-assistant' ? 55000 : 45000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     for (const name of ['content-type', 'content-disposition']) {

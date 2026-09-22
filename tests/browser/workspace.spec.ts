@@ -37,6 +37,7 @@ test('source setup preloads Spanish keywords, preserves secret and edits URLs', 
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
   await page.getByLabel('Buscar fuente').fill('InfoJobs');
   await page.getByRole('button', { name: 'Conectar', exact: true }).click();
+  await page.getByRole('button', { name: 'Necesito una configuración avanzada' }).click();
   await expect(page.getByLabel('Actor ID', { exact: true })).toHaveValue('haketa/infojobs-scraper');
   await page.getByLabel('Token API de Apify').fill('fake-browser-token');
   await page.getByLabel('Enlaces a scrapear · uno por línea').fill('https://www.infojobs.net/ofertas-trabajo/closer');
@@ -52,4 +53,56 @@ test('source setup preloads Spanish keywords, preserves secret and edits URLs', 
 test('backend proxy rejects other web origins', async ({ request }) => {
   const response = await request.get('/api/backend/config', { headers: { Origin: 'https://example.com' } });
   expect(response.status()).toBe(403);
+});
+
+
+test('guided setup needs no actor IDs or JSON and saves a server plan', async ({ page }) => {
+  await page.route('**/api/backend/source-assistant/prepare', async route => {
+    expect(route.request().postDataJSON().source).toBe('infojobs');
+    expect(route.request().postDataJSON().max_items).toBe(25);
+    await route.fulfill({ json: { id: 'test-plan', actor_title: 'InfoJobs preparado', actor_url: 'https://apify.com/haketa/infojobs-scraper', pricing_model: 'PAY_PER_EVENT', connection: { name: 'InfoJobs', max_items: 25, max_charge_usd: 1 }, message: 'Configuración preparada.' } });
+  });
+  let accepted = false;
+  await page.route('**/api/backend/source-assistant/connect', async route => {
+    expect(route.request().postDataJSON()).toEqual({ plan_id: 'test-plan' });
+    accepted = true;
+    await route.fulfill({ json: { id: 'guided-test' } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
+  await page.getByLabel('Buscar fuente').fill('InfoJobs');
+  await page.getByRole('button', { name: 'Conectar', exact: true }).click();
+  await expect(page.getByLabel('Actor ID', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Input adicional del Actor · JSON')).toHaveCount(0);
+  await page.getByRole('button', { name: '3. Preparar mi fuente' }).click();
+  await expect(page.getByRole('link', { name: 'InfoJobs preparado ↗', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar fuente preparada' }).click();
+  await expect(page.getByRole('region', { name: 'Asistente de fuente' })).toHaveCount(0);
+  expect(accepted).toBe(true);
+  await page.getByText('Motor de IA', { exact: false }).first().click();
+  await expect(page.getByLabel('Clave de OpenAI')).toBeVisible();
+  await expect(page.getByLabel('Análisis nuevos por día (UTC)')).toHaveValue('20');
+});
+
+
+test('offer AI analysis displays persisted result and token usage', async ({ page }) => {
+  const job = { id: 'job-ui', title: 'Closer digital', company: 'Empresa fixture', description: 'Trabajo remoto. Buscamos ventas para nuestro equipo.', source: 'Fixture', source_url: 'https://example.com/jobs/1', application_url: 'https://example.com/jobs/1', locations: ['Spain'], published_at: new Date().toISOString(), salary_min: null, salary_max: null, salary_currency: null, salary_period: null, score: 75, reasons: ['Perfil mencionado'], warnings: [], raw_id: 'raw-ui', captured_at: new Date().toISOString(), provider: 'fixture', starred: false };
+  const run = { id: 'run-ui', query: { role: 'digital_sales', market: 'ES', days: 30 }, status: 'completed', created_at: new Date().toISOString(), sources: [], jobs: [job] };
+  const analysis = { id: 'analysis-ui', status: 'completed', model: 'gpt-4.1-mini', usage: { input_tokens: 400, output_tokens: 90 }, result: { summary: 'Cierre comercial en remoto.', fit: 'alineada', confidence: 'media', requirements: ['Experiencia en ventas'], questions: ['Confirmar comisiones'], evidence: 'Trabajo remoto.' } };
+  let requested = false;
+  await page.route('**/api/backend/search-runs', route => route.fulfill({ json: [{ ...run, jobs: [] }] }));
+  await page.route('**/api/backend/search-runs/run-ui', route => route.fulfill({ json: run }));
+  await page.route('**/api/backend/ai/jobs/job-ui', route => route.fulfill({ json: requested ? analysis : null }));
+  await page.route('**/api/backend/ai/analyses', route => { requested = true; return route.fulfill({ json: analysis }); });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Historial', exact: true }).click();
+  await page.locator('.history-row').first().click();
+  await page.getByRole('button', { name: 'Closer digital', exact: true }).click();
+  await page.getByRole('button', { name: 'Analizar esta oferta con IA' }).click();
+  await expect(page.getByText('Cierre comercial en remoto.')).toBeVisible();
+  await expect(page.getByText(/400 tokens de entrada \/ 90 de salida/)).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar detalle' }).click();
+  await page.getByRole('button', { name: 'Closer digital', exact: true }).click();
+  await expect(page.getByText('Cierre comercial en remoto.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Analizar esta oferta con IA' })).toHaveCount(0);
 });

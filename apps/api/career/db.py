@@ -5,6 +5,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from .migrations import migrate
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -91,6 +92,7 @@ def initialize():
         CREATE INDEX IF NOT EXISTS run_queue ON search_runs(status, created_at);
         CREATE INDEX IF NOT EXISTS run_org ON search_runs(org_id, created_at DESC);
         """)
+        migrate(db)
 
 
 def load_run(run_id: str, organization: str):

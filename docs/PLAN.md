@@ -15,6 +15,8 @@ Cada entrega requiere comportamiento real, pruebas y actualización de STATUS. N
 
 ## Evolución diaria
 
+Avance de la entrega 2: conexión guiada de Apify y análisis individual con OpenAI implementados. Caché y límites de consumo activos; validación de contratos con HTTP local y migraciones SQLite versionadas completadas. Siguiente prioridad: ejecutar una extracción pequeña con claves WDC, medir relevancia sobre muestras hispanas y calibrar mapeos antes de ampliar fuentes. Ver INTEGRATIONS.md y STATUS.md. Roleplays, entrevistas y autoapply siguen en sus fases correspondientes.
+
 Trabajar una mejora pequeña del backlog por ejecución, priorizando fallos reproducibles y utilidad del buscador. Mantener una única línea de trabajo. No consumir servicios de pago, publicar aplicaciones ni contactar terceros sin configuración/autorización. Notificar avances verificables o bloqueos accionables.
 
 ## Proyecto separado

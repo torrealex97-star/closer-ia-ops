@@ -3,6 +3,8 @@ import io
 import json
 import os
 import secrets
+from .integrations import router as integrations_router
+from .ai import router as ai_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.responses import Response
@@ -32,6 +34,8 @@ app = FastAPI(title="Career Platform API", version="0.1.0", lifespan=lifespan,
 
 
 app.include_router(sources_router)
+app.include_router(integrations_router)
+app.include_router(ai_router)
 
 
 @app.get("/health/live")
@@ -74,8 +78,8 @@ def create_search(request: SearchRequest):
 @app.get("/v1/search-runs", response_model=list[SearchRun])
 def history():
     with connect() as db:
-        ids = db.execute("SELECT id FROM search_runs WHERE org_id=? ORDER BY created_at DESC LIMIT 30", (org(),)).fetchall()
-    return [dict(load_run(r["id"], org()), jobs=[]) for r in ids]
+        rows = db.execute("SELECT id,query,status,sources,created_at,completed_at FROM search_runs WHERE org_id=? ORDER BY created_at DESC LIMIT 30", (org(),)).fetchall()
+    return [dict(r, query=json.loads(r["query"]), sources=json.loads(r["sources"]), jobs=[]) for r in rows]
 
 
 @app.get("/v1/search-runs/{run_id}", response_model=SearchRun)
