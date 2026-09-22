@@ -4,6 +4,92 @@
  */
 
 export interface paths {
+    "/v1/source-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connections */
+        get: operations["list_connections_v1_source_connections_get"];
+        put?: never;
+        /** Create Connection */
+        post: operations["create_connection_v1_source_connections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/source-connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Save Connection */
+        patch: operations["save_connection_v1_source_connections__connection_id__patch"];
+        trace?: never;
+    };
+    "/v1/source-connections/{connection_id}/scrape": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scrape */
+        post: operations["scrape_v1_source_connections__connection_id__scrape_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/source-connections/{connection_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check */
+        post: operations["check_v1_source_connections__connection_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/source-connections/{connection_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve */
+        post: operations["resolve_v1_source_connections__connection_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -160,6 +246,68 @@ export interface components {
             /** Sources */
             sources: components["schemas"]["SourceInfo"][];
         };
+        /** ConnectionInput */
+        ConnectionInput: {
+            /** Name */
+            name: string;
+            /**
+             * Source
+             * @default custom
+             */
+            source: string;
+            /**
+             * Actor Id
+             * @default
+             */
+            actor_id: string;
+            /**
+             * Dataset Id
+             * @default
+             */
+            dataset_id: string;
+            /** Token */
+            token?: string | null;
+            /**
+             * Clear Token
+             * @default false
+             */
+            clear_token: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Urls */
+            urls?: string[];
+            /**
+             * Url Field
+             * @default startUrls
+             */
+            url_field: string;
+            /**
+             * Url Format
+             * @default objects
+             */
+            url_format: string;
+            /** Actor Input */
+            actor_input?: {
+                [key: string]: unknown;
+            };
+            /** Mapping */
+            mapping?: {
+                [key: string]: string;
+            };
+            /**
+             * Max Items
+             * @default 100
+             */
+            max_items: number;
+            /**
+             * Max Charge Usd
+             * @default 1
+             */
+            max_charge_usd: number;
+        };
         /** ExportRequest */
         ExportRequest: {
             /** Run Id */
@@ -223,6 +371,11 @@ export interface components {
              */
             starred: boolean;
         };
+        /** ResolveRequest */
+        ResolveRequest: {
+            /** Reviewed Apify Console */
+            reviewed_apify_console: boolean;
+        };
         /** SavedRequest */
         SavedRequest: {
             /** Name */
@@ -244,7 +397,7 @@ export interface components {
              * @default sales
              * @enum {string}
              */
-            role: "sales" | "closer" | "setter" | "sdr" | "account_executive" | "custom";
+            role: "digital_sales" | "sales" | "closer" | "setter" | "sdr" | "account_executive" | "custom";
             /**
              * Keywords
              * @default
@@ -255,7 +408,7 @@ export interface components {
              * @default any
              * @enum {string}
              */
-            market: "any" | "ES" | "LATAM" | "US";
+            market: "any" | "ES" | "EU" | "LATAM" | "US";
             /**
              * Language
              * @default any
@@ -289,8 +442,19 @@ export interface components {
              * @default true
              */
             include_unknown: boolean;
+            /**
+             * Require Spanish
+             * @default false
+             */
+            require_spanish: boolean;
+            /**
+             * Work Mode
+             * @default remote_hybrid
+             * @enum {string}
+             */
+            work_mode: "remote_hybrid" | "remote" | "any";
             /** Sources */
-            sources?: ("himalayas" | "weworkremotely")[];
+            sources?: string[];
         };
         /** SearchRequest */
         SearchRequest: {
@@ -324,6 +488,21 @@ export interface components {
             available: boolean;
             /** Note */
             note: string;
+            /**
+             * Category
+             * @default Internacional
+             */
+            category: string;
+            /**
+             * Website
+             * @default
+             */
+            website: string;
+            /**
+             * Setup Url
+             * @default
+             */
+            setup_url: string;
         };
         /** SourceProgress */
         SourceProgress: {
@@ -383,6 +562,212 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_connections_v1_source_connections_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_connection_v1_source_connections_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_connection_v1_source_connections__connection_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scrape_v1_source_connections__connection_id__scrape_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_v1_source_connections__connection_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_v1_source_connections__connection_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_live_get: {
         parameters: {
             query?: never;

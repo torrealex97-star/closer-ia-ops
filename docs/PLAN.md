@@ -5,7 +5,7 @@ Producto independiente para preparar personas y conectarlas con empresas. WDC es
 ## Entregas incrementales
 
 1. **MVP local operativo (activo):** repositorio, web, API, worker, evidencia original inmutable, búsqueda progresiva en fuentes públicas, filtros verificables, historial, selección, copia y exportación. Pruebas de fallos parciales, persistencia y recorrido en navegador.
-2. **Cobertura para closers:** validar proveedores de LinkedIn, Upwork, Facebook y Skool; ampliar mercados y fuentes, medir oportunidades útiles/coste, fixtures y fallback real. Conectar IA solo donde mejore clasificación medida.
+2. **Cobertura para closers (activa):** priorizar español/bilingüe para alumnas hispanas y puestos remotos o híbridos, incluyendo Europa. Seis feeds públicos, catálogo ampliable y conexiones Apify configurables desde Fuentes. Validar primero InfoJobs, Computrabajo y LinkedIn con credenciales del operador; después Workana, bolsas hispanas, comunidades y empresas. Medir oportunidades útiles/coste y falsos positivos antes de activar más proveedores. Ver SOURCES.md. Conectar IA solo donde mejore clasificación medida.
 3. **Acceso online seguro:** Supabase independiente, organizaciones, membresías, permisos, RLS y despliegue; login para equipo y luego alumnas. Migración del histórico local.
 4. **Portal y matching:** perfiles, programas, preferencias, ofertas seleccionadas, seguimiento de candidaturas y conexión con empresas colaboradoras.
 5. **Preparación:** roleplays con IA, rúbricas por profesión, feedback y simulación de entrevistas; progreso y revisión por mentoras.

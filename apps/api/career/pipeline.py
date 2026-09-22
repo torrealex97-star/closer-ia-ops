@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+import unicodedata
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
@@ -9,12 +10,13 @@ from .db import connect, now, uid
 from .models import Job, SearchQuery
 
 ALIASES = {
-    "closer": ["closer", "closing specialist", "enrollment advisor", "enrollment specialist", "sales consultant"],
-    "setter": ["appointment setter", "appointment setting", "booking specialist", "lead qualifier", "dm setter", "outbound setter", "setter"],
+    "closer": ["closer", "cerrador", "cerradora", "venta de alto valor", "ventas de alto valor", "closing specialist", "enrollment advisor", "enrollment specialist", "sales consultant"],
+    "setter": ["appointment setter", "appoitment setter", "appointment setting", "agendador", "agendadora", "booking specialist", "lead qualifier", "dm setter", "outbound setter", "setter"],
     "sdr": ["sdr", "bdr", "sales development", "business development representative", "cold caller"],
-    "account_executive": ["account executive", "ejecutivo comercial", "ejecutivo de ventas"],
+    "account_executive": ["account executive", "ejecutivo comercial", "ejecutivo de ventas", "comercial digital", "asesor comercial", "asesora comercial"],
 }
 ALIASES["sales"] = list(dict.fromkeys(sum(ALIASES.values(), []) + ["sales", "ventas", "comercial", "business development"]))
+ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ["comercial", "asesor de ventas", "asesora de ventas"]))
 LATAM = {"mexico", "méxico", "argentina", "colombia", "chile", "peru", "perú", "ecuador", "uruguay", "paraguay", "bolivia", "venezuela", "costa rica", "panama", "panamá", "guatemala", "honduras", "el salvador", "nicaragua", "dominican republic", "república dominicana", "brazil", "brasil", "latin america", "latam"}
 
 
@@ -59,6 +61,14 @@ def number(value):
 
 
 def normalize(source, row):
+    if source == "getonbrd-public":
+        attrs = row.get("attributes", {})
+        item = normalize_mapped(row, {"title": "attributes.title", "source_url": "links.public_url", "locations": "attributes.countries", "published_at": "attributes.published_at"})
+        item["description"] = "\n\n".join(plain(attrs.get(key)) for key in ["projects", "functions", "description", "desirable", "benefits"] if attrs.get(key))
+        item["work_mode"] = {"fully_remote": "remote", "remote_local": "remote", "hybrid": "hybrid", "no_remote": "exclusivamente presencial"}.get(attrs.get("remote_modality"), "")
+        # API does not expand company name or salary unit in this response.
+        item["locations"] = [v for v in item["locations"] if v.lower() != "remote"]
+        return item
     if source == "himalayas":
         locations = row.get("locationRestrictions")
         return {
@@ -68,8 +78,19 @@ def normalize(source, row):
             "locations": [str(x) for x in locations] if isinstance(locations, list) else [],
             "published_at": date_value(row.get("pubDate")), "expires_at": date_value(row.get("expiryDate")),
             "salary_min": number(row.get("minSalary")), "salary_max": number(row.get("maxSalary")),
+            "work_mode": "remote",
             "salary_currency": row.get("currency"), "salary_period": row.get("salaryPeriod"),
         }
+    if source in {"remotive", "remoteok", "arbeitnow"}:
+        fields = {
+            "remotive": {"title": "title", "company": "company_name", "description": "description", "source_url": "url", "locations": "candidate_required_location", "published_at": "publication_date"},
+            "remoteok": {"title": "position", "company": "company", "description": "description", "source_url": "url", "locations": "location", "published_at": "date"},
+            "arbeitnow": {"title": "title", "company": "company_name", "description": "description", "source_url": "url", "locations": "location", "published_at": "created_at"},
+        }[source]
+        item = normalize_mapped(row, fields)
+        if source != "arbeitnow" or row.get("remote") is True:
+            item["work_mode"] = "remote"
+        return item
     title = plain(row.get("title"))
     company, _, job_title = title.partition(":")
     region = plain(row.get("region"))
@@ -77,24 +98,58 @@ def normalize(source, row):
         "title": job_title.strip() or title, "company": company if job_title else "Empresa no indicada",
         "description": plain(row.get("description")), "source_url": safe_url(row.get("link")),
         "application_url": safe_url(row.get("link")), "locations": [region] if region else [],
-        "published_at": date_value(row.get("pubDate")), "expires_at": None,
+        "published_at": date_value(row.get("pubDate")), "expires_at": None, "work_mode": "remote",
         "salary_min": None, "salary_max": None, "salary_currency": None, "salary_period": None,
     }
 
 
+
+def folded(text):
+    return "".join(c for c in unicodedata.normalize("NFD", str(text).lower()) if unicodedata.category(c) != "Mn")
+
+
+def normalize_mapped(row, fields):
+    def get(name):
+        value = row
+        for part in fields.get(name, "").split("."):
+            if not isinstance(value, dict) or not part:
+                return None
+            value = value.get(part)
+        return value
+    locations = get("locations")
+    if not isinstance(locations, list):
+        locations = [locations] if isinstance(locations, str) and locations else []
+    return {
+        "title": plain(get("title")), "company": plain(get("company")) or "Empresa no indicada",
+        "description": plain(get("description")), "source_url": safe_url(get("source_url")),
+        "application_url": safe_url(get("application_url")) or safe_url(get("source_url")),
+        "locations": [str(v) for v in locations if isinstance(v, str)],
+        "published_at": date_value(get("published_at")), "expires_at": date_value(get("expires_at")),
+        "work_mode": plain(get("work_mode")),
+        "salary_min": number(get("salary_min")), "salary_max": number(get("salary_max")),
+        "salary_currency": get("salary_currency") if isinstance(get("salary_currency"), str) else None,
+        "salary_period": get("salary_period") if isinstance(get("salary_period"), str) else None,
+    }
+
+
+EUROPE = {"europe", "europa", "european union", "union europea", "eu", "eea", "emea", "spain", "espana", "portugal", "france", "francia", "germany", "alemania", "italy", "italia", "netherlands", "paises bajos", "ireland", "irlanda", "united kingdom", "uk", "reino unido", "belgium", "belgica", "switzerland", "suiza", "austria", "poland", "polonia", "greece", "grecia", "sweden", "suecia", "norway", "noruega", "finland", "finlandia", "denmark", "dinamarca", "romania", "rumania", "czechia", "czech republic", "czech republic", "bulgaria", "croatia", "croacia", "hungary", "hungria", "slovakia", "eslovaquia", "slovenia", "eslovenia", "estonia", "latvia", "letonia", "lithuania", "lituania", "malta", "cyprus", "chipre", "luxembourg", "luxemburgo", "iceland", "islandia", "serbia", "ukraine", "ucrania"}
+
 def match(item: dict, query: SearchQuery):
-    title, body = item["title"].lower(), item["description"].lower()
+    title, body = folded(item["title"]), folded(item["description"])
     terms = ALIASES.get(query.role, [query.keywords.strip().lower()])
     terms = [t for t in terms if t]
     if not terms:
         return None
     def contains(text, term):
         return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
+    if query.role == "digital_sales" and re.search(r"\b(?:director[ae]?|gerente|head|coordinador[ao]?|analista|inteligencia|operations|operaciones)\b", title):
+        if not any(contains(title, term) for term in ALIASES["closer"] + ALIASES["setter"]):
+            return None
     title_match = any(contains(title, term) for term in terms)
     # A passing mention of a sales team is not a sales vacancy. Without an LLM,
     # accept description-only evidence only in explicit hiring language.
     hiring_match = any(re.search(
-        r"\b(?:hiring|seeking|looking for|buscamos|contratamos|puesto de)\b(?:\s+\w+){0,4}\s+"
+        r"\b(?:hiring|seeking|looking for|buscamos|estamos buscando|se busca|necesitamos|contratamos|puesto de)\b(?:\s+\w+){0,4}\s+"
         + re.escape(term) + r"(?!\w)", body[:3000]) for term in terms)
     if not title_match and not hiring_match:
         return None
@@ -104,6 +159,20 @@ def match(item: dict, query: SearchQuery):
     reasons = ["Perfil mencionado en el título" if title_match else "Perfil mencionado en la descripción"]
     warnings = []
     score = 50 if title_match else 25
+    text = title + " " + body
+    work = folded(item.get("work_mode", ""))
+    combined = work + " " + text
+    hybrid = bool(re.search(r"\b(hybrid|hibrid[oa]|semi[ -]?presencial)\b", combined))
+    remote = bool(re.search(r"\b(remote|remot[oa]|teletrabajo|home office|work from home|trabaj[oa] (?:desde casa|online|en linea))\b", combined))
+    negative = bool(re.search(r"\b(no (?:es |se permite |ofrecemos )?(?:remote|remoto|teletrabajo)|not remote|on[ -]?site only|100% presencial|exclusivamente presencial|sin (?:opcion (?:a|de) )?teletrabajo)\b", combined))
+    if work in {"onsite", "on-site", "on_site", "presencial", "no_remote", "in-office"}:
+        negative = True
+    if query.work_mode != "any":
+        if negative or (query.work_mode == "remote" and hybrid) or not (remote or (hybrid and query.work_mode == "remote_hybrid")):
+            return None
+        reasons.append("Modalidad híbrida publicada" if hybrid else "Modalidad remota publicada")
+        if hybrid:
+            warnings.append("Híbrido: requiere presencia física; revisar ciudad y frecuencia")
     current = datetime.now(timezone.utc)
     if item.get("expires_at") and datetime.fromisoformat(item["expires_at"]) < current:
         return None
@@ -118,14 +187,15 @@ def match(item: dict, query: SearchQuery):
         return None
     else:
         warnings.append("Fecha de publicación no confirmada")
-    locations = {v.strip().lower() for v in item["locations"]}
+    locations = {folded(v.strip()) for v in item["locations"]}
     global_scope = bool(locations & {"worldwide", "anywhere in the world", "anywhere", "global"})
     if query.market != "any":
-        accepted = {"ES": {"spain", "españa", "es", "europe", "european union"}, "US": {"united states", "usa", "us"}, "LATAM": LATAM}[query.market]
-        if global_scope or locations & accepted:
+        accepted = {"ES": {"spain", "españa", "es", "europe", "european union"}, "US": {"united states", "usa", "us"}, "LATAM": {folded(v) for v in LATAM}, "EU": EUROPE}[query.market]
+        if global_scope or any(contains(location, folded(country)) for location in locations for country in accepted):
             score += 15
             reasons.append("Ubicación compatible según la fuente")
-        elif locations:
+        elif any(contains(location, country) for location in locations for country in
+                 EUROPE | {folded(v) for v in LATAM} | {"united states", "usa", "us", "canada", "australia", "india", "china", "japan", "south africa"}):
             return None
         elif not query.include_unknown:
             return None
@@ -133,8 +203,19 @@ def match(item: dict, query: SearchQuery):
             warnings.append("Países permitidos sin confirmar: remoto no implica global")
     elif not locations:
         warnings.append("La fuente no especifica países permitidos")
-    if query.language != "any":
-        terms_language = {"es": ["spanish", "español", "castellano"], "en": ["english", "inglés"]}[query.language]
+    spanish_mention = bool(re.search(r"\b(spanish(?:[- ]speaking)?|espanol|castellano|hispanohablante)\b", text))
+    # Shared Portuguese words (experiencia, clientes, requisitos) aren't evidence of Spanish.
+    spanish_text = len(set(re.findall(r"\b(?:ventas|ofrecemos|equipo|remuneracion|comisiones|trabajar|puesto|funciones|formacion)\b", text))) >= 2
+    spanish_negative = bool(re.search(r"\b(?:english only|solo ingles|spanish (?:is )?not (?:required|needed)|no (?:se )?requiere espanol)\b", text))
+    spanish_evidence = (spanish_mention or spanish_text) and not spanish_negative
+    if query.require_spanish:
+        if not spanish_evidence:
+            return None
+        reasons.append("Oferta redactada en español o con español mencionado")
+        warnings.append("Confirmar idioma de trabajo y nivel de inglés si es bilingüe")
+        score += 10
+    if query.language != "any" and not query.require_spanish:
+        terms_language = {"es": ["spanish", "espanol", "castellano"], "en": ["english", "ingles"]}[query.language]
         if any(contains(title + " " + body, term) for term in terms_language):
             reasons.append("Idioma mencionado; revisar el requisito en la oferta")
             score += 5
@@ -171,7 +252,7 @@ def ingest(candidate, connector, query, run_id, organization):
                    (uid(), organization, connector.code, connector.provider, candidate.external_id, digest, serialized, captured))
         raw = db.execute("SELECT id,captured_at FROM raw_items WHERE org_id=? AND source=? AND external_id=? AND content_hash=?",
                          (organization, connector.code, candidate.external_id, digest)).fetchone()
-    item = normalize(connector.code, candidate.payload)
+    item = connector.normalize(candidate.payload) if hasattr(connector, "normalize") else normalize(connector.code, candidate.payload)
     if not item["title"] or not item["source_url"]:
         return False
     matching = match(item, query)
@@ -188,6 +269,7 @@ def ingest(candidate, connector, query, run_id, organization):
         job_id = db.execute("SELECT id FROM jobs WHERE org_id=? AND posting_id=?", (organization, posting_id)).fetchone()["id"]
         score, reasons, warnings = matching
         item.pop("expires_at")
+        item.pop("work_mode", None)
         job = Job(**item, id=job_id, source=connector.name, score=score, reasons=reasons,
                   warnings=warnings, raw_id=raw["id"], captured_at=raw["captured_at"], provider=connector.provider)
         db.execute("INSERT OR REPLACE INTO search_results VALUES(?,?,?,?)", (organization, run_id, job_id, job.model_dump_json()))

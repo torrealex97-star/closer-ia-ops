@@ -16,7 +16,7 @@ class ProviderError(Exception):
     pass
 
 
-async def fetch(url: str, params: dict | None = None) -> str:
+async def fetch(url: str, params: dict | None = None, ttl: int = 900) -> str:
     key = hashlib.sha256((url + json.dumps(params, sort_keys=True)).encode()).hexdigest()
     with connect() as db:
         cached = db.execute("SELECT payload FROM provider_cache WHERE key=? AND expires_at>?", (key, time.time())).fetchone()
@@ -38,7 +38,7 @@ async def fetch(url: str, params: dict | None = None) -> str:
                             raise ProviderError("Respuesta demasiado grande")
                     payload = chunks.decode("utf-8")
                 with connect() as db:
-                    db.execute("INSERT OR REPLACE INTO provider_cache VALUES(?,?,?)", (key, payload, time.time() + 900))
+                    db.execute("INSERT OR REPLACE INTO provider_cache VALUES(?,?,?)", (key, payload, time.time() + ttl))
                 return payload
             except (httpx.HTTPError, UnicodeError) as error:
                 if attempt == 1:
@@ -60,11 +60,12 @@ class Himalayas:
 
     async def batches(self, query: SearchQuery) -> AsyncIterator[list[Candidate]]:
         terms = {
-            "closer": ["closer", "sales consultant", "enrollment"],
+            "digital_sales": ["closer", "setter", "comercial", "cerrador", "venta de alto valor"],
+            "closer": ["closer", "cerrador", "venta de alto valor"],
             "setter": ["appointment setter", "appointment setting"],
             "sdr": ["sales development", "business development representative"],
             "account_executive": ["account executive"],
-            "sales": ["sales", "closer", "appointment setter"],
+            "sales": ["closer", "setter", "comercial digital", "ventas"],
             "custom": [query.keywords],
         }[query.role]
         seen = set()
@@ -110,3 +111,55 @@ class WeWorkRemotely:
 
 
 REGISTRY = {c.code: c for c in [Himalayas(), WeWorkRemotely()]}
+
+
+class PublicJSON:
+    provider = "official_json_v1"
+
+    def __init__(self, code, name, url, key=None, ttl=3600):
+        self.code, self.name, self.url, self.key, self.ttl = code, name, url, key, ttl
+
+    async def batches(self, query):
+        data = json.loads(await fetch(self.url, ttl=self.ttl))
+        rows = data.get(self.key) if self.key and isinstance(data, dict) else data
+        if not isinstance(rows, list):
+            raise ProviderError("El proveedor ha cambiado su formato JSON")
+        batch = []
+        for row in rows[:1500]:
+            if not isinstance(row, dict):
+                continue
+            external_id = row.get("id") or row.get("slug")
+            if external_id:
+                batch.append(Candidate(str(external_id), row))
+            if len(batch) == 50:
+                yield batch
+                batch = []
+        if batch:
+            yield batch
+
+
+for connector in [
+    PublicJSON("remotive", "Remotive", "https://remotive.com/api/remote-jobs", "jobs", 21600),
+    PublicJSON("remoteok", "Remote OK", "https://remoteok.com/api"),
+    PublicJSON("arbeitnow", "Arbeitnow", "https://www.arbeitnow.com/api/job-board-api", "data"),
+]:
+    REGISTRY[connector.code] = connector
+
+
+class GetOnBoard:
+    code = "getonbrd-public"
+    name = "Get on Board"
+    provider = "official_json_v0"
+    url = "https://www.getonbrd.com"
+
+    async def batches(self, query):
+        for page in range(1, 4):
+            data = json.loads(await fetch("https://www.getonbrd.com/api/v0/categories/sales/jobs", {"per_page": 100, "page": page}, ttl=3600))
+            if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+                raise ProviderError("Get on Board ha cambiado su formato")
+            yield [Candidate(str(row["id"]), row) for row in data["data"] if isinstance(row, dict) and row.get("id")]
+            if page >= data.get("meta", {}).get("total_pages", 1):
+                break
+
+
+REGISTRY[GetOnBoard.code] = GetOnBoard()

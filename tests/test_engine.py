@@ -45,7 +45,7 @@ def test_auth_and_empty_state(client):
     assert client.get("/v1/config", headers={"Authorization": ""}).status_code == 401
     assert client.get("/v1/search-runs").json() == []
     assert client.get("/v1/config").json()["mode"] == "local"
-    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 2
+    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 6
 
 
 def test_idempotency_and_conflicting_replay(client):
@@ -180,3 +180,137 @@ def test_provider_contracts(client, candidate, monkeypatch):
     normalized = normalize("weworkremotely", wwr[0].payload)
     assert normalized["company"] == "Company"
     assert normalized["locations"] == ["Anywhere in the World"]
+
+
+def test_spanish_bilingual_europe_and_work_mode(candidate):
+    item = normalize('himalayas', candidate.payload)
+    query = SearchQuery(role='sales', market='EU', require_spanish=True)
+    item['locations'] = ['Berlin, Germany']
+    item['title'] = 'Comercial digital'
+    item['description'] = 'Buscamos experiencia en ventas para nuestro equipo. Trabajo híbrido.'
+    item['work_mode'] = 'hybrid'
+    assert match(item, query)
+    assert match(item, query.model_copy(update={'work_mode': 'remote'})) is None
+    item['description'] = 'English-speaking sales team. On-site only.'
+    item['work_mode'] = 'onsite'
+    assert match(item, query) is None
+    item['description'] = 'Bilingual Spanish and English. Work from home.'
+    item['work_mode'] = ''
+    assert match(item, query)
+    item['description'] = 'English only. Remote.'
+    assert match(item, query) is None
+    item['description'] = 'Remote. Spanish not required.'
+    assert match(item, query) is None
+    item['locations'] = ['United States']
+    item['description'] = 'Spanish-speaking closer. Remote.'
+    assert match(item, query) is None
+
+
+def test_portuguese_is_not_spanish_and_sales_management_is_not_default(candidate):
+    item = normalize('himalayas', candidate.payload)
+    item['title'] = 'Executivo Comercial'
+    item['description'] = 'Buscamos experiência com clientes e requisitos. Trabalho remoto.'
+    assert match(item, SearchQuery(role='digital_sales', require_spanish=True)) is None
+    item['title'] = 'Líder de Equipo de Ventas'
+    item['description'] = 'Dirige nuestro equipo de ventas en remoto.'
+    assert match(item, SearchQuery(role='digital_sales', require_spanish=True)) is None
+    item['title'] = 'Coordinador de inteligencia comercial'
+    assert match(item, SearchQuery(role='digital_sales', require_spanish=True)) is None
+
+
+@pytest.mark.parametrize('title', ['Closer de Ventas', 'Closer digital', 'High Ticket Closer', 'Appoitment Setter', 'Appointment Setter', 'Setter', 'Comercial Digital', 'Cerrador', 'Cerradora', 'Venta de Alto Valor'])
+def test_requested_aliases(candidate, title):
+    item = normalize('himalayas', candidate.payload)
+    item['title'] = title
+    assert match(item, SearchQuery(role='sales', require_spanish=True))
+
+
+def test_sources_secrets_isolation_and_availability(client, monkeypatch):
+    body = {'name': 'InfoJobs prueba', 'source': 'infojobs', 'token': 'fake-unit-secret', 'actor_id': 'user/actor', 'dataset_id': 'unit-dataset', 'urls': ['https://www.infojobs.net/ofertas-trabajo/closer']}
+    response = client.post('/v1/source-connections', json=body)
+    assert response.status_code == 200, response.text
+    value = response.json()
+    assert value['has_token'] and 'fake-unit-secret' not in response.text and '"token"' not in response.text
+    connection_id = value['id']
+    with connect() as db:
+        assert 'fake-unit-secret' not in db.execute('SELECT payload FROM source_connections').fetchone()[0]
+    assert any(s['code'] == connection_id and s['available'] for s in client.get('/v1/config').json()['sources'])
+    run = create(client, {'sources': [connection_id]}, 'configured-run-123')
+    assert run['sources'][0]['name'] == 'InfoJobs prueba'
+    from career.sources import secret_path
+    assert secret_path('org-a', connection_id).stat().st_mode & 0o777 == 0o600
+    monkeypatch.setenv('CAREER_ORG_ID', 'org-b')
+    assert client.get('/v1/source-connections').json() == []
+    assert client.patch('/v1/source-connections/' + connection_id, json=body).status_code == 404
+    assert client.post('/v1/source-connections/' + connection_id + '/check', json={}).status_code == 404
+    assert client.post('/v1/search-runs', json={'query': {'sources': [connection_id]}, 'idempotency_key': 'cross-org-test'}).status_code == 422
+
+
+@pytest.mark.parametrize('patch', [
+    {'urls': ['http://example.com']}, {'urls': ['https://127.0.0.1/private']},
+    {'urls': ['https://example.com?token=secret']}, {'actor_input': {'cookies': 'secret'}},
+    {'mapping': {'source_url': 'url', 'bogus': 'password'}}, {'max_items': 501},
+])
+def test_connection_invalid_input(client, patch):
+    assert client.post('/v1/source-connections', json={'name': 'Bad', **patch}).status_code == 422
+
+
+def test_apify_launch_check_import_and_no_paid_search(client, monkeypatch):
+    from career import sources
+    calls = []
+    async def fake_request(method, path, token, **kwargs):
+        calls.append((method, path, kwargs))
+        assert token == 'fake-unit-secret'
+        if method == 'POST':
+            assert kwargs['payload']['startUrls'] == [{'url': 'https://example.com/jobs'}]
+            assert kwargs['params']['maxTotalChargeUsd'] == 1
+            return {'data': {'id': 'run-test', 'status': 'RUNNING'}}
+        if path.startswith('actor-runs'):
+            return {'data': {'status': 'SUCCEEDED', 'defaultDatasetId': 'dataset-test', 'usageTotalUsd': .01}}
+        return [{'title': 'Closer digital', 'companyName': 'Test', 'description': 'Buscamos experiencia en ventas para nuestro equipo. Trabajo remoto con clientes.', 'url': 'https://example.com/job', 'location': 'Spain', 'postedAt': now(), 'workMode': 'remote'}]
+    monkeypatch.setattr(sources, 'apify_request', fake_request)
+    body = {'name': 'Apify fixture', 'token': 'fake-unit-secret', 'actor_id': 'user/actor', 'urls': ['https://example.com/jobs']}
+    value = client.post('/v1/source-connections', json=body).json()
+    path = '/v1/source-connections/' + value['id']
+    assert client.post(path + '/scrape').status_code == 200
+    assert client.post(path + '/scrape').status_code == 409
+    assert client.patch(path, json=body).status_code == 409
+    check = client.post(path + '/check')
+    assert check.status_code == 200, check.text
+    assert check.json()['connection']['dataset_id'] == 'dataset-test'
+    run = create(client, {'sources': [value['id']], 'require_spanish': True})
+    asyncio.run(execute(run['id'], 'org-a', SearchQuery(**run['query'])))
+    result = load_run(run['id'], 'org-a')
+    assert result['status'] == 'completed' and len(result['jobs']) == 1
+    assert len([c for c in calls if c[0] == 'POST']) == 1  # searching only reads existing data
+    assert client.patch(path, json={**body, 'token': '', 'dataset_id': 'dataset-test'}).json()['has_token']
+    assert not client.patch(path, json={**body, 'token': '', 'clear_token': True}).json()['has_token']
+
+
+def test_uncertain_scrape_is_not_retried(client, monkeypatch):
+    from career import sources
+    async def failed(*args, **kwargs):
+        raise ProviderError('timeout')
+    monkeypatch.setattr(sources, 'apify_request', failed)
+    value = client.post('/v1/source-connections', json={'name': 'Uncertain', 'actor_id': 'user/actor', 'token': 'fake-unit-secret'}).json()
+    path = '/v1/source-connections/' + value['id']
+    assert client.post(path + '/scrape').status_code == 502
+    assert client.post(path + '/scrape').status_code == 409
+    assert client.post(path + '/resolve', json={'reviewed_apify_console': False}).status_code == 409
+    assert client.post(path + '/resolve', json={'reviewed_apify_console': True}).status_code == 200
+
+
+def test_new_public_connector_contracts(client, monkeypatch):
+    from career.connectors import PublicJSON, GetOnBoard
+    async def fake_fetch(url, params=None, ttl=900):
+        if 'getonbrd' in url:
+            return json.dumps({'data': [{'id': 'closer', 'attributes': {'title': 'Closer digital', 'description': 'Buscamos experiencia en ventas para el equipo.', 'remote_modality': 'hybrid', 'countries': ['Chile'], 'published_at': 1789684387}, 'links': {'public_url': 'https://www.getonbrd.com/jobs/test'}}], 'meta': {'total_pages': 1}})
+        return json.dumps({'jobs': [{'id': 1, 'title': 'Closer', 'url': 'https://remotive.com/job/1', 'description': 'Spanish', 'candidate_required_location': 'Spain', 'publication_date': now()}]})
+    monkeypatch.setattr(connectors, 'fetch', fake_fetch)
+    async def collect(c):
+        return [row async for batch in c.batches(SearchQuery()) for row in batch]
+    rows = asyncio.run(collect(GetOnBoard()))
+    item = normalize('getonbrd-public', rows[0].payload)
+    assert item['work_mode'] == 'hybrid' and item['company'] == 'Empresa no indicada'
+    rows = asyncio.run(collect(PublicJSON('remotive', 'Remotive', 'https://remotive.com/api/remote-jobs', 'jobs')))
+    assert normalize('remotive', rows[0].payload)['work_mode'] == 'remote'

@@ -28,12 +28,23 @@ Vista previa en http://127.0.0.1:3100 . Se ejecuta desde una copia temporal por 
 
 Automatización «Mejora diaria WDC» activa a las 09:00 (hora local), vinculada a esta tarea. Requiere entorno local disponible. Una mejora comprobable por ejecución, sin servicios de pago ni publicación/contactos automáticos.
 
+## Ampliación de fuentes — 2026-09-22
+
+- Catálogo de 33 entradas priorizando España/LATAM, Europa, freelance, comunidades y empresas. Seis conectores públicos operativos: Himalayas, WWR, Get on Board, Remotive, Remote OK y Arbeitnow. El catálogo incluye rutas configurables, no 33 scrapers validados.
+- Fuentes permite crear/editar conexiones Apify por organización: token local, Actor/dataset, URLs, Input JSON, mapeo, límites y activación. InfoJobs precarga términos y esquema según documentación del Actor.
+- Ejecución de scraping explícita, bloqueo de duplicados/respuestas inciertas y comprobación de estado/coste. Buscar solo lee el dataset, sin iniciar ejecuciones de pago.
+- Perfil inicial «Closers, setters y comercial online», aliases españoles, filtro de evidencia de español/bilingüe independiente de campos desconocidos y modalidad remota/híbrida. Mercado Europa añadido.
+- Primera búsqueda de calibración: seis fuentes respondieron y produjo 51 resultados; se detectaron falsos positivos en portugués y puestos de dirección. Se corrigió la heurística y se añadió un perfil más específico y regresión. Ese recuento no es el resultado final ni precisión validada.
+- Segunda búsqueda con el perfil específico: 679 publicaciones revisadas en las seis fuentes; 12 resultados (9 Himalayas y 3 Get on Board), en unos 5,3 segundos con caché parcial. Se identificó un coordinador de inteligencia comercial y se añadió exclusión de perfiles de análisis/dirección al perfil inicial. El histórico conserva las capturas originales de cada búsqueda.
+- 34 tests backend, 3 Playwright, build Next/TypeScript y Ruff PASS en la copia sincronizada. Browser verifica edición de enlaces, token no devuelto, plantilla InfoJobs, navegación y viewport móvil. La conexión Apify se prueba con fixtures, no con créditos reales.
+- Documentación de configuración, cobertura, límites y referencias en SOURCES.md. No se añadieron servicios externos de pago ni credenciales de otras empresas.
+
 ## Próximo incremento
 
 1. Medir calidad de consultas Closer España, Setter LATAM y ventas hispanohablantes; mejorar taxonomía con fixtures reales anonimizados. No presentar score como probabilidad.
 2. Extraer esquema local a migraciones versionadas y preparar transición Postgres antes de funciones multiusuario. El aislamiento local actual no equivale a RLS.
 3. Añadir dedupe conservador entre fuentes y corrección manual; hoy solo hay dedupe por source/external_id.
-4. Validar fuentes críticas cuando existan proveedores/credenciales. No aparecen operativas en UI.
+4. Validar Actors de InfoJobs/Computrabajo/LinkedIn cuando el operador conecte credenciales. Ampliar plantillas con esquemas comprobados, versionar configuración por búsqueda y mejorar paginación; no dar por operativa una fuente solo por figurar en el catálogo.
 5. Mejorar estabilidad de arranque local y paginación/histórico antes de ampliar módulos.
 
 ## Pendiente de siguientes fases

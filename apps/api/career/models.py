@@ -4,17 +4,19 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class SearchQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    role: Literal["sales", "closer", "setter", "sdr", "account_executive", "custom"] = "sales"
+    role: Literal["digital_sales", "sales", "closer", "setter", "sdr", "account_executive", "custom"] = "sales"
     keywords: str = Field(default="", max_length=120)
-    market: Literal["any", "ES", "LATAM", "US"] = "any"
+    market: Literal["any", "ES", "EU", "LATAM", "US"] = "any"
     language: Literal["any", "es", "en"] = "any"
     days: int = Field(default=30, ge=1, le=90)
     salary_min: float = Field(default=0, ge=0, le=100000)
     salary_currency: Literal["EUR", "USD"] = "EUR"
     salary_mode: Literal["prefer", "strict"] = "prefer"
     include_unknown: bool = True
-    sources: list[Literal["himalayas", "weworkremotely"]] = Field(
-        default_factory=lambda: ["himalayas", "weworkremotely"], min_length=1, max_length=2
+    require_spanish: bool = False
+    work_mode: Literal["remote_hybrid", "remote", "any"] = "remote_hybrid"
+    sources: list[str] = Field(
+        default_factory=lambda: ["himalayas", "weworkremotely"], min_length=1, max_length=40
     )
 
 
@@ -93,6 +95,9 @@ class SourceInfo(BaseModel):
     name: str
     available: bool
     note: str
+    category: str = "Internacional"
+    website: str = ""
+    setup_url: str = ""
 
 
 class Configuration(BaseModel):

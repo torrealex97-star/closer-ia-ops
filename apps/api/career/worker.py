@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import time
-from .connectors import REGISTRY, ProviderError
+from .connectors import ProviderError
+from .sources import registry as source_registry, ApifyDataset, get_connection
 from .db import connect, initialize, now
 from .models import SearchQuery
 from .pipeline import ingest
@@ -48,7 +49,10 @@ async def run_source(connector, query, run_id, organization):
 
 
 async def execute(run_id, organization, query, registry=None):
-    registry = registry or REGISTRY
+    registry = registry or source_registry(organization)
+    for code in query.sources:
+        if code not in registry:
+            registry[code] = ApifyDataset(get_connection(code, organization), organization)
     await asyncio.gather(*(run_source(registry[code], query, run_id, organization) for code in dict.fromkeys(query.sources)))
     with connect() as db:
         row = db.execute("SELECT sources,status FROM search_runs WHERE id=? AND org_id=?", (run_id, organization)).fetchone()

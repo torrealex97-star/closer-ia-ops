@@ -5,6 +5,298 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/v1/source-connections": {
+      "get": {
+        "summary": "List Connections",
+        "operationId": "list_connections_v1_source_connections_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Connection",
+        "operationId": "create_connection_v1_source_connections_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/source-connections/{connection_id}": {
+      "patch": {
+        "summary": "Save Connection",
+        "operationId": "save_connection_v1_source_connections__connection_id__patch",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Connection Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/source-connections/{connection_id}/scrape": {
+      "post": {
+        "summary": "Scrape",
+        "operationId": "scrape_v1_source_connections__connection_id__scrape_post",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Connection Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/source-connections/{connection_id}/check": {
+      "post": {
+        "summary": "Check",
+        "operationId": "check_v1_source_connections__connection_id__check_post",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Connection Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/source-connections/{connection_id}/resolve": {
+      "post": {
+        "summary": "Resolve",
+        "operationId": "resolve_v1_source_connections__connection_id__resolve_post",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Connection Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "summary": "Health",
@@ -504,6 +796,111 @@
         ],
         "title": "Configuration"
       },
+      "ConnectionInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Source",
+            "default": "custom"
+          },
+          "actor_id": {
+            "type": "string",
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_~/-]*$",
+            "title": "Actor Id",
+            "default": ""
+          },
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]*$",
+            "title": "Dataset Id",
+            "default": ""
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "clear_token": {
+            "type": "boolean",
+            "title": "Clear Token",
+            "default": false
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Urls"
+          },
+          "url_field": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+            "title": "Url Field",
+            "default": "startUrls"
+          },
+          "url_format": {
+            "type": "string",
+            "pattern": "^(objects|strings|single)$",
+            "title": "Url Format",
+            "default": "objects"
+          },
+          "actor_input": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Actor Input"
+          },
+          "mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Mapping"
+          },
+          "max_items": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Items",
+            "default": 100
+          },
+          "max_charge_usd": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.1,
+            "title": "Max Charge Usd",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ConnectionInput"
+      },
       "ExportRequest": {
         "properties": {
           "run_id": {
@@ -698,6 +1095,19 @@
         ],
         "title": "Job"
       },
+      "ResolveRequest": {
+        "properties": {
+          "reviewed_apify_console": {
+            "type": "boolean",
+            "title": "Reviewed Apify Console"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviewed_apify_console"
+        ],
+        "title": "ResolveRequest"
+      },
       "SavedRequest": {
         "properties": {
           "name": {
@@ -744,6 +1154,7 @@
           "role": {
             "type": "string",
             "enum": [
+              "digital_sales",
               "sales",
               "closer",
               "setter",
@@ -765,6 +1176,7 @@
             "enum": [
               "any",
               "ES",
+              "EU",
               "LATAM",
               "US"
             ],
@@ -818,16 +1230,27 @@
             "title": "Include Unknown",
             "default": true
           },
+          "require_spanish": {
+            "type": "boolean",
+            "title": "Require Spanish",
+            "default": false
+          },
+          "work_mode": {
+            "type": "string",
+            "enum": [
+              "remote_hybrid",
+              "remote",
+              "any"
+            ],
+            "title": "Work Mode",
+            "default": "remote_hybrid"
+          },
           "sources": {
             "items": {
-              "type": "string",
-              "enum": [
-                "himalayas",
-                "weworkremotely"
-              ]
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 2,
+            "maxItems": 40,
             "minItems": 1,
             "title": "Sources"
           }
@@ -925,6 +1348,21 @@
           "note": {
             "type": "string",
             "title": "Note"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": "Internacional"
+          },
+          "website": {
+            "type": "string",
+            "title": "Website",
+            "default": ""
+          },
+          "setup_url": {
+            "type": "string",
+            "title": "Setup Url",
+            "default": ""
           }
         },
         "type": "object",

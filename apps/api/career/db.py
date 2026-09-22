@@ -81,6 +81,10 @@ def initialize():
         CREATE TABLE IF NOT EXISTS saved_searches (
           id TEXT PRIMARY KEY, org_id TEXT NOT NULL, name TEXT NOT NULL, query TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS source_connections (
+          id TEXT NOT NULL, org_id TEXT NOT NULL, payload TEXT NOT NULL,
+          PRIMARY KEY(org_id, id)
+        );
         CREATE TABLE IF NOT EXISTS provider_cache (
           key TEXT PRIMARY KEY, payload TEXT NOT NULL, expires_at REAL NOT NULL
         );

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowUpRight, Bookmark, Check, CheckCheck, ChevronRight, CircleHelp, Clock3, Compass, Copy, ExternalLink, Globe2, Layers3, LoaderCircle, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import Sources from './Sources';
 import type { components } from '../../../packages/contracts/api';
 
 type Query = components['schemas']['SearchQuery'];
@@ -9,8 +10,8 @@ type Run = components['schemas']['SearchRun'];
 type Job = components['schemas']['Job'];
 type Config = components['schemas']['Configuration'];
 type Saved = components['schemas']['SavedSearch'];
-const defaults: Query = { role: 'closer', keywords: '', market: 'any', language: 'any', days: 30, salary_min: 0, salary_currency: 'EUR', salary_mode: 'prefer', include_unknown: true, sources: ['himalayas', 'weworkremotely'] };
-const roles = { sales: 'Ventas · todos los perfiles', closer: 'Closer de ventas', setter: 'Appointment setter', sdr: 'SDR / BDR', account_executive: 'Account executive', custom: 'Otro puesto' };
+const defaults: Query = { role: 'digital_sales', keywords: '', market: 'any', language: 'es', require_spanish: true, work_mode: 'remote_hybrid', days: 30, salary_min: 0, salary_currency: 'EUR', salary_mode: 'prefer', include_unknown: true, sources: ['himalayas', 'weworkremotely', 'remotive', 'remoteok', 'arbeitnow', 'getonbrd-public'] };
+const roles = { digital_sales: 'Closers, setters y comercial online', sales: 'Ventas · búsqueda amplia', closer: 'Closer de ventas', setter: 'Appointment setter', sdr: 'SDR / BDR', account_executive: 'Account executive', custom: 'Otro puesto' };
 const statuses: Record<string, string> = { queued: 'En cola', running: 'Buscando', completed: 'Completada', partial: 'Resultados parciales', failed: 'No disponible', cancelled: 'Cancelada' };
 const date = (value?: string | null) => value ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(value)) : 'Fecha sin confirmar';
 const active = (run: Run | null) => !!run && ['queued', 'running'].includes(run.status);
@@ -53,7 +54,7 @@ export default function Workspace() {
 
   useEffect(() => {
     Promise.all([api<Config>('config'), api<Run[]>('search-runs'), api<Saved[]>('saved-searches')])
-      .then(([c, h, s]) => { setConfig(c); setHistory(h); setSaved(s); })
+      .then(([c, h, s]) => { setConfig(c); setQuery(old => ({ ...old, sources: c.sources.filter(source => source.available).map(source => source.code) })); setHistory(h); setSaved(s); })
       .catch(e => setError(e.message));
   }, []);
   useEffect(() => {
@@ -153,25 +154,25 @@ export default function Workspace() {
         {notice && <div className="toast" role="status"><CheckCheck size={18} />{notice}</div>}
         {tab === 'search' && <>
           <form className="search-panel" onSubmit={e => { e.preventDefault(); search(); }}>
-            <div className="panel-title"><span><Search size={17} /> ¿Qué oportunidad buscas?</span><span className="muted">Ofertas remotas</span></div>
+            <div className="panel-title"><span><Search size={17} /> ¿Qué oportunidad buscas?</span><span className="muted">Español · online o híbrido</span></div>
             <div className="search-grid">
               <label>Perfil profesional<select value={query.role} onChange={e => update('role', e.target.value as Query['role'])}>{Object.entries(roles).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></label>
-              <label>Mercado<select value={query.market} onChange={e => update('market', e.target.value as Query['market'])}><option value="any">Todos los mercados</option><option value="ES">España</option><option value="LATAM">Latinoamérica</option><option value="US">Estados Unidos</option></select></label>
+              <label>Mercado<select value={query.market} onChange={e => update('market', e.target.value as Query['market'])}><option value="any">Todos los mercados</option><option value="ES">España</option><option value="EU">Europa · cualquier país</option><option value="LATAM">Latinoamérica</option><option value="US">Estados Unidos</option></select></label>
               <label>Publicación<select value={query.days} onChange={e => update('days', Number(e.target.value))}><option value={3}>Últimas 72 horas</option><option value={7}>Últimos 7 días</option><option value={30}>Últimos 30 días</option><option value={90}>Últimos 90 días</option></select></label>
               <button className="primary search-button" disabled={busy || active(run) || !config || !query.sources?.length}>{busy || active(run) ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}{active(run) ? 'Buscando…' : 'Buscar oportunidades'}</button>
             </div>
             <div className="search-bottom"><details className="advanced"><summary><SlidersHorizontal size={15} /> Afinar búsqueda</summary><div className="advanced-grid">
               <label>Palabras clave<input value={query.keywords} maxLength={120} placeholder="Ej. high ticket, SaaS…" onChange={e => update('keywords', e.target.value)} /></label>
               <label>Idioma mencionado<select value={query.language} onChange={e => update('language', e.target.value as Query['language'])}><option value="any">Cualquier idioma</option><option value="es">Español</option><option value="en">Inglés</option></select></label>
-              <label>Mínimo mensual<input type="number" min={0} max={100000} value={query.salary_min} onChange={e => update('salary_min', Number(e.target.value))} /></label>
+              <label>Modalidad<select value={query.work_mode} onChange={e => update('work_mode', e.target.value as Query['work_mode'])}><option value="remote_hybrid">Remoto o híbrido publicado</option><option value="remote">Solo remoto publicado</option><option value="any">Cualquier modalidad</option></select></label><label className="check-label"><input type="checkbox" checked={query.require_spanish} onChange={e => update('require_spanish', e.target.checked)} />Exigir evidencia de español (incluye bilingües)</label><label>Mínimo mensual<input type="number" min={0} max={100000} value={query.salary_min} onChange={e => update('salary_min', Number(e.target.value))} /></label>
               <label>Moneda<select value={query.salary_currency} onChange={e => update('salary_currency', e.target.value as Query['salary_currency'])}><option>EUR</option><option>USD</option></select></label>
               <label>Compensación<select value={query.salary_mode} onChange={e => update('salary_mode', e.target.value as Query['salary_mode'])}><option value="prefer">Preferencia, admite sin confirmar</option><option value="strict">Exigir mínimo publicado</option></select></label>
-              <label className="check-label"><input type="checkbox" checked={query.include_unknown} onChange={e => update('include_unknown', e.target.checked)} />Incluir país, fecha o idioma sin confirmar</label>
-              <fieldset><legend>Fuentes</legend>{config?.sources.filter(s => s.available).map(s => <label className="check-label" key={s.code}><input type="checkbox" checked={query.sources?.includes(s.code as 'himalayas' | 'weworkremotely')} onChange={e => update('sources', e.target.checked ? [...(query.sources || []), s.code as 'himalayas' | 'weworkremotely'] : query.sources?.filter(v => v !== s.code))} />{s.name}</label>)}</fieldset>
-            </div></details><span className="source-caption"><span className="status-dot" />{query.sources?.length || 0} fuentes públicas seleccionadas</span></div>
+              <label className="check-label"><input type="checkbox" checked={query.include_unknown} onChange={e => update('include_unknown', e.target.checked)} />Incluir país o fecha sin confirmar</label>
+              <fieldset><legend>Fuentes</legend>{config?.sources.filter(s => s.available).map(s => <label className="check-label" key={s.code}><input type="checkbox" checked={query.sources?.includes(s.code)} onChange={e => update('sources', e.target.checked ? [...(query.sources || []), s.code] : query.sources?.filter(v => v !== s.code))} />{s.name}</label>)}</fieldset>
+            </div></details><span className="source-caption"><span className="status-dot" />{query.sources?.length || 0} fuentes seleccionadas</span></div>
             {query.role === 'custom' && !query.keywords && <p className="inline-hint">Escribe el puesto en «Afinar búsqueda → Palabras clave».</p>}
           </form>
-          <div className="saved-strip"><Bookmark size={15} /><span>Repetir búsqueda:</span>{saved.slice(0, 4).map(s => <button key={s.id} onClick={() => { setQuery(s.query); setNotice('Filtros cargados. Pulsa Buscar oportunidades.'); }}>{s.name}</button>)}<details><summary>Guardar estos filtros <span>+</span></summary><div className="save-form"><label>Nombre<input value={saveName} maxLength={80} onChange={e => setSaveName(e.target.value)} placeholder="Ej. Closers España" /></label><button type="button" onClick={saveSearch} disabled={!saveName.trim()}>Guardar</button></div></details></div>
+          <p className="inline-hint">Incluye closer de ventas, closer digital, high ticket closer, appointment setter, setter, comercial digital, cerrador y venta de alto valor. Español/bilingüe con evidencia; remoto o híbrido con modalidad publicada.</p><div className="saved-strip"><Bookmark size={15} /><span>Repetir búsqueda:</span>{saved.slice(0, 4).map(s => <button key={s.id} onClick={() => { setQuery(s.query); setNotice('Filtros cargados. Pulsa Buscar oportunidades.'); }}>{s.name}</button>)}<details><summary>Guardar estos filtros <span>+</span></summary><div className="save-form"><label>Nombre<input value={saveName} maxLength={80} onChange={e => setSaveName(e.target.value)} placeholder="Ej. Closers España" /></label><button type="button" onClick={saveSearch} disabled={!saveName.trim()}>Guardar</button></div></details></div>
           {run && <section className="run-progress" aria-label="Progreso de búsqueda"><div className="run-heading"><strong aria-live="polite">{statuses[run.status]} <span className="muted">· {fetched} publicaciones revisadas</span></strong>{active(run) && <button onClick={async () => { try { setRun(await api<Run>(`search-runs/${run.id}/cancel`, {})); } catch (e) { setError((e as Error).message); } }}>Cancelar</button>}</div><div className="sources-progress">{run.sources.map(s => <div className={`source-progress ${s.status}`} key={s.code}>{s.status === 'running' ? <LoaderCircle size={15} className="spin" /> : s.status === 'completed' ? <Check size={15} /> : <span className="status-dot" />}<span>{s.name}</span><small>{s.status === 'completed' ? `${s.accepted} con encaje` : statuses[s.status] || s.status}</small>{s.warning && <p>{s.warning}</p>}</div>)}</div></section>}
           <section className="results-section"><div className="results-heading"><h2>{run ? 'Oportunidades encontradas' : 'Tu selección de oportunidades'} <span>{jobs.length}</span></h2><label className="star-filter"><input type="checkbox" checked={onlyStarred} onChange={e => setOnlyStarred(e.target.checked)} /><Bookmark size={15} /> Marcadas</label></div>
             {jobs.length > 0 && <div className="results-toolbar"><label className="result-search"><Search size={16} /><input aria-label="Filtrar resultados" placeholder="Filtrar por puesto, empresa o fuente" value={filter} onChange={e => setFilter(e.target.value)} /></label><button onClick={() => setSelected(selected.size === visible.length ? new Set() : new Set(visible.map(j => j.id)))}>{selected.size === visible.length && visible.length ? 'Quitar selección' : 'Seleccionar visibles'}</button></div>}
@@ -186,7 +187,7 @@ export default function Workspace() {
           </section><p className="footnote"><CircleHelp size={14} /> El encaje es orientativo. Revisa requisitos y condiciones en la oferta original antes de compartirla.</p>
         </>}
         {tab === 'history' && <section className="history-list">{!history.length ? <div className="empty"><Clock3 size={32} /><h3>Todavía no hay búsquedas.</h3><p>Tu historial se guarda en este ordenador.</p><button className="primary" onClick={() => setTab('search')}>Buscar oportunidades</button></div> : history.map(h => <button key={h.id} className="history-row" onClick={() => openRun(h.id)}><span className="history-symbol"><Search size={20} /></span><span><strong>{roles[h.query.role || 'sales']}</strong><small>{date(h.created_at)} · {h.query.market === 'any' ? 'Todos los mercados' : h.query.market} · Últimos {h.query.days} días</small></span><span className="history-status">{statuses[h.status]}</span><ChevronRight size={18} /></button>)}</section>}
-        {tab === 'sources' && <section className="source-grid">{config?.sources.map(s => <article className="source-card" key={s.code}><div><Layers3 size={21} /><span className={s.available ? 'available' : 'pending'}>{s.available ? 'Disponible' : 'Pendiente'}</span></div><h2>{s.name}</h2><p>{s.note}</p>{s.available && <small>Las ofertas conservan su enlace y atribución.</small>}</article>)}</section>}
+        {tab === 'sources' && config && <Sources config={config} onRefresh={async () => { const next = await api<Config>('config'); setConfig(next); setQuery(old => ({ ...old, sources: [...new Set([...(old.sources || []), ...next.sources.filter(s => s.available).map(s => s.code)])].filter(code => next.sources.some(s => s.code === code && s.available)) })); }} />}
       </main>
     </div>
     <dialog ref={dialog} onClose={() => setDetail(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }}>
