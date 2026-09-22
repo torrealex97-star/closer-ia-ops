@@ -1,0 +1,33 @@
+name: Quality
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -r requirements-lock.txt
+      - run: npm ci
+      - run: npm run contracts
+      - run: git diff --exit-code packages/contracts
+      - run: .venv/bin/python -m ruff check apps/api scripts/openapi.py tests/test_engine.py
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run dev > /tmp/career-dev.log 2>&1 &
+      - run: |
+          for i in $(seq 1 30); do
+            if curl --fail http://127.0.0.1:3100/api/backend/config; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/career-dev.log
+          exit 1
+      - run: npm run test:e2e
