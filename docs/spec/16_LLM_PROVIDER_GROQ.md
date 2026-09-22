@@ -1,6 +1,6 @@
 # IA: Groq principal y proveedores reemplazables
 
-Fecha: 2026-09-22. Decisión aprobada; implementación pendiente en P05A. El código local aún usa OpenAI para análisis individual. Este documento no declara Groq conectado.
+Fecha: 2026-09-22. Decisión aprobada; P05A parcialmente entregada. El código local ya permite conectar Groq (principal) u OpenAI mediante LLMProvider para análisis individual. La especificación de procesamiento masivo, límites monetarios, cuotas y configuración por tarea de abajo sigue pendiente. Ninguna generación real Groq se ha validado sin clave WDC.
 
 ## Contrato de dominio
 

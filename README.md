@@ -61,4 +61,4 @@ Leer `AGENTS.md`, `docs/STATUS.md`, `docs/PLAN.md` y la decisión `docs/decision
 
 [MASTER SPEC](docs/spec/00_MASTER_SPEC.md) y [PLAN](docs/PLAN.md) incorporan Groq principal mediante LLMProvider, WDCOpportunity para alumnas y expansión US hispana con [17 fichas](docs/spec/18_US_HISPANIC_SOURCE_RESEARCH.md). Administración conserva toda trazabilidad; la experiencia alumna prioriza empresa, condiciones y siguiente paso.
 
-La implementación local ya incluye Apify guiado y análisis individual OpenAI. Groq, la nueva proyección/portal y las nuevas fuentes siguen pendientes de sus fases: esta actualización es documental y no cambia la app que está en ejecución. Configuración instalada en [INTEGRATIONS](docs/INTEGRATIONS.md).
+La implementación local incluye Apify guiado y análisis individual con Groq principal u OpenAI opcional. La nueva proyección/portal y las nuevas fuentes siguen pendientes, al igual que los controles masivos de P05A. Configuración instalada en [INTEGRATIONS](docs/INTEGRATIONS.md).

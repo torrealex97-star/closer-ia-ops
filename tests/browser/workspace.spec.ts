@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('operator can configure search, inspect sources and use mobile navigation', async ({ page }) => {
+  await page.route('**/api/backend/source-connections', route => route.fulfill({ json: [] }));
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Su próximo paso empieza aquí.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Buscar oportunidades', exact: true })).toBeEnabled();
@@ -80,7 +81,7 @@ test('guided setup needs no actor IDs or JSON and saves a server plan', async ({
   await expect(page.getByRole('region', { name: 'Asistente de fuente' })).toHaveCount(0);
   expect(accepted).toBe(true);
   await page.getByText('Motor de IA', { exact: false }).first().click();
-  await expect(page.getByLabel('Clave de OpenAI')).toBeVisible();
+  await expect(page.getByLabel('Clave de Groq')).toBeVisible();
   await expect(page.getByLabel('Análisis nuevos por día (UTC)')).toHaveValue('20');
 });
 
@@ -105,4 +106,29 @@ test('offer AI analysis displays persisted result and token usage', async ({ pag
   await page.getByRole('button', { name: 'Closer digital', exact: true }).click();
   await expect(page.getByText('Cierre comercial en remoto.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Analizar esta oferta con IA' })).toHaveCount(0);
+});
+
+test('Groq is visible and switching provider never carries the typed key', async ({ page }) => {
+  await page.route('**/api/backend/integrations/ai*', async route => {
+    const provider = new URL(route.request().url()).searchParams.get('provider') || 'groq';
+    const config = { provider, enabled: false, has_token: false, model: provider === 'groq' ? 'openai/gpt-oss-20b' : 'gpt-4.1-mini', daily_limit: 20, used_today: 0, max_input_characters: 6000, max_output_tokens: provider === 'groq' ? 900 : 600 };
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      expect(body.provider).toBe('groq');
+      expect(body.token).toBe('');
+      await route.fulfill({ json: { ...config, ...body, has_token: false } });
+    } else await route.fulfill({ json: config });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
+  await page.getByText('Motor de IA · Groq', { exact: false }).first().click();
+  await expect(page.getByLabel('Proveedor de IA')).toHaveValue('groq');
+  await page.getByLabel('Clave de Groq').fill('never-send-to-openai');
+  await page.getByLabel('Proveedor de IA').selectOption('openai');
+  await expect(page.getByLabel('Clave de OpenAI')).toHaveValue('');
+  await page.getByLabel('Proveedor de IA').selectOption('groq');
+  await expect(page.getByLabel('Clave de Groq')).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Comprobar IA', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Guardar motor de IA' }).click();
+  await expect(page.getByRole('status')).toContainText('Conexión guardada');
 });

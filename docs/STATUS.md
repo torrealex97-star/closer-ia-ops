@@ -1,5 +1,14 @@
 # Estado
 
+## Última entrega — Groq visible en preview (2026-09-22)
+
+- Conexión Groq implementada en Fuentes → Motor de IA; default para nuevas configuraciones, GPT-OSS 20B/120B, clave propia, guardar/comprobar y límites diarios. OpenAI permanece seleccionable con clave independiente.
+- LLMProvider con adaptadores Groq Chat Completions strict JSON y OpenAI Responses. Análisis individual persistido, proveedor/modelo/caché/uso/latencia/error; no cambios automáticos de proveedor ni reintentos facturables. Respuesta incierta y truncada no se muestran como análisis válido.
+- Migración v3 etiqueta generaciones heredadas como OpenAI sin modificar raws. Provider separado en clave de caché. Tipos de configuración generados desde OpenAPI; clave escrita se borra al cambiar de proveedor.
+- Verificación: 45 backend PASS; tras ajuste final de validación sin eco de secretos, 11 integraciones PASS; 6 Playwright PASS; build/TypeScript y Ruff PASS. Preview e IAB muestran Groq. No canary de generación real ni consumo de créditos.
+- P05A parcialmente entregada: falta procesamiento masivo, configuración por tarea, presupuestos monetarios/reservas, rate limiting coordinado, retries 429 acotados, benchmark/gold set y canary con clave WDC. Se mantiene un worker secuencial y límite diario de solicitudes; esta entrega no afirma fase completa.
+- WDCOpportunity/portal y nuevas fuentes US siguen pendientes. La app sigue local en 127.0.0.1:3100.
+
 Primera entrega local implementada el 2026-09-22. No desplegada en internet. No existen credenciales WDC ni proyecto Supabase configurado. Repositorio Git local independiente; sin remoto.
 
 ## Disponible

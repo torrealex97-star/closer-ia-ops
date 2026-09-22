@@ -4,6 +4,8 @@ Revisión 2026-09-22. Producto independiente de Scalix; WDC primera organizació
 
 ## Base disponible
 
+Actualización de ejecución: P05A iniciada; Groq ya configurable en preview con adaptadores separados, salida estructurada, historial y límites por solicitud/día. Faltan presupuestos monetarios/cuotas coordinadas, tareas masivas y canary/benchmark; ver STATUS. Las entregas posteriores continúan pendientes.
+
 MVP administrativo local: seis feeds públicos, catálogo de fuentes, Apify guiado, análisis individual OpenAI, búsqueda/histórico/exportación y migraciones SQLite v2. No login de alumnas ni portal desplegado. Esta revisión no cambia proveedores ni consume servicios.
 
 ## Próximos incrementos, en orden

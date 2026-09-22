@@ -1,6 +1,6 @@
 # P05A_GROQ_PROVIDER — Groq y LLMProvider
 
-Estado: planificada, no implementada por esta actualización documental.
+Estado: parcialmente implementada. Adaptadores, configuración visible, caché por proveedor y migración heredada entregados; pruebas HTTP/local y browser correctas. Pendientes presupuestos monetarios/reservas, rate limiting coordinado, configuración por tarea, canary real y benchmark ES/EN. No declarar fase completa. Ver STATUS.
 
 ## Dependencias y alcance
 

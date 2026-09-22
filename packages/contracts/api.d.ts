@@ -388,8 +388,36 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIConfig */
+        AIConfig: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "groq" | "openai";
+            /** Enabled */
+            enabled: boolean;
+            /** Model */
+            model: string;
+            /** Daily Limit */
+            daily_limit: number;
+            /** Has Token */
+            has_token: boolean;
+            /** Used Today */
+            used_today: number;
+            /** Max Input Characters */
+            max_input_characters: number;
+            /** Max Output Tokens */
+            max_output_tokens: number;
+        };
         /** AISettings */
         AISettings: {
+            /**
+             * Provider
+             * @default groq
+             * @enum {string}
+             */
+            provider: "groq" | "openai";
             /**
              * Enabled
              * @default false
@@ -404,10 +432,9 @@ export interface components {
             clear_token: boolean;
             /**
              * Model
-             * @default gpt-4.1-mini
-             * @enum {string}
+             * @default openai/gpt-oss-20b
              */
-            model: "gpt-4.1-mini" | "gpt-4.1-nano" | "gpt-4o-mini";
+            model: string;
             /**
              * Daily Limit
              * @default 20
@@ -1173,7 +1200,9 @@ export interface operations {
     };
     ai_settings_v1_integrations_ai_get: {
         parameters: {
-            query?: never;
+            query?: {
+                provider?: ("groq" | "openai") | null;
+            };
             header?: {
                 authorization?: string;
             };
@@ -1188,7 +1217,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIConfig"];
                 };
             };
             /** @description Validation Error */
@@ -1223,7 +1252,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIConfig"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,6 @@
 # Conexiones y análisis de ofertas
 
-Estado operativo actual: MVP local con Apify y análisis individual OpenAI. Decisión objetivo: Groq principal detrás de LLMProvider; migración aún pendiente. Configuración propuesta, límites y fases en [16](spec/16_LLM_PROVIDER_GROQ.md) y [PLAN](PLAN.md). Las instrucciones OpenAI de abajo describen solo la versión instalada; no pegues una clave Groq en ese campo.
+Estado operativo actual: MVP local con Apify y análisis individual Groq/OpenAI mediante LLMProvider. Groq es principal por defecto; cada proveedor conserva su clave. En Fuentes → Motor de IA elige proveedor, pega su clave, guarda y comprueba. Cambiar de proveedor limpia la clave escrita para no enviarla al destino incorrecto. Configuración masiva/por tarea sigue pendiente: ver [16](spec/16_LLM_PROVIDER_GROQ.md) y [PLAN](PLAN.md).
 
 En Fuentes, abrir Cuenta de Apify, guardar la clave y comprobarla. La comprobación consulta la cuenta; no ejecuta un Actor. Las conexiones heredan esta clave, salvo las que tengan una clave específica.
 
@@ -8,7 +8,7 @@ Pulsar Conectar en el catálogo o Añadir fuente. Elegir proveedor, pegar enlace
 
 El asistente acepta proveedores con cobro por evento/resultado y límite reconocido. Solicita al proveedor el máximo de cargos indicado; no es una estimación del coste total. Por defecto pide 25 resultados y 1 USD. Reutiliza durante seis horas un dataset completado con los mismos parámetros. Los metadatos públicos también se cachean. Si el Actor solo admite una palabra clave, se prepara el primer término; para buscar otros, editar el término o aportar un enlace de búsqueda. Los términos de un enlace dependen de ese enlace.
 
-En Motor de IA, guardar una clave OpenAI, elegir modelo, límite diario y activar. Comprobar consulta acceso al modelo sin generar contenido. En el detalle de una oferta, Analizar crea una tarea persistida y procesa únicamente esa oferta. No envía el histórico de conversación ni todo el dataset. Entrada limitada a 6.000 caracteres y salida a 600 tokens; el análisis de textos largos puede ser incompleto. Se guarda modelo, versión de prompt, respuesta, uso y evidencia. El coste monetario depende del proveedor/modelo y no se calcula en la app.
+En Motor de IA, guardar una clave del proveedor seleccionado, elegir modelo, límite diario y activar. Comprobar consulta acceso al modelo sin generar contenido. En el detalle de una oferta, Analizar crea una tarea persistida y procesa únicamente esa oferta. No envía el histórico de conversación ni todo el dataset. Entrada limitada a 6.000 caracteres y salida a 900 tokens en Groq/600 en OpenAI; el análisis de textos largos puede ser incompleto. Se guarda proveedor, modelo, versión de prompt, respuesta, uso, latencia y evidencia. El coste monetario depende del proveedor/modelo y no se calcula en la app.
 
 La misma oferta/contenido/modelo/prompt reutiliza su resultado. El límite diario (20 por defecto, UTC) cuenta solicitudes reservadas, incluidas fallidas. Las respuestas se validan contra un esquema y sus citas deben existir literalmente en la oferta. Una respuesta puede seguir siendo incorrecta: revisión humana antes de compartir o aplicar. Las llamadas fallidas o interrumpidas no se reintentan automáticamente para evitar cargos duplicados.
 

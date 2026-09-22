@@ -521,6 +521,26 @@
         "operationId": "ai_settings_v1_integrations_ai_get",
         "parameters": [
           {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "groq",
+                    "openai"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -536,7 +556,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AIConfig"
+                }
               }
             }
           },
@@ -582,7 +604,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AIConfig"
+                }
               }
             }
           },
@@ -1283,8 +1307,69 @@
   },
   "components": {
     "schemas": {
+      "AIConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "groq",
+              "openai"
+            ],
+            "title": "Provider"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "daily_limit": {
+            "type": "integer",
+            "title": "Daily Limit"
+          },
+          "has_token": {
+            "type": "boolean",
+            "title": "Has Token"
+          },
+          "used_today": {
+            "type": "integer",
+            "title": "Used Today"
+          },
+          "max_input_characters": {
+            "type": "integer",
+            "title": "Max Input Characters"
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "title": "Max Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "enabled",
+          "model",
+          "daily_limit",
+          "has_token",
+          "used_today",
+          "max_input_characters",
+          "max_output_tokens"
+        ],
+        "title": "AIConfig"
+      },
       "AISettings": {
         "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "groq",
+              "openai"
+            ],
+            "title": "Provider",
+            "default": "groq"
+          },
           "enabled": {
             "type": "boolean",
             "title": "Enabled",
@@ -1310,13 +1395,8 @@
           },
           "model": {
             "type": "string",
-            "enum": [
-              "gpt-4.1-mini",
-              "gpt-4.1-nano",
-              "gpt-4o-mini"
-            ],
             "title": "Model",
-            "default": "gpt-4.1-mini"
+            "default": "openai/gpt-oss-20b"
           },
           "daily_limit": {
             "type": "integer",

@@ -4,6 +4,8 @@ MIGRATIONS = [(2, [
     'CREATE TABLE IF NOT EXISTS integration_plans (id TEXT NOT NULL, org_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(org_id,id))',
     'CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT, UNIQUE(org_id,fingerprint))',
     'CREATE INDEX IF NOT EXISTS ai_queue ON ai_generations(status,created_at)',
+ ]), (3, [
+    "UPDATE ai_generations SET payload=json_set(payload, '$.provider', 'openai') WHERE json_extract(payload, '$.provider') IS NULL",
 ])]
 
 
