@@ -213,7 +213,18 @@ async def apify_request(method, path, token, *, payload=None, params=None):
 
 @router.post("/source-connections/{connection_id}/scrape")
 async def scrape(connection_id: str):
-    organization = org()
+    return await launch_scrape(connection_id, org())
+
+
+async def launch_scrape(connection_id, organization, allocation_cents=None):
+    from .collection import budget_quote, reserve, record_launch
+    initial = get_connection(connection_id, organization)
+    if initial.get('run_status') in {'STARTING', 'READY', 'RUNNING', 'TIMING-OUT', 'ABORTING', 'UNKNOWN'}:
+        raise HTTPException(409, 'Ya hay una ejecución pendiente. Comprueba su estado.')
+    token = connection_token(organization, connection_id)
+    if not token or not initial['actor_id'] or not initial['enabled']:
+        raise HTTPException(422, 'Guarda un Actor, token y conexión activa antes de ejecutar')
+    rate, minimum = await budget_quote(initial, token)
     # Reserve before network I/O to prevent duplicate launches from double clicks.
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -221,6 +232,8 @@ async def scrape(connection_id: str):
         if not row:
             raise HTTPException(404, "Conexión no encontrada")
         value = json.loads(row["payload"])
+        if value != initial:
+            raise HTTPException(409, 'La conexión cambió. Vuelve a comprobarla.')
         if value.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
             raise HTTPException(409, "Ya hay una ejecución pendiente. Comprueba su estado.")
         token = connection_token(organization, connection_id)
@@ -232,7 +245,9 @@ async def scrape(connection_id: str):
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(value["last_completed_at"])).total_seconds()
             if age < 21600 and value.get("dataset_id"):
                 return {**public_connection(value, organization), "message": "Reutilizamos la extracción de las últimas 6 horas. No se ha lanzado ni cobrado otro scraper."}
-        value.update(run_status="STARTING", run_id=None, last_fingerprint=fingerprint, last_completed_at=None)
+        reservation, cap = reserve(db, organization, connection_id, value['max_charge_usd'], rate, minimum, allocation_cents)
+        value.update(run_status="STARTING", run_id=None, last_fingerprint=fingerprint, last_completed_at=None,
+                     budget_reservation=reservation)
         db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=?", (json.dumps(value), connection_id, organization))
     payload = dict(value["actor_input"])
     urls = value["urls"]
@@ -240,11 +255,13 @@ async def scrape(connection_id: str):
         payload[value["url_field"]] = ([{"url": u} for u in urls] if value["url_format"] == "objects" else urls if value["url_format"] == "strings" else urls[0])
     try:
         data = await apify_request("POST", f'acts/{value["actor_id"].replace("/", "~")}/runs', token,
-                                   payload=payload, params={"build": value.get("build", "latest"), "timeout": 90, "maxItems": value["max_items"], "maxTotalChargeUsd": value["max_charge_usd"]})
+                                   payload=payload, params={"build": value.get("build", "latest"), "timeout": 90, "maxItems": value["max_items"], "maxTotalChargeUsd": cap})
         run = data["data"]
         value.update(run_id=run["id"], run_status=run["status"])
+        record_launch(reservation, organization, run['id'], run['status'])
     except Exception:
         value["run_status"] = "UNKNOWN"
+        record_launch(reservation, organization, None, 'UNKNOWN')
         put_connection(value, organization)
         raise HTTPException(502, "No se ha confirmado el lanzamiento. Revisa Apify; no se reintentará para evitar cobros duplicados.") from None
     put_connection(value, organization)
@@ -253,19 +270,25 @@ async def scrape(connection_id: str):
 
 @router.post("/source-connections/{connection_id}/check")
 async def check(connection_id: str):
-    value = get_connection(connection_id, org())
-    token = connection_token(org(), connection_id)
+    return await check_connection(connection_id, org())
+
+
+async def check_connection(connection_id, organization):
+    value = get_connection(connection_id, organization)
+    token = connection_token(organization, connection_id)
     original = json.dumps(value)
     def update_checked():
         nonlocal original
         with connect() as db:
-            result = db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=? AND payload=?", (json.dumps(value), connection_id, org(), original))
+            result = db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=? AND payload=?", (json.dumps(value), connection_id, organization, original))
             if not result.rowcount:
                 raise HTTPException(409, "La conexión cambió durante la comprobación. Vuelve a comprobar.")
         original = json.dumps(value)
     try:
         if value.get("run_id"):
             run = (await apify_request("GET", f'actor-runs/{value["run_id"]}', token))["data"]
+            from .collection import record_cost
+            record_cost(organization, run)
             value["run_status"] = run["status"]
             value["actual_cost_usd"] = run.get("usageTotalUsd")
             if run["status"] == "SUCCEEDED":
@@ -273,7 +296,7 @@ async def check(connection_id: str):
                 value["last_completed_at"] = value.get("last_completed_at") or now()
             update_checked()
             if run["status"] != "SUCCEEDED":
-                return {"connection": public_connection(value, org()), "message": "Estado de Apify: " + run["status"]}
+                return {"connection": public_connection(value, organization), "message": "Estado de Apify: " + run["status"]}
         if not value["dataset_id"]:
             raise ProviderError("Indica un dataset o ejecuta el Actor. Si el lanzamiento quedó incierto, compruébalo en Apify.")
         rows = await apify_request("GET", f'datasets/{value["dataset_id"]}/items', token, params={"limit": 5, "clean": "true"})
@@ -286,7 +309,7 @@ async def check(connection_id: str):
         if rows and not valid:
             raise ProviderError("Hay registros, pero el mapeo de enlace no coincide. Corrige source_url.")
         update_checked()
-        return {"connection": public_connection(value, org()), "message": f"Dataset accesible: {len(rows)} registros de muestra, {valid} con enlace válido. Los filtros de búsqueda se aplican al importar."}
+        return {"connection": public_connection(value, organization), "message": f"Dataset accesible: {len(rows)} registros de muestra, {valid} con enlace válido. Los filtros de búsqueda se aplican al importar."}
     except ProviderError as exc:
         raise HTTPException(422, str(exc)) from None
     except (KeyError, TypeError, ValueError):
@@ -333,11 +356,13 @@ def registry(organization):
 
 
 def source_infos(organization):
+    with connect() as db:
+        saved_sources = {r[0] for r in db.execute('SELECT DISTINCT p.source FROM catalog_entries c JOIN jobs j ON j.org_id=c.org_id AND j.id=c.job_id JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id WHERE c.org_id=? AND c.expires_at>?', (organization, now()))}
     public = [{"code": c.code, "name": c.name, "available": True,
                "category": "LATAM" if c.code == "getonbrd-public" else "Internacional", "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
                "website": c.url if hasattr(c, "url") else "https://himalayas.app" if c.code == "himalayas" else "https://weworkremotely.com"} for c in REGISTRY.values()]
     public += [{"code": c[0], "name": c[1], "category": c[2], "website": c[3], "setup_url": c[4] or "https://apify.com/store?search=web%20scraper", "note": c[5], "available": False} for c in CATALOG]
-    public += [{"code": v["id"], "name": v["name"], "category": "Mis conexiones", "available": v["enabled"] and bool(v["dataset_id"]), "note": "Dataset Apify · consulta sin lanzar un nuevo scraper"} for v in connections(organization)]
+    public += [{"code": v["id"], "name": v["name"], "category": "Mis conexiones", "available": (v["enabled"] and bool(v["dataset_id"] or v["actor_id"])) or v["id"] in saved_sources, "note": "Catálogo local · consulta sin lanzar un nuevo scraper"} for v in connections(organization)]
     return public
 
 
@@ -351,5 +376,7 @@ def resolve(connection_id: str, body: ResolveRequest):
     if not body.reviewed_apify_console or value.get("run_status") not in {"UNKNOWN", "STARTING"}:
         raise HTTPException(409, "Solo se desbloquean lanzamientos inciertos tras revisar la consola")
     value["run_status"] = "REVIEWED"
+    with connect() as db:
+        db.execute("UPDATE scrape_budget SET status='REVIEWED' WHERE org_id=? AND id=? AND status IN ('reserved','UNKNOWN')", (org(), value.get('budget_reservation', '')))
     put_connection(value, org())
     return public_connection(value, org())

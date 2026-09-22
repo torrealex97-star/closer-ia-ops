@@ -31,4 +31,4 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return Response.json({ detail: 'El motor no está disponible. Comprueba que el lanzador sigue abierto.' }, { status: 503 });
   }
 }
-export { proxy as GET, proxy as POST, proxy as PATCH };
+export { proxy as GET, proxy as POST, proxy as PATCH, proxy as PUT };

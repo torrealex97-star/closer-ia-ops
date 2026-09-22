@@ -246,6 +246,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/collection/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Settings */
+        put: operations["save_settings_v1_collection_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_v1_collection_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/collection/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh */
+        post: operations["refresh_v1_collection_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -463,6 +514,64 @@ export interface components {
             /** Job Id */
             job_id: string;
         };
+        /** CollectionRun */
+        CollectionRun: {
+            /** Id */
+            id: string;
+            /** Day */
+            day: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Sources */
+            sources: components["schemas"]["SourceProgress"][];
+        };
+        /** CollectionSettings */
+        CollectionSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Daily Budget Eur
+             * @default 1
+             */
+            daily_budget_eur: number;
+            /**
+             * Hour
+             * @default 8
+             */
+            hour: number;
+        };
+        /** CollectionStatus */
+        CollectionStatus: {
+            settings: components["schemas"]["CollectionSettings"];
+            /**
+             * Timezone
+             * @default Europe/Madrid
+             */
+            timezone: string;
+            /**
+             * Retention Days
+             * @default 10
+             */
+            retention_days: number;
+            /** Catalog Total */
+            catalog_total: number;
+            /** Added Last 24H */
+            added_last_24h: number;
+            /** Reserved Eur */
+            reserved_eur: number;
+            /** Actual Usd */
+            actual_usd: number;
+            /** Uncertain Runs */
+            uncertain_runs: number;
+            latest?: components["schemas"]["CollectionRun"] | null;
+        };
         /** Configuration */
         Configuration: {
             /** Organization */
@@ -606,6 +715,10 @@ export interface components {
             captured_at: string;
             /** Provider */
             provider: string;
+            /** First Seen At */
+            first_seen_at?: string | null;
+            /** Catalog Expires At */
+            catalog_expires_at?: string | null;
             /**
              * Starred
              * @default false
@@ -680,7 +793,7 @@ export interface components {
             language: "any" | "es" | "en";
             /**
              * Days
-             * @default 30
+             * @default 10
              */
             days: number;
             /**
@@ -1416,6 +1529,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_settings_v1_collection_settings_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_v1_collection_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_v1_collection_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionStatus"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,7 @@
 'use client';
 
 import IntegrationSettings from './IntegrationSettings';
+import CollectionPanel from './CollectionPanel';
 import SourceAssistant from './SourceAssistant';
 import { request } from './client';
 import { useEffect, useState } from 'react';
@@ -73,8 +74,9 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
   const catalog = config.sources.filter(s => s.category !== 'Mis conexiones').sort((a, b) => Number(a.category === 'Internacional') - Number(b.category === 'Internacional'));
   const shown = catalog.filter(s => (category === 'Todas' || s.category?.includes(category)) && `${s.name} ${s.note} ${s.category}`.toLowerCase().includes(filter.toLowerCase()));
   return <div className="sources-workspace">
-    <div className="source-intro"><div><span className="eyebrow">ESPAÑOL · REMOTO · HÍBRIDO</span><h2>Abre nuevas puertas para tus alumnas.</h2><p>Prioriza España y LATAM. Las fuentes internacionales complementan la búsqueda de ofertas en español o bilingües.</p></div><button className="primary" onClick={() => open()}><Plus size={16} /> Añadir fuente</button></div>
+    <div className="source-intro"><div><span className="eyebrow">ESPAÑOL · REMOTO · HÍBRIDO</span><h2>Abre nuevas puertas para tus alumnas.</h2><p>Oportunidades en español o bilingües de España, LATAM y otros mercados. Reunimos publicaciones de portales, comunidades y empresas.</p></div><button className="primary" onClick={() => open()}><Plus size={16} /> Añadir fuente</button></div>
     {error && <p className="alert error" role="alert">{error}</p>}{message && <p className="alert" role="status">{message}</p>}
+    <CollectionPanel editable />
     <IntegrationSettings onChanged={refresh} />
     {wizard && <SourceAssistant key={wizard} source={wizard} sources={config.sources} onClose={() => setWizard(null)} onConnected={refresh} onAdvanced={() => open(wizard, undefined, true)} />}
     {form && <form className="connection-form" onSubmit={e => { e.preventDefault(); save(); }}>

@@ -8,6 +8,10 @@ Actualización de ejecución: P05A iniciada; Groq ya configurable en preview con
 
 MVP administrativo local: seis feeds públicos, catálogo de fuentes, Apify guiado, análisis individual OpenAI, búsqueda/histórico/exportación y migraciones SQLite v2. No login de alumnas ni portal desplegado. Esta revisión no cambia proveedores ni consume servicios.
 
+## Prioridad solicitada — catálogo diario (2026-09-22)
+
+Entregado antes de continuar P05A: recogida diaria de las fuentes conectadas, búsqueda exclusivamente local y ventana de diez días. Presupuesto inicial de scraping 1 €/día, ajustable a 2 €, reservas globales, conversión BCE con margen y actores PPE compatibles. Ver [ADR-008](decisions/ADR-008-daily-catalog.md) y [operación](DAILY_CATALOG.md). La automatización de mantenimiento de código sigue siendo independiente del worker de recogida.
+
 ## Próximos incrementos, en orden
 
 | Orden | Fase | Resultado y dependencia |

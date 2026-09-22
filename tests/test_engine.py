@@ -20,6 +20,10 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("CAREER_DB", str(tmp_path / "test.sqlite3"))
     monkeypatch.setenv("CAREER_LOCAL_TOKEN", "test-token")
     monkeypatch.setenv("CAREER_ORG_ID", "org-a")
+    from career import collection
+    async def quote(value, token):
+        return 1.30, 0
+    monkeypatch.setattr(collection, 'budget_quote', quote)
     with TestClient(app, headers={"Authorization": "Bearer test-token"}) as c:
         yield c
 
@@ -266,7 +270,7 @@ def test_apify_launch_check_import_and_no_paid_search(client, monkeypatch):
             assert kwargs['params']['maxTotalChargeUsd'] == 1
             return {'data': {'id': 'run-test', 'status': 'RUNNING'}}
         if path.startswith('actor-runs'):
-            return {'data': {'status': 'SUCCEEDED', 'defaultDatasetId': 'dataset-test', 'usageTotalUsd': .01}}
+            return {'data': {'id': 'run-test', 'status': 'SUCCEEDED', 'defaultDatasetId': 'dataset-test', 'usageTotalUsd': .01}}
         return [{'title': 'Closer digital', 'companyName': 'Test', 'description': 'Buscamos experiencia en ventas para nuestro equipo. Trabajo remoto con clientes.', 'url': 'https://example.com/job', 'location': 'Spain', 'postedAt': now(), 'workMode': 'remote'}]
     monkeypatch.setattr(sources, 'apify_request', fake_request)
     body = {'name': 'Apify fixture', 'token': 'fake-unit-secret', 'actor_id': 'user/actor', 'urls': ['https://example.com/jobs']}
@@ -279,7 +283,7 @@ def test_apify_launch_check_import_and_no_paid_search(client, monkeypatch):
     assert check.status_code == 200, check.text
     assert check.json()['connection']['dataset_id'] == 'dataset-test'
     run = create(client, {'sources': [value['id']], 'require_spanish': True})
-    asyncio.run(execute(run['id'], 'org-a', SearchQuery(**run['query'])))
+    asyncio.run(execute(run['id'], 'org-a', SearchQuery(**run['query']), sources.registry('org-a')))
     result = load_run(run['id'], 'org-a')
     assert result['status'] == 'completed' and len(result['jobs']) == 1
     assert len([c for c in calls if c[0] == 'POST']) == 1  # searching only reads existing data

@@ -102,7 +102,8 @@ def load_run(run_id: str, organization: str):
             return None
         jobs = db.execute("""SELECT r.payload, j.starred FROM search_results r
           JOIN jobs j ON j.id=r.job_id AND j.org_id=r.org_id
-          WHERE r.run_id=? AND r.org_id=?""", (run_id, organization)).fetchall()
+          JOIN catalog_entries c ON c.org_id=j.org_id AND c.job_id=j.id
+          WHERE r.run_id=? AND r.org_id=? AND c.expires_at>?""", (run_id, organization, now())).fetchall()
     result = dict(row)
     result["query"] = json.loads(result["query"])
     result["sources"] = json.loads(result["sources"])

@@ -839,6 +839,136 @@
         }
       }
     },
+    "/v1/collection/settings": {
+      "put": {
+        "summary": "Save Settings",
+        "operationId": "save_settings_v1_collection_settings_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/collection": {
+      "get": {
+        "summary": "Status",
+        "operationId": "status_v1_collection_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/collection/refresh": {
+      "post": {
+        "summary": "Refresh",
+        "operationId": "refresh_v1_collection_refresh_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "summary": "Health",
@@ -1464,6 +1594,135 @@
         ],
         "title": "AnalyzeRequest"
       },
+      "CollectionRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceProgress"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "day",
+          "status",
+          "created_at",
+          "sources"
+        ],
+        "title": "CollectionRun"
+      },
+      "CollectionSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "daily_budget_eur": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "title": "Daily Budget Eur",
+            "default": 1
+          },
+          "hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "default": 8
+          }
+        },
+        "type": "object",
+        "title": "CollectionSettings"
+      },
+      "CollectionStatus": {
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/CollectionSettings"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Europe/Madrid"
+          },
+          "retention_days": {
+            "type": "integer",
+            "title": "Retention Days",
+            "default": 10
+          },
+          "catalog_total": {
+            "type": "integer",
+            "title": "Catalog Total"
+          },
+          "added_last_24h": {
+            "type": "integer",
+            "title": "Added Last 24H"
+          },
+          "reserved_eur": {
+            "type": "number",
+            "title": "Reserved Eur"
+          },
+          "actual_usd": {
+            "type": "number",
+            "title": "Actual Usd"
+          },
+          "uncertain_runs": {
+            "type": "integer",
+            "title": "Uncertain Runs"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "settings",
+          "catalog_total",
+          "added_last_24h",
+          "reserved_eur",
+          "actual_usd",
+          "uncertain_runs"
+        ],
+        "title": "CollectionStatus"
+      },
       "Configuration": {
         "properties": {
           "organization": {
@@ -1779,6 +2038,28 @@
             "type": "string",
             "title": "Provider"
           },
+          "first_seen_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seen At"
+          },
+          "catalog_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Expires At"
+          },
           "starred": {
             "type": "boolean",
             "title": "Starred",
@@ -1949,7 +2230,7 @@
             "maximum": 90.0,
             "minimum": 1.0,
             "title": "Days",
-            "default": 30
+            "default": 10
           },
           "salary_min": {
             "type": "number",

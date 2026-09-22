@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.responses import Response
 from openpyxl import Workbook
-from .sources import registry, router as sources_router, source_infos
+from .sources import router as sources_router, source_infos
 from .db import connect, initialize, load_run, now, org, uid
 from .models import (Configuration, ExportRequest, SavedRequest, SavedSearch, SearchRequest,
                      SearchRun, SourceProgress, StarRequest)
@@ -36,6 +36,8 @@ app = FastAPI(title="Career Platform API", version="0.1.0", lifespan=lifespan,
 app.include_router(sources_router)
 app.include_router(integrations_router)
 app.include_router(ai_router)
+from .collection import router as collection_router  # noqa: E402
+app.include_router(collection_router)
 
 
 @app.get("/health/live")
@@ -54,7 +56,8 @@ def config():
 def create_search(request: SearchRequest):
     if request.query.role == "custom" and not request.query.keywords.strip():
         raise HTTPException(422, "Indica el puesto que quieres buscar")
-    available = registry(org())
+    from .catalog import available_sources
+    available = available_sources(org())
     if any(code not in available for code in request.query.sources):
         raise HTTPException(422, "Selecciona fuentes disponibles; configura primero su dataset")
     with connect() as db:
@@ -69,7 +72,7 @@ def create_search(request: SearchRequest):
             if active >= 3:
                 raise HTTPException(429, "Ya hay tres búsquedas en curso. Espera o cancela una.")
             run_id = uid()
-            sources = [SourceProgress(code=c, name=available[c].name).model_dump() for c in dict.fromkeys(request.query.sources)]
+            sources = [SourceProgress(code=c, name=available[c]).model_dump() for c in dict.fromkeys(request.query.sources)]
             db.execute("INSERT INTO search_runs VALUES(?,?,?,?,?,?,?,NULL)",
                        (run_id, org(), request.idempotency_key, request.query.model_dump_json(), "queued", json.dumps(sources), now()))
     return load_run(run_id, org())

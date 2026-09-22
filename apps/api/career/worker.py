@@ -49,6 +49,10 @@ async def run_source(connector, query, run_id, organization):
 
 
 async def execute(run_id, organization, query, registry=None):
+    if registry is None:
+        from .catalog import search_catalog
+        search_catalog(run_id, organization, query)
+        return
     registry = registry or source_registry(organization)
     for code in query.sources:
         if code not in registry:
@@ -67,6 +71,9 @@ async def execute(run_id, organization, query, registry=None):
 async def main():
     initialize()
     from .ai import ai_loop
+    from .collection import collection_loop
+    collection_task = asyncio.create_task(collection_loop())
+    collection_task.add_done_callback(lambda task: task.result() if not task.cancelled() else None)
     ai_task = asyncio.create_task(ai_loop())
     ai_task.add_done_callback(lambda task: task.result() if not task.cancelled() else None)
     # Single consumer in local mode. Restarts replay idempotently from the durable queue.

@@ -8,7 +8,7 @@ class SearchQuery(BaseModel):
     keywords: str = Field(default="", max_length=120)
     market: Literal["any", "ES", "EU", "LATAM", "US"] = "any"
     language: Literal["any", "es", "en"] = "any"
-    days: int = Field(default=30, ge=1, le=90)
+    days: int = Field(default=10, ge=1, le=90)
     salary_min: float = Field(default=0, ge=0, le=100000)
     salary_currency: Literal["EUR", "USD"] = "EUR"
     salary_mode: Literal["prefer", "strict"] = "prefer"
@@ -56,6 +56,8 @@ class Job(BaseModel):
     raw_id: str
     captured_at: str
     provider: str
+    first_seen_at: str | None = None
+    catalog_expires_at: str | None = None
     starred: bool = False
 
 

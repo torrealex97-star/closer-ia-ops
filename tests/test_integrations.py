@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from fastapi.testclient import TestClient
 
-from career import ai, integrations, sources, connectors, llm
+from career import ai, integrations, sources, connectors, llm, collection
 from career.db import connect, initialize, load_run, now
 from career.main import app
 from career.models import SearchQuery
@@ -83,6 +83,9 @@ def api(tmp_path, monkeypatch, vendor):
     monkeypatch.setattr(sources, 'APIFY_BASE', base)
     monkeypatch.setattr(llm, 'OPENAI_BASE', base)
     monkeypatch.setattr(llm, 'GROQ_BASE', base)
+    async def rate():
+        return 1.15
+    monkeypatch.setattr(collection, 'euro_rate', rate)
     original_fetch = connectors.fetch
     async def local_metadata(path, params=None):
         # Uses the real bounded HTTP fetcher and SQLite metadata cache.
@@ -115,7 +118,7 @@ def imported_job(api):
     assert check.status_code == 200, check.text
     query = {'role': 'digital_sales', 'require_spanish': True, 'sources': [connection['id']]}
     run = client.post('/v1/search-runs', json={'query': query, 'idempotency_key': 'integration-full-flow'}).json()
-    asyncio.run(execute(run['id'], 'org-test', SearchQuery(**query)))
+    asyncio.run(execute(run['id'], 'org-test', SearchQuery(**query), sources.registry('org-test')))
     result = load_run(run['id'], 'org-test')
     assert result['status'] == 'completed' and len(result['jobs']) == 1
     return run['id'], result['jobs'][0]['id'], connection
@@ -135,7 +138,7 @@ def test_guided_flow_real_http_queue_database_and_reuse(api):
     with connect() as db:
         assert db.execute('SELECT count(*) FROM raw_items').fetchone()[0] == 1
         assert db.execute('SELECT count(*) FROM source_connections').fetchone()[0] == 1
-        assert db.execute('SELECT max(version) FROM schema_version').fetchone()[0] == 3
+        assert db.execute('SELECT max(version) FROM schema_version').fetchone()[0] == 4
     initialize()  # migration repeat preserves data
     assert client.get('/v1/search-runs/' + run_id).json()['jobs'][0]['id'] == job_id
 

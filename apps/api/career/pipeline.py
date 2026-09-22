@@ -257,6 +257,10 @@ def ingest(candidate, connector, query, run_id, organization):
         return False
     matching = match(item, query)
     if not matching:
+        # A newer closed/changed listing must invalidate its previously accepted version.
+        with connect() as db:
+            db.execute('UPDATE job_postings SET raw_id=?,payload=? WHERE org_id=? AND source=? AND external_id=?',
+                       (raw['id'], json.dumps(item), organization, connector.code, candidate.external_id))
         return False
     with connect() as db:
         posting = db.execute("SELECT id FROM job_postings WHERE org_id=? AND source=? AND external_id=?",
@@ -267,10 +271,13 @@ def ingest(candidate, connector, query, run_id, organization):
                    (posting_id, organization, raw["id"], connector.code, candidate.external_id, json.dumps(item)))
         db.execute("INSERT OR IGNORE INTO jobs VALUES(?,?,?,0)", (uid(), organization, posting_id))
         job_id = db.execute("SELECT id FROM jobs WHERE org_id=? AND posting_id=?", (organization, posting_id)).fetchone()["id"]
+        from .catalog import remember
+        remember(db, organization, job_id, raw['captured_at'])
         score, reasons, warnings = matching
         item.pop("expires_at")
         item.pop("work_mode", None)
         job = Job(**item, id=job_id, source=connector.name, score=score, reasons=reasons,
                   warnings=warnings, raw_id=raw["id"], captured_at=raw["captured_at"], provider=connector.provider)
-        db.execute("INSERT OR REPLACE INTO search_results VALUES(?,?,?,?)", (organization, run_id, job_id, job.model_dump_json()))
+        if run_id is not None:
+            db.execute("INSERT OR REPLACE INTO search_results VALUES(?,?,?,?)", (organization, run_id, job_id, job.model_dump_json()))
     return True

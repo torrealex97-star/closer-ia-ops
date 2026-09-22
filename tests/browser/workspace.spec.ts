@@ -11,7 +11,7 @@ test('operator can configure search, inspect sources and use mobile navigation',
   await page.getByRole('combobox', { name: 'Idioma mencionado' }).selectOption('es');
   await expect(page.getByLabel('Incluir país o fecha sin confirmar')).toBeChecked();
   await expect(page.getByLabel('Exigir evidencia de español (incluye bilingües)')).toBeChecked();
-  await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Himalayas', exact: true })).toBeVisible();
   await expect(page.getByText('API pública activa', { exact: true })).toHaveCount(6);
   await expect(page.getByRole('heading', { name: 'InfoJobs', exact: true })).toBeVisible();
@@ -35,7 +35,7 @@ test('source setup preloads Spanish keywords, preserves secret and edits URLs', 
     } else await route.fulfill({ json: saved });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await page.getByLabel('Buscar fuente').fill('InfoJobs');
   await page.getByRole('button', { name: 'Conectar', exact: true }).click();
   await page.getByRole('button', { name: 'Necesito una configuración avanzada' }).click();
@@ -70,7 +70,7 @@ test('guided setup needs no actor IDs or JSON and saves a server plan', async ({
     await route.fulfill({ json: { id: 'guided-test' } });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await page.getByLabel('Buscar fuente').fill('InfoJobs');
   await page.getByRole('button', { name: 'Conectar', exact: true }).click();
   await expect(page.getByLabel('Actor ID', { exact: true })).toHaveCount(0);
@@ -120,7 +120,7 @@ test('Groq is visible and switching provider never carries the typed key', async
     } else await route.fulfill({ json: config });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Fuentes', exact: true }).click();
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await page.getByText('Motor de IA · Groq', { exact: false }).first().click();
   await expect(page.getByLabel('Proveedor de IA')).toHaveValue('groq');
   await page.getByLabel('Clave de Groq').fill('never-send-to-openai');
@@ -131,4 +131,43 @@ test('Groq is visible and switching provider never carries the typed key', async
   await expect(page.getByRole('button', { name: 'Comprobar IA', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Guardar motor de IA' }).click();
   await expect(page.getByRole('status')).toContainText('Conexión guardada');
+});
+
+test('daily collection budget controls are separate from saved catalog search', async ({ page }) => {
+  let settings = { enabled: true, daily_budget_eur: 1, hour: 8 };
+  const summary = () => ({ settings, timezone: 'Europe/Madrid', retention_days: 10, catalog_total: 6, added_last_24h: 2, reserved_eur: 0.25, actual_usd: 0.03, uncertain_runs: 0, latest: null });
+  await page.route('**/api/backend/collection', route => route.fulfill({ json: summary() }));
+  await page.route('**/api/backend/collection/settings', route => {
+    expect(route.request().method()).toBe('PUT');
+    settings = route.request().postDataJSON();
+    return route.fulfill({ json: summary() });
+  });
+  await page.route('**/api/backend/source-connections', route => route.fulfill({ json: [] }));
+  let collectionRequests = 0;
+  await page.route('**/api/backend/collection/refresh', route => { collectionRequests++; return route.fulfill({ json: summary() }); });
+  let searches = 0;
+  await page.route('**/api/backend/search-runs', route => {
+    if (route.request().method() === 'POST') {
+      searches++;
+      const query = route.request().postDataJSON().query;
+      expect(query.days).toBe(10);
+      return route.fulfill({ json: { id: 'catalog-fixture', query, status: 'completed', created_at: new Date().toISOString(), sources: [], jobs: [] } });
+    }
+    return route.fulfill({ json: [] });
+  });
+  await page.goto('/');
+  await expect(page.getByText('6 en catálogo')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Publicación', exact: true })).toHaveValue('10');
+  await page.getByRole('button', { name: 'Buscar oportunidades', exact: true }).click();
+  expect(searches).toBe(1);
+  expect(collectionRequests).toBe(0);
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
+  await page.getByLabel('Presupuesto diario de scraping').selectOption('2');
+  await page.getByLabel('Hora de recogida · Madrid').selectOption('9');
+  await page.getByLabel('Recoger ofertas cada día').uncheck();
+  await page.getByRole('button', { name: 'Guardar recogida diaria' }).click();
+  await expect(page.getByText('Recogida automática pausada')).toBeVisible();
+  expect(settings).toEqual({ enabled: false, daily_budget_eur: 2, hour: 9 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

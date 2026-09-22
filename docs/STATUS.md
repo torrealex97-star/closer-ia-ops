@@ -1,5 +1,21 @@
 # Estado
 
+## Catálogo diario y presupuesto — 2026-09-22
+
+- Recogida automática local a las 08:00 Europe/Madrid; presupuesto inicial 1 € de scraping, ajustable a 2 €, pausa y botón idempotente de recogida del día. Todos los conectores públicos y conexiones activas se incorporan al lote; una conexión añadida tras cerrarse el lote entra al siguiente día.
+- Buscar ahora consulta SQLite: ninguna llamada a proveedores, scraper o IA. Pool de ventas digitales en español con remoto/híbrido; búsqueda y contador excluyen históricos heredados fuera de ese perfil. Filtros de publicación 1/3/7/10 días; fecha desconocida sigue identificada como tal.
+- Retirada del catálogo y snapshots buscables diez días desde primera incorporación, incluso marcadas; metadatos de búsquedas y evidencia técnica inmutable se conservan. Redescarga no renueva la fecha. Dedupe conservador por URL original exacta dentro de la organización; no agrupación semántica.
+- Migración aditiva v4 con backfill desde primera captura; copia de seguridad local previa. Reservas SQLite atómicas por organización/día/fuente, compartidas con ejecución manual. No liberan saldo por consumo bajo; un lanzamiento incierto bloquea nuevas ejecuciones hasta revisión. Reinicio reanuda importación sin repetir POST facturable. Las reservas liquidadas después de medianoche también cuentan ese día.
+- Solo nuevos Actors PPE con precio y cambio verificables; límite agregado convertido a USD con margen 30 %. No equivale a un tope de factura: excluye cuotas, impuestos, almacenamiento, IA y ejecuciones fuera de esta app. Sin FX vigente o esquema compatible se omite el lanzamiento y se intenta importar dataset previo.
+- Primera recogida real finalizada: 678 registros públicos revisados, seis coincidencias en Himalayas y cero registros en el dataset existente InfoJobs. Se reutilizó la extracción reciente de InfoJobs; no se lanzó un nuevo Actor ni se gastaron créditos para las pruebas.
+- Verificación final: 54 backend y 7 Playwright PASS, build/TypeScript y Ruff PASS. Incluye prueba con presupuesto Apify agotado y fuente pública que sigue importando. Catálogo real: siete ofertas elegibles contando incorporaciones previas; el reinicio conserva el mismo lote y reserva de hoy 0 €. Más detalle operativo en DAILY_CATALOG.md. Se mantiene el despliegue local: necesita app y ordenador encendidos; no ejecuta desde la nube ni recupera días perdidos.
+
+## Red de oportunidades — 2026-09-22
+
+- Navegación y presentación renombradas a «Red de oportunidades», sin atribuir acuerdos de colaboración a portales externos. Configuración técnica conservada en el panel administrativo local.
+- Buscar consulta el dataset Apify existente; la extracción se inicia con «Ejecutar scraper». Conectar la cuenta no activa una extracción automática de InfoJobs.
+- Verificación: build/TypeScript, 45 pruebas backend y 6 pruebas Playwright PASS; sin llamadas facturables a proveedores.
+
 ## Última entrega — Groq visible en preview (2026-09-22)
 
 - Conexión Groq implementada en Fuentes → Motor de IA; default para nuevas configuraciones, GPT-OSS 20B/120B, clave propia, guardar/comprobar y límites diarios. OpenAI permanece seleccionable con clave independiente.

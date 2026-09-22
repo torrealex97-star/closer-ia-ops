@@ -1,3 +1,5 @@
+> Actualización 2026-09-22: buscar utiliza ahora el catálogo local de diez días. La recogida diaria y los lanzamientos manuales comparten presupuesto; ver [Catálogo diario](DAILY_CATALOG.md). Las instrucciones de extracción anteriores se mantienen como contexto técnico.
+
 # Conexiones y análisis de ofertas
 
 Estado operativo actual: MVP local con Apify y análisis individual Groq/OpenAI mediante LLMProvider. Groq es principal por defecto; cada proveedor conserva su clave. En Fuentes → Motor de IA elige proveedor, pega su clave, guarda y comprueba. Cambiar de proveedor limpia la clave escrita para no enviarla al destino incorrecto. Configuración masiva/por tarea sigue pendiente: ver [16](spec/16_LLM_PROVIDER_GROQ.md) y [PLAN](PLAN.md).
