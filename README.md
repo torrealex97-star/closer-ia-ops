@@ -26,7 +26,7 @@ Los datos persisten en `.local/career.sqlite3`. No borres `.local` si quieres co
 
 ## Alcance real
 
-- Himalayas y We Work Remotely: conectores públicos, timeout/reintentos y caché de 15 minutos.
+- Seis conectores públicos: Himalayas, We Work Remotely, Get on Board, Remotive, Remote OK y Arbeitnow; timeout/reintentos y caché según proveedor.
 - Capturas inmutables, publicaciones y oportunidades separadas; búsquedas en cola durable con worker explícito.
 - Filtros deterministas, puntuación orientativa y avisos de incertidumbre. Sin IA de clasificación aún.
 - Idempotencia por fuente/publicación y por petición. Dedupe entre fuentes y revisión de merges pendientes.
@@ -56,3 +56,9 @@ Las pruebas de backend usan una base temporal y respuestas de proveedores contro
 ## Continuidad
 
 Leer `AGENTS.md`, `docs/STATUS.md`, `docs/PLAN.md` y la decisión `docs/decisions/ADR-006-local-first-delivery.md`. Las especificaciones originales completas están en `docs/spec`, incluidas las fases y ADR que antes solo estaban dentro del ZIP.
+
+## Nueva arquitectura aprobada
+
+[MASTER SPEC](docs/spec/00_MASTER_SPEC.md) y [PLAN](docs/PLAN.md) incorporan Groq principal mediante LLMProvider, WDCOpportunity para alumnas y expansión US hispana con [17 fichas](docs/spec/18_US_HISPANIC_SOURCE_RESEARCH.md). Administración conserva toda trazabilidad; la experiencia alumna prioriza empresa, condiciones y siguiente paso.
+
+La implementación local ya incluye Apify guiado y análisis individual OpenAI. Groq, la nueva proyección/portal y las nuevas fuentes siguen pendientes de sus fases: esta actualización es documental y no cambia la app que está en ejecución. Configuración instalada en [INTEGRATIONS](docs/INTEGRATIONS.md).

@@ -47,3 +47,9 @@ Execute in order:
 2. `P03B_UPWORK.md`
 3. `P03C_FACEBOOK.md`
 4. `P03D_SKOOL.md`
+
+## Actualización normativa — ADR-007
+
+El orden de integración se prioriza según PLAN y yield/acceso; no bloquear Groq/proyección por no activar las cuatro fuentes. Mantenerlas como pendientes hasta canary.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

@@ -194,3 +194,25 @@ Nunca devolver secreto/provider raw error completo a usuarios normales.
 FastAPI es la fuente del contrato backend.
 
 Frontend genera tipos desde OpenAPI en CI/build; no mantener interfaces duplicadas a mano.
+
+## Contratos objetivo separados (no implementados aún)
+
+El contrato ejecutable actual está en OpenAPI generado. Las rutas de este documento describen el destino; el modo local usa secreto loopback según ADR-006, no JWT de alumnas.
+
+- GET /admin/opportunities/{id}: job/postings/raw references, source/provider, runs, fechas, confidencias, costes, revisiones y relación.
+- POST /admin/opportunities/{id}/prepare: 202 generation/processing id; idempotency_key + input version.
+- PATCH /admin/opportunities/{id}: corrección editorial con expected_version; 409 si cambió.
+- POST /admin/opportunities/{id}/approve: actor autorizado, revisión y política; no equivale a publicar.
+- POST /admin/opportunities/{id}/verify: encola verificación con presupuesto.
+- GET /student/opportunities y GET /student/opportunities/{id}: DTO permitido WDCOpportunity de [17](17_WDC_OPPORTUNITY_EXPERIENCE.md), cursor/page_size, filtros de rol/idioma/elegibilidad/estado; sin raw, costos, prompts ni contactos privados.
+- POST /student/opportunities/{id}/next-step: versión presentada; valida estado/elegibilidad/destino. Devuelve acción y destino real o 409 OPPORTUNITY_STALE; no envía candidatura.
+- POST /student/opportunities/{id}/referrals: solo relación directa verificada + consentimiento + idempotency_key; 202 referral_id, no afirma envío.
+- GET /student/referrals/{id}: solo propia candidata/org.
+- GET/PATCH /admin/integrations/llm: provider=groq default, model_by_task, límites y has_key; nunca devuelve clave.
+- POST /admin/integrations/llm/check: valida credencial/capabilities sin generar texto; canary de pago es acción explícita separada.
+
+Admin/staff no equivale a student; JWT/membership y ownership se verifican server-side. Sin perfil no afirmar “para ti”; la preview usa contexto de prueba identificado como tal. DTO se serializa por allowlist, no por exclusión ad hoc. Attribution permitida puede incluir source_label/source_url cuando lo exija la fuente.
+
+Nuevos errores: LLM_RATE_LIMITED, LLM_BUDGET_EXCEEDED, LLM_RESULT_UNCERTAIN, OPPORTUNITY_STALE, OPPORTUNITY_CLOSED, ELIGIBILITY_UNKNOWN, RELATIONSHIP_UNVERIFIED, DISTRIBUTION_NOT_ALLOWED. Para student: mensaje accionable sin diagnóstico del proveedor.
+
+Implementar Pydantic/OpenAPI y regenerar TypeScript con cada corte. No editar contratos generados solo para simular endpoints documentados.

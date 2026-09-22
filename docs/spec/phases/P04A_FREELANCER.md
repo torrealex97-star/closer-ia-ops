@@ -147,3 +147,9 @@ Actualizar status a `expired/removed` cuando deje de aceptar propuestas.
 ## Research reference
 
 https://developer.freelancer.com/
+
+## Actualización normativa — ADR-007
+
+Extender suite ES/EN a clientes US; no inferir español por locale=.es ni elegibilidad por client_country. marketplace_application, atribución y cuenta de candidata explícitas.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

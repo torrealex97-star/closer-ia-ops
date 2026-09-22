@@ -76,3 +76,13 @@ Fallback/captura manual:
 - selected section.
 
 No es dependencia del buscador automático.
+
+## Orden revisado de evolución
+
+Antes del portal: P05A Groq/LLMProvider; P01B proyección/modelo y relaciones; P04K fuentes US en lotes pequeños; P05B normalización/verificación/WDCOpportunity; P06B preview de alumna en admin. Después acceso multiusuario seguro y portal. Preparar entidades no autoriza envíos ni crea relaciones ficticias.
+
+La primera experiencia de alumna mostrará empresa, oportunidad, condiciones y siguiente paso; trazabilidad técnica queda admin-only con atribución preservada. Matching combina requisitos/preferencias/competencias y evidencia, no reutiliza ciegamente el score de búsqueda como probabilidad personal.
+
+Evolución de conexiones: descubrimiento público → empresa/recruiter verificados → necesidad directa → selección de candidatas consentida → referral → introducción confirmada. P11_DIRECT_CONNECTIONS define criterios. companies, company_partnerships, recruiters, company_contacts, direct_opportunities, candidate_referrals e introductions evitan reconstruir adquisición.
+
+Groq también será default detrás de LLMProvider para futuros roleplays/entrevistas, con contratos y evaluación propios. Autoapply sigue separado de búsqueda y exige autorización/confirmación; no se activa por este cambio documental.

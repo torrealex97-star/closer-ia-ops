@@ -1,5 +1,7 @@
 # Conexiones y análisis de ofertas
 
+Estado operativo actual: MVP local con Apify y análisis individual OpenAI. Decisión objetivo: Groq principal detrás de LLMProvider; migración aún pendiente. Configuración propuesta, límites y fases en [16](spec/16_LLM_PROVIDER_GROQ.md) y [PLAN](PLAN.md). Las instrucciones OpenAI de abajo describen solo la versión instalada; no pegues una clave Groq en ese campo.
+
 En Fuentes, abrir Cuenta de Apify, guardar la clave y comprobarla. La comprobación consulta la cuenta; no ejecuta un Actor. Las conexiones heredan esta clave, salvo las que tengan una clave específica.
 
 Pulsar Conectar en el catálogo o Añadir fuente. Elegir proveedor, pegar enlaces si corresponde y preparar. El servidor busca candidatos, inspecciona esquema, versión y modalidad de precio y propone una configuración. Guardarla no consume una extracción. Ejecutar scraper es una acción separada; Buscar lee el dataset disponible. Las fuentes del catálogo no son una garantía de scraper operativo: esquemas incompatibles requieren configuración avanzada y la primera salida necesita verificación.

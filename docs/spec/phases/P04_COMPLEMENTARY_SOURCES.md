@@ -40,3 +40,9 @@ es muy bajo, su coste por oportunidad útil es alto o su mantenimiento consume m
 - source yield/cost observability;
 - distribution policies respected;
 - manual ingest sigue usando el mismo pipeline.
+
+## Actualización normativa — ADR-007
+
+Añadir P04K_US_HISPANIC_SOURCES y fichas de 18. APIs ATS, recruiters y boards hispanos se priorizan por yield/coste; no es necesario completar A–J antes de la proyección WDC.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

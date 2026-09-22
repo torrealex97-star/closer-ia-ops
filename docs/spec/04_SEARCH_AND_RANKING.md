@@ -113,7 +113,7 @@ Score por señales:
 Solo para generar un `duplicate candidate`.
 
 Umbrales iniciales:
-- `>= 0.95` + empresa/dominio iguales: auto-link permitido.
+- `>= 0.95` + empresa/dominio iguales: candidato fuerte; auto-link solo con identidad determinista adicional y política validada, nunca por score semántico aislado.
 - `0.80–0.95`: mantener separados o review candidate.
 - `< 0.80`: no merge.
 
@@ -130,7 +130,8 @@ application_url:
   careers/ATS company > LinkedIn > aggregator > social post
 
 published_at:
-  provider exact date > parsed text > discovered_at
+  provider exact publication date > parsed explicit publication date > null
+  discovered_at se conserva separado; nunca sustituye publicación
 
 salary:
   structured provider field > explicit text extraction > null
@@ -192,7 +193,7 @@ Relevance nunca se sustituye por popularidad de fuente.
 Cada resultado debe poder mostrar algo como:
 
 ```text
-92% match
+Encaje orientativo alto (score interno 0.92; no probabilidad)
 - Role: Closer ✓
 - Remote from Spain ✓
 - Posted: 11h ago ✓
@@ -209,3 +210,17 @@ Cada resultado debe poder mostrar algo como:
 4. permitir “ver todos” los candidatos aceptados.
 
 Nunca inventar 30 resultados si solo hay 12 válidos.
+
+## Búsqueda US hispana y procesamiento Groq
+
+Usar suite ES/EN de [18](18_US_HISPANIC_SOURCE_RESEARCH.md), ampliando roles de ventas sin reducir todo a “closer”. Mantener modo estricto Spanish-required y modo bilingüe/internacional opt-in; español como ventaja se registra separado de obligatorio. Portales hispanos y empresa latina no son evidencia de idioma.
+
+Separar mercado de clientes US de allowed_worker_countries. US-only se excluye para ES/LATAM; ubicación desconocida va a revisión. Híbrido exige oficina accesible. Distinguir inglés requerido y nivel, licencia profesional/autorización laboral explícita, horario y relación laboral/contractor. Ningún ranking puede sobreponerse a exclusión geográfica fiable.
+
+Límite inicial: 200 candidatos, máximo 3 queries por fuente, priorización por yield/coste, caché de listados y detección de cambios antes de descargar detalle. No iniciar todos los proveedores/Actors ni combinar todo el diccionario como una query AND. Conservar query real por connector_run.
+
+Extracción determinista → dedupe exacto → filtros baratos → Groq solo para ambigüedad/enriquecimiento → schema/evidencia → scoring explicable → WDCOpportunity. Un JSON combinado reutilizado cubre rol, condiciones, requisitos, idioma y resumen; no una llamada por cada campo. Gate por tokens/coste/tiempo y backpressure; detalles en [16](16_LLM_PROVIDER_GROQ.md).
+
+Scoring semántico es señal versionada no probabilidad de contratación. No puntuar género/etnia ni deducirlos; “alumnas” es voz de marca. La ficha alumna explica condiciones útiles, no muestra 0.96 de confianza como certeza. Dedupe semántico propone pares con revisión; no fusiona oportunidades distintas de una empresa.
+
+Freshness_score ordena, pero nunca demuestra activa. Solo VerificationService deriva estado conforme a [17](17_WDC_OPPORTUNITY_EXPERIENCE.md). Correcciones de salario/fecha/relación invalidan presentación y caché factual correspondiente.

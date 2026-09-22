@@ -26,3 +26,9 @@ Preparar operación diaria.
 
 ## Acceptance
 No scenario individual produce pérdida silenciosa o búsqueda completa fallida cuando otros sources funcionan.
+
+## Actualización normativa — ADR-007
+
+Añadir cuota/tokens/coste/uncertain Groq, fuga DTO, revocación de relación, verificación caducada y publicación obsoleta. Reinicio no repite solicitudes inciertas facturables.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

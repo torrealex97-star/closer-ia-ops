@@ -7,7 +7,8 @@ Server only:
 ```text
 SUPABASE_SECRET_KEY
 APIFY_TOKEN
-LLM_API_KEY
+GROQ_API_KEY
+OPENAI_API_KEY               # futuro secundario opt-in, no requerido
 FREELANCER_OAUTH_*
 DISCORD_*
 TELEGRAM_*
@@ -147,3 +148,11 @@ Configurable data export para recuperación de mappings de sources/providers.
 - publicación rate limit por destination.
 
 No permitir que doble click lance múltiples searches: idempotency key UI/API.
+
+## Groq, DTO y relaciones
+
+Configuración completa/limitadores en [16](16_LLM_PROVIDER_GROQ.md). Telemetría separa adquisición (source/provider/run) e IA (llm_provider/model/task/generation/attempt); conservar ambos aunque la alumna no los vea. Métricas: cache hit, tokens reservados/reportados, coste estimado/real/desconocido, queue time, 429, uncertain, invalid evidence, utilidad por token y fuente.
+
+No usar el secreto local como autenticación del portal. API de alumna con allowlist y autorización por membership/candidata; tests negativos de org y rol. Contactos, consentimientos y evidencias de acuerdos requieren acceso restringido y retención definida. No incluir CV/perfil de candidata en extracción masiva de ofertas.
+
+Auditar activación Groq, cambio de modelos/límites, fallback, aprobación de revisión, atribución, relación verificada/revocada, siguiente paso y envío real. Logs sin prompts/raw completos ni secretos. Contenido scrapeado no instruye al sistema ni habilita tools. Pausar por límite no elimina resultados ya procesados.

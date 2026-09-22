@@ -201,3 +201,9 @@ P04J Wellfound/startups
 - Careerjet Publisher API: https://www.careerjet.com/partners/api
 - Talent.com Publisher Program: https://employers.talent.com/publishers
 - WhatJobs Publisher Program: https://www.whatjobs.com/affiliates
+
+## Ampliación US hispana — revisión vigente
+
+La investigación adicional, prioridades y 17 fichas están en [18_US_HISPANIC_SOURCE_RESEARCH](18_US_HISPANIC_SOURCE_RESEARCH.md). Ese orden de spikes complementa/sustituye la secuencia lineal anterior según yield y acceso público. Las afirmaciones históricas de volumen/API de este archivo deben revalidarse antes de implementar.
+
+Incluye job boards hispanos, redes profesionales, recruiters LATAM→US, ventas/startups y ATS. Mantener marketplaces y feeds existentes con consultas ES/EN. Ninguna fuente añade elegibilidad internacional por pertenecer a un portal latino.

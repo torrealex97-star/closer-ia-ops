@@ -139,3 +139,9 @@ Esto evita que la lógica de publicación ignore condiciones de cada feed.
 - https://weworkremotely.com/remote-job-rss-feed
 - https://remoteok.com/faq
 - https://remotive.com/remote-jobs/api
+
+## Actualización normativa — ADR-007
+
+Añadir suite US Spanish/bilingual manteniendo políticas de redistribución. No retirar atribución para centrar empresa; feed reciente no demuestra vacante activa.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

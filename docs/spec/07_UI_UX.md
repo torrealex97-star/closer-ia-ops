@@ -1,152 +1,34 @@
-# UI / UX
+# UI / UX — dos superficies
 
-## Principio
+Objetivo según [ADR-007](../decisions/ADR-007-groq-opportunity-surfaces.md). El runtime actual es una mesa administrativa local. Esta revisión especifica el preview y posterior portal de alumnas, no afirma que estén implementados.
 
-La interfaz principal debe responder a:
+## Admin / staff
 
-> “¿Qué estoy buscando, qué fuentes están trabajando y qué oportunidades utilizables tengo ya?”
+Mantener Search Builder, Live Run, resultados progresivos, selección, historial, exportación y gestión de fuentes. Datos técnicos visibles aquí: source, provider, Actor/version, source_url, canonical_url, external_id, raw, job_posting, scrape_run/provider_used, first_seen, last_verified, duplicados, confianza por campo y relevancia orientativa.
 
-## 1. Search Builder
+Fuentes: asistentes comprensibles con controles avanzados colapsados; catálogo distingue disponible, por conectar, en validación y bloqueada. No presentar todos los sitios investigados como funcionando.
 
-Ruta: `/search`
+Motor IA: Groq principal, estado de clave/modelos/capabilities, límites de gasto/tokens y uso; sin secretos al reabrir. Proveedor secundario futuro explícito. Mostrar rate limited/en cola/revisión, sin lanzar retries facturables al refrescar.
 
-Campos:
-- rol;
-- keyword;
-- país/ubicación;
-- remote;
-- idioma;
-- experiencia;
-- compensación;
-- antigüedad;
-- fuentes;
-- target results.
+Detalle admin añade estado editorial, vigencia, evidencias de relación, correcciones auditadas y Preview alumna. Revisar/publicar separado de ejecutar scraper. Score nunca rotulado como probabilidad.
 
-Controles avanzados colapsados:
-- include/exclude;
-- strict/prefer salary;
-- per-source limits.
+## Alumna
 
-CTA principal:
-`Buscar oportunidades`.
+La pregunta principal es “¿Qué empresa busca un perfil como el mío, con qué condiciones y cómo avanzo?”. Ficha: empresa → puesto → remoto/híbrido y países permitidos → fijo/comisiones/potencial declarado → idioma/experiencia → qué buscan y qué harías → estado y fecha → acción.
 
-## 2. Live Search Run
+Contrato, copy y matriz de CTA normativos en [17](17_WDC_OPPORTUNITY_EXPERIENCE.md). No mostrar fuentes como columna protagonista. Procedencia en detalles o atribución obligatoria, sin ocultar destino real al continuar.
 
-Ruta: `/runs/{id}`
+Activa/Verificando/Cerrada con texto/icono/color; fecha original independiente de descubierta. Desconocidos explícitos. “Seleccionada por WDC” exige selección registrada; “conexión directa” exige relación vigente. Sin perfil no fingir personalización.
 
-Header:
+Aplicar ahora / Solicitar conexión / Enviar candidatura / Contactar recruiter / Continuar candidatura / Ver proceso se resuelven por application_type y relación. Si falta URL/canal o está cerrada, acción deshabilitada con motivo, nunca botón vacío. Antes de salida externa identificar dominio/plataforma y posible cuenta; sin envío automático.
 
-```text
-Closer · España · Remote · >= 2.000 EUR
-Running · 01:18
-157 candidatos · 24 oportunidades
-```
+## Estados y accesibilidad
 
-Source status:
+Admin: empty, queued, partial, degraded, no results, completed, cancelled, failed, export/publish pending/success/error.
+Alumna: loading, empty con filtros accionables, active, verifying, closed, restricción geográfica, proceso externo, referral pending y acceso denegado.
 
-```text
-LinkedIn      ✓ 48
-Skool         ✓ 22
-Facebook      … 31
-Upwork        ✓ 37
-Freelancer    ⚠ timeout -> fallback
-ATS           ✓ 19
-```
+Responsive: admin desktop-first, tablet y móvil sin overflow; portal alumna mobile-first, CTA legible, foco/teclado, contraste y semántica accesible. No depender solo del color. Diseño visual existente de WDC se conserva; ver [DESIGN](../DESIGN.md).
 
-Un fallo muestra warning, no pantalla roja global.
+## Aceptación
 
-## 3. Results table
-
-Columnas:
-
-```text
-select
-score
-role/title
-company/client
-location
-remote
-compensation
-source(s)
-published
-status
-actions
-```
-
-Filtros locales no relanzan sources; filtran el resultado ya producido.
-
-## 4. Job detail
-
-Mostrar:
-
-- título;
-- empresa/cliente;
-- match explanation;
-- resumen;
-- descripción;
-- requisitos;
-- compensación;
-- apply;
-- sources;
-- provenance;
-- discovered/posted/last checked.
-
-Acciones:
-
-```text
-Copy
-Open original
-Export
-Publish
-Mark invalid
-Mark duplicate
-Edit
-```
-
-## 5. Saved searches
-
-Ruta `/saved-searches`.
-
-```text
-Closers ES Remote
-Last run: today 09:00
-25 new
-Schedule: every 6h
-[Run now]
-```
-
-## 6. Sources health
-
-Ruta `/sources`.
-
-```text
-Source     Provider        Health     p95     Last success
-LinkedIn   provider-a      healthy    31s     2m
-LinkedIn   provider-b      standby    -       -
-Skool      provider-a      healthy    44s     5m
-```
-
-## 7. Publication
-
-Preview antes de enviar.
-
-Bulk select + destination + template.
-
-## UX states obligatorios
-
-- empty before search;
-- queued;
-- partial results;
-- source degraded;
-- no results;
-- completed;
-- cancelled;
-- global failed;
-- export generating;
-- publication pending/success/error.
-
-## Responsive
-
-Desktop-first interno.
-Tablet usable.
-Mobile no es prioridad MVP.
+Un admin llega desde raw hasta el preview sin perder provenance. Una alumna identifica empresa/rol/condiciones/siguiente paso sin entender conectores. Su respuesta API no contiene raw, provider, tokens, costes, contactos privados o evidencias internas de partnership. Fuente visible cuando corresponda a política. Pruebas cubren los seis connection_type, estados, unknown company/salary/date y móvil.

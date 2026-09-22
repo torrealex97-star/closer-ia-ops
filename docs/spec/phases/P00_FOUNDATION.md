@@ -34,3 +34,9 @@ Solo placeholders. Nunca valores reales.
 
 ## Do not
 No integrar sources todavía.
+
+## Actualización normativa — ADR-007
+
+Añadir placeholders Groq/LLMProvider de 16 y capability config, sin secretos ni dependencia de OpenAI por defecto. Mantener lockfiles reales y ADR-006 local.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

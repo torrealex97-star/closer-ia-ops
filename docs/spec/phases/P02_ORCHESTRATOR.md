@@ -28,3 +28,9 @@ Búsqueda con 3 mocks:
 - failed source genera warning;
 - final status `partial`;
 - ningún raw duplicado por retry.
+
+## Actualización normativa — ADR-007
+
+Separar adquisición de cola IA/proyección; backpressure por proveedor/modelo y presupuesto; primeros resultados deterministas no esperan Groq. Suite ES/EN y restricciones de trabajador distintas del mercado US.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

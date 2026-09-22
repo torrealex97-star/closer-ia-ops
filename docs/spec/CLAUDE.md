@@ -23,3 +23,7 @@ Evita:
 - meter provider payloads en modelos de dominio;
 - hardcodear secrets, actor IDs o taxonomía en componentes UI;
 - usar IA donde un parser determinista resuelve el dato.
+
+## Decisión explícita posterior
+
+LLMProvider está requerido por el usuario desde ADR-007 aunque inicialmente Groq sea el único proveedor principal. Encapsular OpenAI existente y conservar su historial. Esta decisión prevalece sobre la recomendación genérica de esperar dos implementaciones para abstraer.

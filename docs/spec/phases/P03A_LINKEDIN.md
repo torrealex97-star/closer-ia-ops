@@ -46,3 +46,9 @@ Priorizar:
 
 ## Acceptance
 Una query `closer + Spain + remote + 72h` devuelve raw items trazables y el provider puede ser reemplazado sin cambiar SearchOrchestrator.
+
+## Actualización normativa — ADR-007
+
+Añadir consultas US ES/EN y evidencia de español/país permitido. ATS de empresa preferido para vigencia; no implica relación WDC. Registrar external_application y proceso real, conservando Easy Apply.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

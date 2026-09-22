@@ -128,3 +128,9 @@ cold calling
 ## Research reference
 
 https://himalayas.app/api
+
+## Actualización normativa — ADR-007
+
+Conservar atribución requerida también en ficha alumna. locationRestrictions/timezoneRestrictions tienen prioridad sobre etiqueta remote; probar US-only vs España/LATAM.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

@@ -134,3 +134,13 @@ Aliases se guardan en configuración, no hardcodeados en conectores.
 - autoapply;
 - outreach automático;
 - marketplace público.
+
+## Revisión WDC: admin y alumna
+
+El MVP local sigue siendo administrativo; preparar ahora modelo/DTO y preview de alumna, sin afirmar que existe portal/login. La experiencia objetivo prioriza empresa, rol, condiciones, vigencia y siguiente paso, conforme a [17](17_WDC_OPPORTUNITY_EXPERIENCE.md). La procedencia completa sigue disponible para admin.
+
+Groq es proveedor principal de todas las tareas IA mediante LLMProvider; ver [16](16_LLM_PROVIDER_GROQ.md). El código OpenAI actual es transitorio, no decisión de proveedor futuro.
+
+Extender mercados a Europa en español y US hispano/internacional con búsqueda ES/EN. Añadir dm_setter, enrollment_advisor, sales_consultant, cold_caller, lead_generation y telemarketing a la taxonomía configurable; no clasificar cualquier soporte/marketing como ventas. manager/customer_success solo en perfiles ampliados.
+
+Nuevos filtros: customer_market, employer_country, allowed_worker_countries, residency_required, work_authorization, timezone_overlap, spanish_requirement (required/preferred/unknown), english_level, connection_type, opportunity_status y verified_within_hours. La lista actual de filtros es objetivo de contrato; STATUS describe lo disponible.

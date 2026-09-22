@@ -28,3 +28,9 @@ Implementar schema y contratos base.
 Crear manualmente:
 `source -> provider -> search_run -> connector_run -> raw_item -> posting -> job -> search_result`
 con integridad referencial.
+
+## Actualización normativa — ADR-007
+
+Completar extensión P01B: WDCOpportunity versionada, verificaciones, connection_type/application_type, relaciones directas y org_id/FKs; raw sin estados mutables.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

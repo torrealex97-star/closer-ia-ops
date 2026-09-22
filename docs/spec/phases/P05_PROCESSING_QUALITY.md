@@ -31,3 +31,9 @@ Gold set inicial:
 - false merge < 1%.
 
 Si no cumple, la fase no termina.
+
+## Actualización normativa — ADR-007
+
+Desglosar P05A Groq y P05B WDCOpportunity; LLMProvider default groq y extracción combinada. Añadir gold set US-only/ES/LATAM/idioma, OTE, actividad y copy factual; score no es probabilidad.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

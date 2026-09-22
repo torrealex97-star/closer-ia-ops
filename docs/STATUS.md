@@ -61,3 +61,13 @@ Automatización «Mejora diaria WDC» activa a las 09:00 (hora local), vinculada
 ## Pendiente de siguientes fases
 
 Supabase/Auth/RLS, portal de alumnas, clasificación IA y gold set, publicación externa con políticas por fuente, programación de búsquedas, fallback real entre proveedores, roleplays, entrevistas y autoapply. Ver PLAN y ADR-006. Las búsquedas guardadas hoy se repiten manualmente.
+
+## Revisión de arquitectura — Groq, US y WDC Opportunity (2026-09-22)
+
+- Actualización documental solicitada, registrada en ADR-007. MASTER SPEC, alcance, arquitectura, dominio, búsqueda, conectores, contratos objetivo, UX, publicación, operación, aceptación y fases alineados.
+- Nuevos documentos: LLMProvider/Groq; WDCOpportunity/CTA/vigencia; investigación US; 17 fichas de fuentes; seis fases de implementación y registro de revisión documental.
+- Groq será default; el código sigue usando OpenAI para análisis individual. No se añadió adaptador, variable activa, endpoint ejecutable, tabla nueva ni conexión real con Groq en esta entrega.
+- Fuentes nuevas incorporadas a documentación/backlog, no al catálogo runtime. Acceso público y límites investigados con referencias; ninguno de estos scrapers se ejecutó ni consumió créditos.
+- Próximo incremento: P05A_GROQ_PROVIDER, después P01B_OPPORTUNITY_DOMAIN, P04K por lotes, P05B y P06B; PLAN prevalece sobre el backlog anterior.
+- Portal de alumnas, conexiones directas y políticas de publicación descritos como objetivo; no implementados por crear sus MD.
+- Verificación de esta entrega: referencias Markdown locales, inventario, cobertura de requisitos y diff; no se han vuelto a ejecutar las suites runtime porque no cambió código. Los resultados de 40 backend/5 navegador anteriores corresponden a la entrega de integraciones.

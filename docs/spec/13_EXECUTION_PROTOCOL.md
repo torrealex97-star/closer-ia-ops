@@ -42,9 +42,9 @@ Sugerido:
 
 ```text
 main
-  └── phase/00-foundation
-  └── phase/01-domain-db
-  └── phase/02-orchestrator
+  └── codex/00-foundation
+  └── codex/01-domain-db
+  └── codex/02-orchestrator
   ...
 ```
 
@@ -104,3 +104,11 @@ Debe existir:
 Código + tests + docs + migration + observability necesaria.
 
 “Funciona en mi máquina” no cierra una fase.
+
+## Revisión documental y siguiente implementación
+
+Leer PLAN/STATUS además de fase; siguiente corte pendiente P05A_GROQ_PROVIDER. La excepción a una fase por cambio aquí es la actualización transversal de arquitectura solicitada expresamente por el usuario, sin implementación de runtime.
+
+Un cambio solo documental se verifica con diff, referencias locales y consistencia de requisitos/estado; no exige simular ejecución de tests de código. Nuevos endpoints/envs/modelos documentados permanecen “objetivo” hasta su corte de implementación. Mantener distinción admin/alumna, source/provider/llm_provider y evidencia de relación.
+
+Usar ramas codex/ por defecto, salvo petición distinta.

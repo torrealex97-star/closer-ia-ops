@@ -200,3 +200,17 @@ No se hace migración silenciosa de resultados históricos.
 - web puede correr con package manager.
 
 Los conectores externos se mockean en CI excepto suites contractuales dedicadas.
+
+## Arquitectura WDC y Groq (ADR-007)
+
+Las carpetas/colas anteriores describen el destino, no el árbol implementado: hoy API y worker Python viven en apps/api/career y la persistencia es SQLite. No crear servicios nuevos por cada responsabilidad.
+
+Separar Acquisition (source/provider, raw, runs) de Canonical Processing (parsers, LLMProvider, evidencia/dedupe) y Opportunity Presentation (revisión, verificación, DTO versionado). Dos routers/servicios de lectura: AdminOpportunityDetail y StudentOpportunity. No enviar el objeto admin completo y esconder campos en React.
+
+GroqAdapter detrás de LLMProvider es default; OpenAIAdapter conserva generaciones heredadas como proveedor secundario opt-in. Configuración/secret_ref por org y task, modelo/versiones por intento. Ver [16](16_LLM_PROVIDER_GROQ.md).
+
+Colas lógicas adicionales: classify-candidate, build-opportunity, verify-opportunity, prepare-referral. Se implementan inicialmente sobre la cola durable existente; Supabase sigue pendiente. Backpressure por cuenta/modelo y presupuestos antes de llamadas. Eventos: llm.queued/completed/uncertain, opportunity.reviewed/published/status_changed, relationship.verified/revoked, referral.requested. No requieren bus separado.
+
+OpportunityBuilder recibe hechos aceptados y referencias, no se conecta a fuentes. VerificationService controla actividad/TTL; RelationshipService controla evidencia de relación; ApplicationResolver deriva CTA/destino. Publisher y portal consumen misma revisión aprobada. Una corrección genera nueva versión, nunca edita raw ni reescribe exportaciones históricas.
+
+Prever companies, partnerships, recruiters, contacts, direct_opportunities, referrals e introductions; la necesidad enviada directamente por empresa entra también por raw/posting. No asumir que una empresa con ATS público es partner.

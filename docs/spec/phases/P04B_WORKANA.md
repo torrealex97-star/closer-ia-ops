@@ -134,3 +134,9 @@ role classifier in {closer, appointment_setter, sdr, bdr}
 
 - https://www.workana.com/es/jobs
 - https://www.workana.com/es/work/freelancers
+
+## Actualización normativa — ADR-007
+
+Extender consultas US-market ES/EN; marketplace_application y proceso externo transparente. Salario/potencial no se infiere de presupuesto.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

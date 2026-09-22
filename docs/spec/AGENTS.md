@@ -76,3 +76,7 @@ Entregar:
 - criterios de aceptación cumplidos/no cumplidos.
 
 No declarar fase terminada si queda un criterio de aceptación rojo.
+
+## Revisión WDC / Groq
+
+Leer documentos 16–18 y ADR-007 cuando afecten al área. default_llm_provider=groq es objetivo; no afirmar migración hecha hasta tests/canary. Student DTO separado por allowlist; nunca inferir relación directa de URL/empresa. Mantener source/provider/raw íntegros en administración. Actualizaciones documentales se validan con enlaces/consistencia, sin declarar tests runtime no ejecutados.

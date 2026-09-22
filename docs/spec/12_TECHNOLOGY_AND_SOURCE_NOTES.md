@@ -48,3 +48,11 @@ Actualmente publica un catálogo/API de millones de ofertas desde ATS/company ca
 ## Rule
 
 No congelar IDs de Actors/vendors en la arquitectura. Guardarlos como configuración de `source_providers`.
+
+## Actualización Groq y US — 2026-09-22
+
+Groq es default objetivo según ADR-007; modelos de producción y structured outputs verificados en documentación oficial enlazada en [16](16_LLM_PROVIDER_GROQ.md). No asumir streaming/tools para JSON strict ni cuotas iguales en todas las cuentas. Revalidar capacidades antes del canary.
+
+Fuentes nuevas y límites de evidencia en [18](18_US_HISPANIC_SOURCE_RESEARCH.md). LatPro redirige a DiversityJobs; HispanicPro remite a Hispanic-Jobs. ATS públicos por empresa tienen documentación oficial; el resto requiere spike y política de distribución. Un actor sugerido no demuestra acceso ni legitimidad del output.
+
+Los números de frameworks del paquete original son históricos: lockfiles y STATUS reflejan runtime; esta actualización no cambia dependencias.

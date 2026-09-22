@@ -205,3 +205,13 @@ Por provider:
 - result cap.
 
 Persistir `actual_cost`.
+
+## Ampliación US y separación de presentación
+
+Matriz/fichas por fuente en [18](18_US_HISPANIC_SOURCE_RESEARCH.md). Reutilizar conectores de mercados actuales con SourceQuery ES/EN antes de duplicar implementaciones. APIs ATS por tenant y recruiters LATAM→US priorizados; job boards hispanos amplían descubrimiento, sin inferir elegibilidad.
+
+Capacidades adicionales: public_without_personal_account, application_requires_candidate_account, worker_country_filter, language_filter, status_revalidation, redistribution_policy_known. Estado de integración: researched → spike → contract_tested → canary_verified → enabled; una ficha documental no pasa automáticamente a enabled. URL/Actor configurables y validados por fuente; no dar por compatible un Actor por coincidir solo en título del Store.
+
+SourceDistributionPolicy distingue internal_admin_display, student_display, external_publish, export, requires_attribution, attribution_text/url/placement, allowed/blocked_targets, verified_at y terms_url. Política desconocida no habilita redistribución externa. Registro de alias/sindicación: LatPro→DiversityJobs, board HispanicPro→Hispanic-Jobs. Fuentes duplicadas no multiplican presupuesto.
+
+Conector entrega raw con fuente/proveedor/run/version/query completos; jamás decide copy WDC, relación directa o next_step. country del cliente no se mapea a country permitido del trabajador. Oportunidad de empresa directa entra por conector intake interno con raw y canal autorizado.

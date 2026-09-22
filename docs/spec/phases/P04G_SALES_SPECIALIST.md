@@ -117,3 +117,9 @@ Buena fuente de recall. Si el resultado apunta a una vacante que ya existe en AT
 - https://www.commissioncrowd.com/listings/commission-only-sales-opportunities/opportunities/
 - https://www.repvue.com/sales-jobs
 - https://www.workingnomads.com/remote-closer-jobs
+
+## Actualización normativa — ADR-007
+
+US expansion: fichas RepVue/Working Nomads y SalesJobs en sources/. RepVue devolvió 403 en revisión 2026-09-22: canary pendiente, no acceso validado. OTE/benchmarks no son fijo de vacante.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

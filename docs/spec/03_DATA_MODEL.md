@@ -128,8 +128,6 @@ raw_html text null
 raw_json jsonb null
 content_hash text
 captured_at timestamptz
-processing_status text
-processing_error text null
 schema_hint text null
 ```
 
@@ -369,3 +367,57 @@ Añadir búsqueda full-text Postgres a título/description si se necesita; no in
 - claves secretas de backend bypass RLS y nunca llegan al browser;
 - `raw_items`, provider config, costs y eventos son backend/admin only;
 - destinos de publicación solo son visibles/editables por su owner/admin.
+
+## Extensión normativa WDC (objetivo, migraciones pendientes)
+
+Todas las entidades privadas anteriores y siguientes incluyen org_id NOT NULL. owner_id no sustituye organización. FKs compuestas (org_id, id), índices con org_id y autorización impiden enlaces cruzados. companies es por organización hasta decidir catálogo común: unicidad (org_id, domain) parcial, no domain global. sources puede ser catálogo público, pero configuración, credenciales, snapshots y resultados son privados por org.
+
+raw no contiene estado mutable: processing_tasks(raw_item_id, stage, status, error, version, timestamps) lo separa. Cada captura nueva crea otro raw; no actualizar payload. connector_runs conserva provider y provider_run_id: scrape_run es su subejecución externa/referencia, no se pierde al cambiar proveedor.
+
+### opportunity_versions y opportunities
+
+opportunities: id, org_id, job_id FK, current_version_id, editorial_status, created_at, updated_at; UNIQUE(org_id, job_id).
+opportunity_versions: id, org_id, opportunity_id FK, version, locale, headline, company_name nullable, role, short_summary, what_they_are_looking_for JSON, what_you_would_do JSON, compensation_summary, location_summary, language_requirements JSON, experience_summary, why_it_may_be_interesting JSON, connection_type, application_type, application_url nullable, next_step JSON, field_provenance JSON, generation_id nullable, job_revision_hash, presentation_schema_version, created_by, reviewed_by nullable, reviewed_at nullable, selection_method, selection_policy_version, created_at.
+UNIQUE(org_id, opportunity_id, locale, version). Revisiones inmutables; pointer actual cambia con control optimista. Por idioma se selecciona la última revisión aprobada compatible; no mezclar campos de versiones distintas.
+
+published_relative se deriva de published_at en respuesta, nunca se almacena como “hace dos días”. Datos de fecha/actividad vienen del job y su verificación vigente, no de texto LLM cacheado.
+
+### verification_events y elegibilidad
+
+verification_events: id, org_id, job_id, posting_id nullable, checked_at, result (open/closed/unknown), method, evidence_raw_id, valid_until, reason_code, verifier_version.
+Estado derivado opportunity_status (active/verifying/closed), last_verified_at, verified_until, status_reason, closed_at. Índice (org_id, opportunity_status, verified_until). Política de conflictos/TTL en [17](17_WDC_OPPORTUNITY_EXPERIENCE.md).
+
+Hechos de elegibilidad en job/posting: employer_country, customer_markets[], allowed_worker_countries[], excluded_worker_countries[], residency_required, work_authorization_requirements, timezone_overlap, languages con required/preferred/level/evidence. allowed vacío = desconocido, nunca worldwide implícito.
+
+Compensación: base_min/max, commission_text/rate nullable, ote_min/max, currency, period, amount_kind, compensation_evidence. No sumar base y OTE ni convertir un presupuesto total en mensual. Potencial es declarado, no predicho.
+
+### Relaciones directas y referencias
+
+| Entidad | Campos y relaciones esenciales |
+|---|---|
+| companies | id/org, nombre/dominio/identidad; dominio coincidente no crea partnership |
+| company_partnerships | company_id, status (pending/verified/revoked/expired), type, evidence_ref, scope, verified_by/at, valid_until |
+| recruiters | id/org, company_id nullable, nombre/identidad profesional y estado de verificación |
+| company_contacts | company_id, recruiter_id nullable, contacto privado, finalidad/autorización, source/evidence_ref, verified_at; no DTO alumna por defecto |
+| direct_opportunities | company_id, job_id, posting_id, partnership_id nullable, recruiter_id nullable, evidence_ref, intake_raw_id, authorized_channel, relationship_status |
+| candidate_referrals | opportunity_id/version, candidate_id, consent_ref, partnership/recruiter/channel_ref, status, idempotency_key, requested_at; UNIQUE(org_id,idempotency_key) |
+| introductions | referral_id, contact_id, authorized_by, status, external_message_id nullable, sent_at nullable, response_at nullable |
+
+direct_company exige evidence_ref y relationship_status=verified aunque no haya partnership contractual. direct_recruiter exige identidad y autorización para la vacante. Revocación invalida uso futuro; histórico conserva evidencia y revisión anterior. Referrals usan contacto privado server-side, no exponen correo automáticamente.
+
+Referrals: requested → approved → prepared → sent → acknowledged/declined; cancelled/failed posibles. “sent” requiere confirmación del canal, nunca un click. Candidata consiente datos/destinatario; reglas de envío viven fuera de acquisition.
+
+### IA y coste
+
+Ampliar ai_generations actual con provider, task, schema_version, input_hash/config_hash, organization_id equivalente a org_id existente, actual_cost nullable, estimated_cost, pricing_version y estado uncertain. Backfill provider=openai para histórico, sin volver a generar.
+llm_attempts: generation_id, attempt, provider/model, provider_request_id, token_usage, latency, status/error, timestamps.
+budget_reservations: org/run/generation, token_cap, estimated_cost, status, reserved_at, settled_at; transacciones evitan carreras.
+UNIQUE cache por org/task/input_hash/provider/model/prompt/schema/config; no compartir datos entre organizaciones.
+
+### Migración e integridad
+
+Forward-only tras v2 local: ampliar IA → entidades/proyección → backfill como draft/verifying/external_application sin inventar relaciones → preview → habilitar publicación tras revisión. Si no se puede determinar modalidad de candidatura, application_type=unknown y CTA deshabilitado. No marcar automáticamente todo el histórico como active. RLS de portal exige org/membership y approved/published; raw, contactos, costes y relaciones privadas son admin-only.
+
+### Empleo y proyectos freelance
+
+Mantener opportunity_kind=employment|freelance_project|contract|commission_only y compensation_type=base_only|commission_only|base_plus_commission|per_appointment|per_closed_deal|revenue_share|ote|unknown. Commission-only puede ser relevante, según filtros explícitos; no es motivo automático de rechazo. budget_min/max/currency/type (fixed/hourly/commission/unknown), project_duration, bid_deadline y proposals_count pertenecen a proyectos; no convertirlos en salario periódico.

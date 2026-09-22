@@ -117,3 +117,9 @@ para vigencia y apply URL cuando haya contradicción.
 
 - https://developer.infojobs.net/
 - https://developer.infojobs.net/documentation/operation/offer-list-9.xhtml
+
+## Actualización normativa — ADR-007
+
+Estado real: asistente Apify local preparado; API oficial de esta fase sigue pendiente de validar credenciales/operación. No confundir esa ruta objetivo con integración oficial ya existente.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

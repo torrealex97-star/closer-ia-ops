@@ -90,3 +90,9 @@ Para closer/high-ticket:
 ## Research reference
 
 https://wellfound.com/jobs
+
+## Actualización normativa — ADR-007
+
+Suite Spanish SDR/BDR/AE/enrollment y US-market; evidencia de contratación internacional/idioma antes del feed de alumna. Ficha WELLFOUND en sources/.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

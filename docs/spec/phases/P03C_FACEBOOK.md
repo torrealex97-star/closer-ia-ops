@@ -37,3 +37,9 @@ No se asume acceso anónimo. Cualquier capacidad autenticada futura vive en un p
 
 ## Acceptance
 Grupos conocidos producen posts recientes; errores de un grupo no cancelan otros; cada oferta conserva permalink.
+
+## Actualización normativa — ADR-007
+
+Discovery de comunidades públicas US hispanas por URL concreta validada. No miembros/contactos privados; clasificar promociones/no-empleo; community_opportunity hasta prueba de relación.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

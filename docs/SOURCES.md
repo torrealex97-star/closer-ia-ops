@@ -48,3 +48,11 @@ Una respuesta incierta bloquea nuevos lanzamientos. Revisa la consola de Apify y
 - [LinkedIn: Actor de referencia](https://apify.com/curious_coder/linkedin-jobs-scraper)
 
 Se verificaron públicamente los seis feeds. Los Actors de pago están documentados y probados con fixtures; no se han ejecutado con una cuenta real ni se han consumido créditos.
+
+## Expansión documental US — 2026-09-22
+
+La nueva investigación añade 17 fichas priorizadas en [18_US_HISPANIC_SOURCE_RESEARCH](spec/18_US_HISPANIC_SOURCE_RESEARCH.md). El catálogo ejecutable sigue con 33 entradas y seis conectores públicos; esta entrega no cambia esos recuentos ni activa scrapers.
+
+Prioridad: ATS por empresa (Greenhouse/Lever/Ashby), recruiters LATAM→US (Remote Latinos/HireLATAM/Near), boards hispanos (Hispanic-Jobs/iHispano/DiversityJobs) y fuentes remotas/ventas/comunidades. Acceso y bloqueos documentados por ficha; sin Actors nuevos declarados operativos.
+
+Buscar ES/EN separando US como mercado de clientes de residencia permitida. Español requerido/preferido, inglés, oficina híbrida y autorización laboral son criterios independientes. Admin conserva source/provider/raw; alumna recibe proyección centrada en empresa y condiciones con atribución necesaria.

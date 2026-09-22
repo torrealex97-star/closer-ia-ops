@@ -131,3 +131,9 @@ para futuro `source_trust_score`.
 - https://www.peopleperhour.com/freelance-cold-calling-jobs
 - https://www.peopleperhour.com/freelance-commission-sales-jobs
 - https://www.guru.com/d/jobs/
+
+## Actualización normativa — ADR-007
+
+Consultas bilingües y clientes US; account/canal externo honestos, empresa desconocida nullable y no derivada del portal. Elegibilidad de trabajador separada.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

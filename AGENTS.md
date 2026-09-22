@@ -9,3 +9,5 @@ No invented listings, salaries, dates or eligibility. Expose unknowns. A failed 
 OpenAPI generates frontend types. Keep providers replaceable and paid integrations opt-in.
 Run backend tests, web typecheck/build and relevant browser checks. Record evidence and limitations in docs/STATUS.md.
 Do not deploy local mode publicly. Do not send messages or applications automatically without explicit configuration and authorization.
+
+Architecture revision: docs/decisions/ADR-007-groq-opportunity-surfaces.md and docs/spec/16_LLM_PROVIDER_GROQ.md define Groq as the target default behind LLMProvider. Current runtime status remains in STATUS. Student WDCOpportunity is a separate allowlisted projection; never remove admin provenance or infer a direct WDC relationship from a public company URL. Documentation-only changes require link/consistency verification; do not claim runtime tests were run.

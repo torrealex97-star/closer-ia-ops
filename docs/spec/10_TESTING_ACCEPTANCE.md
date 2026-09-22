@@ -117,3 +117,17 @@ MVP se considera listo cuando:
 8. gold set alcanza gates;
 9. métricas por provider visibles;
 10. runbook permite diagnosticar source failures.
+
+## Gates añadidos por ADR-007
+
+- Contrato LLMProvider con Groq y adaptador legado: structured strict, truncación, JSON inválido, evidencia inexistente, modelo no disponible, auth, 429/Retry-After, timeout incierto, reinicio, caché por org/proveedor/versiones y presupuestos concurrentes.
+- Tests externos con HTTP local + DB/worker real; canary de proveedor real separado con credenciales WDC, nunca parte obligatoria de CI ni gasto implícito.
+- Migración mantiene raw e historial OpenAI; ninguna fila se reclasifica como generada en Groq.
+- Dataset de >=200 casos ES/EN estratificado: US-only, LATAM, España, hybrid, inglés obligatorio, español preferido/ambiguo, OTE/comisión, fecha desconocida, cerrada y comunidades. Medir subgrupos además de score agregado.
+- Presupuesto/performance: 200 candidatos, p95 <=5 min con cuenta/límites y cache-hit declarados, múltiples runs, time-to-first <=60 s; reportar degradación real. No excluir silenciosamente llamadas lentas del coste.
+- Student DTO: cero secretos/raw/contactos privados/costes/proveedores; mismas oportunidades admin trazables al 100%; tests cross-org y rol.
+- Seis connection_type: URL ATS pública no activa relación directa; recruiter descubierto no es partner; revocar relación deshabilita referral.
+- Frescura: first_seen nunca sustituye published_at; timeout/403 no cierra; TTL vencido verifying; cierre deshabilita CTA.
+- Compensación: ningún OTE presentado como fijo, ni potencial inventado; ninguna elegibilidad inferida del idioma/portal.
+- Renderer: empresa protagonista, atribución exigida preservada, destino externo honesto, preview == payload y review/version correctas.
+- Métrica de producto futura: click no es applied, referral requested no es sent. Envío requiere consentimiento y confirmación.

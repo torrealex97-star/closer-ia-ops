@@ -31,3 +31,9 @@ Usar compensation metadata y permitir ranking específico sin falsear period.
 
 ## Acceptance
 Búsqueda de sales/closer devuelve candidatos recientes y no contamina el modelo salarial de empleo tradicional.
+
+## Actualización normativa — ADR-007
+
+Añadir Spanish closer/setter y clientes US; client_country no es residencia elegible. connection_type=marketplace_application por defecto; advertir plataforma/cuenta al continuar.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

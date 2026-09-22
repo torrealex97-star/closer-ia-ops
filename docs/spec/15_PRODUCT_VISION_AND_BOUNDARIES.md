@@ -9,9 +9,9 @@
 - El código debe poder reutilizarse para otras empresas que preparen personas para otros puestos online, incluyendo búsqueda de oportunidades para esos perfiles.
 - El descubrimiento de colaboradoras/influencers en Instagram, TikTok, YouTube y LinkedIn es otro producto. El usuario prevé ubicarlo en el repositorio de Scalix Systems, separado de la aplicación Scalix. No se implementa como parte de este motor de empleo.
 
-## Recomendación arquitectónica pendiente de materializar
+## Arquitectura del producto
 
-Crear un repositorio independiente para la plataforma de preparación y empleabilidad, con nombre técnico neutral. WDC es la primera configuración de empresa, no una condición fija en el código.
+El repositorio local independiente career-platform ya existe para la plataforma de preparación y empleabilidad. WDC es la primera configuración de empresa, no una condición fija en el código.
 
 Empezar con una aplicación modular y el motor de oportunidades ya especificado. El monorepo puede alojar otras aplicaciones si aparecen necesidades concretas de experiencia o despliegue; no crear una app por función de antemano.
 
@@ -46,4 +46,10 @@ No hacer que un repositorio importe rutas internas del otro ni compartir datos, 
 
 Este documento registra la aclaración del usuario posterior al paquete original. Prevalece respecto a identidad del producto, separación de Scalix y posibilidad de reutilización multiempresa. Las decisiones detalladas de arquitectura aquí recomendadas aún deben concretarse mediante ADR y actualizaciones de los contratos afectados.
 
-No se ha creado un repositorio remoto, movido archivos ni implementado funcionalidades con esta actualización.
+La implementación local y sus límites están en ../STATUS.md. Esta revisión documental incorpora ADR-007; no cambia el runtime ni crea un repositorio remoto.
+
+## Decisiones posteriores incorporadas
+
+Groq principal mediante LLMProvider; experiencia alumna centrada en empresa/oportunidad/condiciones/acción; admin conserva toda trazabilidad. WDCOpportunity versionada, connection_type explícito y verificación de actividad/relación evitan aparentar partnerships inexistentes. US hispano y bilingüe se incorpora sin confundir español con residencia ni remoto con mundial. Ver MASTER SPEC y documentos 16–18.
+
+Las tablas de relaciones directas se diseñan ahora para futura conexión real con empresas. UI alumna, portal, preparación y autoapply siguen teniendo fases y gates propios.

@@ -1,24 +1,37 @@
 # Plan de producto
 
-Producto independiente para preparar personas y conectarlas con empresas. WDC es la primera organización; marca, programas y puestos son configuración.
+Revisión 2026-09-22. Producto independiente de Scalix; WDC primera organización. Arquitectura aprobada no equivale a código entregado. Estado ejecutable en [STATUS](STATUS.md).
 
-## Entregas incrementales
+## Base disponible
 
-1. **MVP local operativo (activo):** repositorio, web, API, worker, evidencia original inmutable, búsqueda progresiva en fuentes públicas, filtros verificables, historial, selección, copia y exportación. Pruebas de fallos parciales, persistencia y recorrido en navegador.
-2. **Cobertura para closers (activa):** priorizar español/bilingüe para alumnas hispanas y puestos remotos o híbridos, incluyendo Europa. Seis feeds públicos, catálogo ampliable y conexiones Apify configurables desde Fuentes. Validar primero InfoJobs, Computrabajo y LinkedIn con credenciales del operador; después Workana, bolsas hispanas, comunidades y empresas. Medir oportunidades útiles/coste y falsos positivos antes de activar más proveedores. Ver SOURCES.md. Conectar IA solo donde mejore clasificación medida.
-3. **Acceso online seguro:** Supabase independiente, organizaciones, membresías, permisos, RLS y despliegue; login para equipo y luego alumnas. Migración del histórico local.
-4. **Portal y matching:** perfiles, programas, preferencias, ofertas seleccionadas, seguimiento de candidaturas y conexión con empresas colaboradoras.
-5. **Preparación:** roleplays con IA, rúbricas por profesión, feedback y simulación de entrevistas; progreso y revisión por mentoras.
-6. **Aplicaciones asistidas y autoapply:** perfil validado, autorización, adaptadores separados, idempotencia y verificación del envío.
+MVP administrativo local: seis feeds públicos, catálogo de fuentes, Apify guiado, análisis individual OpenAI, búsqueda/histórico/exportación y migraciones SQLite v2. No login de alumnas ni portal desplegado. Esta revisión no cambia proveedores ni consume servicios.
 
-Cada entrega requiere comportamiento real, pruebas y actualización de STATUS. No adelantar módulos por facilidad. La primera entrega no equivale a aceptar todos los requisitos del MVP original.
+## Próximos incrementos, en orden
+
+| Orden | Fase | Resultado y dependencia |
+|---|---|---|
+| 1 | [P05A Groq](spec/phases/P05A_GROQ_PROVIDER.md) | LLMProvider, adaptador Groq principal y conservación de OpenAI/histórico; caché/cuotas/observabilidad; pruebas y canary si hay clave |
+| 2 | [P01B Dominio](spec/phases/P01B_OPPORTUNITY_DOMAIN.md) | WDCOpportunity, fechas/actividad/elegibilidad/relaciones, DTOs separados y migración conservadora |
+| 3 | [P04K Fuentes US](spec/phases/P04K_US_HISPANIC_SOURCES.md) | Spikes e integración incremental según fichas; un conector por corte, no esperar todas para continuar |
+| 4 | [P05B Calidad WDC](spec/phases/P05B_WDC_OPPORTUNITY.md) | Hechos verificados, presentación normalizada y CTA honesto, gold set ES/EN |
+| 5 | [P06B Preview](spec/phases/P06B_STUDENT_PREVIEW.md) | Superficie de alumna previsualizable dentro de admin con contrato separado |
+| 6 | P07 / P09 / P10 | Publicación por políticas/atribución y revisión, hardening y aceptación medidos |
+| 7 | Acceso online y portal | Postgres/Auth/RLS, membresías, pruebas multiusuario; feed/perfil/preferencias/matching de alumnas |
+| 8 | [P11 Conexiones directas](spec/phases/P11_DIRECT_CONNECTIONS.md) | Empresas/recruiters verificados, necesidades, consentimiento, referrals e introductions |
+| 9 | Preparación y candidaturas | Roleplays/entrevistas con Groq detrás de abstracción; seguimiento, aplicaciones asistidas y autoapply autorizado |
+
+P05B puede usar las fuentes existentes sin esperar toda P04K. Spikes de documentación son preparatorios; mantener una sola fase de implementación activa. Si falta clave Groq, avanzar contrato/fixture/migración sin declarar canary completado. No sustituir P05A por expansión indiscriminada de scrapers.
+
+## Principios de entrega
+
+Admin conserva adquisición y trazabilidad; alumna ve empresa + oportunidad + condiciones + siguiente paso. Groq es default objetivo; toda IA tiene evidencia/versiones/límites. US hispano no equivale a residencia US ni a elegibilidad España/LATAM. Ver [ADR-007](decisions/ADR-007-groq-opportunity-surfaces.md).
+
+Cada corte deja código, pruebas, migración/contratos cuando corresponda y estado honesto. Los MD nuevos son especificación, no una marca de fase terminada.
 
 ## Evolución diaria
 
-Avance de la entrega 2: conexión guiada de Apify y análisis individual con OpenAI implementados. Caché y límites de consumo activos; validación de contratos con HTTP local y migraciones SQLite versionadas completadas. Siguiente prioridad: ejecutar una extracción pequeña con claves WDC, medir relevancia sobre muestras hispanas y calibrar mapeos antes de ampliar fuentes. Ver INTEGRATIONS.md y STATUS.md. Roleplays, entrevistas y autoapply siguen en sus fases correspondientes.
-
-Trabajar una mejora pequeña del backlog por ejecución, priorizando fallos reproducibles y utilidad del buscador. Mantener una única línea de trabajo. No consumir servicios de pago, publicar aplicaciones ni contactar terceros sin configuración/autorización. Notificar avances verificables o bloqueos accionables.
+Una mejora pequeña comprobable del incremento activo. Priorizar fallos reproducibles, contratos y coste por oportunidad útil. No consumir servicios de pago, publicar aplicaciones ni contactar terceros sin configuración/autorización. Notificar avances verificables o bloqueos accionables. La automatización existente mantiene el proyecto, no publica ofertas.
 
 ## Proyecto separado
 
-El descubrimiento de influencers IG/TikTok/YouTube/LinkedIn se desarrollará en el repo de Scalix como herramienta independiente. Compartir código versionado cuando exista reutilización concreta, nunca datos o dependencias internas entre repositorios.
+Influencers IG/TikTok/YouTube/LinkedIn pertenece al futuro proyecto separado en Scalix. Reutilizar paquetes versionados solo ante necesidad concreta, nunca secretos, datos ni dependencias internas.

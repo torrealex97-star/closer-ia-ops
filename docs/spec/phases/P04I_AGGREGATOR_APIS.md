@@ -150,3 +150,9 @@ aggregators
 - https://www.careerjet.com/partners/api
 - https://employers.talent.com/publishers
 - https://www.whatjobs.com/affiliates
+
+## Actualización normativa — ADR-007
+
+Queries US hispanas con key/país si aplica; dedupe al destino corporativo, conservando proveedor y atribución. No generar relación directa por resolver enlace ATS.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

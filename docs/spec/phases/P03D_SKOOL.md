@@ -41,3 +41,9 @@ Nunca hacer que credenciales personales sean requisito implícito del source.
 
 ## Acceptance
 Al menos una community configurada ejecuta un run reproducible, produce raw items y pasa contract fixtures.
+
+## Actualización normativa — ADR-007
+
+Registrar cada comunidad pública y su ruta verificada; hints de mercado/idioma no son requisitos factuales. CTA de proceso real y relación desconocida, sin inventar empresa.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

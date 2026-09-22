@@ -111,3 +111,9 @@ source_code = somewhere
 - https://www.remotelatinos.com/jobs
 - https://www.onlinejobs.ph/
 - https://somewhere.com/jobs
+
+## Actualización normativa — ADR-007
+
+Ampliar HireLATAM y Hire With Near; fichas Remote Latinos/Somewhere en sources/. LATAM→US e inglés no significa empleo en español o elegible España. Mantener restricción PH explícita.
+
+Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.
