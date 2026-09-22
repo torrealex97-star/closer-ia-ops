@@ -1,5 +1,12 @@
 # Estado
 
+## Prioridad España y cobertura conjunta — 2026-09-22
+
+- Recogida Himalayas consulta España antes del pool mundial; se elimina el corte global de 180 registros y una página duplicada ya no detiene la paginación. Límite operativo de tres páginas por término/mercado, caché y timeout conservados: no se afirma cobertura exhaustiva de internet.
+- Alumna inicia con todos los perfiles; conserva filtros Closer/Setter/Cold Caller. La proyección reúne todas las fuentes guardadas sin selección de proveedor y prioriza ubicaciones explícitas España. Europa/UE reconocidas en el filtro ES. Siguen las restricciones de idioma, modalidad, publicación y caducidad.
+- Actualización gratuita real: 719 registros revisados en seis fuentes, cuatro oportunidades visibles y cero para España con los criterios actuales. Datasets InfoJobs comprobados: cero registros antes del filtrado. Conexión LinkedIn existente corregida de United States a Spain para su siguiente extracción, sin lanzar Actor.
+- Validación: 63 backend y 9 Playwright PASS; build/TypeScript y Ruff PASS. Incluye mezcla de origen público/Apify, perfiles, prioridad ES, exclusión de México para ES y paginación con duplicados. No consumo de IA ni nuevos scrapers de pago.
+
 ## Oportunidades para la alumna — 2026-09-22
 
 - Inicio `/` sustituido por la experiencia de alumna: Closer, Setter y Cold Caller, carga inicial de ofertas, guardadas, tarjetas de condiciones y siguiente paso hacia la publicación original. Gestión local conservada en `/admin`, sin controles operativos en la navegación de alumna.

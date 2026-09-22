@@ -16,6 +16,8 @@ Entregado antes de continuar P05A: recogida diaria de las fuentes conectadas, b�
 
 Preview de alumna adelantado de P06B: `/` centrado en elección profesional, perfiles Closer/Setter/Cold Caller, español por defecto y condiciones visibles; gestión en `/admin`. DTO de presentación permitido ya implementado sobre el catálogo local. P01B/P05B/P06B completos siguen pendientes: clasificación/verificación editorial, dominio versionado, matching real y autorización multiusuario no quedan resueltos por esta separación visual. Ver STATUS.
 
+Prioridad de cobertura España aplicada: consultas públicas ES antes del pool global y vista inicial de todos los perfiles; pendiente obtener resultados válidos de InfoJobs y medir rendimiento de las conexiones nuevas. La ausencia de datos no se suple ampliando a países incompatibles.
+
 ## Próximos incrementos, en orden
 
 | Orden | Fase | Resultado y dependencia |

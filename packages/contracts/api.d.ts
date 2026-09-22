@@ -795,11 +795,8 @@ export interface components {
         };
         /** OpportunityQuery */
         OpportunityQuery: {
-            /**
-             * Role
-             * @default closer
-             */
-            role: ("closer" | "setter" | "cold_caller") | null;
+            /** Role */
+            role?: ("closer" | "setter" | "cold_caller") | null;
             /**
              * Market
              * @default any

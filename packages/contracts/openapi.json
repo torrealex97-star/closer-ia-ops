@@ -2288,8 +2288,7 @@
                 "type": "null"
               }
             ],
-            "title": "Role",
-            "default": "closer"
+            "title": "Role"
           },
           "market": {
             "type": "string",

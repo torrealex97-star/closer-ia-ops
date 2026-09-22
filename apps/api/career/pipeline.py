@@ -17,7 +17,7 @@ ALIASES = {
     "account_executive": ["account executive", "ejecutivo comercial", "ejecutivo de ventas", "comercial digital", "asesor comercial", "asesora comercial"],
 }
 ALIASES["sales"] = list(dict.fromkeys(sum(ALIASES.values(), []) + ["sales", "ventas", "comercial", "business development"]))
-ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ALIASES["cold_caller"] + ["comercial", "asesor de ventas", "asesora de ventas"]))
+ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ALIASES["cold_caller"] + ["comercial", "asesor de ventas", "asesora de ventas", "agente de ventas", "ejecutivo de ventas", "ejecutiva de ventas", "representante de ventas"]))
 LATAM = {"mexico", "méxico", "argentina", "colombia", "chile", "peru", "perú", "ecuador", "uruguay", "paraguay", "bolivia", "venezuela", "costa rica", "panama", "panamá", "guatemala", "honduras", "el salvador", "nicaragua", "dominican republic", "república dominicana", "brazil", "brasil", "latin america", "latam"}
 
 
@@ -191,7 +191,7 @@ def match(item: dict, query: SearchQuery):
     locations = {folded(v.strip()) for v in item["locations"]}
     global_scope = bool(locations & {"worldwide", "anywhere in the world", "anywhere", "global"})
     if query.market != "any":
-        accepted = {"ES": {"spain", "españa", "es", "europe", "european union"}, "US": {"united states", "usa", "us"}, "LATAM": {folded(v) for v in LATAM}, "EU": EUROPE}[query.market]
+        accepted = {"ES": {"spain", "españa", "es", "europe", "europa", "european union", "union europea", "eu", "eea"}, "US": {"united states", "usa", "us"}, "LATAM": {folded(v) for v in LATAM}, "EU": EUROPE}[query.market]
         if global_scope or any(contains(location, folded(country)) for location in locations for country in accepted):
             score += 15
             reasons.append("Ubicación compatible según la fuente")

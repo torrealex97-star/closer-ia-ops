@@ -10,7 +10,7 @@ test('student sees three profiles and decision facts without operational control
   });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Elige tu próxima oportunidad.' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Perfil profesional' }).locator('option')).toHaveText(['Closer', 'Setter', 'Cold Caller']);
+  await expect(page.getByRole('combobox', { name: 'Perfil profesional' }).locator('option')).toHaveText(['Todos los perfiles', 'Closer', 'Setter', 'Cold Caller']);
   await expect(page.getByRole('heading', { name: offer.compensation })).toBeVisible();
   await expect(page.getByText(offer.schedule)).toBeVisible();
   await expect(page.getByText(offer.experience)).toBeVisible();

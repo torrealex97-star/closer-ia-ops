@@ -70,26 +70,30 @@ class Himalayas:
             "custom": [query.keywords],
         }[query.role]
         seen = set()
-        for term in terms:
-            for page in range(1, 4):
-                params = {"q": term, "sort": "recent", "page": page}
-                if query.market in {"ES", "US"}:
-                    params["country"] = query.market
-                data = json.loads(await fetch("https://himalayas.app/jobs/api/search", params))
-                if not isinstance(data, dict) or not isinstance(data.get("jobs"), list):
-                    raise ProviderError("El formato de Himalayas ha cambiado")
-                batch = []
-                for row in data["jobs"]:
-                    if not isinstance(row, dict) or not row.get("guid"):
-                        continue
-                    external_id = str(row["guid"])
-                    if external_id not in seen:
-                        seen.add(external_id)
-                        batch.append(Candidate(external_id, row))
-                if batch:
-                    yield batch
-                if not batch or len(seen) >= 180:
-                    break
+        # Country-targeted queries run before the global pool so busy global
+        # results cannot exhaust Spain's coverage. Shared dedupe is not pagination.
+        markets = ['ES', None] if query.market == 'any' else [query.market if query.market in {'ES', 'US'} else None]
+        for country in markets:
+            for term in terms:
+                for page in range(1, 4):
+                    params = {"q": term, "sort": "recent", "page": page}
+                    if country:
+                        params["country"] = country
+                    data = json.loads(await fetch("https://himalayas.app/jobs/api/search", params))
+                    if not isinstance(data, dict) or not isinstance(data.get("jobs"), list):
+                        raise ProviderError("El formato de Himalayas ha cambiado")
+                    batch = []
+                    for row in data["jobs"]:
+                        if not isinstance(row, dict) or not row.get("guid"):
+                            continue
+                        external_id = str(row["guid"])
+                        if external_id not in seen:
+                            seen.add(external_id)
+                            batch.append(Candidate(external_id, row))
+                    if batch:
+                        yield batch
+                    if not data["jobs"]:
+                        break
 
 
 class WeWorkRemotely:

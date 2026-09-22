@@ -22,7 +22,7 @@ COUNTRIES = {'united states': 'Estados Unidos', 'usa': 'Estados Unidos', 'spain'
 
 
 class OpportunityQuery(BaseModel):
-    role: Role | None = 'closer'
+    role: Role | None = None
     market: Literal['any', 'ES', 'EU', 'LATAM', 'US'] = 'any'
     days: int = Field(default=10, ge=1, le=10)
     include_bilingual: bool = False
@@ -127,4 +127,6 @@ def search(body: OpportunityQuery):
             contract=excerpt(details, r'\b(?:contrato|contractor|freelance|autonom[oa])\b', 'Contrato no especificado'),
             description=item['description'], published_at=item['published_at'], expires_at=row['expires_at'],
             source_name=names.get(row['source'], row['source']), source_url=item['source_url'], starred=bool(row['starred'])))
+    # Explicit Spain locations first, without interpreting remote as worldwide.
+    items.sort(key=lambda offer: 0 if re.search(r'\b(?:espana|spain|es)\b', fold(offer.location)) else 1)
     return OpportunityList(items=items, total=len(items))

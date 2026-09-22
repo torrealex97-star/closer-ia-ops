@@ -65,3 +65,48 @@ def test_student_bookmarks_and_org_scope(api, monkeypatch):
     assert client.post('/v1/opportunities/search', json={'starred_only': True}).json()['total'] == 1
     monkeypatch.setenv('CAREER_ORG_ID', 'another-org')
     assert client.post('/v1/opportunities/search', json={}).json()['total'] == 0
+
+
+def test_all_sources_and_profiles_spain_priority_and_location_filter(api):
+    from career.pipeline import normalize
+    client, _ = api
+    text = 'Buscamos una profesional para nuestro equipo de ventas. Trabajo remoto.'
+    for identity, country, title, code in [
+        ('mexico', 'Mexico', 'Closer de ventas', 'himalayas'),
+        ('spain', 'Spain', 'Closer de ventas', 'apify-fixture'),
+        ('setter', 'Spain', 'Appointment Setter', 'himalayas'),
+        ('europe', 'Europa', 'Cold Caller', 'himalayas'),
+    ]:
+        class Source:
+            name, provider = 'Fuente de prueba', 'fixture'
+            def normalize(self, row):
+                return normalize('himalayas', row)
+        source = Source()
+        source.code = code
+        assert ingest(Candidate(identity, {'guid': f'https://example.com/{identity}',
+            'title': title, 'companyName': identity, 'description': text,
+            'pubDate': now(), 'locationRestrictions': [country]}), source,
+            SearchQuery(), None, 'org-test')
+    all_offers = client.post('/v1/opportunities/search', json={}).json()['items']
+    assert len(all_offers) == 4
+    assert {o['company'] for o in all_offers[:2]} == {'spain', 'setter'}
+    spanish = client.post('/v1/opportunities/search', json={'market': 'ES'}).json()['items']
+    assert {o['company'] for o in spanish} == {'spain', 'setter', 'europe'}
+    assert {o['role'] for o in spanish} == {'closer', 'setter', 'cold_caller'}
+
+
+def test_spain_queries_first_and_duplicate_page_does_not_stop_pagination(monkeypatch):
+    import asyncio
+    import json
+    calls = []
+    async def fetch(url, params):
+        calls.append(params.copy())
+        # Page one/two overlap across queries; page three still adds a new listing.
+        identity = 'third' if params['page'] == 3 else 'shared'
+        return json.dumps({'jobs': [{'guid': 'https://example.com/' + identity}]})
+    monkeypatch.setattr('career.connectors.fetch', fetch)
+    async def collect():
+        return [candidate.external_id async for batch in Himalayas().batches(SearchQuery(role='digital_sales')) for candidate in batch]
+    assert set(asyncio.run(collect())) == {'https://example.com/shared', 'https://example.com/third'}
+    assert calls[0]['country'] == 'ES'
+    assert any(c['page'] == 3 and 'country' not in c for c in calls)
