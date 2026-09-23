@@ -1,5 +1,13 @@
 # Estado
 
+## Mejora diaria — ofertas cerradas, 2026-09-23
+
+- Reproducido: una publicación actualizada con «Estado: Vacante cubierta» seguía entrando en el catálogo. Cinco regresiones fallaron antes del cambio.
+- El filtro compartido excluye marcadores afirmativos independientes de cierre en español/inglés. Se aplica tanto al importar como al consultar ofertas guardadas; una actualización cerrada invalida la versión anterior conservando ambas capturas inmutables. No confunde cierre de ventas, negaciones ni frases condicionales con una vacante cerrada. Es detección limitada de avisos explícitos, no verificación externa de actividad.
+- Validación: 80 pruebas backend PASS, Ruff PASS y build/TypeScript PASS en copia aislada. Sin cambios de UI/contrato; sin prueba de navegador adicional. El primer build con symlink externo falló por restricción de Turbopack; pasó con dependencias copiadas dentro de la copia aislada.
+- Sin proveedores, IA, scraping de pago, modificaciones de la BD activa ni reinicio de servicios. Se conserva next-env.d.ts no versionado que ya estaba en el repositorio.
+- Siguiente acción: ampliar evidencia de estado cerrado con muestras anonimizadas reales y mantener separados caducidad local y vigencia publicada.
+
 ## Fuentes filtradas y referencias del Excel — 2026-09-22
 
 - Catálogo de 35 entradas con método, filtros en origen y estado explícito. Candidatos revisados para 20 rutas adicionales; nueve rutas sin proveedor verificado. No se presentan metadatos como extracción validada.

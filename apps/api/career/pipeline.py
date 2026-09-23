@@ -136,6 +136,9 @@ def normalize_mapped(row, fields):
 EUROPE = {"europe", "europa", "european union", "union europea", "eu", "eea", "emea", "spain", "espana", "portugal", "france", "francia", "germany", "alemania", "italy", "italia", "netherlands", "paises bajos", "ireland", "irlanda", "united kingdom", "uk", "reino unido", "belgium", "belgica", "switzerland", "suiza", "austria", "poland", "polonia", "greece", "grecia", "sweden", "suecia", "norway", "noruega", "finland", "finlandia", "denmark", "dinamarca", "romania", "rumania", "czechia", "czech republic", "czech republic", "bulgaria", "croatia", "croacia", "hungary", "hungria", "slovakia", "eslovaquia", "slovenia", "eslovenia", "estonia", "latvia", "letonia", "lithuania", "lituania", "malta", "cyprus", "chipre", "luxembourg", "luxemburgo", "iceland", "islandia", "serbia", "ukraine", "ucrania"}
 
 def match(item: dict, query: SearchQuery):
+    from .presentation import explicitly_closed
+    if explicitly_closed(item["title"], item["description"]):
+        return None
     title, body = folded(item["title"]), folded(item["description"])
     terms = ALIASES.get(query.role, [query.keywords.strip().lower()])
     terms = [t for t in terms if t]

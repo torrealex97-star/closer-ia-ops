@@ -110,3 +110,29 @@ def test_spain_queries_first_and_duplicate_page_does_not_stop_pagination(monkeyp
     assert set(asyncio.run(collect())) == {'https://example.com/shared', 'https://example.com/third'}
     assert calls[0]['country'] == 'ES'
     assert any(c['page'] == 3 and 'country' not in c for c in calls)
+
+
+def test_explicitly_closed_offer_is_removed_without_deleting_evidence(api):
+    from career.db import connect
+    client, _ = api
+    text = 'Buscamos una closer para nuestro equipo de ventas. Trabajo remoto.'
+    assert add(text, identity='closing-status')
+    assert client.post('/v1/opportunities/search', json={}).json()['total'] == 1
+    assert not add(text + '\nEstado: Vacante cubierta.', identity='closing-status')
+    assert client.post('/v1/opportunities/search', json={}).json()['total'] == 0
+    with connect() as db:
+        assert db.execute('SELECT count(*) FROM raw_items').fetchone()[0] == 2
+
+
+@pytest.mark.parametrize('status', ['Vacante cerrada.', 'Proceso de selección cerrado.',
+                                   'This position has been filled.', 'Applications are closed.'])
+def test_closed_status_markers_are_not_opportunities(api, status):
+    assert not add('Buscamos una closer para nuestro equipo de ventas. Trabajo remoto.\n' + status)
+
+
+@pytest.mark.parametrize('text', ['La vacante no está cubierta.',
+                                'Te encargarás del cierre de ventas.',
+                                'Cuando la vacante esté cubierta avisaremos.',
+                                'Las aplicaciones no están cerradas.'])
+def test_closing_sales_and_unfilled_vacancies_remain_eligible(api, text):
+    assert add('Buscamos una closer para nuestro equipo de ventas. Trabajo remoto.\n' + text)

@@ -57,3 +57,16 @@ def professional_role(title, description):
             r'\b(?:cerrar (?:la |su |las )?(?:venta|inscripcion)|cierre (?:de |comercial)|closing (?:sales|deals))', body):
         return 'closer'
     return None
+
+
+def explicitly_closed(title, description):
+    """Only standalone affirmative status markers, not sales-closing duties."""
+    text = fold(title + '\n' + description)
+    marker = (
+        r'(?:estado:\s*)?(?:'
+        r'(?:esta )?vacante (?:ya )?(?:esta )?(?:cubierta|cerrada)|'
+        r'proceso de (?:seleccion|contratacion) (?:cerrado|finalizado)|'
+        r'(?:this )?(?:position|vacancy|role) (?:has been |is )filled|'
+        r'applications (?:are )closed)'
+    )
+    return bool(re.search(r'(?:^|[\n.!?])\s*' + marker + r'\s*(?=$|[\n.!?])', text))
