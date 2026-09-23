@@ -193,6 +193,84 @@
         }
       }
     },
+    "/v1/google/run": {
+      "post": {
+        "summary": "Google Run",
+        "description": "Ejecuta los dorks WDC v\u00eda SerpApi engine=google_jobs bajo presupuesto.",
+        "operationId": "google_run_v1_google_run_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/google/check": {
+      "post": {
+        "summary": "Google Check",
+        "description": "Comprueba credencial y conexi\u00f3n; consume la b\u00fasqueda de prueba solo v\u00eda /integrations/serpapi/check.",
+        "operationId": "google_check_v1_google_check_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/source-connections/{connection_id}/check": {
       "post": {
         "summary": "Check",
@@ -385,6 +463,129 @@
       "post": {
         "summary": "Check Apify",
         "operationId": "check_apify_v1_integrations_apify_check_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/serpapi": {
+      "get": {
+        "summary": "Serpapi Account",
+        "operationId": "serpapi_account_v1_integrations_serpapi_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Serpapi",
+        "operationId": "save_serpapi_v1_integrations_serpapi_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/serpapi/check": {
+      "post": {
+        "summary": "Check Serpapi",
+        "description": "Verifica la clave con una petici\u00f3n real de 1 b\u00fasqueda de Google (barata).",
+        "operationId": "check_serpapi_v1_integrations_serpapi_check_post",
         "parameters": [
           {
             "name": "authorization",
@@ -1003,6 +1204,167 @@
                 "schema": {
                   "$ref": "#/components/schemas/OpportunityList"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company-targets": {
+      "get": {
+        "summary": "Company Targets",
+        "operationId": "company_targets_v1_company_targets_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profile-terms": {
+      "get": {
+        "summary": "Profile Terms",
+        "description": "T\u00e9rminos del vocabulario can\u00f3nico por rol, para rellenar los inputs de Apify.\nOrden por defecto: primero los t\u00edtulos con m\u00e1s se\u00f1al WDC (la 'lista m\u00ednima' del usuario).",
+        "operationId": "profile_terms_v1_profile_terms_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/search-goal": {
+      "get": {
+        "summary": "Read Search Goal",
+        "operationId": "read_search_goal_v1_search_goal_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Search Goal",
+        "operationId": "update_search_goal_v1_search_goal_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchGoal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -2424,6 +2786,67 @@
         ],
         "title": "SavedSearch"
       },
+      "SearchGoal": {
+        "properties": {
+          "daily_high_quality_target": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Daily High Quality Target",
+            "default": 10
+          },
+          "minimum_qualified": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Minimum Qualified",
+            "default": 15
+          },
+          "minimum_unique_companies": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Minimum Unique Companies",
+            "default": 5
+          },
+          "maximum_offer_age_hours": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Maximum Offer Age Hours",
+            "default": 72
+          },
+          "minimum_quality_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Minimum Quality Score",
+            "default": 0.8
+          },
+          "minimum_application_ratio": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Minimum Application Ratio",
+            "default": 0.9
+          },
+          "max_daily_paid_budget": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Max Daily Paid Budget",
+            "default": 2.0
+          },
+          "prefer_free_sources": {
+            "type": "boolean",
+            "title": "Prefer Free Sources",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "SearchGoal",
+        "description": "Objetivo diario configurable sin tocar codigo: se persiste en integration_settings."
+      },
       "SearchQuery": {
         "properties": {
           "role": {
@@ -2679,6 +3102,11 @@
           "setup_url": {
             "type": "string",
             "title": "Setup Url",
+            "default": ""
+          },
+          "requires": {
+            "type": "string",
+            "title": "Requires",
             "default": ""
           }
         },

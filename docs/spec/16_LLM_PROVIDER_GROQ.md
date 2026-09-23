@@ -1,5 +1,9 @@
 # IA: Groq principal y proveedores reemplazables
 
+## Hermes y Manus como AgenticGapFillProvider (ADR-009)
+
+Hermes y Manus no son scrapers generales ni proveedores de adquisición por defecto. Se definen como `AgenticGapFillProvider` de nivel superior al premium: solo actúan cuando el Quality Gate determina un gap que las capas FREE/LOW/MEDIUM/HIGH no cerraron, y reciben la brecha descrita en términos de negocio ("Find up to 10 current remote Spanish-speaking closer opportunities in US companies"), no "busca todo en todas partes". Hermes cubre gap filling dirigido (careers pages, empresas, vacantes específicas); Manus queda reservado como deep research excepcional. Si el gap se cierra, STOP. El gasto pasa por el mismo presupuesto diario y la misma trazabilidad que cualquier proveedor. Sin implementación actual: requisito de diseño, no código entregado.
+
 Fecha: 2026-09-22. Decisión aprobada; P05A parcialmente entregada. El código local ya permite conectar Groq (principal) u OpenAI mediante LLMProvider para análisis individual. La especificación de procesamiento masivo, límites monetarios, cuotas y configuración por tarea de abajo sigue pendiente. Ninguna generación real Groq se ha validado sin clave WDC.
 
 ## Contrato de dominio

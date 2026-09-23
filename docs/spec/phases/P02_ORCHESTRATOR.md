@@ -33,4 +33,8 @@ Búsqueda con 3 mocks:
 
 Separar adquisición de cola IA/proyección; backpressure por proveedor/modelo y presupuesto; primeros resultados deterministas no esperan Groq. Suite ES/EN y restricciones de trabajador distintas del mercado US.
 
+## Actualización normativa — ADR-009 (2026-09-23, implementado)
+
+La ejecución del orquestador es por capas de coste (free→low→medium→high→premium) con Quality Gate y SearchGoal configurable: FREE primero en paralelo, parada temprana si se alcanza el objetivo, escalado solo del gap y presupuesto de pago nunca superado. Implementación en `orchestrator.py::execute_layered`; contrato demostrado por 7 pruebas en `tests/test_orchestrator.py` (ver [10_TESTING_ACCEPTANCE](../10_TESTING_ACCEPTANCE.md)). Las fuentes de pago y agénticas son gap filling, no camino principal.
+
 Ver [MASTER SPEC](../00_MASTER_SPEC.md) y [PLAN](../../PLAN.md) para dependencias y alcance real.

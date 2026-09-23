@@ -1,6 +1,6 @@
 # Source Expansion Research — Sales Opportunity Engine
 
-**Research date:** 2026-09-22
+**Research date:** 2026-09-23 (España, en vivo) · 2026-09-22
 **Scope:** fuentes adicionales para Closer, Appointment Setter, SDR, BDR, Account Executive, Inside Sales, Cold Calling, Telemarketing, Business Development y ventas por comisión.
 
 ## Conclusión ejecutiva
@@ -207,3 +207,11 @@ P04J Wellfound/startups
 La investigación adicional, prioridades y 17 fichas están en [18_US_HISPANIC_SOURCE_RESEARCH](18_US_HISPANIC_SOURCE_RESEARCH.md). Ese orden de spikes complementa/sustituye la secuencia lineal anterior según yield y acceso público. Las afirmaciones históricas de volumen/API de este archivo deben revalidarse antes de implementar.
 
 Incluye job boards hispanos, redes profesionales, recruiters LATAM→US, ventas/startups y ATS. Mantener marketplaces y feeds existentes con consultas ES/EN. Ninguna fuente añade elegibilidad internacional por pertenecer a un portal latino.
+
+## Sondeo en vivo España — 2026-09-23 (verificado, no suposición)
+
+Sondeo HTTP real de ~35 dominios candidatos, priorizando señal comercial. Detalle completo con evidencia y criterio en [SOURCES · Siguiente lote](../SOURCES.md). Síntesis:
+
+- **Tanda 1 recomendada (conector propio coste cero):** JobToday (`__NEXT_DATA__` con 18 ofertas closer / 19 setter / 65 comercial-remoto, empresas españolas, salario EUR estructurado), ClosersAvenue (nicho comisión-pura ES, parseo a validar) y altas de watchlist Greenhouse verificadas con ofertas (Typeform 3 ventas, Cabify 14).
+- **Descartados con evidencia:** Remoters (Cloudflare), Tecnoempleo/Infoempleo/Trabajos/Jobrapido/Jobgether/Milanuncios/PrimerEmpleo (403/404 o sin feed), Trovit (HTML, no RSS), EURES (sin formato estable), Personio (307), Ashby/Lever/SmartRecruiters sin slugs ES con ventas verificadas.
+- Bajo ADR-009, solo entra como conector coste cero lo verificado en vivo con datos reales; lo bloqueado por anti-bot va al catálogo Apify opt-in con presupuesto.

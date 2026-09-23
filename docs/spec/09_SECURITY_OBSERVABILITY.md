@@ -117,6 +117,10 @@ cost
 source_coverage
 ```
 
+## Orquestación cost-aware (ADR-009)
+
+Por fuente, en `source_stats` (migración 6): `candidates_found`, `qualified_jobs`, `high_quality_jobs`, `cost_eur`, `quality_yield`, `duplicate_ratio`, `failure`, `cost_per_qualified`, `cost_per_high_quality`. Por ejecución, en el resultado de `execute_layered`: capas intentadas (tier, attempted, stop, gap_description) y stats por fuente. Métrica económica principal: `cost_per_high_quality_opportunity`, con objetivo descendente mes a mes. La brecha se registra como texto de negocio (`describe_gap`) para el futuro AgenticGapFillProvider: nunca se lanza una capa de pago sin gap documentado.
+
 ## Health
 
 Endpoints:

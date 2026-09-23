@@ -19,12 +19,29 @@ id uuid PK
 code text UNIQUE               # linkedin, skool, facebook...
 name text
 kind text                      # job_board, community, ats, freelance, manual
+cost_tier text                 # free, low, medium, high, premium (ADR-009; configurable, no hardcodeado)
 active boolean
 priority smallint
 config jsonb
 created_at timestamptz
 updated_at timestamptz
 ```
+
+### `source_stats` (ADR-009, migración 6 SQLite)
+
+Aprendizaje por fuente que alimenta la prioridad dinámica del orquestador:
+
+```text
+org_id, source                 PK
+updated_at
+candidates_found, qualified_jobs, high_quality_jobs
+cost_eur
+quality_yield, duplicate_ratio
+failure
+cost_per_qualified, cost_per_high_quality
+```
+
+Métrica económica principal: `cost_per_high_quality_opportunity`, con objetivo descendente. En SQLite el objetivo SearchGoal y la asignación fuente→tier viven en `integration_settings` (providers `search-goal` y `source-tier`).
 
 ### `source_providers`
 

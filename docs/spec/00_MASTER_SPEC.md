@@ -1,6 +1,6 @@
 # MASTER SPEC — WDC Career Platform
 
-Revisión 2026-09-22: Groq, expansión US hispana y experiencia de oportunidades. Arquitectura objetivo aprobada; estado implementado en [STATUS](../STATUS.md). [ADR-007](../decisions/ADR-007-groq-opportunity-surfaces.md) registra estas decisiones; ADR-006 conserva la entrega local. Los lockfiles determinan versiones reales.
+Revisión 2026-09-23: se añade la orquestación cost-aware/quality-aware ([ADR-009](../decisions/ADR-009-cost-aware-search.md)) y el vocabulario canónico de perfiles comerciales ([ADR-010](../decisions/ADR-010-role-vocabulary.md)), fuente única de familias de rol, señales de calidad y ruido para búsqueda, clasificación e inputs de proveedores. Revisión 2026-09-22: Groq, expansión US hispana y experiencia de oportunidades ([ADR-007](../decisions/ADR-007-groq-opportunity-surfaces.md)); ADR-006 conserva la entrega local. Estado implementado en [STATUS](../STATUS.md). Los lockfiles determinan versiones reales.
 
 ## Principio de producto
 
@@ -66,6 +66,14 @@ Contrato, mensajes, estados y CTA en [17_WDC_OPPORTUNITY_EXPERIENCE](17_WDC_OPPO
 connection_type: direct_partner, direct_recruiter, direct_company, external_application, marketplace_application, community_opportunity.
 Relación directa exige evidencia vigente y canal autorizado. application_type determina cómo aplicar; abrir un ATS público no crea relación directa.
 Estados: Activa, Verificando, Cerrada. Fecha publicada separada de descubierta y verificada; potencial/OTE separado de fijo.
+
+## Objetivo de búsqueda y coste (ADR-009)
+
+El objetivo diario es ~10 oportunidades nuevas de alta calidad, no un volumen de candidatas brutas. Prioridad: CALIDAD > FRESCURA > DIVERSIDAD > CANTIDAD. El orquestador ejecuta primero todas las fuentes gratuitas en paralelo, mide con un Quality Gate determinista (relevancia, frescura ≤72 h configurable, activa, siguiente paso claro) y para si alcanza el objetivo con diversidad mínima; solo escala a capas de pago (LOW→MEDIUM→HIGH→PREMIUM) el gap restante y sin superar el presupuesto configurable (2 €/día como margen, no gasto objetivo). Las fuentes caras (scrapers intensivos, proxies residenciales, Facebook/Skool de pago, Hermes, Manus) son gap filling, nunca el camino principal: Hermes/Manus quedan definidos como AgenticGapFillProvider con la brecha descrita en términos de negocio. El aprendizaje por fuente (yield, duplicados, fallo, coste por cualificada y por alta calidad) alimenta una prioridad dinámica: la métrica económica principal es `cost_per_high_quality_opportunity`, con objetivo descendente. La asignación fuente→cost_tier es configuración, no código.
+
+## Vocabulario de perfiles (ADR-010)
+
+Las familias de perfiles comerciales, sus equivalentes, señales de calidad y ruido negativo viven en una fuente única (`apps/api/career/vocabulary.py`). Buscar "closer" solo pierde las ofertas publicadas como "asesor de admisiones", "sales advisor" o "patient coordinator": la clasificación (`match`, `professional_role`), los presets por fuente y los inputs de Actores Apify (`GET /v1/profile-terms`) consumen ese vocabulario, no listas propias. Ampliar la taxonomía es editar un fichero; ver ADR-010 y las secciones Query expansion (04) y Keywords para proveedores (05).
 
 ## Arquitectura y contratos
 

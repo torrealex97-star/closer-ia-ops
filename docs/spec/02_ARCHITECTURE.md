@@ -110,7 +110,7 @@ En MVP pueden persistirse en `processing_events` en vez de introducir un event b
 
 ## Search orchestration
 
-El orquestador solo conoce la interfaz de conectores.
+El orquestador solo conoce la interfaz de conectores. Desde ADR-009 la ejecución es por capas de coste: FREE primero en paralelo, Quality Gate tras cada capa y parada temprana si se alcanza el SearchGoal; las capas de pago solo ejecutan el gap y nunca superan el presupuesto diario. Implementación real en `apps/api/career/orchestrator.py` (`execute_layered`); la asignación fuente→cost_tier viene de configuración, no de código.
 
 Pseudoflujo:
 
@@ -200,6 +200,10 @@ No se hace migración silenciosa de resultados históricos.
 - web puede correr con package manager.
 
 Los conectores externos se mockean en CI excepto suites contractuales dedicadas.
+
+## Orquestación cost-aware (ADR-009)
+
+El principio que gobierna el Search Orchestrator: obtener la calidad objetivo al menor coste posible, no el máximo número de resultados. FREE FIRST → MEASURE QUALITY → STOP IF GOOD ENOUGH → ESCALATE ONLY THE GAP. Las fuentes caras (scrapers intensivos, proxies residenciales, Hermes, Manus) son mecanismos de gap filling: Hermes y Manus se definen como AgenticGapFillProvider que reciben la brecha descrita en términos de negocio ("faltan 2: closer, español, remoto, España"), no scrapers generales. El aprendizaje por fuente (yield, duplicados, fallo, coste por cualificada) alimenta una prioridad dinámica y la métrica económica principal es `cost_per_high_quality_opportunity`.
 
 ## Arquitectura WDC y Groq (ADR-007)
 

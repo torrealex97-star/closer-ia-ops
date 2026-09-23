@@ -56,13 +56,24 @@ Debe incluir:
 
 ### Traceability
 - 100% jobs tienen al menos un posting;
-- 100% postings tienen raw/source/provider.
+- 100% postings tienen raw/source/provider.### Search reliability
 
-### Search reliability
 Con una fuente forzada a timeout:
 - run termina `partial`;
 - resultados de otras fuentes están disponibles;
 - warning identifica fuente.
+
+### Orquestador cost-aware (ADR-009)
+
+Siete pruebas de contrato en `tests/test_orchestrator.py`, obligatorias en CI:
+
+1. si FREE encuentra ≥10 válidas, no se llama a proveedores de pago;
+2. si FREE encuentra 8, solo se escala lo necesario para completar el gap;
+3. una fuente cara con mal yield pierde prioridad;
+4. una fuente gratuita con buen yield gana prioridad;
+5. el fallo de una fuente no detiene la búsqueda;
+6. nunca se supera el presupuesto configurado;
+7. el objetivo puede cambiar de 10 a otro número sin cambiar código (API + persistencia).
 
 ### Performance
 - API create run p95 < 1 s sin contar ejecución externa;

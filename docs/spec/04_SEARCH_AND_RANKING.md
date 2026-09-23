@@ -6,6 +6,10 @@ Recuperar con alta cobertura y después reducir ruido.
 
 No detener búsqueda al encontrar 20 ofertas brutas.
 
+## Objetivo por calidad y coste (ADR-009)
+
+El criterio de parada depende del resultado final, no del volumen bruto. El orquestador ejecuta capas de coste (free → low → medium → high → premium) y tras cada capa evalúa un SearchGoal configurable (`daily_high_quality_target=10`, `minimum_unique_companies`, `maximum_offer_age_hours=72`, `minimum_quality_score=0.80`, presupuesto diario de pago como margen): si FREE produce ≥10 válidas, no se llama a proveedores de pago; si FREE produce 8, solo se escala lo necesario para el gap. El SearchGoal se edita por API sin tocar código. La ejecución por capas, el gate y las 7 pruebas de contrato viven en `orchestrator.py` + `tests/test_orchestrator.py`.
+
 ## SearchDefinition
 
 Ejemplo:
@@ -45,15 +49,16 @@ ATS/others  25
 
 No es una garantía. Los conectores pueden devolver menos.
 
-## Query expansion
+## Query expansion (ADR-010)
 
 El orquestador genera consultas por source a partir de:
-- role aliases;
+- **vocabulario canónico de perfiles** (`apps/api/career/vocabulary.py`, ADR-010): familias closer/setter/cold_caller/account_executive/sdr + agregado digital_sales, con equivalentes (asesor de admisiones, sales advisor, patient coordinator…) y errores ortográficos observados;
 - keywords del usuario;
 - idioma/mercado;
-- include/exclude terms.
+- señales de calidad (leads cualificados, fijo más comisiones…) que suben el score;
+- ruido negativo (MLM, rentabilidad garantizada, cursos que enseñan closing) que descarta.
 
-No usar un LLM para inventar decenas de consultas en cada run. La taxonomía versionada produce comportamiento reproducible.
+No usar un LLM para inventar decenas de consultas en cada run. La taxonomía de `vocabulary.py` —fuente única consumida por match(), la clasificación de presentación, los presets por fuente y los inputs de Apify vía `GET /v1/profile-terms`— produce comportamiento reproducible. Los títulos de dirección (gerente, líder, responsable, manager…) no cuentan como perfiles de cierre salvo término explícito de closer/setter en el título.
 
 ## Procesamiento
 

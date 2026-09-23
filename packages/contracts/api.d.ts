@@ -56,6 +56,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/google/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Google Run
+         * @description Ejecuta los dorks WDC vía SerpApi engine=google_jobs bajo presupuesto.
+         */
+        post: operations["google_run_v1_google_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/google/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Google Check
+         * @description Comprueba credencial y conexión; consume la búsqueda de prueba solo vía /integrations/serpapi/check.
+         */
+        post: operations["google_check_v1_google_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/source-connections/{connection_id}/check": {
         parameters: {
             query?: never;
@@ -119,6 +159,44 @@ export interface paths {
         put?: never;
         /** Check Apify */
         post: operations["check_apify_v1_integrations_apify_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integrations/serpapi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Serpapi Account */
+        get: operations["serpapi_account_v1_integrations_serpapi_get"];
+        put?: never;
+        /** Save Serpapi */
+        post: operations["save_serpapi_v1_integrations_serpapi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integrations/serpapi/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Serpapi
+         * @description Verifica la clave con una petición real de 1 búsqueda de Google (barata).
+         */
+        post: operations["check_serpapi_v1_integrations_serpapi_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -308,6 +386,62 @@ export interface paths {
         put?: never;
         /** Search */
         post: operations["search_v1_opportunities_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/company-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company Targets */
+        get: operations["company_targets_v1_company_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profile-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Profile Terms
+         * @description Términos del vocabulario canónico por rol, para rellenar los inputs de Apify.
+         *     Orden por defecto: primero los títulos con más señal WDC (la 'lista mínima' del usuario).
+         */
+        get: operations["profile_terms_v1_profile_terms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search-goal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Search Goal */
+        get: operations["read_search_goal_v1_search_goal_get"];
+        /** Update Search Goal */
+        put: operations["update_search_goal_v1_search_goal_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -865,6 +999,52 @@ export interface components {
             name: string;
             query: components["schemas"]["SearchQuery"];
         };
+        /**
+         * SearchGoal
+         * @description Objetivo diario configurable sin tocar codigo: se persiste en integration_settings.
+         */
+        SearchGoal: {
+            /**
+             * Daily High Quality Target
+             * @default 10
+             */
+            daily_high_quality_target: number;
+            /**
+             * Minimum Qualified
+             * @default 15
+             */
+            minimum_qualified: number;
+            /**
+             * Minimum Unique Companies
+             * @default 5
+             */
+            minimum_unique_companies: number;
+            /**
+             * Maximum Offer Age Hours
+             * @default 72
+             */
+            maximum_offer_age_hours: number;
+            /**
+             * Minimum Quality Score
+             * @default 0.8
+             */
+            minimum_quality_score: number;
+            /**
+             * Minimum Application Ratio
+             * @default 0.9
+             */
+            minimum_application_ratio: number;
+            /**
+             * Max Daily Paid Budget
+             * @default 2
+             */
+            max_daily_paid_budget: number;
+            /**
+             * Prefer Free Sources
+             * @default true
+             */
+            prefer_free_sources: boolean;
+        };
         /** SearchQuery */
         SearchQuery: {
             /**
@@ -1004,6 +1184,11 @@ export interface components {
              * @default
              */
             setup_url: string;
+            /**
+             * Requires
+             * @default
+             */
+            requires: string;
         };
         /** SourceProgress */
         SourceProgress: {
@@ -1210,6 +1395,68 @@ export interface operations {
             };
         };
     };
+    google_run_v1_google_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_check_v1_google_check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     check_v1_source_connections__connection_id__check_post: {
         parameters: {
             query?: never;
@@ -1347,6 +1594,103 @@ export interface operations {
         };
     };
     check_apify_v1_integrations_apify_check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    serpapi_account_v1_integrations_serpapi_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_serpapi_v1_integrations_serpapi_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_serpapi_v1_integrations_serpapi_check_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1797,6 +2141,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpportunityList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_targets_v1_company_targets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    profile_terms_v1_profile_terms_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_search_goal_v1_search_goal_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_search_goal_v1_search_goal_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchGoal"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

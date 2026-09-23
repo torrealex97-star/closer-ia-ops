@@ -1,6 +1,6 @@
 # Plan de producto
 
-Revisión 2026-09-22. Producto independiente de Scalix; WDC primera organización. Arquitectura aprobada no equivale a código entregado. Estado ejecutable en [STATUS](STATUS.md).
+Revisión 2026-09-23: orquestación cost-aware/quality-aware entregada ([ADR-009](decisions/ADR-009-cost-aware-search.md): SearchGoal configurable, ejecución por capas FREE→premium, presupuesto tope y 7 pruebas de contrato). Revisión 2026-09-22. Producto independiente de Scalix; WDC primera organización. Arquitectura aprobada no equivale a código entregado. Estado ejecutable en [STATUS](STATUS.md).
 
 ## Base disponible
 
@@ -25,6 +25,7 @@ Referencias WDC y adquisición por fuente organizadas en [SOURCE_ACQUISITION](SO
 | Orden | Fase | Resultado y dependencia |
 |---|---|---|
 | 1 | [P05A Groq](spec/phases/P05A_GROQ_PROVIDER.md) | LLMProvider, adaptador Groq principal y conservación de OpenAI/histórico; caché/cuotas/observabilidad; pruebas y canary si hay clave |
+| 1b | Conectores del lote España 2026-09-23 | JobToday (`__NEXT_DATA__`), ClosersAvenue (parseo a validar) y watchlist Greenhouse Typeform/Cabify; coste 0, señal comercial máxima. Ver [SOURCES](SOURCES.md) y [ADR-009](decisions/ADR-009-cost-aware-search.md) |
 | 2 | [P01B Dominio](spec/phases/P01B_OPPORTUNITY_DOMAIN.md) | WDCOpportunity, fechas/actividad/elegibilidad/relaciones, DTOs separados y migración conservadora |
 | 3 | [P04K Fuentes US](spec/phases/P04K_US_HISPANIC_SOURCES.md) | Spikes e integración incremental según fichas; un conector por corte, no esperar todas para continuar |
 | 4 | [P05B Calidad WDC](spec/phases/P05B_WDC_OPPORTUNITY.md) | Hechos verificados, presentación normalizada y CTA honesto, gold set ES/EN |

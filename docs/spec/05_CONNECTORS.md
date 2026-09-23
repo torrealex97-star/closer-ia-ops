@@ -15,6 +15,10 @@ linkedin
 
 El dominio no conoce detalles del proveedor.
 
+## Cost tier por conector (ADR-009)
+
+Cada conector declara o hereda un `cost_tier` (free/low/medium/high/premium) que el orquestador usa para ejecutar por capas. Por defecto: feeds/APIs públicos → `free`; conexiones Apify → `low`. La asignación explícita es configuración (`integration_settings`, provider `source-tier`), nunca código. Los conectores caros son fallback de gap filling; solo se ejecutan cuando el Quality Gate determina que falta calidad para el SearchGoal y cabe en el presupuesto diario.
+
 ## Interface
 
 ```python
@@ -173,6 +177,16 @@ for provider:
   if success with valid items -> stop for that source
   if retryable failure -> next provider
 ```
+
+## Keywords para proveedores (ADR-010)
+
+Los inputs de Actores/scrappers (keywords, searchQueries, startUrls) se rellenan desde el **vocabulario canónico** (`apps/api/career/vocabulary.py`), no desde listas hardcodeadas:
+
+- `GET /v1/profile-terms` expone cada familia (digital_sales, closer, setter, cold_caller, account_executive, sdr) con etiqueta y términos ordenados por preferencia (la "lista mínima" primero: closer, closer de ventas, high ticket closer… asesor de admisiones, admissions advisor, enrollment advisor, sales advisor, patient coordinator, treatment coordinator…).
+- El asistente guiado muestra un selector "Perfil de búsqueda" y rellena los términos con la familia elegida; siempre editable. El formulario avanzado usa el mismo vocabulario en sus presets (p. ej. InfoJobs).
+- `prepare_input` envía los términos tal cual: si el Actor acepta array van todos; si acepta uno solo se usa el primero **sin descartar el resto en silencio** (se exige enlaces filtrados o se avisa).
+- `KEYWORDS` en `integrations.py` se deriva del vocabulario; ampliar la taxonomía actualiza búsqueda, clasificación y inputs juntos.
+- Las búsquedas preparadas por fuente (`wdc_source_presets.json`) siguen esta misma taxonomía con las combinaciones recomendadas (cargo + sector + modalidad).
 
 No ejecutar todos los fallbacks simultáneamente salvo configuración de comparación.
 

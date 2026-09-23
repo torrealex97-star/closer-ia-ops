@@ -1,6 +1,6 @@
 # Fuentes y búsquedas para WDC
 
-Actualizado: 2026-09-22. La revisión vigente de métodos, filtros y 51 referencias del Excel está en [SOURCE_ACQUISITION](SOURCE_ACQUISITION.md). El catálogo actual contiene 35 entradas; los recuentos históricos inferiores se conservan como contexto. Integración local, independiente de Scalix.
+Actualizado: 2026-09-23. La revisión vigente de métodos, filtros y 51 referencias del Excel está en [SOURCE_ACQUISITION](SOURCE_ACQUISITION.md). El catálogo actual contiene 38 entradas; los recuentos históricos inferiores se conservan como contexto. Integración local, independiente de Scalix.
 
 ## Uso
 
@@ -8,7 +8,13 @@ La búsqueda inicial usa «Closers, setters y comercial online», evidencia de e
 
 El catálogo contiene 33 entradas (incluye categorías y una alternativa Apify para Get on Board); no representa 33 conectores directos ni todo internet.
 
-Seis conectores públicos: Himalayas, We Work Remotely, Get on Board, Remotive, Remote OK y Arbeitnow. Los demás son rutas de integración a validar, priorizadas para España/LATAM. Un enlace a un Actor es referencia de integración, no una garantía de calidad o mantenimiento.
+Quince conectores públicos de coste cero: Himalayas, We Work Remotely, Get on Board, Remotive, Remote OK, Arbeitnow, Working Nomads, Virtual Vocations, Remote.jobs, Jobicy (industria Sales, slug `seller`), Remote First Jobs (RSS de ventas), Jobspresso, RemotoJOB (hispano) y los tableros ATS de la watchlist (Greenhouse: Stripe/Typeform/Wallapop · Ashby: Pennylane · Recruitee: Livestorm). Además hay una watchlist de empresas objetivo consultable a diario (migración 5, tablas `company_watchlist`/`watchlist_targets`); ampliarla exige un slug verificado, no se adivinan URLs. Los demás son rutas de integración a validar, priorizadas para España/LATAM. Un enlace a un Actor es referencia de integración, no una garantía de calidad o mantenimiento.
+
+Pendientes con clave propia (no conectadas: la clave la aporta el usuario y el gasto pasa por el presupuesto diario de Apify o por su cuenta del proveedor): Adzuna (app_id/app_key, ES/MX), Jooble (key, ES/LATAM), Careerjet/Opcionempleo (affid), InfoJobs (API oficial restringida a agregadores), Reddit (OAuth para r/forhire), Upwork (OAuth), SerpApi/JSearch (Google for Jobs, de pago). Descartadas por anti-bot o sin feed: Jobgether, Tecnoempleo, Talent.com, Milanuncios, NoDesk, Dynamite Jobs, Remote Rocketship, Lever/SmartRecruiters/Workable sin slug verificado, Personio (429 incluso anónimo).
+
+## Expansión de fuentes solicitada por WDC — 2026-09-23
+
+Se evaluó una lista de ~108 sitios propuesta por WDC (con muchos duplicados y sitios ya integrados). Triaje con verificación en vivo: tres fuentes nuevas con feed público gratuito entraron como conectores; Remote Work Hub se descarta como conector (su /rss solo publica artículos del blog, no ofertas) y GitHub Jobs, Stack Overflow Jobs y AngelList están cerrados. Jobgether, Tecnoempleo, Chumijobs, Glassdoor, Monster, Dice, FlexJobs, Jobrack y OnlyMarketingJobs están vivos pero sin feed público utilizable (Cloudflare o HTML); quedan como rutas Apify opt-in en el catálogo, sin scraping general en el motor.
 
 ## Conectar una fuente
 
@@ -29,6 +35,9 @@ Una respuesta incierta bloquea nuevos lanzamientos. Revisa la consola de Apify y
 - Remote OK: ventana reciente del feed, sin historial completo.
 - Arbeitnow: primera página, actualmente 250 registros; principalmente Europa, cobertura hispana variable.
 - WWR: hasta 300 registros RSS. Himalayas: consultas por alias con hasta tres páginas por término; no garantiza cobertura exhaustiva.
+- Working Nomads: API JSON pública, ~60 registros globales por descarga; sin filtros upstream.
+- Virtual Vocations: RSS general de 50 ofertas, mayoritariamente en inglés (US); el filtro de español descarta la mayoría al importar.
+- Remote.jobs: RSS de 10 ofertas; el feed sin barra final redirige 301 y el fetch de la app no sigue redirects por diseño.
 - Apify: hasta 500 registros de cada dataset por conexión; no es importación ilimitada. HTTP JSON de proveedores distintos de Apify, OAuth y acceso privado con cookies no tienen adaptador propio todavía.
 - La detección de español y modalidad es determinista y conservadora. Puede perder ofertas escuetas o ambiguas; no equivale a clasificación semántica validada. Compartir palabras con portugués no basta para declarar español. Revisar residencia, inglés, experiencia, vigencia y condiciones antes de compartir.
 - No se filtra por género. La audiencia WDC son mujeres hispanas; eso no convierte las ofertas en exclusivas para mujeres.
@@ -47,7 +56,43 @@ Una respuesta incierta bloquea nuevos lanzamientos. Revisa la consola de Apify y
 - [Computrabajo: Actor de referencia](https://apify.com/haketa/computrabajo-scraper)
 - [LinkedIn: Actor de referencia](https://apify.com/curious_coder/linkedin-jobs-scraper)
 
-Se verificaron públicamente los seis feeds. Los Actors de pago están documentados y probados con fixtures; no se han ejecutado con una cuenta real ni se han consumido créditos.
+Se verificaron públicamente los nueve feeds (los tres últimos el 2026-09-23). Los Actors de pago están documentados y probados con fixtures; no se han ejecutado con una cuenta real ni se han consumido créditos.
+
+## Siguiente lote propuesto — investigación en vivo España, 2026-09-23
+
+Sondeo real (HTTP + estructura de respuesta) de ~35 dominios candidatos para España, priorizando señal comercial (closer/setter/comercial/ventas). Resultado verificado, no suposición:
+
+### Tanda 1 — conector propio coste cero (señal máxima España) · IMPLEMENTADA 2026-09-23
+
+| Fuente | Estado | Resultado de la recogida real |
+|---|---|---|
+| **JobToday** | **Conector en REGISTRY** (3 rutas: `jobtoday` closer-venta, `jobtoday-telemarketing`, `jobtoday-remoto` ventas-remoto). Lee el `__NEXT_DATA__` embebido; salario/ubicación solo si `isValid`/address presentes; fecha de `createDate` (ms) o `postedSecondsAgo`. | 142 leídas, 2 aceptadas por el filtro WDC (Técnico/a Comercial en Venta Directa — Foro Soluciones S.L., Madrid; Business Development Manager — Nara k Skin, Las Rozas). Las demás son Marketing/RRHH/retail: el clasificador conservador no las convierte en ventas. La ruta `/trabajos-setter` devuelve **410 Gone**: sustituida por `telemarketing` (60 leídas). |
+| **ClosersAvenue** | Entrada de catálogo informativa: su bolsa interna devuelve **500**; sin listado público extraíble. Requiere Actor opt-in o acceso autorizado. | — |
+| **Greenhouse Cabify** | **Alta en watchlist (migración 7)**: board verificado con 14 ofertas de ventas en el sondeo. | 67 leídas en la recogida real; ninguna matchea perfiles WDC en español hoy (SaaS B2B en inglés/hibrido). El board queda vigilado a diario sin coste. |
+
+### Tanda 2 — a confirmar en siguiente sondeo
+
+- **RemotoList** (`remotolist.com`): HTML 200 con un User-Agent real (el probe `CareerPlatform` recibía 000/403); sin feed RSS localizado aún. Buscar su estructura de listado y categoría Ventas.
+- **JobToday paginación**: la primera página trae ~18-83 ítems por ruta; paginar y añadir rutas (`comercial`, `ventas`, `appointment-setter`) si la señal lo justifica.
+- **EuropeLanguageJobs**: HTML 200 con secciones de hispanohablantes; el RSS devolvió 1.4 KB sin `<item>` — revisar su feed real o listar HTML.
+- **WelcometotheJungle ES**: HTML 200 sin `__NEXT_DATA__`; su backend Algolia exige más ingeniería (tier opt-in Apify).
+
+### Descartados en esta pasada (evidencia en vivo, 2026-09-23)
+
+- **Remoters.net**: 403 con UA propio y 200 con UA navegador pero Cloudflare y sin `<item>` en el feed — anti-bot activo; iría por Actor Apify.
+- **Tecnoempleo / Infoempleo / Trabajos.com / Jobrapido / Jobgether / Milanuncios / PrimerEmpleo / GlobalRemoteHub**: 403/404 o sin feed público.
+- **Trovit**: responde 200 pero devuelve HTML, no RSS; su API de partner requiere acuerdo.
+- **EURES**: endpoint de búsqueda sin formato público estable (404 en ambas variantes).
+- **Personio**: 307 a login incluso anónimo (Factorial ya no usa Personio); Ashby sin board público para las empresas probadas; SmartRecruiters sin postings para Adevinta/eDreams/Vueling/Glovo (SuccessFactors interno).
+- **RankingCloser**: HTML con señal pero tras paywall; sin listado scrapeable gratuito.
+- **Salehires**: conexión fallida (000) desde este entorno.
+- **Jobicy**: la API existe (200 con 50 ofertas) pero `industry` exige su slug exacto (`sales` fue rechazado: `Invalid industry value`); probar slugs válidos de su lista antes de añadir un filtro en origen.
+- **SmartRecruiters/Ashby/Lever**: sin slugs de empresas España con ofertas de ventas verificados; no añadir a la watchlist sin evidencia.
+
+### Criterio aplicado (coherente con ADR-008/ADR-009)
+
+Solo entra como conector coste cero lo verificado en vivo con datos reales. Todo lo bloqueado por anti-bot queda en el catálogo Apify opt-in con presupuesto diario; nada se conecta a ciegas. La integración de JobToday y las altas de watchlist (Typeform/Cabify) son el siguiente incremento de cobertura recomendado.
+
 
 ## Expansión documental US — 2026-09-22
 

@@ -1,5 +1,19 @@
 # Estado
 
+## Vocabulario canónico de perfiles (ADR-010) e inputs Apify — 2026-09-23
+
+- Entregado: ADR-010 como decisión permanente. Fuente única `apps/api/career/vocabulary.py`: familias de rol (closer/setter/cold_caller/account_executive/sdr + digital_sales/sales agregados) con equivalentes (asesor de admisiones, admissions advisor, enrollment advisor, sales advisor, patient coordinator, treatment coordinator, técnico/consultor/gestor comercial, televendedor…), señales de calidad (leads cualificados, fijo+comisión, CRM, OTE…), señales de sector high-ticket y ruido negativo (MLM, rentabilidad garantizada, cursos de closing).
+- Motor: `match()` reconoce equivalentes, suma hasta +10 por señales de calidad y +5 por sector, rechaza ruido; guard anti-gestión ampliado (líder/jefe/responsable/manager/gerenta/supervisor no son perfiles de cierre sin término explícito). `professional_role` clasifica la vista de alumnas con las mismas familias. Efecto medible: catálogo diario de 10-11 a 14 ofertas con las mismas fuentes (entraron Channel Account Executive, Healthcare Sales Representative, Commercial Executive).
+- Inputs de proveedores: `GET /v1/profile-terms` expone familias con etiqueta y orden preferido; asistente guiado añade selector "Perfil de búsqueda" y rellena términos desde la API (verificado en navegador); `KEYWORDS` de integraciones se deriva del vocabulario (sin duplicar); preset InfoJobs del formulario avanzado usa `digital_sales`. Tests: `test_profile_terms_feed_apify_inputs` y 3 de regresión del motor; suite 94 PASS, Ruff PASS, TypeScript PASS.
+- Pendiente declarado: coincidencia léxica (un título nuevo sin término se pierde hasta añadirlo); clasificación LLM de ADR-007 como evolución complementaria; presets de Google dorks (SerpApi) aún no conectados.
+
+## Orquestación cost-aware y sondeo España — 2026-09-23
+
+- Entregado: ADR-009 como decisión permanente; `orchestrator.py` con SearchGoal configurable por API (`GET/PUT /v1/search-goal`), Quality Gate determinista, ejecución por capas FREE→premium con parada temprana por calidad, presupuesto de pago como tope (no objetivo) y `source_stats` (migración 6) para prioridad dinámica. `worker.execute` pasa por la ejecución por capas; el cierre `partial/failed` clásico se conserva.
+- Los 7 tests de contrato exigidos pasan (tests/test_orchestrator.py): FREE≥objetivo no llama a pago; gap 8/10 escala solo lo necesario; fuente cara con mal yield pierde prioridad; fuente gratuita con buen yield la gana; fallo de fuente no detiene; presupuesto nunca superado; objetivo 10→3 sin tocar código. Suite completa: 89 backend PASS, Ruff PASS, TypeScript PASS.
+- Sondeo en vivo de ~35 dominios España (evidencia y criterio en SOURCES): siguiente lote propuesto = JobToday (18 closer/19 setter/65 comercial-remoto en `__NEXT_DATA__`, coste 0), ClosersAvenue (a validar parseo) y watchlist Greenhouse Typeform/Cabify (3 y 14 ofertas de ventas verificadas). Descartados con anti-bot o sin feed: Remoters, Tecnoempleo, Jobgether, Trovit, EURES, Personio, entre otros.
+- Sin proveedores de pago, sin IA, sin scraping real nuevo; la investigación fue HTTP de solo lectura. Pendiente declarado: integrar el lote propuesto, Hermes/Manus como AgenticGapFillProvider es diseño (no código), y el reparto dinámico de presupuesto entre capas.
+
 ## Mejora diaria — ofertas cerradas, 2026-09-23
 
 - Reproducido: una publicación actualizada con «Estado: Vacante cubierta» seguía entrando en el catálogo. Cinco regresiones fallaron antes del cambio.
