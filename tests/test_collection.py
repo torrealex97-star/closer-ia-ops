@@ -192,5 +192,6 @@ def test_public_sources_still_import_when_apify_budget_is_exhausted(api, monkeyp
     result = client.get('/v1/collection').json()
     assert result['catalog_total'] == 1 and result['latest']['status'] == 'partial'
     assert result['latest']['sources'][0]['accepted'] == 1
-    assert 'Presupuesto' in result['latest']['sources'][1]['warning']
+    apify_source = next(s for s in result['latest']['sources'] if s['code'].startswith('apify-'))
+    assert 'Presupuesto' in apify_source['warning']
     assert not any(c[0] == 'POST' and '/runs' in c[1] for c in state['calls'])

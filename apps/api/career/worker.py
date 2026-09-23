@@ -57,7 +57,7 @@ async def execute(run_id, organization, query, registry=None):
     for code in query.sources:
         if code not in registry:
             registry[code] = ApifyDataset(get_connection(code, organization), organization)
-    await asyncio.gather(*(run_source(registry[code], query, run_id, organization) for code in dict.fromkeys(query.sources)))
+    await layered_or_classic(run_id, organization, query, registry)
     with connect() as db:
         row = db.execute("SELECT sources,status FROM search_runs WHERE id=? AND org_id=?", (run_id, organization)).fetchone()
         sources = json.loads(row["sources"])
@@ -66,6 +66,20 @@ async def execute(run_id, organization, query, registry=None):
         status = "failed" if failures == len(sources) and not count else "partial" if failures else "completed"
         if row["status"] != "cancelled":
             db.execute("UPDATE search_runs SET status=?,completed_at=? WHERE id=? AND org_id=?", (status, now(), run_id, organization))
+
+
+async def layered_or_classic(run_id, organization, query, registry):
+    """ADR-009: si la ejecucion es por capas, el orchestrator cierra el run; si no, cierre clasico."""
+    from .orchestrator import execute_layered
+    await execute_layered(run_id, organization, query, registry)
+    with connect() as db:
+        row = db.execute("SELECT sources FROM search_runs WHERE id=? AND org_id=?", (run_id, organization)).fetchone()
+        sources = json.loads(row["sources"])
+        failures = sum(s["status"] == "failed" for s in sources if s.get("status"))
+        count = db.execute("SELECT count(*) FROM search_results WHERE org_id=? AND run_id=?", (organization, run_id)).fetchone()[0]
+        status = "failed" if failures == len(sources) and not count else "partial" if failures else "completed"
+        db.execute("UPDATE search_runs SET status=?,completed_at=? WHERE id=? AND org_id=?",
+                   (status if row else "completed", now(), run_id, organization))
 
 
 async def main():
