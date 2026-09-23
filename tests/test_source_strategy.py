@@ -8,6 +8,8 @@ def test_every_source_has_explicit_strategy_and_no_false_operational_claim():
     for code, *_ in CATALOG:
         info = strategy(code)
         assert info['acquisition_method'] and info['validation_status']
+        # Ninguna entrada del catálogo es un conector operativo; pueden ser rutas Apify pendientes
+        # o informativas sin listado extraíble (p. ej. ClosersAvenue), nunca falso operativo.
         assert info['validation_status'] != 'Conector operativo'
     assert not actor_matches('torre', 'epctex/torrent-downloader')
     assert not actor_matches('remotoco', 'orgupdate/remote-co-jobs-scraper')

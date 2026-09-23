@@ -138,7 +138,7 @@ def test_guided_flow_real_http_queue_database_and_reuse(api):
     with connect() as db:
         assert db.execute('SELECT count(*) FROM raw_items').fetchone()[0] == 1
         assert db.execute('SELECT count(*) FROM source_connections').fetchone()[0] == 1
-        assert db.execute('SELECT max(version) FROM schema_version').fetchone()[0] == 4
+        assert db.execute('SELECT max(version) FROM schema_version').fetchone()[0] == 10
     initialize()  # migration repeat preserves data
     assert client.get('/v1/search-runs/' + run_id).json()['jobs'][0]['id'] == job_id
 

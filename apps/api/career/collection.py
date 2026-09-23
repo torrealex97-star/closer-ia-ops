@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from .catalog import catalog_counts, prune, collection_query
-from .connectors import REGISTRY, fetch
+from .connectors import REGISTRY, fetch, watchlist_connectors, ProviderError
 from .db import connect, now, org, uid
 from .models import SourceProgress
 from .pipeline import ingest
@@ -90,9 +90,21 @@ def status():
 
 
 def enqueue(organization):
-    from .sources import connections
+    from .sources import connections, get_or_create_google_connection
+    from .sources import read_token
     sources = [SourceProgress(code=c.code, name=c.name).model_dump() for c in REGISTRY.values()]
-    sources += [SourceProgress(code=c['id'], name=c['name']).model_dump() for c in connections(organization) if c['enabled']]
+    sources += [SourceProgress(code=c.code, name=c.name).model_dump() for c in watchlist_connectors(organization).values()]
+    # SerpApi entra en la recogida diaria solo con clave guardada y conexión activa.
+    google = None
+    try:
+        google = get_or_create_google_connection(organization)
+    except HTTPException:
+        google = None
+    if google and google.get('enabled') and read_token(organization, 'account-serpapi'):
+        sources.append(SourceProgress(code='google', name='Google Jobs · SerpApi').model_dump())
+    # La conexión interna google-serpapi ya está representada por el código 'google'.
+    sources += [SourceProgress(code=c['id'], name=c['name']).model_dump() for c in connections(organization)
+                if c['enabled'] and c['id'] != 'google-serpapi']
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         db.execute("INSERT OR IGNORE INTO collection_runs VALUES(?,?,?,'queued',?,?,NULL)",
@@ -187,7 +199,8 @@ def progress(run_id, organization, code, **changes):
 
 
 async def collect(run_id, organization):
-    from .sources import ApifyDataset, check_connection, get_connection, launch_scrape, connections
+    from .sources import (ApifyDataset, check_connection, get_connection, launch_scrape,
+                          connections, read_token, get_or_create_google_connection)
     with connect() as db:
         row = db.execute('SELECT sources,day FROM collection_runs WHERE org_id=? AND id=?', (organization, run_id)).fetchone()
     sources = json.loads(row['sources'])
@@ -202,8 +215,19 @@ async def collect(run_id, organization):
         warning = None
         try:
             progress(run_id, organization, code, status='running', fetched=0, accepted=0)
-            if code in REGISTRY:
+            if code == 'google':
+                # SerpApi dorks: un dork del vocabulario WDC = una búsqueda de pago.
+                google = get_or_create_google_connection(organization)
+                if not read_token(organization, 'account-serpapi'):
+                    raise ProviderError('Falta la clave de SerpApi; la fuente no se ejecuta sin credencial')
+                from .sources import _MultiDorkConnector
+                connector = _MultiDorkConnector(google.get('urls') or [])
+            elif code in REGISTRY:
                 connector = REGISTRY[code]
+            elif code.startswith('ats-'):
+                connector = watchlist_connectors(organization).get(code)
+                if connector is None:
+                    raise ProviderError('Esta empresa ya no está en la watchlist activa')
             else:
                 value = get_connection(code, organization)
                 if not value['enabled']:
@@ -241,8 +265,7 @@ async def collect(run_id, organization):
                 warning = warning or 'La fuente devolvió cero registros. Revisa la consulta o el dataset; no se han añadido ofertas.'
             progress(run_id, organization, code, status='completed', warning=warning)
         except Exception as exc:
-            from .connectors import ProviderError
-            message = str(exc.detail) if isinstance(exc, HTTPException) else str(exc) if isinstance(exc, ProviderError) else 'No se pudo completar esta fuente. Las demás continúan.'
+            message = str(exc.detail) if isinstance(exc, HTTPException) else 'No se pudo completar esta fuente. Las demás continúan.'
             if warning:
                 message = warning + ' ' + message
             logger.warning('collection_source_failed source=%s type=%s', code, type(exc).__name__)

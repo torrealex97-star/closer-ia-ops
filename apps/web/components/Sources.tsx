@@ -13,12 +13,23 @@ type Input = components['schemas']['ConnectionInput'];
 type Connection = Omit<Input, 'token' | 'clear_token'> & { id: string; has_token: boolean; run_status?: string; run_id?: string; actual_cost_usd?: number };
 const mapping = { title: 'title', company: 'companyName', description: 'description', source_url: 'url', locations: 'location', published_at: 'postedAt', work_mode: 'workMode' };
 const fresh = (): Input => ({ name: '', build: 'latest', auto_mapping: false, clear_token: false, source: 'custom', actor_id: '', dataset_id: '', enabled: true, urls: [], url_field: 'startUrls', url_format: 'objects', actor_input: {}, mapping, max_items: 100, max_charge_usd: 1 });
+type Target = { slug: string; name: string; website: string; sector: string; ticket: string; careers_url: string; priority: number; monitoring: string };
+type RoleTerms = { label: string; terms: string[] };
+const MONITOR_LABEL: Record<string, string> = {
+  teamtailor_feed: 'Feed ATS público vigilado a diario',
+  ats_page: 'Portal ATS · añadir feed',
+  careers_page: 'Página de empleo propia · revisar periódicamente',
+  linkedin_guest: 'Publica en LinkedIn · búsqueda guest periódica',
+  manual: 'Vigilancia manual',
+};
 const presets: Record<string, string> = { infojobs: 'haketa/infojobs-scraper', computrabajo: 'haketa/computrabajo-scraper', linkedin: 'curious_coder/linkedin-jobs-scraper', workana: 'automation-lab/workana-freelance-projects-scraper', getonbrd: 'scrapers_lat/getonbrd-scraper' };
 // WDC operators connect sources using the existing paper/plum surfaces,
 // native controls and 4px rhythm. The connection form is the focal point.
 export default function Sources({ config, onRefresh }: { config: Config; onRefresh: () => Promise<void> }) {
   const [wizard, setWizard] = useState<string | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [roleTerms, setRoleTerms] = useState<Record<string, RoleTerms>>({});
   const [form, setForm] = useState<Input | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [urls, setUrls] = useState('');
@@ -42,12 +53,14 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
     return () => { stopped = true; clearInterval(timer); };
   }, [activeIds]);
   useEffect(() => { request<Connection[]>('source-connections').then(setConnections).catch(e => setError(e.message)); }, []);
+  useEffect(() => { request<{ targets: Target[] }>('company-targets').then(d => setTargets(d.targets || [])).catch(() => {}); }, []);
+  useEffect(() => { request<{ roles: Record<string, RoleTerms> }>('profile-terms').then(d => setRoleTerms(d.roles || {})).catch(() => {}); }, []);
   const update = <K extends keyof Input>(key: K, value: Input[K]) => setForm(old => old && ({ ...old, [key]: value }));
   function open(source = 'custom', connection?: Connection, advanced = false) {
     if (!connection && !advanced) { setForm(null); setWizard(source); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     setWizard(null);
     const value: Input = connection ? { ...fresh(), ...connection, token: '', clear_token: false } : { ...fresh(), source, name: config.sources.find(s => s.code === source)?.name || 'Mi fuente', actor_id: presets[source] || '' };
-    if (!connection && source === 'infojobs') { value.actor_input = { keywords: ['closer de ventas', 'closer digital', 'high ticket closer', 'appointment setter', 'setter', 'cold caller', 'llamadas en frío', 'comercial digital', 'cerrador', 'venta de alto valor'], onlyTeleworking: true, maxItems: 100 }; value.mapping = { ...mapping, company: 'company', locations: 'city', published_at: 'publishedAt', work_mode: 'teleworking' }; }
+    if (!connection && source === 'infojobs') { value.actor_input = { keywords: (roleTerms.digital_sales?.terms || []).slice(0, 12), onlyTeleworking: true, maxItems: 100 }; value.mapping = { ...mapping, company: 'company', locations: 'city', published_at: 'publishedAt', work_mode: 'teleworking' }; }
     setForm(value); setEditing(connection?.id || null); setUrls((value.urls || []).join('\n'));
     setInputJSON(JSON.stringify(value.actor_input || {}, null, 2)); setMappingJSON(JSON.stringify(value.mapping || mapping, null, 2)); setError(''); setMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -71,8 +84,26 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
     } catch (e) { setError((e as Error).message); await refresh().catch(() => {}); }
     finally { setBusy(false); }
   }
-  const catalog = config.sources.filter(s => s.category !== 'Mis conexiones').sort((a, b) => Number(a.category === 'Internacional') - Number(b.category === 'Internacional'));
-  const shown = catalog.filter(s => (category === 'Todas' || s.category?.includes(category)) && `${s.name} ${s.note} ${s.category}`.toLowerCase().includes(filter.toLowerCase()));
+  const [serpapiState, setSerpapiState] = useState<{ has_token: boolean; run_id?: string; busy?: boolean }>({ has_token: false });
+  useEffect(() => { request<{ has_token: boolean }>('integrations/serpapi').then(d => setSerpapiState(s => ({ ...s, has_token: d.has_token }))).catch(() => {}); }, []);
+  const runGoogle = async () => {
+    setSerpapiState(s => ({ ...s, busy: true })); setError(''); setMessage('');
+    try { const r = await request<{ message?: string }>('google/run', {}); setMessage(r.message || 'Importación SerpApi encolada.'); await onRefresh(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setSerpapiState(s => ({ ...s, busy: false })); }
+  };
+  const catalog = config.sources.filter(s => s.category !== 'Mis conexiones');
+  const groups = {
+    connected: catalog.filter(s => s.available),
+    apify: catalog.filter(s => !s.available && s.requires === 'apify' && s.code !== 'google'),
+    input: catalog.filter(s => !s.available && s.requires === 'input' && s.code !== 'google'),
+    serpapi: catalog.filter(s => s.code === 'google' && !s.available),
+  };
+  // Catálogo agrupado por puesta en marcha; la búsqueda/filtro desactiva los grupos.
+  const searchable = (filter || category !== 'Todas') ? catalog : [];
+  const card = (s: NonNullable<Config['sources']>[number]) => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className={s.available ? 'available' : 'pending'}>{s.available ? 'API pública activa' : 'Por conectar'}</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>Filtros en origen: {s.upstream_filters?.length ? s.upstream_filters.join(', ') : 'sin filtros verificados'}</p><p>{s.acquisition_note}</p>{!!s.suggested_searches?.length && <p>{s.suggested_searches.length} enlaces WDC preparados · español primero</p>}<details><summary>Detalles de la fuente</summary><p>{s.note}</p>{s.provider_candidates?.map(url => <p key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url.replace('https://apify.com/', '')} ↗</a></p>)}</details><div className="source-actions">{s.website && <a href={s.website} target="_blank" rel="noopener noreferrer">Visitar <ExternalLink size={12} /></a>}{!s.available && <><a href={s.setup_url} target="_blank" rel="noopener noreferrer">Ver proveedor <ExternalLink size={12} /></a><button onClick={() => open(s.code)}>Conectar</button></>}</div></article>;
+  const googleCard = (s: NonNullable<Config['sources']>[number]) => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className={serpapiState.has_token ? 'available' : 'pending'}>{serpapiState.has_token ? 'Clave guardada · lista para ejecutar' : 'Falta clave de SerpApi'}</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>{s.acquisition_note}</p>{!!s.suggested_searches?.length && <p>{s.suggested_searches.length} dorks WDC listos · español primero</p>}<details><summary>Detalles de la fuente</summary><p>{s.note}</p></details><div className="source-actions"><a href={s.setup_url} target="_blank" rel="noopener noreferrer">Ver proveedor <ExternalLink size={12} /></a><button disabled={serpapiState.busy || !serpapiState.has_token} onClick={runGoogle}>Ejecutar dorks · genera ~{ (0.025 * (s.suggested_searches?.length || 14)).toFixed(2) } USD</button></div></article>;
+  const sourcesCard = (s: NonNullable<Config['sources']>[number]) => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className="available">API pública activa</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>{s.acquisition_note}</p></article>;
   return <div className="sources-workspace">
     <div className="source-intro"><div><span className="eyebrow">ESPAÑOL · REMOTO · HÍBRIDO</span><h2>Abre nuevas puertas para tus alumnas.</h2><p>Oportunidades en español o bilingües de España, LATAM y otros mercados. Reunimos publicaciones de portales, comunidades y empresas.</p></div><button className="primary" onClick={() => open()}><Plus size={16} /> Añadir fuente</button></div>
     {error && <p className="alert error" role="alert">{error}</p>}{message && <p className="alert" role="status">{message}</p>}
@@ -104,9 +135,39 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
     <section><div className="results-heading"><h2>Mis conexiones <span>{connections.length}</span></h2><a href="https://console.apify.com" target="_blank" rel="noopener noreferrer">Consola Apify <ExternalLink size={13} /></a></div>
       {!connections.length ? <p className="connection-empty">Aún no has conectado proveedores. Elige un portal del catálogo o añade los enlaces de una comunidad.</p> : <div className="source-grid">{connections.map(c => <article className="source-card" key={c.id}><div><Layers3 size={20} /><span className={c.enabled && c.dataset_id ? 'available' : 'pending'}>{!c.enabled ? 'Desactivada' : c.dataset_id ? 'Dataset configurado' : 'Sin dataset'}</span></div><h2>{c.name}</h2><p>{c.has_token ? 'Token guardado' : 'Sin token'} · {(c.urls || []).length} enlaces · {c.max_items} registros máx.</p>{c.run_status && <p>Extracción: {c.run_status}{typeof c.actual_cost_usd === 'number' ? ` · ${c.actual_cost_usd.toFixed(3)} USD reportados` : ''}</p>}{c.run_id && <a href={`https://console.apify.com/actors/runs/${c.run_id}`} target="_blank" rel="noopener noreferrer">Ver ejecución <ExternalLink size={12} /></a>}{['UNKNOWN', 'STARTING'].includes(c.run_status || '') && <button disabled={busy} onClick={() => action(c, 'resolve')}>Ya revisé Apify: desbloquear</button>}<div className="source-actions"><button disabled={busy} onClick={() => open(c.source, c)}>Editar</button><button disabled={busy} onClick={() => action(c, 'check')}>Comprobar</button></div><button disabled={busy || !c.actor_id || !c.has_token || !c.enabled || ['STARTING', 'READY', 'RUNNING', 'UNKNOWN', 'TIMING-OUT', 'ABORTING'].includes(c.run_status || '')} onClick={() => action(c, 'scrape')}>Ejecutar scraper · puede generar coste</button></article>)}</div>}
     </section>
-    <section><div className="results-heading"><h2>Catálogo de fuentes <span>{catalog.length}</span></h2></div><p className="catalog-note">Cada fuente muestra su método, filtros en origen y estado de validación. Primero acota la búsqueda en el portal; después importa solo ese resultado. Una revisión de metadatos no confirma todavía la calidad de la extracción.</p>
-      <div className="source-filters"><label><span><Search size={14} /> Buscar fuente</span><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="InfoJobs, comunidades, LATAM…" /></label><label>Prioridad<select value={category} onChange={e => setCategory(e.target.value)}>{['Todas', 'España', 'LATAM', 'Europa', 'Comunidades', 'Freelance', 'Empresas', 'Internacional'].map(c => <option key={c}>{c}</option>)}</select></label></div>
-      <div className="source-grid">{shown.map(s => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className={s.available ? 'available' : 'pending'}>{s.available ? 'API pública activa' : 'Por conectar'}</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>Filtros en origen: {s.upstream_filters?.length ? s.upstream_filters.join(', ') : 'sin filtros verificados'}</p><p>{s.acquisition_note}</p>{!!s.suggested_searches?.length && <p>{s.suggested_searches.length} enlaces WDC preparados · español primero</p>}<details><summary>Detalles de la fuente</summary><p>{s.note}</p>{s.provider_candidates?.map(url => <p key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url.replace('https://apify.com/', '')} ↗</a></p>)}</details><div className="source-actions">{s.website && <a href={s.website} target="_blank" rel="noopener noreferrer">Visitar <ExternalLink size={12} /></a>}{!s.available && <><a href={s.setup_url} target="_blank" rel="noopener noreferrer">Ver proveedor <ExternalLink size={12} /></a><button onClick={() => open(s.code)}>Conectar</button></>}</div></article>)}</div>{!shown.length && <p>No hay fuentes con ese filtro. Puedes añadir una fuente personalizada.</p>}
+    <section>
+      {searchable.length > 0 ? <>
+        <div className="results-heading"><h2>Catálogo de fuentes <span>{searchable.length}</span></h2></div>
+        <div className="source-filters"><label><span><Search size={14} /> Buscar fuente</span><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="InfoJobs, comunidades, LATAM…" /></label><label>Prioridad<select value={category} onChange={e => setCategory(e.target.value)}>{['Todas', 'España', 'LATAM', 'Europa', 'Comunidades', 'Freelance', 'Empresas', 'Internacional'].map(c => <option key={c}>{c}</option>)}</select></label></div>
+        <div className="source-grid">{searchable.map(card)}</div>
+      </> : <>
+        <div className="results-heading"><h2>Conectadas ahora <span>{groups.connected.length}</span></h2></div>
+        <p className="catalog-note">APIs y feeds públicos ya operativos: entran en cada recogida diaria sin configuración ni coste. No hay que tocar nada.</p>
+        <div className="source-grid">{groups.connected.map(sourcesCard)}</div>
+
+        <div className="results-heading" style={{ marginTop: 40 }}><h2>Por conectar · Actor de Apify <span>{groups.apify.length}</span></h2></div>
+        <p className="catalog-note">Portales sin API pública: se conectan con un Actor de Apify (puede generar coste por ejecución). Elige el proveedor propuesto, valida su salida y ajusta el mapeo.</p>
+        <div className="source-grid">{groups.apify.map(card)}</div>
+
+        <div className="results-heading" style={{ marginTop: 40 }}><h2>Google · SerpApi <span>{groups.serpapi.length}</span></h2></div>
+        <p className="catalog-note">Los dorks del vocabulario WDC se ejecutan con tu clave de SerpApi (motor google_jobs). Paga por búsqueda y queda sujeto al presupuesto diario; guarda la clave en «Conecta una vez» y pulsa ejecutar.</p>
+        <div className="source-grid">{groups.serpapi.map(googleCard)}</div>
+
+        <div className="results-heading" style={{ marginTop: 40 }}><h2>Requieren más datos de tu parte <span>{groups.input.length}</span></h2></div>
+        <p className="catalog-note">Sin proveedor verificado todavía: hay que validar un scraper concreto y configurar búsquedas o enlaces específicos antes de que puedan entrar en la recogida.</p>
+        <div className="source-grid">{groups.input.map(card)}</div>
+      </>}    </section>
+    <section>
+      <div className="results-heading"><h2>Empresas objetivo <span>{targets.length}</span></h2></div>
+      <p className="catalog-note">Base verificada de academias y clínicas que venden por llamada (edtech, fertilidad, capilar, dental, estética). Sus ofertas de closer son las prioritarias: cuando una de estas empresas publica, debe aparecer entre las primeras.</p>
+      <div className="source-grid">{targets.map(t => <article className="source-card" key={t.slug}>
+        <div><span className="eyebrow">{t.sector}</span><span className={t.priority === 1 ? 'available' : 'pending'}>{t.priority === 1 ? 'Prioridad alta' : 'En seguimiento'}</span></div>
+        <h2>{t.name}</h2>
+        <p>{MONITOR_LABEL[t.monitoring] || t.monitoring}</p>
+        {t.ticket && <p>Ticket: {t.ticket}</p>}
+        {t.careers_url && <p><a href={t.careers_url} target="_blank" rel="noopener noreferrer">Página de empleo ↗</a></p>}
+      </article>)}</div>
+      {!targets.length && <p className="catalog-note">Cargando empresas objetivo…</p>}
     </section>
   </div>;
 }

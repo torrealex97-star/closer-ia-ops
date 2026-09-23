@@ -1,9 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LoaderCircle, Sparkles, X } from 'lucide-react';
 import type { components } from '../../../packages/contracts/api';
 import { request } from './client';
 type Source = components['schemas']['SourceInfo'];
+type RoleTerms = { label: string; terms: string[] };
 type Plan = { filters_applied?: string[]; filters_pending?: string[]; prepared_input?: Record<string, unknown>; id: string; actor_title: string; actor_url: string; pricing_model: string; connection: { name: string; max_items: number; max_charge_usd: number }; message: string; pricing?: { pricingPerEvent?: { actorChargeEvents?: Record<string, { eventTitle?: string; eventPriceUsd?: number; eventTieredPricingUsd?: Record<string, { tieredEventPriceUsd?: number }> }> } } };
 export default function SourceAssistant({ source, sources, onClose, onConnected, onAdvanced }: { source: string; sources: Source[]; onClose: () => void; onConnected: () => Promise<void>; onAdvanced: () => void }) {
   const [selected, setSelected] = useState(source);
@@ -11,10 +12,19 @@ export default function SourceAssistant({ source, sources, onClose, onConnected,
   const [location, setLocation] = useState('Spain');
   const [limit, setLimit] = useState(25);
   const [budget, setBudget] = useState(1);
-  const [keywords, setKeywords] = useState('closer de ventas, closer digital, high ticket closer, appointment setter, setter, cold caller, llamadas en frío, comercial digital, cerrador, venta de alto valor');
+  // Términos por defecto desde el vocabulario canónico (API /v1/profile-terms).
+  const [roleTerms, setRoleTerms] = useState<Record<string, RoleTerms>>({});
+  const [role, setRole] = useState('digital_sales');
+  const [keywords, setKeywords] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [plan, setPlan] = useState<Plan | null>(null);
+  useEffect(() => { request<{ roles: Record<string, RoleTerms> }>('profile-terms').then(d => { setRoleTerms(d.roles || {}); setKeywords((d.roles?.digital_sales?.terms || []).slice(0, 12).join(', ')); }).catch(() => {}); }, []);
+  function pickRole(next: string) {
+    setRole(next); changed();
+    const terms = roleTerms[next]?.terms || [];
+    if (terms.length) setKeywords(terms.slice(0, 12).join(', '));
+  }
   function changed() { setPlan(null); setError(''); }
   async function prepare() {
     setBusy(true); setError(''); setPlan(null);
@@ -36,6 +46,7 @@ export default function SourceAssistant({ source, sources, onClose, onConnected,
       <label>Ofertas por extracción<select value={limit} onChange={e => { setLimit(Number(e.target.value)); changed(); }}><option value={25}>25 · empezar con poco consumo</option><option value={50}>50 ofertas</option><option value={100}>100 ofertas</option></select></label>
       {!!sources.find(s => s.code === selected)?.suggested_searches?.length && <label className="wide">Búsquedas y comunidades de WDC<select value="" onChange={e => { if (e.target.value) { setUrls(e.target.value); changed(); } }}><option value="">Elegir un enlace del Excel</option>{sources.find(s => s.code === selected)?.suggested_searches?.map(s => <option key={s.url} value={s.url}>{s.name} · {s.language}</option>)}</select><small>Referencias aportadas por WDC. Acceso y vigencia pendientes de comprobar; las comunidades en inglés no se priorizan.</small></label>}
       <label className="wide">2. Pega enlaces de búsqueda o páginas<textarea rows={3} value={urls} onChange={e => { setUrls(e.target.value); changed(); }} placeholder="https://www.infojobs.net/ofertas-trabajo/closer" /><small>Un enlace por línea. Si eliges InfoJobs puedes dejarlo vacío y buscar por los términos preparados. «Otra web» intenta reconocer la fuente a partir del enlace.</small></label>
+      <label>Perfil de búsqueda<select value={role} onChange={e => pickRole(e.target.value)}>{Object.entries(roleTerms).map(([code, r]) => <option key={code} value={code}>{r.label}</option>)}</select><small>Rellena los términos con el vocabulario WDC del perfil elegido (incluye asesor de admisiones, sales advisor, patient coordinator…). Puedes editarlos después.</small></label>
       <label>Términos a buscar (separados por comas)<textarea rows={3} value={keywords} onChange={e => { setKeywords(e.target.value); changed(); }} /></label>
       <label>Límite de cargos solicitado · USD<input type="number" min={0.1} max={5} step={0.1} value={budget} onChange={e => { setBudget(Number(e.target.value)); changed(); }} /><small>El proveedor aplica este límite según su modalidad de cobro. Revisa su precio antes de ejecutar.</small></label>
     </div></fieldset>

@@ -18,13 +18,37 @@ PUBLIC = {
     'weworkremotely': ('RSS de ventas y marketing', ['Categoría ventas y marketing'], 'Feed de categoría; no garantiza búsqueda por palabras clave. Validación local final.'),
     'remoteok': ('Feed público', [], 'El feed no ofrece filtros verificados para este flujo; descarga compartida y cacheada.'),
     'arbeitnow': ('Feed público', [], 'Sin búsqueda por keywords verificada; no se inventan parámetros. Filtrado local.'),
+    'workingnomads': ('API pública', [], 'Descarga global cacheada una hora; sin filtros upstream verificados. Validación local.'),
+    'virtualvocations': ('RSS general', [], 'Feed sin filtro de categoría; acepta perfiles de ventas y se filtra al importar.'),
+    'remotejobs': ('RSS general', [], 'Feed sin filtro de categoría; acepta perfiles de ventas y se filtra al importar.'),
+    'jobicy': ('API pública por industria', ['Industria ventas (slug seller)'], 'Descarga de la industria Sales; el resto de requisitos se comprueba al importar.'),
+    'remotefirstjobs': ('RSS de ventas', [], 'Feed de la categoría ventas con descripción completa; validación local final.'),
+    'jobspresso': ('RSS general', [], 'Ofertas curadas sin filtro de categoría; se filtra al importar.'),
+    'remotojob': ('RSS general', [], 'Vacantes diarias en español; sin filtro de categoría en origen. Validación local.'),
+    'jobtoday': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (closer)'], 'Ofertas comerciales España del listado closer-venta; sin keywords en origen. Validación local final.'),
+    'jobtoday-telemarketing': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (telemarketing)'], 'Listado televenta España; sin keywords en origen. Validación local final. La ruta setter devuelve 410 Gone.'),
+    'jobtoday-remoto': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (ventas-remoto)'], 'Listado comercial remoto España; sin keywords en origen. Validación local final.'),
+    'closers-avenue': ('Sin listado público', [], 'Su bolsa devuelve 500 (2026-09-23). Entrada informativa: requiere Actor opt-in o acceso autorizado; no extraíble hoy.'),
+    'google': ('SerpApi · motor google_jobs (pendiente de conectar)', ['Dork completo (site:, comillas, ubicación)', 'País (gl) e idioma (hl)'], 'Preset de la taxonomía WDC: cada dork busca en Google ofertas indexadas de LinkedIn y portales con filtros exactos. Necesita API key de SerpApi y se paga por búsqueda; sujeto al presupuesto diario de ADR-009. Hasta conectar la clave, los dorks son enlaces ejecutables para revisión manual.'),
 }
 
 
 def strategy(code):
     if code in PUBLIC:
         method, filters, note = PUBLIC[code]
+        # Entradas informativas sin listado extraíble no son conectores operativos.
+        # 'pendiente' en el método = requiere credencial/proveedor aún no conectado.
+        if method == 'Sin listado público':
+            status = 'Sin listado público extraíble'
+        elif 'pendiente' in method.lower():
+            status = 'Requiere API key · presets listos'
+        else:
+            status = 'Conector operativo'
         return {'acquisition_method': method, 'upstream_filters': filters, 'acquisition_note': note,
+                'validation_status': status, 'provider_candidates': [], 'checked_at': ''}
+    if code.startswith('ats-'):
+        return {'acquisition_method': 'ATS público por empresa', 'upstream_filters': [],
+                'acquisition_note': 'Tablero público de la empresa según su watchlist; sin palabras clave en origen. El filtrado es local.',
                 'validation_status': 'Conector operativo', 'provider_candidates': [], 'checked_at': ''}
     record = audit().get(code, {})
     candidates = record.get('candidates', [])
@@ -48,7 +72,7 @@ def discovery_url(name):
 
 
 BRANDS = {
-    "jooble": ["jooble"], "simplyhired": ["simplyhired", "simply-hired"],
+    "jooble": ["jooble"], "simplyhired": ["simplyhired", "simply-hired"], 'google': ['serpapi', 'google-jobs', 'google-search'],
     'infojobs': ['infojobs'], 'computrabajo': ['computrabajo'], 'workana': ['workana'],
     'getonbrd': ['getonbrd'], 'linkedin': ['linkedin'], 'indeed': ['indeed'],
     'infoempleo': ['infoempleo'], 'jobtoday': ['jobtoday'], 'trabajos': ['trabajos-com'],

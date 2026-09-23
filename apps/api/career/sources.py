@@ -11,9 +11,10 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
-from .connectors import Candidate, ProviderError, REGISTRY
+from .connectors import Candidate, ProviderError, REGISTRY, watchlist_connectors
 from .db import ROOT, connect, org, uid, now
 from .pipeline import normalize_mapped
+from .source_strategy import source_presets
 
 APIFY_BASE = "https://api.apify.com/v2/"
 
@@ -29,7 +30,6 @@ CATALOG = [
     ("linkedin", "LinkedIn Jobs", "España · LATAM · Europa", "https://www.linkedin.com/jobs", "https://apify.com/curious_coder/linkedin-jobs-scraper", "Ofertas públicas; búsquedas por términos, región y modalidad."),
     ("indeed", "Indeed", "España · LATAM · Europa", "https://www.indeed.com", "https://apify.com/store?search=indeed%20jobs", "Elegir dominio regional y proveedor con descripción completa."),
     ("infoempleo", "Infoempleo", "España", "https://www.infoempleo.com", "", "Páginas públicas: necesita validar extracción y paginación."),
-    ("jobtoday", "JOB TODAY", "España", "https://jobtoday.com/es", "", "Comercial y ventas: descartar puestos exclusivamente presenciales."),
     ("trabajos", "Trabajos.com", "España", "https://www.trabajos.com", "", "Portal generalista: configurar búsquedas de comercial remoto."),
     ("torre", "Torre", "LATAM", "https://torre.ai", "", "Empleo y talento: validar páginas y campos de cada búsqueda."),
     ("weremoto", "WeRemoto", "LATAM", "https://www.weremoto.com", "", "Bolsa remota hispana; extracción de páginas públicas por validar."),
@@ -49,6 +49,17 @@ CATALOG = [
     ("reddit", "Reddit", "Comunidades", "https://www.reddit.com", "https://apify.com/store?search=reddit", "Comunidades de trabajo remoto; evitar autopromoción y candidatos buscando empleo."),
     ("company", "Empresas · páginas de empleo / ATS", "Empresas", "https://apify.com/store", "https://apify.com/store?search=jobs%20ats", "Añadir webs de empresas, agencias, academias y sus bolsas ATS."),
     ("custom", "Otra web o comunidad", "Personalizada", "https://apify.com/store", "https://apify.com/store", "Cualquier proveedor que entregue registros estructurados. Viabilidad y acceso se validan por sitio."),
+    ("jobgether", "Jobgether", "Internacional", "https://jobgether.com", "", "Remoto con filtro por país; HTML tras Cloudflare. Proveedor por validar."),
+    ("tecnoempleo", "Tecnoempleo", "España", "https://www.tecnoempleo.com", "", "IT España; útil para SDR y AE de SaaS. Sin RSS localizado; HTML por validar."),
+    ("talent", "Talent.com", "España · LATAM", "https://www.talent.com", "", "Agregador con penetración ES/LATAM; feed partner sin verificar."),
+    ("milanuncios", "Milanuncios Empleo", "España", "https://www.milanuncios.com/empleo/", "", "Volumen de comercial autónomo; HTML con anti-bot por validar."),
+    ("primer-empleo", "Primer Empleo", "España", "https://www.primerempleo.com", "", "Perfiles junior; HTML por validar."),
+    ("jobfluent", "Jobfluent", "España", "https://www.jobfluent.com", "", "Startups, sobre todo Barcelona; HTML por validar."),
+    ("welcomejungle", "Welcome to the Jungle ES", "España", "https://www.welcometothejungle.com/es", "", "Backend Algolia; requiere adaptador específico de su API interna."),
+    ("closers-avenue", "ClosersAvenue", "España", "https://closersavenue.com", "", "Nicho closer comisión-pura España. Su bolsa interna devuelve 500 (2026-09-23): sin listado público extraíble; requiere Actor opt-in o acceso autorizado."),
+    ("google", "Google dorks · SerpApi", "España · Europa", "https://www.google.com/search?q=site%3Alinkedin.com%2Fjobs%2Fview+%22closer+de+ventas%22", "https://serpapi.com/google-jobs-api", "Motor google_jobs de SerpApi (pendiente de conectar): cada dork del vocabulario WDC busca ofertas ya indexadas de LinkedIn/portales con los filtros exactos (site:, comillas, España). Requiere API key de SerpApi; el coste por búsqueda se controla con el presupuesto diario de ADR-009."),
+    ("remotolist", "RemotoList", "España · LATAM", "https://remotolist.com", "", "Comunidad remota hispana con categoría de ventas; sin feed público localizado."),
+    ("domestika", "Domestika Empleo", "España", "https://www.domestika.org", "", "Marginal para ventas; HTML por validar."),
 ]
 CATALOG_BY_CODE = {r[0]: r for r in CATALOG}
 DEFAULT_MAPPING = {"title": "title", "company": "companyName", "description": "description", "source_url": "url", "locations": "location", "published_at": "postedAt", "work_mode": "workMode"}
@@ -218,6 +229,109 @@ async def scrape(connection_id: str):
     return await launch_scrape(connection_id, org())
 
 
+@router.post("/google/run")
+async def google_run():
+    """Ejecuta los dorks WDC vía SerpApi engine=google_jobs bajo presupuesto."""
+    return await launch_serpapi(org())
+
+
+@router.post("/google/check")
+def google_check():
+    """Comprueba credencial y conexión; consume la búsqueda de prueba solo vía /integrations/serpapi/check."""
+    organization = org()
+    value = get_or_create_google_connection(organization)
+    if not read_token(organization, "account-serpapi"):
+        raise HTTPException(422, "Guarda tu clave de SerpApi en Integraciones antes de comprobar")
+    value = get_connection(google_connection_id(organization), organization)
+    state = "Sin ejecución" if not value.get("run_status") else value["run_status"]
+    return {"connection": public_connection(value, organization),
+            "message": f"Clave presente, conexión con {len(value.get('urls') or [])} dorks WDC. Estado: {state}."}
+
+
+SERPAPI_COST_PER_SEARCH_USD = 0.025  # Starter plan: 25 USD / 1.000 búsquedas.
+
+
+def google_connection_id(organization):
+    """Single shared connection id for the google source (one per org)."""
+    return "google-serpapi"
+
+
+def google_dorks():
+    """Dorks WDC de la fuente google, leídos de los presets sin tocar la BD."""
+    return [row["dork"] for row in source_presets()["searches"]
+            if row["source"] == "google" and row.get("dork")]
+
+
+def get_or_create_google_connection(organization):
+    """Idempotent connection for the google source: urls = WDC dorks.
+    No actor, no dataset: its scrape endpoint runs SerpApi directly.
+    Solo se crea al ejecutar o comprobar, nunca al registrar la fuente."""
+    presets = [{"dork": d} for d in google_dorks()]
+    if not presets:
+        raise HTTPException(422, "No hay dorks WDC preparados para la fuente google")
+    with connect() as db:
+        row = db.execute("SELECT payload FROM source_connections WHERE id=? AND org_id=?",
+                         (google_connection_id(organization), organization)).fetchone()
+        if row:
+            value = json.loads(row["payload"])
+            # Presets changed: refresh dorks but keep run state and fingerprint.
+            if value.get("urls") != [p["dork"] for p in presets]:
+                value["urls"] = [p["dork"] for p in presets]
+                value["max_items"] = len(presets) * 50
+                put_connection(value, organization)
+            return value
+    value = {"id": google_connection_id(organization), "name": "Google Jobs · SerpApi (dorks WDC)",
+             "source": "google", "actor_id": "", "dataset_id": "", "enabled": True,
+             "urls": [p["dork"] for p in presets], "url_field": "q", "url_format": "strings",
+             "actor_input": {}, "mapping": {}, "build": "latest", "auto_mapping": False,
+             "max_items": len(presets) * 50, "max_charge_usd": round(len(presets) * SERPAPI_COST_PER_SEARCH_USD * 1.3, 2)}
+    put_connection(value, organization)
+    return value
+
+
+async def launch_serpapi(organization, connection_id=None):
+    """Run the WDC dorks through SerpApi engine=google_jobs under the daily budget.
+    Reservation before I/O, same rules as Apify: one launch per day per source."""
+    from .collection import euro_rate, reserve, record_launch
+    from .connectors import read_serpapi_token
+    connection_id = connection_id or google_connection_id(organization)
+    value = get_or_create_google_connection(organization)
+    if not value["enabled"]:
+        raise HTTPException(409, "Conexión desactivada")
+    if not read_serpapi_token():
+        raise HTTPException(422, "Guarda tu clave de SerpApi en Integraciones antes de ejecutar los dorks")
+    if value.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
+        raise HTTPException(409, "Ya hay una ejecución pendiente. Comprueba su estado.")
+    rate = await euro_rate()
+    # Price model is known and fixed: one search per dork. No metadata call needed.
+    minimum = value["max_charge_usd"]
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT payload FROM source_connections WHERE id=? AND org_id=?",
+                         (connection_id, organization)).fetchone()
+        if not row:
+            raise HTTPException(404, "Conexión no encontrada")
+        value = json.loads(row["payload"])
+        if value.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
+            raise HTTPException(409, "Ya hay una ejecución pendiente. Comprueba su estado.")
+        reservation, cap = reserve(db, organization, connection_id, value["max_charge_usd"], rate, minimum)
+        value.update(run_status="RUNNING", run_id=None, budget_reservation=reservation, dataset_id="serpapi-local")
+        db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=?",
+                   (json.dumps(value), connection_id, organization))
+    from .catalog import collection_query
+    query = collection_query().model_copy(update={"sources": ["google"]})
+    run_id = uid()
+    sources = [{"code": "google", "name": value["name"], "status": "queued", "fetched": 0, "accepted": 0, "cost": 0}]
+    with connect() as db:
+        db.execute("INSERT INTO search_runs VALUES(?,?,?,?,?,?,?,NULL)",
+                   (run_id, organization, "serpapi-" + reservation, query.model_dump_json(), "queued", json.dumps(sources), now()))
+    value["run_id"] = run_id
+    record_launch(reservation, organization, run_id, "RUNNING")
+    put_connection(value, organization)
+    return {**public_connection(value, organization), "run_id": run_id,
+            "message": f"Importación SerpApi encolada: {len(value['urls'])} dorks, tope {cap:.2f} USD. El presupuesto diario la limita; las búsquedas cacheadas de SerpApi no consumen crédito."}
+
+
 async def launch_scrape(connection_id, organization, allocation_cents=None):
     from .collection import budget_quote, reserve, record_launch
     initial = get_connection(connection_id, organization)
@@ -354,15 +468,44 @@ class ApifyDataset:
 
 
 def registry(organization):
-    return {**REGISTRY, **{v["id"]: ApifyDataset(v, organization) for v in connections(organization) if v["enabled"] and v["dataset_id"]}}
+    base = {**REGISTRY, **watchlist_connectors(organization),
+            **{v["id"]: ApifyDataset(v, organization) for v in connections(organization) if v["enabled"] and v["dataset_id"]}}
+    # SerpApi entra solo con clave guardada: nunca lanza búsquedas de pago sin credencial.
+    # Sin conexión persistente aquí: registrar la fuente no debe crear filas como efecto lateral.
+    if read_token(organization, "account-serpapi"):
+        dorks = google_dorks()
+        if dorks:
+            base["google"] = _MultiDorkConnector(dorks)
+    return base
+
+
+class _MultiDorkConnector:
+    """Ejecuta los dorks WDC en secuencia: un dork = una búsqueda de pago."""
+    code = "google"
+    name = "Google Jobs · SerpApi"
+    provider = "serpapi_google_jobs_v1"
+
+    def __init__(self, dorks):
+        self.dorks = dorks
+
+    async def batches(self, query):
+        from .connectors import google_serpapi_connector
+        for dork in self.dorks:
+            connector = google_serpapi_connector(dork)
+            async for batch in connector.batches(query):
+                yield batch
 
 
 def source_infos(organization):
     with connect() as db:
         saved_sources = {r[0] for r in db.execute('SELECT DISTINCT p.source FROM catalog_entries c JOIN jobs j ON j.org_id=c.org_id AND j.id=c.job_id JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id WHERE c.org_id=? AND c.expires_at>?', (organization, now()))}
     public = [{"code": c.code, "name": c.name, "available": True,
-               "category": "LATAM" if c.code == "getonbrd-public" else "Internacional", "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+               "category": ("España" if c.code.startswith("jobtoday") else "LATAM" if c.code == "getonbrd-public" else "Internacional"),
+               "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
                "website": c.url if hasattr(c, "url") else "https://himalayas.app" if c.code == "himalayas" else "https://weworkremotely.com"} for c in REGISTRY.values()]
+    public += [{"code": c.code, "name": c.name, "available": True, "category": "Empresas",
+                "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+                "website": c.url} for c in watchlist_connectors(organization).values()]
     public += [{"code": c[0], "name": c[1], "category": c[2], "website": c[3], "setup_url": c[4] or "https://apify.com/store?search=web%20scraper", "note": c[5], "available": False} for c in CATALOG]
     public += [{"code": v["id"], "name": v["name"], "category": "Mis conexiones", "available": (v["enabled"] and bool(v["dataset_id"] or v["actor_id"])) or v["id"] in saved_sources, "note": "Catálogo local · consulta sin lanzar un nuevo scraper"} for v in connections(organization)]
     from .source_strategy import strategy, discovery_url, suggested_searches
@@ -372,6 +515,13 @@ def source_infos(organization):
             entry["suggested_searches"] = suggested_searches(entry["code"], organization)
             if not entry.get("setup_url") or entry["setup_url"] == "https://apify.com/store?search=web%20scraper":
                 entry["setup_url"] = discovery_url(entry["name"])
+            # Requisito de puesta en marcha: la web agrupa por esto, sin heurísticas locales.
+            if entry["available"]:
+                entry["requires"] = "none"          # API/feed público ya operativo
+            elif entry.get("provider_candidates"):
+                entry["requires"] = "apify"          # conectar con Actor de Apify (puede costar)
+            else:
+                entry["requires"] = "input"          # falta proveedor verificado: validar y dar inputs
     return public
 
 

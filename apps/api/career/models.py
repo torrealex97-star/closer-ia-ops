@@ -114,6 +114,8 @@ class SourceInfo(BaseModel):
     category: str = "Internacional"
     website: str = ""
     setup_url: str = ""
+    # Puesta en marcha: 'none' = API pública activa, 'apify' = conectar Actor, 'input' = validar proveedor y dar inputs.
+    requires: str = ""
 
 
 class Configuration(BaseModel):
