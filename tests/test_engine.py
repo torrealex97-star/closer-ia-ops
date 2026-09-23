@@ -4,15 +4,62 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 import pytest
+from pydantic import SecretStr
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from career import connectors
-from career.connectors import Candidate, Himalayas, WeWorkRemotely, ProviderError
+from career.connectors import AtsCompany, Candidate, Himalayas, WeWorkRemotely, ProviderError, REGISTRY, watchlist_connectors
 from career.db import connect, load_run, now
 from career.main import app
 from career.models import SearchQuery
 from career.pipeline import ingest, match, normalize, plain, safe_url
 from career.worker import execute
+from career.presentation import professional_role
+
+
+def test_vocabulary_families_recognize_equivalent_titles():
+    """Taxonomía WDC 2026-09-23: titulos que no dicen closer pero son el mismo perfil."""
+    assert professional_role('Asesor de Admisiones', 'captacion de alumnos bootcamp') == 'closer'
+    assert professional_role('Admissions Advisor', 'student recruitment') == 'closer'
+    assert professional_role('Enrollment Specialist', 'education sales') == 'closer'
+    assert professional_role('Patient Coordinator', 'clinica dental') == 'closer'
+    assert professional_role('Treatment Coordinator', 'clinica capilar') == 'closer'
+    assert professional_role('Sales Advisor', 'formacion digital') == 'account_executive'
+    assert professional_role('Consultor Comercial', 'negociacion comercial') == 'account_executive'
+    assert professional_role('Teleoperador Comercial', 'citas agendadas') == 'setter'
+    assert professional_role('Growth Manager', 'analitica y producto') is None
+
+
+def test_match_quality_signals_and_noise():
+    base = {'title': 'Closer de ventas', 'company': 'Academia X', 'description': '<p>Remoto.</p>',
+            'source_url': 'https://example.com/x', 'locations': ['España'], 'published_at': now(),
+            'work_mode': 'remote', 'salary_min': None, 'salary_max': None,
+            'salary_currency': None, 'salary_period': None}
+    plain_offer = dict(base)
+    score, reasons, _ = match(plain_offer, SearchQuery())
+    strong = dict(base, description='<p>Remoto. Leads cualificados, fijo más comisiones y contrato indefinido. CRM propio.</p>')
+    score2, reasons2, _ = match(strong, SearchQuery())
+    assert score2 > score, (reasons, reasons2)
+    assert any('proceso comercial' in r.lower() for r in reasons2)
+    # Ruido: curso para aprender closing y MLM nunca son oportunidades.
+    course = dict(base, title='Curso de Closer', description='<p>Aprende a cerrar ventas.</p>')
+    assert match(course, SearchQuery()) is None
+    mlm = dict(base, title='Closer de ventas', description='<p>Red multinivel, network marketing.</p>')
+    assert match(mlm, SearchQuery()) is None
+    scam = dict(base, title='Closer de ventas', description='<p>Inversiones garantizadas.</p>')
+    assert match(scam, SearchQuery()) is None
+
+
+def test_match_recognizes_admissions_and_sector_terms():
+    offer = {'title': 'Asesor de Admisiones', 'company': 'Universidad Online',
+             'description': '<p>Captación de alumnos, matriculacion. Bootcamp de IA. Remoto.</p>',
+             'source_url': 'https://example.com/a', 'locations': ['España'], 'published_at': now(),
+             'work_mode': 'remote', 'salary_min': None, 'salary_max': None,
+             'salary_currency': None, 'salary_period': None}
+    result = match(offer, SearchQuery())
+    assert result, 'las ofertas de admisiones deben contar para digital_sales'
+    score, reasons, _ = result
+    assert score >= 60
 
 
 @pytest.fixture
@@ -49,7 +96,46 @@ def test_auth_and_empty_state(client):
     assert client.get("/v1/config", headers={"Authorization": ""}).status_code == 401
     assert client.get("/v1/search-runs").json() == []
     assert client.get("/v1/config").json()["mode"] == "local"
-    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 6
+    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 22
+
+
+def test_profile_terms_feed_apify_inputs(client):
+    """El vocabulario canónico alimenta los inputs de Apify del asistente."""
+    data = client.get("/v1/profile-terms").json()
+    roles = data["roles"]
+    assert set(roles) >= {"digital_sales", "closer", "setter", "account_executive"}
+    ds = roles["digital_sales"]["terms"]
+    # La 'lista mínima' del usuario va primero y cubre los equivalentes clave.
+    for term in ["closer", "asesor de admisiones", "admissions advisor", "enrollment advisor",
+                 "patient coordinator", "sales advisor", "treatment coordinator"]:
+        assert term in ds, term
+    assert ds.index("closer") < ds.index("patient coordinator"), "los preferidos primero"
+    assert roles["digital_sales"]["label"] == "Closers, setters y comercial online"
+    # Los términos del asistente y los del KEYWORDS de integraciones comparten vocabulario.
+    from career.integrations import KEYWORDS
+    assert KEYWORDS[0] == "closer" and "high ticket closer" in KEYWORDS
+
+
+def test_google_dorks_presets_ready_for_serpapi(client, monkeypatch):
+    # Los presets WDC pertenecen a local-wdc; el fixture client usa org-a.
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    """Dorks Google (site:linkedin.com/jobs/view con comillas) como presets para SerpApi."""
+    from career.source_strategy import source_presets
+    presets = [p for p in source_presets()['searches'] if p['source'] == 'google']
+    assert len(presets) >= 12, 'la taxonomia debe tener sus dorks preparados'
+    for p in presets:
+        assert p['dork'].startswith('site:linkedin.com/jobs/view'), p['name']
+        assert '"' in p['dork'], 'los dorks usan comillas exactas'
+    # el dork de leads cualificados combina cargo + senal de calidad (seccion 11)
+    assert any('"leads cualificados"' in p['dork'] for p in presets)
+    config = client.get("/v1/config").json()["sources"]
+    google = next(s for s in config if s["code"] == "google")
+    assert google["available"] is False, "SerpApi aun no esta conectado"
+    assert "API key" in google["validation_status"] or "key" in google["validation_status"].lower()
+    assert len(google["suggested_searches"]) >= 12
+    # el asistente debe poder abrir la fuente con su primer dork como URL
+    first = google["suggested_searches"][0]
+    assert first["url"].startswith("https://www.google.com/search?q=")
 
 
 def test_idempotency_and_conflicting_replay(client):
@@ -170,10 +256,86 @@ def test_saved_search_and_cancellation_persist(client):
     assert load_run(run["id"], "org-a")["status"] == "cancelled"
 
 
+def test_expansion_connectors_jobicy_rss(monkeypatch):
+    async def fake_fetch(url, params=None, ttl=900):
+        if "jobicy.com" in url:
+            assert params == {"count": "50", "industry": "seller"}
+            return json.dumps({"jobs": [{"id": 1, "url": "https://jobicy.com/jobs/1-closer", "jobTitle": "Closer",
+                "companyName": "Acme", "jobDescription": "<p>Buscamos closer</p>", "jobGeo": "Spain",
+                "pubDate": "2026-09-22T00:00:00+00:00"}]})
+        if "remotefirstjobs" in url:
+            return '<rss><channel><item><title>Closer at Acme</title><link>https://remotefirstjobs.com/x</link><description>Buscamos closer</description></item></channel></rss>'
+        if "jobspresso" in url:
+            return '<rss><channel><item><title>Closer de ventas</title><link>https://jobspresso.co/x</link><description>Remote sales role</description></item></channel></rss>'
+        raise AssertionError(url)
+    monkeypatch.setattr("career.connectors.fetch", fake_fetch)
+    async def collect(connector):
+        return [row async for batch in connector.batches(SearchQuery()) for row in batch]
+    item = normalize("jobicy", asyncio.run(collect(REGISTRY["jobicy"]))[0].payload)
+    assert item["title"] == "Closer" and item["company"] == "Acme" and item["work_mode"] == "remote"
+    item = normalize("remotefirstjobs", asyncio.run(collect(REGISTRY["remotefirstjobs"]))[0].payload)
+    assert item["company"] == "Acme" and item["title"] == "Closer"
+    item = normalize("jobspresso", asyncio.run(collect(REGISTRY["jobspresso"]))[0].payload)
+    assert item["title"] == "Closer de ventas" and item["company"] == "Empresa no indicada"
+
+
+def test_ats_connectors_and_watchlist(monkeypatch, tmp_path):
+    monkeypatch.setenv("CAREER_DB", str(tmp_path / "watchlist.sqlite3"))
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    from career.db import initialize
+    initialize()
+    async def fake_fetch(url, params=None, ttl=900):
+        if "boards-api.greenhouse.io" in url:
+            return json.dumps({"jobs": [{"id": 7, "title": "Sales Closer", "company_name": "Acme",
+                "absolute_url": "https://boards.greenhouse.io/acme/jobs/7", "location": {"name": "Spain (Remote)"},
+                "first_published": "2026-09-22T10:00:00-04:00"}]})
+        if "ashbyhq.com" in url:
+            return json.dumps({"jobs": [{"id": "ab", "title": "Setter", "jobUrl": "https://jobs.ashbyhq.com/acme/ab",
+                "location": "Madrid", "publishedAt": "2026-09-21T08:00:00.000+00:00", "workplaceType": "Hybrid"}]})
+        if "recruitee.com" in url:
+            return json.dumps({"offers": [{"id": 99, "title": "Account Executive",
+                "careers_url": "https://jobs.acme.co/o/ae", "description": "<p>Ventas</p>",
+                "locations": [{"name": "Anywhere in Europe"}], "remote": True,
+                "published_at": "2026-05-28 13:33:37 UTC",
+                "salary": {"min": 60000, "max": 80000, "currency": "EUR", "period": "year"}}]})
+        if url == "https://careers.monestcapital.com/jobs.rss":
+            return ('<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:tt="https://teamtailor.com/locations">'
+                    '<channel><title>Monest Capital</title><item><title>Closer de ventas</title>'
+                    '<link>https://careers.monestcapital.com/jobs/123</link><guid>abc-uuid-123</guid>'
+                    '<description>&lt;p&gt;Inversor PRO. Venta consultiva.&lt;/p&gt;</description>'
+                    '<pubDate>Tue, 23 Sep 2026 08:00:00 GMT</pubDate>'
+                    '<tt:location><tt:name>Remoto</tt:name></tt:location></item></channel></rss>')
+        raise AssertionError(url)
+    monkeypatch.setattr("career.connectors.fetch", fake_fetch)
+    async def collect(connector):
+        return [row async for batch in connector.batches(SearchQuery()) for row in batch]
+    gh = normalize("ats-greenhouse-acme", asyncio.run(collect(AtsCompany("greenhouse", "acme")))[0].payload)
+    assert gh["company"] == "Acme" and gh["locations"] == ["Spain (Remote)"]
+    ab = normalize("ats-ashby-acme", asyncio.run(collect(AtsCompany("ashby", "acme")))[0].payload)
+    assert ab["work_mode"] == "Hybrid" and ab["source_url"].startswith("https://jobs.ashbyhq.com/")
+    rc = normalize("ats-recruitee-acme", asyncio.run(collect(AtsCompany("recruitee", "acme")))[0].payload)
+    assert rc["work_mode"] == "remote" and rc["salary_min"] == 60000 and rc["salary_currency"] == "EUR"
+    # Dominio propio de Teamtailor (Monest Capital / Inversor PRO, hallazgo Manu).
+    monest_conn = watchlist_connectors()["ats-teamtailor-monestcapital"]
+    monest = normalize(monest_conn.code, asyncio.run(collect(monest_conn))[0].payload)
+    assert monest["title"] == "Closer de ventas" and monest["company"] == "Monest Capital / Inversor PRO"
+    assert monest["source_url"] == "https://careers.monestcapital.com/jobs/123" and monest["work_mode"] == "remote"
+    assert set(watchlist_connectors()) == {"ats-greenhouse-stripe", "ats-greenhouse-typeform", "ats-greenhouse-wallapop",
+                                           "ats-greenhouse-cabify", "ats-ashby-pennylane", "ats-recruitee-livestorm",
+                                           "ats-teamtailor-producthackers", "ats-teamtailor-monestcapital"}
+
+
 def test_provider_contracts(client, candidate, monkeypatch):
-    async def fake_fetch(url, params=None):
+    async def fake_fetch(url, params=None, ttl=900):
         if "himalayas" in url:
             return json.dumps({"jobs": [candidate.payload]})
+        if "workingnomads" in url:
+            return json.dumps([{"url": "https://example.com/wn", "title": "Sales Closer", "company_name": "Closer Team",
+                                "description": "Remote sales role", "location": "Anywhere", "pub_date": "2026-09-22T10:00:00-00:00"}])
+        if "virtualvocations" in url:
+            return '<rss><channel><item><title>Acme: Closer</title><link>https://example.com/vv</link><description>Remote sales role</description></item></channel></rss>'
+        if "remote.jobs" in url:
+            return '<rss><channel><item><title>Setter remoto</title><link>https://example.com/rj</link><description>Agenda demos para equipo comercial</description></item></channel></rss>'
         return '<rss><channel><item><title>Company: Sales Closer</title><link>https://example.com/job</link><region>Anywhere in the World</region><description>Sales position</description></item></channel></rss>'
     monkeypatch.setattr(connectors, "fetch", fake_fetch)
     async def collect(connector):
@@ -184,6 +346,22 @@ def test_provider_contracts(client, candidate, monkeypatch):
     normalized = normalize("weworkremotely", wwr[0].payload)
     assert normalized["company"] == "Company"
     assert normalized["locations"] == ["Anywhere in the World"]
+    # New boards requested by WDC: public feed verified 2026-09-23.
+    wn = asyncio.run(collect(REGISTRY["workingnomads"]))
+    assert len(wn) == 1
+    wn_item = normalize("workingnomads", wn[0].payload)
+    assert wn_item["company"] == "Closer Team"
+    assert wn_item["published_at"] and wn_item["source_url"]
+    for code in ["virtualvocations", "remotejobs"]:
+        rows = asyncio.run(collect(REGISTRY[code]))
+        assert len(rows) == 1, code
+        item = normalize(code, rows[0].payload)
+        assert item["source_url"].startswith("https://example.com/"), code
+        assert item["work_mode"] == "remote", code
+    vv = normalize("virtualvocations", {"title": "Acme: Closer", "link": "https://example.com/vv", "description": "Remote sales role"})
+    assert vv["company"] == "Acme" and vv["title"] == "Closer"
+    rj = normalize("remotejobs", {"title": "Setter remoto", "link": "https://example.com/rj", "description": "Agenda demos"})
+    assert rj["company"] == "Empresa no indicada" and rj["title"] == "Setter remoto"
 
 
 def test_spanish_bilingual_europe_and_work_mode(candidate):
@@ -318,3 +496,144 @@ def test_new_public_connector_contracts(client, monkeypatch):
     assert item['work_mode'] == 'hybrid' and item['company'] == 'Empresa no indicada'
     rows = asyncio.run(collect(PublicJSON('remotive', 'Remotive', 'https://remotive.com/api/remote-jobs', 'jobs')))
     assert normalize('remotive', rows[0].payload)['work_mode'] == 'remote'
+
+
+def test_jobtoday_embedded_listing_contract(client, monkeypatch):
+    """Contrato del listado embebido de JobToday verificado en vivo 2026-09-23."""
+    from career.connectors import JobToday
+    payload = {'key': 'DLpjnX', 'role': 'Closer de ventas', 'companyName': 'Hispaconex',
+               'description': 'Buscamos closer de ventas remoto. Experiencia comercial.',
+               'canonicalUrl': '/es/trabajo/closer-hispaconex-DLpjnX',
+               'address': 'Tetuán, Madrid, Comunidad de Madrid, Spain',
+               'createDate': 1788358516586, 'postedSecondsAgo': 1801361,
+               'salary': {'from': 1500, 'to': 1500, 'currencyCode': 'EUR', 'period': 'MONTHLY', 'isValid': True}}
+    html = '<html><script id="__NEXT_DATA__" type="application/json">' + json.dumps(
+        {'props': {'pageProps': {'feed': {'sections': [{'items': [{'payload': payload}]}]}}}}) + '</script></html>'
+    async def fake_fetch(url, params=None, ttl=900, user_agent=None):
+        assert 'jobtoday.com/es/trabajos-closer-venta' in url
+        return html
+    monkeypatch.setattr(connectors, 'fetch', fake_fetch)
+    connector = JobToday('jobtoday', 'JobToday España', 'closer-venta')
+    async def collect():
+        return [row async for batch in connector.batches(SearchQuery()) for row in batch]
+    rows = asyncio.run(collect())
+    assert len(rows) == 1 and rows[0].external_id == 'DLpjnX'
+    item = normalize('jobtoday', rows[0].payload)
+    assert item['title'] == 'Closer de ventas' and item['company'] == 'Hispaconex'
+    assert item['source_url'].startswith('https://jobtoday.com/es/trabajo/')
+    assert item['salary_min'] == 1500 and item['salary_currency'] == 'EUR' and item['salary_period'] == 'monthly'
+    assert item['locations'] == ['Tetuán, Madrid, Comunidad de Madrid, Spain']
+    assert item['published_at']  # de createDate o inferida de postedSecondsAgo
+    # Sin salary válido no se inventa compensación; sin address no hay ubicación fabricada.
+    payload2 = dict(payload, salary={'from': 0, 'to': 0, 'isValid': False}, address=None, createDate=None, postedSecondsAgo=None)
+    html2 = html.replace(json.dumps(payload), json.dumps(payload2))
+    monkeypatch.setattr(connectors, 'fetch', lambda url, params=None, ttl=900, user_agent=None: _async_return(html2))
+    rows = asyncio.run(collect())
+    item2 = normalize('jobtoday', rows[0].payload)
+    assert item2['salary_min'] is None and item2['locations'] == []
+
+
+async def _drain(connector, query=None):
+    return [row async for batch in connector.batches(query or SearchQuery()) for row in batch]
+
+
+def _async_return(value):
+    async def inner(*args, **kwargs):
+        return value
+    return inner()
+
+
+SERPAPI_JOBS_PAYLOAD = json.dumps({
+    "search_metadata": {"id": "abc123"},
+    "jobs_results": [
+        {"title": "Closer de ventas", "via": "Academia Ejemplo",
+         "description": "<p>Remoto. Venta de formacion online con leads cualificados.</p>",
+         "job_id": "Vk123", "link": "https://www.linkedin.com/jobs/view/vk123",
+         "location": "Espa\u00f1a Remoto",
+         "detected_extensions": {"posted_at": "2026-09-23T08:00:00Z"}},
+        {"title": "Asesor de Admisiones", "via": "Bootcamp Ejemplo",
+         "description": "<p>Captacion de alumnos remoto.</p>",
+         "job_id": "Ab456", "apply_options": [{"link": "https://bootcamp.example/apply"}],
+         "location": "Madrid, Espa\u00f1a",
+         "detected_extensions": {"posted_at_relative": "hace 2 dias"}},
+    ],
+})
+
+
+def test_serpapi_connector_maps_google_jobs(client, monkeypatch, tmp_path):
+    """El conector google consume engine=google_jobs y mapea jobs_results sin inventar datos."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    calls = []
+    async def fake_fetch(url, params=None, ttl=900, user_agent=None):
+        calls.append((url, dict(params or {})))
+        assert 'serpapi.com/search.json' in url
+        assert params['engine'] == 'google_jobs'
+        assert params['api_key'] == 'test-key'
+        return SERPAPI_JOBS_PAYLOAD
+    monkeypatch.setattr(connectors, 'fetch', fake_fetch)
+    from career.integrations import save_secret
+    save_secret('serpapi', SecretStr('test-key'), False, 'local-wdc')
+    from career.connectors import google_serpapi_connector
+    connector = google_serpapi_connector('site:linkedin.com/jobs/view "closer de ventas" Espa\u00f1a')
+    async def collect():
+        return [row async for batch in connector.batches(SearchQuery()) for row in batch]
+    rows = asyncio.run(collect())
+    assert len(rows) == 2
+    item = normalize('google', rows[0].payload)
+    assert item['title'] == 'Closer de ventas' and item['company'] == 'Academia Ejemplo'
+    assert item['source_url'] == 'https://www.linkedin.com/jobs/view/vk123'
+    assert item['published_at'] and item['work_mode'] == 'remote'
+    item2 = normalize('google', rows[1].payload)
+    assert item2['source_url'] == 'https://bootcamp.example/apply', 'apply_options como enlace alternativo'
+    assert item2['published_at'], 'fecha relativa explícita se convierte'
+    # Un dork = una búsqueda: sin token la fuente no lanza nada.
+    save_secret('serpapi', SecretStr(''), True, 'local-wdc')
+    with pytest.raises(ProviderError):
+        asyncio.run(collect())
+
+
+def test_google_run_respects_budget_and_registry(client, monkeypatch):
+    """El endpoint google/run reserva presupuesto y el registry expone el conector con clave."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    from career.integrations import save_secret
+    from career.sources import registry
+    from career.connectors import google_serpapi_connector
+    save_secret('serpapi', SecretStr('test-key'), False, 'local-wdc')
+    reg = registry('local-wdc')
+    assert 'google' in reg, 'con clave guardada, google entra en el registry'
+    assert reg['google'].provider == 'serpapi_google_jobs_v1'
+    assert len(reg['google'].dorks) >= 12
+    # Sin clave el conector se niega: nunca lanza busquedas de pago sin credencial.
+    from career.sources import secret_path
+    secret_path('local-wdc', 'account-serpapi').unlink()
+    connector = google_serpapi_connector('site:linkedin.com/jobs/view "closer" Espana')
+    with pytest.raises(ProviderError, match='SerpApi'):
+        asyncio.run(_drain(connector))
+
+
+def test_google_daily_collection_includes_serpapi_with_key(client, monkeypatch):
+    """La recogida diaria solo añade google si hay clave; nunca lanza sin credencial."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    from career.collection import enqueue
+    from career.db import connect as db_connect
+    # Sin clave: no debe aparecer google.
+    enqueue('local-wdc')
+    with db_connect() as db:
+        row = db.execute("SELECT sources FROM collection_runs WHERE org_id='local-wdc' ORDER BY created_at DESC LIMIT 1").fetchone()
+        sources = json.loads(row['sources'])
+    assert all(s['code'] != 'google' for s in sources)
+    # Con clave y conexion activa: google entra en la lista (INSERT OR IGNORE reutiliza el run del día,
+    # así que borramos para forzar re-encolado con la nueva lista de fuentes).
+    from career.integrations import save_secret
+    from career.sources import put_connection, get_or_create_google_connection
+    save_secret('serpapi', SecretStr('test-key'), False, 'local-wdc')
+    value = get_or_create_google_connection('local-wdc')
+    value['enabled'] = True
+    put_connection(value, 'local-wdc')
+    with db_connect() as db:
+        db.execute("DELETE FROM collection_runs WHERE org_id='local-wdc'")
+    enqueue('local-wdc')
+    with db_connect() as db:
+        row = db.execute("SELECT sources FROM collection_runs WHERE org_id='local-wdc' ORDER BY created_at DESC LIMIT 1").fetchone()
+        sources2 = json.loads(row['sources'])
+    assert any(s['code'] == 'google' for s in sources2)

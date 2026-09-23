@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+import time
 import unicodedata
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -8,16 +9,22 @@ from html import unescape
 from urllib.parse import urlsplit, urlunsplit
 from .db import connect, now, uid
 from .models import Job, SearchQuery
+from .vocabulary import (ALIASES as VOCAB_ALIASES, NEGATIVE_SIGNALS, QUALITY_SIGNALS,
+                         SECTOR_TERMS)
 
-ALIASES = {
+# Canonical user taxonomy (2026-09-23) from vocabulary.py, extended with legacy aliases.
+ALIASES = {role: list(dict.fromkeys(terms + VOCAB_ALIASES.get(role, [])))
+           for role, terms in {
     "cold_caller": ["cold caller", "cold calling", "llamadas en frio", "prospector telefonico", "prospectora telefonica"],
     "closer": ["closer", "cerrador", "cerradora", "venta de alto valor", "ventas de alto valor", "closing specialist", "enrollment advisor", "enrollment specialist", "sales consultant"],
     "setter": ["appointment setter", "appoitment setter", "appointment setting", "agendador", "agendadora", "booking specialist", "lead qualifier", "dm setter", "outbound setter", "setter"],
     "sdr": ["sdr", "bdr", "sales development", "business development representative", "cold caller"],
     "account_executive": ["account executive", "ejecutivo comercial", "ejecutivo de ventas", "comercial digital", "asesor comercial", "asesora comercial"],
-}
-ALIASES["sales"] = list(dict.fromkeys(sum(ALIASES.values(), []) + ["sales", "ventas", "comercial", "business development"]))
-ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ALIASES["cold_caller"] + ["comercial", "asesor de ventas", "asesora de ventas", "agente de ventas", "ejecutivo de ventas", "ejecutiva de ventas", "representante de ventas"]))
+}.items()}
+ALIASES["sales"] = list(dict.fromkeys(sum(ALIASES.values(), []) + ["sales", "ventas", "comercial", "business development", "telemarketing", "televentas"]))
+ALIASES["digital_sales"] = list(dict.fromkeys(ALIASES["closer"] + ALIASES["setter"] + ALIASES["cold_caller"] + ALIASES["account_executive"] + ALIASES["sdr"] + VOCAB_ALIASES["digital_sales"] + ["comercial", "asesor de ventas", "asesora de ventas", "agente de ventas", "ejecutivo de ventas", "ejecutiva de ventas", "representante de ventas", "sales executive", "ejecutiva comercial", "televentas", "telemarketing", "televendedor", "televendedora"]))
+# El vocabulario canonico incluye 'ventas'/'sales'/'comercial' como terminos genericos;
+# aqui solo cuentan los perfiles y equivalentes del vocabulario (los genericos ya estaban).
 LATAM = {"mexico", "méxico", "argentina", "colombia", "chile", "peru", "perú", "ecuador", "uruguay", "paraguay", "bolivia", "venezuela", "costa rica", "panama", "panamá", "guatemala", "honduras", "el salvador", "nicaragua", "dominican republic", "república dominicana", "brazil", "brasil", "latin america", "latam"}
 
 
@@ -45,12 +52,28 @@ def date_value(value):
             dt = datetime.fromtimestamp(value, timezone.utc)
         else:
             try:
-                dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                dt = datetime.fromisoformat(str(value).replace("Z", "+00:00").replace(" UTC", "+00:00"))
             except ValueError:
                 dt = parsedate_to_datetime(str(value))
         return dt.replace(tzinfo=dt.tzinfo or timezone.utc).astimezone(timezone.utc).isoformat()
     except (ValueError, TypeError, OverflowError):
         return None
+
+
+def relative_date(text):
+    """Explicit relative dates from providers ("3 days ago", "hace 2 días").
+    Returns None on anything unrecognized: a gap is not a date."""
+    if not isinstance(text, str):
+        return None
+    t = text.lower()
+    m = re.search(r"(\d+)\s*(minuto|hour|hora|day|d[ií]a|week|semana|month|mes)\w*", t)
+    if not m:
+        return None
+    n, unit = int(m.group(1)), m.group(2)[:2]
+    seconds = {"mi": 60, "ho": 3600, "dá": 86400, "di": 86400, "se": 604800, "me": 2592000}.get(unit)
+    if seconds is None:
+        return None
+    return date_value(time.time() - n * seconds)
 
 
 def number(value):
@@ -62,6 +85,26 @@ def number(value):
 
 
 def normalize(source, row):
+    if source == "google":
+        # SerpApi engine=google_jobs (jobs_results verificado contra su documentación).
+        # apply_links trae el enlace de la oferta; sin él la ficha no es clickable.
+        apply = row.get("apply_options") or []
+        link = safe_url(row.get("link")) or (safe_url(apply[0].get("link")) if isinstance(apply, list) and apply and isinstance(apply[0], dict) else "")
+        via = row.get("via") or ""
+        detected = row.get("detected_extensions", {}) if isinstance(row.get("detected_extensions"), dict) else {}
+        posted = date_value(detected.get("posted_at"))
+        if not posted and isinstance(detected.get("posted_at_relative"), str):
+            # "3 days ago" / "hace 3 días": fecha relativa explícita, no inventada.
+            posted = relative_date(detected["posted_at_relative"])
+        locations = [str(loc) for loc in (row.get("location") or "").split(",") if str(loc).strip()]
+        return {
+            "title": plain(row.get("title")), "company": plain(via) or "Empresa no indicada",
+            "description": plain(row.get("description")), "source_url": link or (safe_url(row.get("job_id")) or ""),
+            "application_url": link, "locations": locations,
+            "published_at": posted, "expires_at": None, "work_mode": "remote" if "remoto" in (row.get("location") or "").lower() or "remote" in (row.get("location") or "").lower() else "",
+            "salary_min": number(detected.get("salary")) if isinstance(detected.get("salary"), (int, float)) else None,
+            "salary_max": None, "salary_currency": None, "salary_period": None,
+        }
     if source == "getonbrd-public":
         attrs = row.get("attributes", {})
         item = normalize_mapped(row, {"title": "attributes.title", "source_url": "links.public_url", "locations": "attributes.countries", "published_at": "attributes.published_at"})
@@ -82,6 +125,101 @@ def normalize(source, row):
             "work_mode": "remote",
             "salary_currency": row.get("currency"), "salary_period": row.get("salaryPeriod"),
         }
+    if source == "jobicy":
+        item = normalize_mapped(row, {
+            "title": "jobTitle", "company": "companyName", "description": "jobDescription",
+            "source_url": "url", "locations": "jobGeo", "published_at": "pubDate",
+        })
+        item["work_mode"] = "remote"
+        return item
+    if source == "remotefirstjobs":
+        title = plain(row.get("title"))
+        company = title.rpartition(" at ")[2].strip()
+        return {
+            "title": title.rpartition(" at ")[0].strip() or title, "company": company or "Empresa no indicada",
+            "description": plain(row.get("description")), "source_url": safe_url(row.get("link")),
+            "application_url": safe_url(row.get("link")), "locations": [],
+            "published_at": date_value(row.get("pubDate")), "expires_at": None, "work_mode": "remote",
+            "salary_min": None, "salary_max": None, "salary_currency": None, "salary_period": None,
+        }
+    if source.startswith("jobtoday"):
+        # Payload embebido de jobtoday.com/es (estructura verificada 2026-09-23).
+        # Sin datos no se inventa nada: ubicación vacía va a revisión, salary desconocido queda nulo.
+        canonical = row.get("canonicalUrl") or ""
+        url = f"https://jobtoday.com{canonical}" if canonical.startswith("/") else safe_url(canonical)
+        address = row.get("address")
+        locations = [str(address)] if isinstance(address, str) and address.strip() else []
+        posted = None
+        created = row.get("createDate")
+        if isinstance(created, (int, float)):
+            # JobToday fecha en milisegundos; date_value interpreta segundos.
+            posted = date_value(created / 1000)
+        if not posted and isinstance(row.get("postedSecondsAgo"), (int, float)):
+            posted = date_value(int(time.time() - row["postedSecondsAgo"]))
+        salary = row.get("salary") if isinstance(row.get("salary"), dict) else {}
+        salary_min, salary_max = number(salary.get("from")), number(salary.get("to"))
+        if salary.get("isValid") is not True:
+            salary_min = salary_max = None
+        description = plain(row.get("description") or row.get("descriptionDeMarkdown"))
+        work_mode = "remote" if "remoto" in source else ""
+        return {
+            "title": plain(row.get("role")), "company": plain(row.get("companyName")) or "Empresa no indicada",
+            "description": description, "source_url": url, "application_url": url,
+            "locations": locations, "published_at": posted, "expires_at": None,
+            "work_mode": work_mode,
+            "salary_min": salary_min, "salary_max": salary_max,
+            "salary_currency": salary.get("currencyCode") if isinstance(salary.get("currencyCode"), str) else None,
+            "salary_period": "monthly" if str(salary.get("period", "")).upper() == "MONTHLY" else None,
+        }
+    if source.startswith("ats-"):
+        ats, _, _slug = source[4:].partition("-")
+        if ats == "greenhouse":
+            item = normalize_mapped(row, {
+                "title": "title", "company": "company_name", "description": "",
+                "source_url": "absolute_url", "locations": "location.name", "published_at": "first_published",
+            })
+            item["work_mode"] = ""
+            return item
+        if ats == "ashby":
+            item = normalize_mapped(row, {
+                "title": "title", "description": "descriptionPlain", "source_url": "jobUrl",
+                "application_url": "applyUrl", "locations": "location", "published_at": "publishedAt",
+                "work_mode": "workplaceType",
+            })
+            return item
+        if ats == "teamtailor":
+            # Feed RSS: título, descripción HTML, link, pubDate y ubicaciones tt:location.
+            item = {
+                "title": plain(row.get("title")), "company": plain(row.get("company_name")) or "Empresa no indicada",
+                "description": plain(row.get("description")),
+                "source_url": safe_url(row.get("link")), "application_url": safe_url(row.get("link")),
+                "locations": [v for v in row.get("locations", []) if isinstance(v, str) and v.strip()],
+                "published_at": date_value(row.get("pubDate")), "expires_at": None,
+                "work_mode": "remote" if any("remoto" in str(v).lower() for v in row.get("locations", [])) else "",
+                "salary_min": None, "salary_max": None, "salary_currency": None, "salary_period": None,
+            }
+            return item
+        if ats == "recruitee":
+            item = normalize_mapped(row, {
+                "title": "title", "company": "company_name", "description": "description",
+                "source_url": "careers_url", "published_at": "published_at",
+                "salary_min": "salary.min", "salary_max": "salary.max",
+                "salary_currency": "salary.currency", "salary_period": "salary.period",
+            })
+            requirements = plain(row.get("requirements"))
+            if requirements:
+                item["description"] = (item["description"] + "\n\n" + requirements)[:40000]
+            item["locations"] = [str(loc.get("name") or loc.get("country") or "") for loc in row.get("locations", []) if isinstance(loc, dict)]
+            item["locations"] = [v for v in item["locations"] if v]
+            item["work_mode"] = "remote" if row.get("remote") is True else "hybrid" if row.get("hybrid") is True else ""
+            return item
+    if source == "workingnomads":
+        item = normalize_mapped(row, {
+            "title": "title", "company": "company_name", "description": "description",
+            "source_url": "url", "locations": "location", "published_at": "pub_date",
+        })
+        item["work_mode"] = "remote"
+        return item
     if source in {"remotive", "remoteok", "arbeitnow"}:
         fields = {
             "remotive": {"title": "title", "company": "company_name", "description": "description", "source_url": "url", "locations": "candidate_required_location", "published_at": "publication_date"},
@@ -92,6 +230,16 @@ def normalize(source, row):
         if source != "arbeitnow" or row.get("remote") is True:
             item["work_mode"] = "remote"
         return item
+    if source in {"virtualvocations", "remotejobs"}:
+        title = plain(row.get("title"))
+        company, _, job_title = title.partition(":")
+        return {
+            "title": job_title.strip() or title, "company": company if job_title else "Empresa no indicada",
+            "description": plain(row.get("description")), "source_url": safe_url(row.get("link")),
+            "application_url": safe_url(row.get("link")), "locations": [],
+            "published_at": date_value(row.get("pubDate")), "expires_at": None, "work_mode": "remote",
+            "salary_min": None, "salary_max": None, "salary_currency": None, "salary_period": None,
+        }
     title = plain(row.get("title"))
     company, _, job_title = title.partition(":")
     region = plain(row.get("region"))
@@ -146,7 +294,7 @@ def match(item: dict, query: SearchQuery):
         return None
     def contains(text, term):
         return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
-    if query.role == "digital_sales" and re.search(r"\b(?:director[ae]?|gerente|head|coordinador[ao]?|analista|inteligencia|operations|operaciones)\b", title):
+    if query.role in {"digital_sales", "sales"} and re.search(r"\b(?:director[ae]?|gerente|gerenta|head|coordinador[ao]?|analista|inteligencia|operations|operaciones|lider|jefe|jefa|supervisor[ae]?|responsable|manager)\b", title):
         if not any(contains(title, term) for term in ALIASES["closer"] + ALIASES["setter"]):
             return None
     title_match = any(contains(title, term) for term in terms)
@@ -240,6 +388,22 @@ def match(item: dict, query: SearchQuery):
             warnings.append("Compensación inferior o no comparable con la preferencia")
     if not item["salary_min"]:
         warnings.append("Compensación no publicada en campos estructurados")
+    # Taxonomía WDC (2026-09-23): señales de calidad suben el score; el ruido
+    # (cursos de closing, MLM, rentabilidad garantizada) no es una oportunidad.
+    folded_all = title + " " + body
+    quality = [s for s in QUALITY_SIGNALS if contains(folded_all, s)]
+    if quality:
+        score += min(2 * len(quality), 10)
+        reasons.append("Señales de proceso comercial real: " + ", ".join(quality[:3]))
+    if any(contains(folded_all, s) for s in SECTOR_TERMS):
+        score += 5
+        reasons.append("Sector high-ticket compatible")
+    if any(contains(folded_all, s) for s in NEGATIVE_SIGNALS):
+        return None
+    from .vocabulary import COURSE_TERMS
+    # Un curso que ENSEÑA a cerrar no es una vacante: solo si el título lo vende.
+    if any(contains(title, s) for s in COURSE_TERMS):
+        return None
     return min(score, 100), reasons, warnings
 
 

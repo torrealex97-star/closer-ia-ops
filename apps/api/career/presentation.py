@@ -41,20 +41,29 @@ def language_evidence(description):
 
 
 def professional_role(title, description):
+    """Families from the canonical vocabulary (vocabulary.py): many employers use
+    'asesor de admisiones', 'sales advisor' or 'patient coordinator' for closing jobs."""
+    from .vocabulary import ROLE_FAMILIES
     title, body = fold(title), fold(description)
     if title == 'publicacion de comunidad':
         hiring = re.search(r'\b(?:busco|buscamos|necesitamos|contratamos|se busca|estamos buscando)\b(?:\s+\w+){0,4}\s+(closer|setter|cerrador[ae]?|appointment setter|cold caller)\b', body)
         if not hiring:
             return None
         title = hiring.group(1)
-    if re.search(r'\b(?:cold caller|cold calling|llamadas en frio|prospector[ae]? telefonic[oa])\b', title):
+    def hits(family):
+        return any(re.search(r'(?<!\w)' + re.escape(term) + r'(?!\w)', title) for term in ROLE_FAMILIES[family])
+    if re.search(r'\b(?:cold caller|cold calling|llamadas en frio|prospeccion telefonica)\b', title):
         return 'cold_caller'
-    if re.search(r'\b(?:setter|appointment setting|agendador[ae]?|booking specialist|lead qualifier)\b', title):
+    if hits('setter'):
         return 'setter'
-    if re.search(r'\b(?:closer|cerrador[ae]?|closing specialist|enrollment advisor|enrollment specialist|sales consultant)\b', title):
+    if hits('closer'):
         return 'closer'
-    if re.search(r'\b(?:comercial|ventas|sales|asesor[ae]?|enrollment)\b', title) and re.search(
-            r'\b(?:cerrar (?:la |su |las )?(?:venta|inscripcion)|cierre (?:de |comercial)|closing (?:sales|deals))', body):
+    if hits('account_executive'):
+        return 'account_executive'
+    if hits('sdr'):
+        return 'sdr'
+    if re.search(r'\b(?:comercial|ventas|sales|asesor[ae]?|enrollment|admisiones)\b', title) and re.search(
+            r'\b(?:cerrar (?:la |su |las )?(?:venta|inscripcion|matricula)|cierre (?:de |comercial)|closing (?:sales|deals))', body):
         return 'closer'
     return None
 

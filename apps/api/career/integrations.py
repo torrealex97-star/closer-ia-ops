@@ -12,9 +12,23 @@ from .connectors import ProviderError, fetch
 from .db import connect, now, org, uid
 from .sources import (CATALOG_BY_CODE, ConnectionInput, _save_connection, apify_request,
                       read_token, secret_path)
+from .vocabulary import ALIASES as _VOCAB_ALIASES
 
 router = APIRouter(prefix="/v1")
-KEYWORDS = ["closer de ventas", "closer digital", "high ticket closer", "appointment setter", "setter", "cold caller", "llamadas en frío", "comercial digital", "cerrador", "venta de alto valor"]
+# Términos por defecto para inputs de Apify: la 'lista mínima' del vocabulario canónico
+# (taxonomía WDC 2026-09-23). El asistente los envía completos; sin duplicar aquí.
+_PREFERRED_INPUT_TERMS = [
+    "closer", "closer de ventas", "high ticket closer", "sales closer",
+    "cerrador de ventas", "setter", "appointment setter", "setter closer",
+    "asesor comercial", "asesor de admisiones", "admissions advisor",
+    "enrollment advisor", "student advisor", "sales advisor", "sales consultant",
+    "account executive", "inside sales", "sdr",
+    "business development representative", "consultor comercial",
+    "ventas consultivas", "asesor educativo", "asesor de matricula",
+    "patient advisor", "patient coordinator", "treatment coordinator",
+]
+_vocab = set(_VOCAB_ALIASES['digital_sales'])
+KEYWORDS = [t for t in _PREFERRED_INPUT_TERMS if t in _vocab]
 PREFERRED = {"infojobs": "haketa/infojobs-scraper", "computrabajo": "haketa/computrabajo-scraper", "linkedin": "curious_coder/linkedin-jobs-scraper", "workana": "automation-lab/workana-freelance-projects-scraper", "getonbrd": "scrapers_lat/getonbrd-scraper"}
 FIELDS = {
     "title": ["title", "jobTitle", "position", "job_title"],
@@ -81,6 +95,37 @@ async def check_apify():
         return {"message": "Cuenta verificada. No se ha ejecutado ningún scraper."}
     except ProviderError as exc:
         raise HTTPException(422, str(exc)) from None
+
+
+@router.get("/integrations/serpapi")
+def serpapi_account():
+    return {"has_token": bool(read_token(org(), "account-serpapi"))}
+
+
+@router.post("/integrations/serpapi")
+def save_serpapi(body: AccountInput):
+    save_secret("serpapi", body.token, body.clear_token, org())
+    return serpapi_account()
+
+
+@router.post("/integrations/serpapi/check")
+async def check_serpapi():
+    """Verifica la clave con una petición real de 1 búsqueda de Google (barata)."""
+    token = read_token(org(), "account-serpapi")
+    if not token:
+        raise HTTPException(422, "Pega tu clave de SerpApi y guarda la conexión primero")
+    from .connectors import fetch
+    from urllib.parse import urlencode
+    probe = urlencode({"engine": "google", "q": "serpapi", "api_key": token})
+    try:
+        data = json.loads(await fetch("https://serpapi.com/search?" + probe, ttl=0))
+    except ProviderError as exc:
+        raise HTTPException(422, "SerpApi no ha respondido: " + str(exc)) from None
+    if "error" in data:
+        raise HTTPException(422, "SerpApi rechazó la clave: " + str(data["error"]))
+    if not isinstance(data.get("search_metadata", {}).get("id"), str):
+        raise HTTPException(422, "SerpApi no ha confirmado la cuenta")
+    return {"message": "Clave verificada con una búsqueda de prueba. Se ha consumido 1 crédito de tu cuenta."}
 
 
 class PrepareSource(BaseModel):

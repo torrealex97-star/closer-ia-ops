@@ -40,6 +40,52 @@ from .collection import router as collection_router  # noqa: E402
 app.include_router(collection_router)
 from .opportunities import router as opportunities_router  # noqa: E402
 app.include_router(opportunities_router)
+from .orchestrator import SearchGoal, get_goal, save_goal  # noqa: E402
+
+
+@app.get("/v1/company-targets")
+def company_targets():
+    from .db import connect
+    with connect() as db:
+        rows = db.execute(
+            "SELECT slug,name,website,sector,country,ticket,careers_url,priority,score,monitoring,enabled FROM company_target "
+            "WHERE enabled=1 ORDER BY priority ASC, score DESC, name ASC").fetchall()
+    return {"targets": [dict(r) for r in rows]}
+
+
+@app.get("/v1/profile-terms")
+def profile_terms():
+    """Términos del vocabulario canónico por rol, para rellenar los inputs de Apify.
+    Orden por defecto: primero los títulos con más señal WDC (la 'lista mínima' del usuario)."""
+    from .vocabulary import ALIASES, ROLE_LABELS
+    PREFERRED_ORDER = [
+        'closer', 'closer de ventas', 'high ticket closer', 'sales closer',
+        'cerrador de ventas', 'setter', 'appointment setter', 'setter closer',
+        'asesor comercial', 'asesor de admisiones', 'admissions advisor',
+        'admissions associate', 'enrollment advisor', 'student advisor',
+        'sales advisor', 'sales consultant', 'account executive', 'inside sales',
+        'sdr', 'business development representative', 'consultor comercial',
+        'ventas consultivas', 'asesor educativo', 'asesor de matricula',
+        'patient advisor', 'patient coordinator', 'treatment coordinator',
+    ]
+    def ordered(role):
+        terms = set(ALIASES.get(role, []))
+        head = [t for t in PREFERRED_ORDER if t in terms]
+        rest = sorted(terms - set(head))
+        return head + rest
+    return {"roles": {role: {'label': ROLE_LABELS.get(role, role), 'terms': ordered(role)}
+                      for role in ('digital_sales', 'closer', 'setter', 'cold_caller',
+                                   'account_executive', 'sdr')}}
+
+
+@app.get("/v1/search-goal")
+def read_search_goal():
+    return get_goal(org())
+
+
+@app.put("/v1/search-goal")
+def update_search_goal(body: SearchGoal):
+    return save_goal(body, org())
 
 
 @app.get("/health/live")
