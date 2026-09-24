@@ -637,3 +637,142 @@ def test_google_daily_collection_includes_serpapi_with_key(client, monkeypatch):
         row = db.execute("SELECT sources FROM collection_runs WHERE org_id='local-wdc' ORDER BY created_at DESC LIMIT 1").fetchone()
         sources2 = json.loads(row['sources'])
     assert any(s['code'] == 'google' for s in sources2)
+
+
+COMPANIES_PAYLOAD = json.dumps({
+    "search_metadata": {"id": "co1"},
+    "jobs_results": [
+        {"title": "Closer senior", "via": "Portal Ejemplo",
+         "description": "<p>Remoto. Venta consultiva con leads propios.</p>",
+         "job_id": "Co789", "link": "https://www.linkedin.com/jobs/view/co789",
+         "location": "España (Remoto)",
+         "detected_extensions": {"posted_at_relative": "hace 3 dias"}},
+    ],
+})
+
+
+def _add_linkedin_guest_company(slug, name, priority=1):
+    """Empresa objetivo de vigilancia LinkedIn para tests (datos neutros, sin tenant real)."""
+    with connect() as db:
+        db.execute("INSERT OR IGNORE INTO company_target (slug,name,website,sector,country,ticket,careers_url,priority,score,monitoring,enabled,created_at) "
+                   "VALUES (?,?,?,?,?,?,?,?,?,?,1,strftime('%Y-%m-%dT%H:%M:%f+00:00','now'))",
+                   (slug, name, '', 'formacion', 'España', '', '', priority, 0, 'linkedin_guest'))
+
+
+def test_google_company_dorks_anchor_exact_company(client, monkeypatch):
+    """Patrón del usuario: "empresa" (rol OR ...) España, en orden estable por prioridad."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    from career.sources import google_company_dorks, company_watch_targets
+    pairs = google_company_dorks([('Academia Ejemplo', 'Academia Ejemplo'), ('Bootcamp Dos', 'Bootcamp Dos')])
+    assert [p[0] for p in pairs] == ['Academia Ejemplo', 'Bootcamp Dos']
+    dork = pairs[0][2]
+    assert dork.startswith('"Academia Ejemplo" (') and dork.endswith(') España'), dork
+    roles = dork[len('"Academia Ejemplo" ('):-len(') España')].split(' OR ')
+    assert sorted(roles) == ['"asesor comercial"', '"closer"', '"sales advisor"', '"setter"'], dork
+    # Las empresas salen de company_target con canal linkedin_guest y enabled.
+    _add_linkedin_guest_company('academia-ejemplo', 'Academia Ejemplo', priority=1)
+    _add_linkedin_guest_company('bootcamp-dos', 'Bootcamp Dos', priority=2)
+    with connect() as db:
+        db.execute("UPDATE company_target SET enabled=0 WHERE slug='bootcamp-dos'")
+    targets = company_watch_targets('local-wdc')
+    assert ('Academia Ejemplo', 'Academia Ejemplo') in targets
+    assert all(name != 'Bootcamp Dos' for name, _ in targets), 'deshabilitada no se vigila'
+
+
+def test_google_companies_connector_one_search_per_company(client, monkeypatch):
+    """Una búsqueda google_jobs por empresa, atribuida a la empresa objetivo; sin clave no lanza nada."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    calls = []
+    async def fake_fetch(url, params=None, ttl=900, user_agent=None):
+        calls.append((url, dict(params or {})))
+        assert 'serpapi.com/search.json' in url
+        assert params['engine'] == 'google_jobs'
+        assert params['api_key'] == 'test-key'
+        prefix = params['q'].split(' (')[0]
+        assert prefix in ('"Academia Ejemplo"', '"Bootcamp Dos"'), params['q']
+        assert prefix.count('"') == 2 and params['q'].endswith('España'), 'empresa anclada como frase exacta'
+        await asyncio.sleep(0)  # El rate-limit real (2 s) no aplica en tests.
+        return COMPANIES_PAYLOAD
+    monkeypatch.setattr(connectors, 'fetch', fake_fetch)
+    from career.integrations import save_secret
+    save_secret('serpapi', SecretStr('test-key'), False, 'local-wdc')
+    from career.connectors import GoogleCompaniesSerpApi
+    connector = GoogleCompaniesSerpApi([('Academia Ejemplo', 'Academia Ejemplo'), ('Bootcamp Dos', 'Bootcamp Dos')])
+    rows = asyncio.run(_drain(connector))
+    assert len(calls) == 2, 'una búsqueda por empresa objetivo'
+    assert {c[1]['q'].split(' (')[0] for c in calls} == {'"Academia Ejemplo"', '"Bootcamp Dos"'}
+    assert len(rows) == 2
+    for row in rows:
+        assert row.payload['company_name'] == row.payload['_search_company'], 'atribución a la empresa buscada'
+        item = normalize('google-companies', row.payload)
+        assert item['company'] == row.payload['_search_company']
+        assert item['title'] == 'Closer senior'
+        assert item['source_url'] == 'https://www.linkedin.com/jobs/view/co789'
+        assert item['published_at'], 'fecha relativa se convierte'
+        assert item['work_mode'] == 'remote'
+    assert {r.payload['_search_company'] for r in rows} == {'Academia Ejemplo', 'Bootcamp Dos'}
+    # Sin clave: la vigilancia no lanza búsquedas de pago.
+    save_secret('serpapi', SecretStr(''), True, 'local-wdc')
+    with pytest.raises(ProviderError):
+        asyncio.run(_drain(connector))
+
+
+def test_google_companies_daily_collection_gated_by_key_and_enabled(client, monkeypatch):
+    """La recogida diaria solo incluye google-companies con clave y conexión activa."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    from career.collection import enqueue
+    from career.db import connect as db_connect
+    _add_linkedin_guest_company('academia-ejemplo', 'Academia Ejemplo')
+    enqueue('local-wdc')
+    with db_connect() as db:
+        row = db.execute("SELECT sources FROM collection_runs WHERE org_id='local-wdc' ORDER BY created_at DESC LIMIT 1").fetchone()
+        sources = json.loads(row['sources'])
+    assert all(s['code'] != 'google-companies' for s in sources), 'sin clave no entra'
+    from career.integrations import save_secret
+    save_secret('serpapi', SecretStr('test-key'), False, 'local-wdc')
+    with db_connect() as db:
+        db.execute("DELETE FROM collection_runs WHERE org_id='local-wdc'")
+    enqueue('local-wdc')
+    with db_connect() as db:
+        row = db.execute("SELECT sources FROM collection_runs WHERE org_id='local-wdc' ORDER BY created_at DESC LIMIT 1").fetchone()
+        sources2 = json.loads(row['sources'])
+    assert any(s['code'] == 'google-companies' for s in sources2)
+
+
+def test_launch_serpapi_companies_reserves_and_closes_on_run_completion(client, monkeypatch):
+    """El lanzamiento manual reserva presupuesto y collect cierra la reserva con coste real."""
+    monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")
+    from career.integrations import save_secret
+    save_secret('serpapi', SecretStr('test-key'), False, 'local-wdc')
+    _add_linkedin_guest_company('academia-ejemplo', 'Academia Ejemplo', priority=1)
+    _add_linkedin_guest_company('bootcamp-dos', 'Bootcamp Dos', priority=2)
+    _add_linkedin_guest_company('colegio-tres', 'Colegio Tres', priority=3)
+    async def fake_rate():
+        return 1.10
+    monkeypatch.setattr('career.collection.euro_rate', fake_rate)
+    from career.sources import launch_serpapi_companies
+    result = asyncio.run(launch_serpapi_companies('local-wdc'))
+    assert result['pending_companies'] == 0, 'con 1 EUR/día caben las 3 búsquedas'
+    assert 'Vigilancia de 3 empresas' in result['message']
+    with connect() as db:
+        reservation = db.execute("SELECT id,status,cap_usd FROM scrape_budget WHERE org_id='local-wdc' AND connection_id='google-companies-serpapi'").fetchone()
+        assert reservation['status'] == 'RUNNING'
+        assert reservation['cap_usd'] + 1e-9 >= 3 * 0.025, 'cap cubre una búsqueda por empresa'
+    # El run encolado lo consume el worker (re-ranking del catálogo, camino sin registry);
+    # al terminalizar el run, execute() cierra la reserva SerpApi con el cap reservado.
+    asyncio.run(execute(result['run_id'], 'local-wdc', SearchQuery()))
+    with connect() as db:
+        closed = db.execute("SELECT status,actual_usd FROM scrape_budget WHERE org_id='local-wdc' AND id=?", (reservation['id'],)).fetchone()
+    assert closed['status'] == 'SUCCEEDED', closed['status']
+    assert closed['actual_usd'] and closed['actual_usd'] > 0
+    # La red de seguridad en collect() es idempotente: nada ya RUNNING queda sin cerrar.
+    from career.collection import enqueue, collect
+    with connect() as db:
+        db.execute("DELETE FROM collection_runs WHERE org_id='local-wdc'")
+    enqueue('local-wdc')
+    with connect() as db:
+        collection_run = db.execute("SELECT id FROM collection_runs WHERE org_id='local-wdc' ORDER BY created_at DESC LIMIT 1").fetchone()['id']
+    asyncio.run(collect(collection_run, 'local-wdc'))
+    with connect() as db:
+        closed2 = db.execute("SELECT status,actual_usd FROM scrape_budget WHERE org_id='local-wdc' AND id=?", (reservation['id'],)).fetchone()
+    assert closed2['status'] == 'SUCCEEDED' and closed2['actual_usd'] == closed['actual_usd']
