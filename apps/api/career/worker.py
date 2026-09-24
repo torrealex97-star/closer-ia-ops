@@ -52,6 +52,8 @@ async def execute(run_id, organization, query, registry=None):
     if registry is None:
         from .catalog import search_catalog
         search_catalog(run_id, organization, query)
+        from .collection import close_serpapi_reservations
+        close_serpapi_reservations(organization, run_id)
         return
     registry = registry or source_registry(organization)
     for code in query.sources:
@@ -66,6 +68,8 @@ async def execute(run_id, organization, query, registry=None):
         status = "failed" if failures == len(sources) and not count else "partial" if failures else "completed"
         if row["status"] != "cancelled":
             db.execute("UPDATE search_runs SET status=?,completed_at=? WHERE id=? AND org_id=?", (status, now(), run_id, organization))
+    from .collection import close_serpapi_reservations
+    close_serpapi_reservations(organization, run_id, status)
 
 
 async def layered_or_classic(run_id, organization, query, registry):

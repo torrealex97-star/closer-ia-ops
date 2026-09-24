@@ -105,6 +105,23 @@ def normalize(source, row):
             "salary_min": number(detected.get("salary")) if isinstance(detected.get("salary"), (int, float)) else None,
             "salary_max": None, "salary_currency": None, "salary_period": None,
         }
+    if source == "google-companies":
+        # Vigilancia de empresas objetivo: la empresa es la buscada, no la del agregador (via).
+        apply = row.get("apply_options") or []
+        link = safe_url(row.get("link")) or (safe_url(apply[0].get("link")) if isinstance(apply, list) and apply and isinstance(apply[0], dict) else "")
+        detected = row.get("detected_extensions", {}) if isinstance(row.get("detected_extensions"), dict) else {}
+        posted = date_value(detected.get("posted_at"))
+        if not posted and isinstance(detected.get("posted_at_relative"), str):
+            posted = relative_date(detected["posted_at_relative"])
+        locations = [str(loc) for loc in (row.get("location") or "").split(",") if str(loc).strip()]
+        return {
+            "title": plain(row.get("title")), "company": plain(row.get("company_name")) or "Empresa no indicada",
+            "description": plain(row.get("description")), "source_url": link or (safe_url(row.get("job_id")) or ""),
+            "application_url": link, "locations": locations,
+            "published_at": posted, "expires_at": None, "work_mode": "remote" if "remoto" in (row.get("location") or "").lower() or "remote" in (row.get("location") or "").lower() else "",
+            "salary_min": number(detected.get("salary")) if isinstance(detected.get("salary"), (int, float)) else None,
+            "salary_max": None, "salary_currency": None, "salary_period": None,
+        }
     if source == "getonbrd-public":
         attrs = row.get("attributes", {})
         item = normalize_mapped(row, {"title": "attributes.title", "source_url": "links.public_url", "locations": "attributes.countries", "published_at": "attributes.published_at"})

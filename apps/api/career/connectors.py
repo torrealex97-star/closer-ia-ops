@@ -373,6 +373,54 @@ def read_serpapi_token():
     return read_token(current_org(), "account-serpapi")
 
 
+class GoogleCompaniesSerpApi:
+    """Una búsqueda google_jobs por empresa objetivo que solo publica en LinkedIn.
+    Dork: "<empresa>" (closer OR setter OR "asesor comercial") España — el usuario pidió
+    el patrón "empresa" closer España; las variantes de rol amplían la cobertura con
+    términos del vocabulario canónico. code y company difieren de la fuente google
+    genérica para que la atribución por empresa no se pierda ni se duplique.
+    Rate limit duro: 2 s entre búsquedas de pago, cada una bajo presupuesto reservado."""
+    code = "google-companies"
+    name = "Empresas objetivo · SerpApi"
+    provider = "serpapi_google_jobs_v1"
+
+    def __init__(self, companies, company_name=""):
+        self.companies = companies  # [(search_name, display_name)] en orden fijo.
+        self.company_name = company_name
+
+    async def batches(self, query):
+        from .sources import google_company_dorks
+        token = read_serpapi_token()
+        if not token:
+            raise ProviderError("Guarda tu clave de SerpApi en Integraciones antes de vigilar empresas")
+        pairs = google_company_dorks(self.companies)
+        for index, (search_name, display, dork) in enumerate(pairs):
+            if index:
+                await asyncio.sleep(2)  # Máx 30 búsquedas/min en SerpApi; no invadir.
+            params = {"engine": "google_jobs", "q": dork, "gl": "es", "hl": "es", "api_key": token}
+            data = json.loads(await fetch("https://serpapi.com/search.json", params, ttl=0))
+            if not isinstance(data, dict):
+                raise ProviderError("SerpApi ha cambiado su formato de respuesta")
+            if data.get("error"):
+                raise ProviderError(f"SerpApi: {data['error']}")
+            rows = data.get("jobs_results")
+            if not isinstance(rows, list):
+                raise ProviderError("SerpApi no devolvió jobs_results")
+            batch = []
+            for row in rows[:50]:
+                if not isinstance(row, dict):
+                    continue
+                row = dict(row)
+                # Atribución: la búsqueda identifica a la empresa objetivo; via puede variar.
+                row["company_name"] = display
+                row["_search_company"] = search_name
+                job_id = row.get("job_id") or row.get("link")
+                if job_id:
+                    batch.append(Candidate(str(job_id), row))
+            if batch:
+                yield batch
+
+
 class GetOnBoard:
     code = "getonbrd-public"
     name = "Get on Board"

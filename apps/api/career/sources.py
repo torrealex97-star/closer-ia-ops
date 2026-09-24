@@ -2,6 +2,7 @@
 import hashlib
 import ipaddress
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -11,7 +12,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
-from .connectors import Candidate, ProviderError, REGISTRY, watchlist_connectors
+from .connectors import Candidate, ProviderError, REGISTRY, watchlist_connectors, GoogleCompaniesSerpApi
 from .db import ROOT, connect, org, uid, now
 from .pipeline import normalize_mapped
 from .source_strategy import source_presets
@@ -248,6 +249,13 @@ def google_check():
             "message": f"Clave presente, conexión con {len(value.get('urls') or [])} dorks WDC. Estado: {state}."}
 
 
+@router.post("/google/companies/run")
+async def google_companies_run():
+    """Vigilancia de empresas objetivo (canal LinkedIn): una búsqueda google_jobs por empresa,
+    bajo el presupuesto SerpApi reservado; las que no caben quedan pendientes."""
+    return await launch_serpapi_companies(org())
+
+
 SERPAPI_COST_PER_SEARCH_USD = 0.025  # Starter plan: 25 USD / 1.000 búsquedas.
 
 
@@ -260,6 +268,26 @@ def google_dorks():
     """Dorks WDC de la fuente google, leídos de los presets sin tocar la BD."""
     return [row["dork"] for row in source_presets()["searches"]
             if row["source"] == "google" and row.get("dork")]
+
+
+def company_watch_targets(organization):
+    """Empresas objetivo que solo publican en LinkedIn (monitoring=linkedin_guest):
+    una búsqueda google_jobs por empresa, en orden estable por prioridad y nombre."""
+    with connect() as db:
+        rows = db.execute("SELECT name FROM company_target WHERE enabled=1 AND monitoring='linkedin_guest' "
+                          "ORDER BY priority ASC, name ASC").fetchall()
+    return [(r["name"], r["name"]) for r in rows]
+
+
+def google_company_dorks(companies):
+    """[(search_name, display_name, dork)] con el patrón del usuario: "empresa" closer España.
+    Las variantes de rol (setter/asesor comercial) vienen del vocabulario canónico; la frase
+    exacta "<empresa>" ancla la búsqueda a la empresa objetivo."""
+    from .vocabulary import ALIASES
+    roles = [t for t in ALIASES['digital_sales'] if t in {'closer', 'setter', 'asesor comercial', 'sales advisor'}]
+    pattern = '"{company}" ({roles}) España'
+    return [(search, display, pattern.format(company=search, roles=' OR '.join(f'"{r}"' for r in roles)))
+            for search, display in companies]
 
 
 def get_or_create_google_connection(organization):
@@ -330,6 +358,111 @@ async def launch_serpapi(organization, connection_id=None):
     put_connection(value, organization)
     return {**public_connection(value, organization), "run_id": run_id,
             "message": f"Importación SerpApi encolada: {len(value['urls'])} dorks, tope {cap:.2f} USD. El presupuesto diario la limita; las búsquedas cacheadas de SerpApi no consumen crédito."}
+
+
+def google_companies_connection_id(organization):
+    """Conexión compartida de vigilancia de empresas objetivo (una por org)."""
+    return "google-companies-serpapi"
+
+
+def get_or_create_google_companies_connection(organization):
+    """Conexión idempotente para google-companies: companies = linkedin_guest actuales.
+    Igual que google: sin actor ni dataset; la ejecución llama a SerpApi directamente."""
+    companies = company_watch_targets(organization)
+    if not companies:
+        raise HTTPException(422, "No hay empresas objetivo con canal LinkedIn para vigilar")
+    with connect() as db:
+        row = db.execute("SELECT payload FROM source_connections WHERE id=? AND org_id=?",
+                         (google_companies_connection_id(organization), organization)).fetchone()
+        if row:
+            value = json.loads(row["payload"])
+            if value.get("companies") != [name for name, _ in companies]:
+                value["companies"] = [name for name, _ in companies]
+                value["max_items"] = len(companies) * 50
+                value["max_charge_usd"] = round(len(companies) * SERPAPI_COST_PER_SEARCH_USD * 1.3, 2)
+                put_connection(value, organization)
+            return value
+    value = {"id": google_companies_connection_id(organization),
+             "name": "Empresas objetivo · SerpApi (LinkedIn)", "source": "google-companies",
+             "actor_id": "", "dataset_id": "", "enabled": True,
+             "companies": [name for name, _ in companies], "urls": [], "url_field": "q",
+             "url_format": "strings", "actor_input": {}, "mapping": {}, "build": "latest",
+             "auto_mapping": False, "max_items": len(companies) * 50,
+             "max_charge_usd": round(len(companies) * SERPAPI_COST_PER_SEARCH_USD * 1.3, 2)}
+    put_connection(value, organization)
+    return value
+
+
+def google_companies_connector(organization):
+    """Conector de vigilancia de empresas objetivo limitado por el cap presupuestado de la
+    conexión. None si no hay conexión creada, está desactivada o no hay empresas. No crea
+    filas: registrar la fuente no debe tener efectos secundarios."""
+    with connect() as db:
+        row = db.execute("SELECT payload FROM source_connections WHERE id=? AND org_id=?",
+                         (google_companies_connection_id(organization), organization)).fetchone()
+    if not row:
+        return None
+    value = json.loads(row["payload"])
+    if not value.get("enabled") or not value.get("companies"):
+        return None
+    cap = value.get("last_budget_cap_usd") or value.get("max_charge_usd")
+    total = len(value["companies"])
+    # int() trunca por coma flotante (0.075/0.025 → 2); se corrige con margen mínimo.
+    affordable = max(1, math.floor(float(cap) / SERPAPI_COST_PER_SEARCH_USD + 1e-9)) if cap else total
+    return GoogleCompaniesSerpApi([(n, n) for n in value["companies"]][:max(1, min(total, affordable))])
+
+
+async def launch_serpapi_companies(organization, connection_id=None):
+    """Vigilancia de empresas objetivo: una búsqueda por empresa bajo presupuesto.
+    Reserva antes de I/O; si el cap no cubre todas, se consultan las primeras N
+    (por prioridad) y el resto queda explícito como pendiente. Nunca se lanza
+    sin presupuesto para al menos una búsqueda."""
+    from .collection import euro_rate, reserve, record_launch
+    from .connectors import read_serpapi_token
+    connection_id = connection_id or google_companies_connection_id(organization)
+    value = get_or_create_google_companies_connection(organization)
+    if not value["enabled"]:
+        raise HTTPException(409, "Conexión desactivada")
+    if not read_serpapi_token():
+        raise HTTPException(422, "Guarda tu clave de SerpApi en Integraciones antes de vigilar empresas")
+    if value.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
+        raise HTTPException(409, "Ya hay una ejecución pendiente. Comprueba su estado.")
+    rate = await euro_rate()
+    total = len(value["companies"])
+    maximum = round(total * SERPAPI_COST_PER_SEARCH_USD, 4)
+    minimum = SERPAPI_COST_PER_SEARCH_USD
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT payload FROM source_connections WHERE id=? AND org_id=?",
+                         (connection_id, organization)).fetchone()
+        if not row:
+            raise HTTPException(404, "Conexión no encontrada")
+        value = json.loads(row["payload"])
+        if value.get("run_status") in {"STARTING", "READY", "RUNNING", "TIMING-OUT", "ABORTING", "UNKNOWN"}:
+            raise HTTPException(409, "Ya hay una ejecución pendiente. Comprueba su estado.")
+        reservation, cap = reserve(db, organization, connection_id, maximum, rate, minimum)
+        # int() trunca: 3*0.025=0.075 da 2.9999… por coma flotante y perdería una empresa pagada.
+        affordable = max(1, math.floor(cap / SERPAPI_COST_PER_SEARCH_USD + 1e-9))
+        value.update(run_status="RUNNING", run_id=None, budget_reservation=reservation, dataset_id="serpapi-local",
+                     last_budget_cap_usd=cap)
+        db.execute("UPDATE source_connections SET payload=? WHERE id=? AND org_id=?",
+                   (json.dumps(value), connection_id, organization))
+    from .catalog import collection_query
+    query = collection_query().model_copy(update={"sources": ["google-companies"]})
+    run_id = uid()
+    sources = [{"code": "google-companies", "name": value["name"], "status": "queued", "fetched": 0, "accepted": 0, "cost": 0}]
+    with connect() as db:
+        db.execute("INSERT INTO search_runs VALUES(?,?,?,?,?,?,?,NULL)",
+                   (run_id, organization, "serpapi-co-" + reservation, query.model_dump_json(), "queued", json.dumps(sources), now()))
+    value["run_id"] = run_id
+    record_launch(reservation, organization, run_id, "RUNNING")
+    put_connection(value, organization)
+    skipped = total - min(total, affordable)
+    note = f" Vigilancia de {min(total, affordable)} de {total} empresas" if skipped > 0 else f" Vigilancia de {total} empresas"
+    return {**public_connection(value, organization), "run_id": run_id,
+            "message": f"Búsquedas encoladas.{note} ({skipped} pendientes por presupuesto)." if skipped > 0 else
+                       f"Búsquedas encoladas.{note}, tope {cap:.2f} USD.",
+            "pending_companies": skipped}
 
 
 async def launch_scrape(connection_id, organization, allocation_cents=None):
@@ -476,6 +609,9 @@ def registry(organization):
         dorks = google_dorks()
         if dorks:
             base["google"] = _MultiDorkConnector(dorks)
+        companies_connector = google_companies_connector(organization)
+        if companies_connector:
+            base["google-companies"] = companies_connector
     return base
 
 

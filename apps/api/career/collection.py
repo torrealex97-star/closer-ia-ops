@@ -90,7 +90,8 @@ def status():
 
 
 def enqueue(organization):
-    from .sources import connections, get_or_create_google_connection
+    from .sources import (connections, get_or_create_google_connection,
+                          get_or_create_google_companies_connection)
     from .sources import read_token
     sources = [SourceProgress(code=c.code, name=c.name).model_dump() for c in REGISTRY.values()]
     sources += [SourceProgress(code=c.code, name=c.name).model_dump() for c in watchlist_connectors(organization).values()]
@@ -102,9 +103,17 @@ def enqueue(organization):
         google = None
     if google and google.get('enabled') and read_token(organization, 'account-serpapi'):
         sources.append(SourceProgress(code='google', name='Google Jobs · SerpApi').model_dump())
-    # La conexión interna google-serpapi ya está representada por el código 'google'.
+    # Vigilancia de empresas objetivo que solo publican en LinkedIn (hallazgo Manu).
+    try:
+        companies = get_or_create_google_companies_connection(organization)
+    except HTTPException:
+        companies = None
+    if companies and companies.get('enabled') and read_token(organization, 'account-serpapi'):
+        sources.append(SourceProgress(code='google-companies', name='Empresas objetivo · SerpApi').model_dump())
+    # Las conexiones internas google-serpapi y google-companies-serpapi ya están
+    # representadas por los códigos 'google' y 'google-companies'.
     sources += [SourceProgress(code=c['id'], name=c['name']).model_dump() for c in connections(organization)
-                if c['enabled'] and c['id'] != 'google-serpapi']
+                if c['enabled'] and c['id'] not in ('google-serpapi', 'google-companies-serpapi')]
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         db.execute("INSERT OR IGNORE INTO collection_runs VALUES(?,?,?,'queued',?,?,NULL)",
@@ -178,6 +187,23 @@ def record_launch(reservation, organization, run_id, state):
         db.execute('UPDATE scrape_budget SET run_id=?,status=? WHERE org_id=? AND id=?', (run_id, state, organization, reservation))
 
 
+def close_serpapi_reservations(organization, run_id, run_status=None):
+    """Las reservas SerpApi (dorks y vigilancia de empresas) no pasan por Apify: se cierran con el
+    ciclo de vida del search_run de su lanzamiento. El coste real se desconoce por búsqueda,
+    así que se contabiliza el cap reservado como cota superior (SerpApi cachea; nunca se inventa
+    un importe menor). Estados no terminales no cierran nada."""
+    if run_status is None:
+        with connect() as db:
+            row = db.execute('SELECT status FROM search_runs WHERE org_id=? AND id=?', (organization, run_id)).fetchone()
+        run_status = row['status'] if row else None
+    terminal = {'completed': 'SUCCEEDED', 'partial': 'SUCCEEDED', 'failed': 'ABORTED', 'cancelled': 'ABORTED'}.get(run_status)
+    if not terminal:
+        return
+    with connect() as db:
+        db.execute("UPDATE scrape_budget SET status=?,actual_usd=cap_usd,finished_day=? "
+                   "WHERE org_id=? AND run_id=? AND status='RUNNING'", (terminal, day_key(), organization, run_id))
+
+
 def record_cost(organization, run):
     cost = run.get('usageTotalUsd')
     if not isinstance(cost, (float, int)) or not math.isfinite(cost) or cost < 0:
@@ -222,6 +248,14 @@ async def collect(run_id, organization):
                     raise ProviderError('Falta la clave de SerpApi; la fuente no se ejecuta sin credencial')
                 from .sources import _MultiDorkConnector
                 connector = _MultiDorkConnector(google.get('urls') or [])
+            elif code == 'google-companies':
+                # Vigilancia de empresas objetivo: "<empresa>" (closer OR ...) España.
+                if not read_token(organization, 'account-serpapi'):
+                    raise ProviderError('Falta la clave de SerpApi; la vigilancia no se ejecuta sin credencial')
+                from .sources import google_companies_connector
+                connector = google_companies_connector(organization)
+                if connector is None:
+                    raise ProviderError('No hay conexión de vigilancia de empresas o no tiene empresas objetivo activas')
             elif code in REGISTRY:
                 connector = REGISTRY[code]
             elif code.startswith('ats-'):
@@ -270,6 +304,18 @@ async def collect(run_id, organization):
                 message = warning + ' ' + message
             logger.warning('collection_source_failed source=%s type=%s', code, type(exc).__name__)
             progress(run_id, organization, code, status='failed', warning=message)
+    # Reservas SerpApi (dorks y vigilancia de empresas): sus búsquedas no pasan por Apify, así
+    # que su cierre se ata al ciclo de vida del search_run del lanzamiento. Con el run finalizado
+    # el coste es conocido (se reservó el cap) y se cierra como SUCCEEDED; si el run se cancela
+    # o cae la reserva queda RUNNING para no reinflar el gasto del día sin ejecución real.
+    # Red de seguridad: reservas SerpApi cuyos search_runs ya terminaron (p. ej. completados
+    # mientras el proceso estaba caído) se cierran aquí; el cierre canónico vive en el worker.
+    with connect() as db:
+        run_ids = [r['run_id'] for r in db.execute(
+            "SELECT DISTINCT run_id FROM scrape_budget WHERE org_id=? AND status='RUNNING' AND run_id IS NOT NULL",
+            (organization,)).fetchall()]
+    for rid in run_ids:
+        close_serpapi_reservations(organization, rid)
     prune(organization)
     with connect() as db:
         sources = json.loads(db.execute('SELECT sources FROM collection_runs WHERE org_id=? AND id=?', (organization, run_id)).fetchone()['sources'])

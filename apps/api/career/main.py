@@ -145,6 +145,8 @@ def get_run(run_id: str):
 def cancel(run_id: str):
     with connect() as db:
         db.execute("UPDATE search_runs SET status='cancelled',completed_at=? WHERE id=? AND org_id=? AND status IN ('queued','running')", (now(), run_id, org()))
+    from .collection import close_serpapi_reservations
+    close_serpapi_reservations(org(), run_id)
     return get_run(run_id)
 
 
