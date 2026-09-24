@@ -52,7 +52,7 @@ def professional_role(title, description):
         title = hiring.group(1)
     def hits(family):
         return any(re.search(r'(?<!\w)' + re.escape(term) + r'(?!\w)', title) for term in ROLE_FAMILIES[family])
-    if re.search(r'\b(?:cold caller|cold calling|llamadas en frio|prospeccion telefonica)\b', title):
+    if hits('cold_caller'):
         return 'cold_caller'
     if hits('setter'):
         return 'setter'

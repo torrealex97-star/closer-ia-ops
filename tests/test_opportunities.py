@@ -136,3 +136,22 @@ def test_closed_status_markers_are_not_opportunities(api, status):
                                 'Las aplicaciones no están cerradas.'])
 def test_closing_sales_and_unfilled_vacancies_remain_eligible(api, text):
     assert add('Buscamos una closer para nuestro equipo de ventas. Trabajo remoto.\n' + text)
+
+
+@pytest.mark.parametrize('title', ['Prospector telefónico', 'Prospectora telefónica'])
+def test_canonical_cold_caller_titles_reach_student_search(api, title):
+    client, _ = api
+    assert add('Buscamos una profesional para nuestro equipo de ventas. Trabajo remoto.',
+               title=title, identity='canonical-caller')
+    offers = client.post('/v1/opportunities/search', json={'role': 'cold_caller'}).json()
+    assert offers['total'] == 1
+    assert offers['items'][0]['role'] == 'cold_caller'
+    assert offers['items'][0]['original_title'] == title
+
+
+def test_cold_caller_presentation_uses_canonical_vocabulary(monkeypatch):
+    from career.presentation import professional_role
+    from career.vocabulary import ROLE_FAMILIES
+    monkeypatch.setitem(ROLE_FAMILIES, 'cold_caller', [*ROLE_FAMILIES['cold_caller'], 'prospector de llamadas salientes'])
+    assert professional_role('Prospector de llamadas salientes', '') == 'cold_caller'
+    assert professional_role('Coordinación telefónica de soporte', '') is None

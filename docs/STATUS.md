@@ -1,5 +1,13 @@
 # Estado
 
+## Mejora diaria — Cold Caller y vocabulario común, 2026-09-24
+
+- Reproducido con tres regresiones: «Prospector telefónico» y «Prospectora telefónica» se importaban pero desaparecían de la búsqueda de alumnas; además, ampliar la familia canónica no actualizaba su clasificación.
+- `professional_role` utiliza ahora `ROLE_FAMILIES["cold_caller"]`, igual que las demás familias, sin mantener una expresión regular parcial. Respeta acentos, límites de palabra y prioridad del perfil; no añade equivalencias nuevas ni relaja idioma/modalidad.
+- Validación en copia aislada del árbol de trabajo: 105 backend PASS (incluidas las tres regresiones antes fallidas), Ruff PASS y build/TypeScript PASS. Sin cambios de UI ni contrato; no se repitieron pruebas de navegador. Sin claves reales de proveedores de pago, IA ni modificaciones de datos activos.
+- Se preservan los siete archivos que ya tenían trabajo en curso, incluidos pipeline.py y tests/test_engine.py. No se reinician servicios ni se afirma preview actualizado.
+- Siguiente acción: revisar que nuevos equivalentes del vocabulario lleguen también a las publicaciones de comunidades, manteniendo la exigencia de contratación explícita.
+
 ## Vocabulario canónico de perfiles (ADR-010) e inputs Apify — 2026-09-23
 
 - Entregado: ADR-010 como decisión permanente. Fuente única `apps/api/career/vocabulary.py`: familias de rol (closer/setter/cold_caller/account_executive/sdr + digital_sales/sales agregados) con equivalentes (asesor de admisiones, admissions advisor, enrollment advisor, sales advisor, patient coordinator, treatment coordinator, técnico/consultor/gestor comercial, televendedor…), señales de calidad (leads cualificados, fijo+comisión, CRM, OTE…), señales de sector high-ticket y ruido negativo (MLM, rentabilidad garantizada, cursos de closing).
