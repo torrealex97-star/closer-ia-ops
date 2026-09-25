@@ -40,7 +40,8 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const refresh = async () => { await Promise.all([request<Connection[]>('source-connections').then(setConnections), onRefresh()]); };
+  const loadSerpapiToken = () => request<{ has_token: boolean }>('integrations/serpapi').then(d => setSerpapiState(s => ({ ...s, has_token: d.has_token }))).catch(() => {});
+  const refresh = async () => { await Promise.all([request<Connection[]>('source-connections').then(setConnections), onRefresh(), loadSerpapiToken()]); };
   const activeIds = connections.filter(c => c.run_id && ['READY', 'RUNNING', 'TIMING-OUT', 'ABORTING'].includes(c.run_status || '')).map(c => c.id).join(',');
   useEffect(() => {
     if (!activeIds) return;
@@ -85,10 +86,23 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
     finally { setBusy(false); }
   }
   const [serpapiState, setSerpapiState] = useState<{ has_token: boolean; run_id?: string; busy?: boolean }>({ has_token: false });
-  useEffect(() => { request<{ has_token: boolean }>('integrations/serpapi').then(d => setSerpapiState(s => ({ ...s, has_token: d.has_token }))).catch(() => {}); }, []);
+  useEffect(() => { loadSerpapiToken(); }, []);
   const runGoogle = async () => {
     setSerpapiState(s => ({ ...s, busy: true })); setError(''); setMessage('');
     try { const r = await request<{ message?: string }>('google/run', {}); setMessage(r.message || 'Importación SerpApi encolada.'); await onRefresh(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setSerpapiState(s => ({ ...s, busy: false })); }
+  };
+  // Vigilancia de empresas objetivo (solo LinkedIn): conexión interna google-companies-serpapi.
+  const companiesConn = connections.find(c => c.id === 'google-companies-serpapi');
+  const companiesBusy = serpapiState.busy || ['STARTING', 'READY', 'RUNNING', 'TIMING-OUT', 'ABORTING', 'UNKNOWN'].includes(companiesConn?.run_status || '');
+  const runCompanies = async () => {
+    setSerpapiState(s => ({ ...s, busy: true })); setError(''); setMessage('');
+    try {
+      const r = await request<{ message?: string; pending_companies?: number }>('google/companies/run', {});
+      setMessage(r.message || 'Vigilancia de empresas encolada.');
+      await refresh();
+    }
     catch (e) { setError((e as Error).message); }
     finally { setSerpapiState(s => ({ ...s, busy: false })); }
   };
@@ -104,6 +118,8 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
   const card = (s: NonNullable<Config['sources']>[number]) => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className={s.available ? 'available' : 'pending'}>{s.available ? 'API pública activa' : 'Por conectar'}</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>Filtros en origen: {s.upstream_filters?.length ? s.upstream_filters.join(', ') : 'sin filtros verificados'}</p><p>{s.acquisition_note}</p>{!!s.suggested_searches?.length && <p>{s.suggested_searches.length} enlaces WDC preparados · español primero</p>}<details><summary>Detalles de la fuente</summary><p>{s.note}</p>{s.provider_candidates?.map(url => <p key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url.replace('https://apify.com/', '')} ↗</a></p>)}</details><div className="source-actions">{s.website && <a href={s.website} target="_blank" rel="noopener noreferrer">Visitar <ExternalLink size={12} /></a>}{!s.available && <><a href={s.setup_url} target="_blank" rel="noopener noreferrer">Ver proveedor <ExternalLink size={12} /></a><button onClick={() => open(s.code)}>Conectar</button></>}</div></article>;
   const googleCard = (s: NonNullable<Config['sources']>[number]) => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className={serpapiState.has_token ? 'available' : 'pending'}>{serpapiState.has_token ? 'Clave guardada · lista para ejecutar' : 'Falta clave de SerpApi'}</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>{s.acquisition_note}</p>{!!s.suggested_searches?.length && <p>{s.suggested_searches.length} dorks WDC listos · español primero</p>}<details><summary>Detalles de la fuente</summary><p>{s.note}</p></details><div className="source-actions"><a href={s.setup_url} target="_blank" rel="noopener noreferrer">Ver proveedor <ExternalLink size={12} /></a><button disabled={serpapiState.busy || !serpapiState.has_token} onClick={runGoogle}>Ejecutar dorks · genera ~{ (0.025 * (s.suggested_searches?.length || 14)).toFixed(2) } USD</button></div></article>;
   const sourcesCard = (s: NonNullable<Config['sources']>[number]) => <article className="source-card" key={s.code}><div><span className="eyebrow">{s.category}</span><span className="available">API pública activa</span></div><h2>{s.name}</h2><p><strong>{s.acquisition_method}</strong></p><p>{s.validation_status}</p><p>{s.acquisition_note}</p></article>;
+  const linkedinTargets = targets.filter(t => t.monitoring === 'linkedin_guest');
+  const companiesCard = () => <article className="source-card"><div><span className="eyebrow">Empresas objetivo · LinkedIn</span><span className={serpapiState.has_token && linkedinTargets.length ? 'available' : 'pending'}>{!serpapiState.has_token ? 'Falta clave de SerpApi' : companiesConn?.run_status === 'RUNNING' ? 'Vigilancia en curso' : linkedinTargets.length ? 'Lista para ejecutar' : 'Sin empresas con canal LinkedIn'}</span></div><h2>Vigilancia de empresas objetivo</h2><p><strong>Motor google_jobs de SerpApi · una búsqueda por empresa</strong></p><p>{linkedinTargets.length} empresas publican solo en LinkedIn: "{linkedinTargets[0]?.name || '—'}"{linkedinTargets.length > 1 ? ` y ${linkedinTargets.length - 1} más` : ''}, en orden de prioridad.</p><p>Patrón por empresa: "<em>{linkedinTargets[0]?.name || 'empresa'}</em>" (closer OR setter OR asesor comercial OR sales advisor) España.</p><p>Coste: ~{(linkedinTargets.length * 0.025).toFixed(2)} USD por pasada completa, sujeto al presupuesto diario; si no caben todas, se vigilan las de mayor prioridad y el resto queda pendiente.</p><div className="source-actions"><button disabled={companiesBusy || !serpapiState.has_token || !linkedinTargets.length} onClick={runCompanies}>{companiesConn?.run_status === 'RUNNING' ? 'Ejecutando…' : `Ejecutar vigilancia · ~${(linkedinTargets.length * 0.025).toFixed(2)} USD`}</button>{companiesConn?.run_id && companiesConn?.run_status === 'RUNNING' && <span>Run {companiesConn.run_id.slice(0, 8)}…</span>}</div></article>;
   return <div className="sources-workspace">
     <div className="source-intro"><div><span className="eyebrow">ESPAÑOL · REMOTO · HÍBRIDO</span><h2>Abre nuevas puertas para tus alumnas.</h2><p>Oportunidades en español o bilingües de España, LATAM y otros mercados. Reunimos publicaciones de portales, comunidades y empresas.</p></div><button className="primary" onClick={() => open()}><Plus size={16} /> Añadir fuente</button></div>
     {error && <p className="alert error" role="alert">{error}</p>}{message && <p className="alert" role="status">{message}</p>}
@@ -149,9 +165,9 @@ export default function Sources({ config, onRefresh }: { config: Config; onRefre
         <p className="catalog-note">Portales sin API pública: se conectan con un Actor de Apify (puede generar coste por ejecución). Elige el proveedor propuesto, valida su salida y ajusta el mapeo.</p>
         <div className="source-grid">{groups.apify.map(card)}</div>
 
-        <div className="results-heading" style={{ marginTop: 40 }}><h2>Google · SerpApi <span>{groups.serpapi.length}</span></h2></div>
+        <div className="results-heading" style={{ marginTop: 40 }}><h2>Google · SerpApi <span>{groups.serpapi.length + 1}</span></h2></div>
         <p className="catalog-note">Los dorks del vocabulario WDC se ejecutan con tu clave de SerpApi (motor google_jobs). Paga por búsqueda y queda sujeto al presupuesto diario; guarda la clave en «Conecta una vez» y pulsa ejecutar.</p>
-        <div className="source-grid">{groups.serpapi.map(googleCard)}</div>
+        <div className="source-grid">{groups.serpapi.map(googleCard)}{companiesCard()}</div>
 
         <div className="results-heading" style={{ marginTop: 40 }}><h2>Requieren más datos de tu parte <span>{groups.input.length}</span></h2></div>
         <p className="catalog-note">Sin proveedor verificado todavía: hay que validar un scraper concreto y configurar búsquedas o enlaces específicos antes de que puedan entrar en la recogida.</p>
