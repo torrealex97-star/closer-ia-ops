@@ -202,6 +202,13 @@ def close_serpapi_reservations(organization, run_id, run_status=None):
     with connect() as db:
         db.execute("UPDATE scrape_budget SET status=?,actual_usd=cap_usd,finished_day=? "
                    "WHERE org_id=? AND run_id=? AND status='RUNNING'", (terminal, day_key(), organization, run_id))
+        # Las conexiones SerpApi internas (dorks y vigilancia de empresas) marcan run_status=RUNNING
+        # al reservar y no tienen run de Apify que lo reconcilie: al cerrar el search_run, su
+        # run_status vuelve a un estado terminal para poder lanzar de nuevo (idempotente).
+        db.execute("UPDATE source_connections SET payload=json_set(payload,'$.run_status',?,'$.last_completed_at',?) "
+                   "WHERE org_id=? AND id IN ('google-serpapi','google-companies-serpapi') "
+                   "AND json_extract(payload,'$.run_status') IN ('STARTING','READY','RUNNING','TIMING-OUT','ABORTING','UNKNOWN')",
+                   (terminal, now(), organization,))
 
 
 def record_cost(organization, run):

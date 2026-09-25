@@ -765,6 +765,13 @@ def test_launch_serpapi_companies_reserves_and_closes_on_run_completion(client, 
         closed = db.execute("SELECT status,actual_usd FROM scrape_budget WHERE org_id='local-wdc' AND id=?", (reservation['id'],)).fetchone()
     assert closed['status'] == 'SUCCEEDED', closed['status']
     assert closed['actual_usd'] and closed['actual_usd'] > 0
+    # El run_status de la conexión interna vuelve a terminal: sin esto, el segundo intento
+    # daría 409 "ejecución pendiente" para siempre (también afectaba a los dorks google).
+    from career.sources import get_connection, check_connection
+    conn = get_connection('google-companies-serpapi', 'local-wdc')
+    assert conn['run_status'] == 'SUCCEEDED', conn['run_status']
+    check = asyncio.run(check_connection('google-companies-serpapi', 'local-wdc'))
+    assert 'SUCCEEDED' in check['message']
     # La red de seguridad en collect() es idempotente: nada ya RUNNING queda sin cerrar.
     from career.collection import enqueue, collect
     with connect() as db:

@@ -534,6 +534,20 @@ async def check_connection(connection_id, organization):
                 raise HTTPException(409, "La conexión cambió durante la comprobación. Vuelve a comprobar.")
         original = json.dumps(value)
     try:
+        if value["id"] in {"google-serpapi", "google-companies-serpapi"}:
+            # Conexiones SerpApi internas: sin run ni dataset de Apify. El estado lo da el
+            # search_run de su lanzamiento, que el worker/cancelación cierra vía
+            # close_serpapi_reservations; aquí solo se informa del estado actual.
+            run_id = value.get("run_id")
+            run_status = value.get("run_status")
+            if run_id and run_status not in {"SUCCEEDED", "ABORTED", "FAILED", "REVIEWED"}:
+                with connect() as db:
+                    run = db.execute("SELECT status FROM search_runs WHERE org_id=? AND id=?", (organization, run_id)).fetchone()
+                if run:
+                    run_status = run["status"]
+            state = {"queued": "RUNNING", "running": "RUNNING"}.get(run_status or "", run_status)
+            return {"connection": public_connection(value, organization),
+                    "message": f"Búsqueda local de SerpApi: estado {state or 'sin ejecución'}."}
         if value.get("run_id"):
             run = (await apify_request("GET", f'actor-runs/{value["run_id"]}', token))["data"]
             from .collection import record_cost
