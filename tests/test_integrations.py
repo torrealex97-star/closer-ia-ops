@@ -47,7 +47,12 @@ def vendor():
                 status = 401 if state['mode'] == 'unauthorized' else 200
                 result = {'id': path.split('/models/', 1)[1]}
             elif path.endswith('/responses') or path.endswith('/chat/completions'):
-                output = {'summary': 'Oferta de cierre comercial remoto.', 'fit': 'alineada', 'confidence': 'media', 'requirements': ['Experiencia en ventas'], 'questions': ['Confirmar fijo y comisiones'], 'evidence': 'Trabajo remoto.'}
+                if 'role_family' in json.dumps(body.get('response_format') or {}):
+                    # Clasificación LLM de oportunidades (ADR-007): cita literal de la oferta.
+                    output = {'role_family': 'closer', 'confidence': 'media',
+                              'reason': 'Texto comercial con venta de programa', 'evidence': 'comercial'}
+                else:
+                    output = {'summary': 'Oferta de cierre comercial remoto.', 'fit': 'alineada', 'confidence': 'media', 'requirements': ['Experiencia en ventas'], 'questions': ['Confirmar fijo y comisiones'], 'evidence': 'Trabajo remoto.'}
                 if state['mode'] == 'hallucinated':
                     output['evidence'] = 'Salario garantizado 100.000 EUR'
                 result = {'id': 'response-fixture', 'status': 'completed', 'usage': {'input_tokens': 400, 'output_tokens': 90}, 'output': [{'content': [{'type': 'output_text', 'text': json.dumps(output)}]}]}
@@ -138,7 +143,8 @@ def test_guided_flow_real_http_queue_database_and_reuse(api):
     with connect() as db:
         assert db.execute('SELECT count(*) FROM raw_items').fetchone()[0] == 1
         assert db.execute('SELECT count(*) FROM source_connections').fetchone()[0] == 1
-        assert db.execute('SELECT max(version) FROM schema_version').fetchone()[0] == 10
+        # Migración 12: WDCOpportunity versionada + verificación + elegibilidad (P01B, aditiva).
+        assert db.execute('SELECT max(version) FROM schema_version').fetchone()[0] == 12
     initialize()  # migration repeat preserves data
     assert client.get('/v1/search-runs/' + run_id).json()['jobs'][0]['id'] == job_id
 

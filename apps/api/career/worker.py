@@ -90,10 +90,13 @@ async def main():
     initialize()
     from .ai import ai_loop
     from .collection import collection_loop
+    from .classification import classification_loop
     collection_task = asyncio.create_task(collection_loop())
     collection_task.add_done_callback(lambda task: task.result() if not task.cancelled() else None)
     ai_task = asyncio.create_task(ai_loop())
     ai_task.add_done_callback(lambda task: task.result() if not task.cancelled() else None)
+    classification_task = asyncio.create_task(classification_loop())
+    classification_task.add_done_callback(lambda task: task.result() if not task.cancelled() else None)
     # Single consumer in local mode. Restarts replay idempotently from the durable queue.
     with connect() as db:
         db.execute("UPDATE search_runs SET status='queued' WHERE status='running'")

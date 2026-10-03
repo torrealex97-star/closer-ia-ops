@@ -38,8 +38,14 @@ app.include_router(integrations_router)
 app.include_router(ai_router)
 from .collection import router as collection_router  # noqa: E402
 app.include_router(collection_router)
+from .funnel import router as funnel_router  # noqa: E402
+app.include_router(funnel_router)
+from .classification import router as classification_router  # noqa: E402
+app.include_router(classification_router)
 from .opportunities import router as opportunities_router  # noqa: E402
 app.include_router(opportunities_router)
+from .domain import router as domain_router  # noqa: E402
+app.include_router(domain_router)
 from .orchestrator import SearchGoal, get_goal, save_goal  # noqa: E402
 
 

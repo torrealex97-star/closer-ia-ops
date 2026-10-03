@@ -15,7 +15,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const { path } = await context.params;
   if (path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) return new Response(null, { status: 400 });
   try {
-    const upstream = await fetch(`http://127.0.0.1:8100/v1/${path.join('/')}`, {
+    // Los parámetros de consulta son parte del contrato (p. ej. editorial_status del listado WDC).
+    const upstream = await fetch(`http://127.0.0.1:8100/v1/${path.join('/')}${request.nextUrl.search}`, {
       method: request.method,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.text(),

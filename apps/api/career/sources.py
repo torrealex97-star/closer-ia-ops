@@ -652,7 +652,8 @@ def source_infos(organization):
     public = [{"code": c.code, "name": c.name, "available": True,
                "category": ("España" if c.code.startswith("jobtoday") else "LATAM" if c.code == "getonbrd-public" else "Internacional"),
                "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
-               "website": c.url if hasattr(c, "url") else "https://himalayas.app" if c.code == "himalayas" else "https://weworkremotely.com"} for c in REGISTRY.values()]
+               "website": c.url if hasattr(c, "url") else "https://himalayas.app" if c.code == "himalayas"
+                          else "https://freehire.me" if c.code == "freehire" else "https://weworkremotely.com"} for c in REGISTRY.values()]
     public += [{"code": c.code, "name": c.name, "available": True, "category": "Empresas",
                 "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
                 "website": c.url} for c in watchlist_connectors(organization).values()]

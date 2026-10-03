@@ -96,7 +96,10 @@ def test_auth_and_empty_state(client):
     assert client.get("/v1/config", headers={"Authorization": ""}).status_code == 401
     assert client.get("/v1/search-runs").json() == []
     assert client.get("/v1/config").json()["mode"] == "local"
-    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 22
+    # 22 públicas anteriores + FreeHire (capa FREE de SPEC-002, disponible sin configurar).
+    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 23
+    freehire = next(s for s in client.get("/v1/config").json()["sources"] if s["code"] == "freehire")
+    assert freehire["available"] is True and freehire["requires"] == "none"
 
 
 def test_profile_terms_feed_apify_inputs(client):

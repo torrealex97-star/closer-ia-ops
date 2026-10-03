@@ -10,7 +10,7 @@ test('student sees three profiles and decision facts without operational control
   });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Elige tu próxima oportunidad.' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Perfil profesional' }).locator('option')).toHaveText(['Todos los perfiles', 'Closer', 'Setter', 'Cold Caller']);
+  await expect(page.getByRole('combobox', { name: 'Perfil profesional' }).locator('option')).toHaveText(['Todos los perfiles', 'Closer', 'Setter', 'Cold Caller', 'Ejecutivo comercial', 'SDR / BDR']);
   await expect(page.getByRole('heading', { name: offer.compensation })).toBeVisible();
   await expect(page.getByText(offer.schedule)).toBeVisible();
   await expect(page.getByText(offer.experience)).toBeVisible();
@@ -28,6 +28,29 @@ test('student sees three profiles and decision facts without operational control
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page.getByRole('heading', { name: offer.compensation })).toBeVisible();
+});
+
+test('student filters survive a reload via the URL', async ({ page }) => {
+  const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/backend/opportunities/search', route => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: { items: [offer], total: 1 } });
+  });
+  await page.goto('/');
+  await expect.poll(() => requests.length).toBeGreaterThan(0);
+  expect(requests.at(-1)?.role).toBeNull();
+  await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('cold_caller');
+  await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
+  await expect.poll(() => requests.at(-1)?.role).toBe('cold_caller');
+  expect(new URL(page.url()).searchParams.get('role')).toBe('cold_caller');
+  await page.reload();
+  await expect.poll(() => requests.length).toBeGreaterThan(1);
+  expect(requests.at(-1)?.role).toBe('cold_caller');
+  expect(requests.at(-1)?.include_extra_roles).toBe(true);
+  await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('');
+  await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
+  await expect.poll(() => requests.at(-1)?.role).toBeNull();
+  expect(new URL(page.url()).search).toBe('');
 });
 
 test('student saves an opportunity and bilingual notices are an explicit choice', async ({ page }) => {

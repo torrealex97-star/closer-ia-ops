@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowUpRight, Bookmark, Check, CheckCheck, ChevronRight, CircleHelp, Clock3, Compass, Copy, ExternalLink, Globe2, Layers3, LoaderCircle, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpRight, Bookmark, BrainCircuit, Check, CheckCheck, ChevronRight, CircleHelp, Clock3, Compass, Copy, ExternalLink, FileCheck2, Globe2, Layers3, LoaderCircle, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import Sources from './Sources';
 import CollectionPanel from './CollectionPanel';
 import AIAnalysis from './AIAnalysis';
+import JobClassification from './JobClassification';
+import ClassificationsPanel from './ClassificationsPanel';
+import ReviewPanel from './ReviewPanel';
 import type { components } from '../../../packages/contracts/api';
 
 type Query = components['schemas']['SearchQuery'];
@@ -40,7 +43,7 @@ export default function Workspace() {
   const [run, setRun] = useState<Run | null>(null);
   const [history, setHistory] = useState<Run[]>([]);
   const [saved, setSaved] = useState<Saved[]>([]);
-  const [tab, setTab] = useState<'search' | 'history' | 'sources'>('search');
+  const [tab, setTab] = useState<'search' | 'history' | 'sources' | 'classifications' | 'review'>('search');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [onlyStarred, setOnlyStarred] = useState(false);
@@ -144,14 +147,16 @@ export default function Workspace() {
         <button className={tab === 'search' ? 'nav active' : 'nav'} onClick={() => setTab('search')}><Compass size={18} /> Oportunidades <span className="nav-dot" /></button>
         <button className={tab === 'history' ? 'nav active' : 'nav'} onClick={() => { setTab('history'); api<Run[]>('search-runs').then(setHistory).catch(e => setError(e.message)); }}><Clock3 size={18} /> Historial</button>
         <button className={tab === 'sources' ? 'nav active' : 'nav'} onClick={() => setTab('sources')}><Layers3 size={18} /> Red de oportunidades</button>
+        <button className={tab === 'classifications' ? 'nav active' : 'nav'} onClick={() => setTab('classifications')}><BrainCircuit size={18} /> Clasificaciones IA</button>
+        <button className={tab === 'review' ? 'nav active' : 'nav'} onClick={() => setTab('review')}><FileCheck2 size={18} /> Revisión</button>
       </nav>
       <div className="sidebar-note"><span className="eyebrow">DE LA PREPARACIÓN<br />A LA OPORTUNIDAD</span><p>El siguiente paso profesional empieza con una buena selección.</p><div className="path-dots"><i /><span /><i /><span /><i /></div></div>
       <div className="local-user"><span className="avatar">EQ</span><div><strong>Equipo WDC</strong><small>Uso local · este ordenador</small></div></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div>{config?.organization || 'Women Digital Closer'} <ChevronRight size={14} /> <strong>{tab === 'search' ? 'Oportunidades' : tab === 'history' ? 'Historial' : 'Red de oportunidades'}</strong></div><span className="local-badge"><span /> Versión local</span></header>
+      <header className="topbar"><div>{config?.organization || 'Women Digital Closer'} <ChevronRight size={14} /> <strong>{tab === 'search' ? 'Oportunidades' : tab === 'history' ? 'Historial' : tab === 'classifications' ? 'Clasificaciones IA' : tab === 'review' ? 'Revisión editorial' : 'Red de oportunidades'}</strong></div><span className="local-badge"><span /> Versión local</span></header>
       <main>
-        <div className="page-heading"><div><span className="eyebrow">{tab === 'search' ? 'CONEXIONES QUE ABREN CAMINO' : 'TU MESA DE TRABAJO'}</span><h1>{tab === 'search' ? 'Su próximo paso empieza aquí.' : tab === 'history' ? 'Cada búsqueda, a mano.' : 'Tu red de oportunidades.'}</h1><p>{tab === 'search' ? 'Encuentra oportunidades, revisa el encaje y prepara una selección para tus alumnas.' : tab === 'history' ? 'Recupera resultados y repite las búsquedas que te funcionan.' : 'Exploramos portales, comunidades y empresas para acercarte oportunidades relevantes.'}</p></div><span className="heading-icon"><Compass size={30} strokeWidth={1.2} /></span></div>
+        <div className="page-heading"><div><span className="eyebrow">{tab === 'search' ? 'CONEXIONES QUE ABREN CAMINO' : tab === 'classifications' ? 'VOCABULARIO AMPLIADO CON IA' : tab === 'review' ? 'DE LA OFERTA BRUTA A LA OPORTUNIDAD' : 'TU MESA DE TRABAJO'}</span><h1>{tab === 'search' ? 'Su próximo paso empieza aquí.' : tab === 'history' ? 'Cada búsqueda, a mano.' : tab === 'classifications' ? 'Clasificaciones con IA.' : tab === 'review' ? 'Revisar antes de ofrecer.' : 'Tu red de oportunidades.'}</h1><p>{tab === 'search' ? 'Encuentra oportunidades, revisa el encaje y prepara una selección para tus alumnas.' : tab === 'history' ? 'Recupera resultados y repite las búsquedas que te funcionan.' : tab === 'classifications' ? 'Las ofertas que el vocabulario no puede clasificar, resueltas con evidencia literal y atribución.' : tab === 'review' ? 'Cada importación llega como borrador literal del anuncio; tu decisión humana aprueba lo que llega a la alumna.' : 'Exploramos portales, comunidades y empresas para acercarte oportunidades relevantes.'}</p></div><span className="heading-icon">{tab === 'classifications' ? <BrainCircuit size={30} strokeWidth={1.2} /> : <Compass size={30} strokeWidth={1.2} />}</span></div>
         {error && <div className="alert error" role="alert"><span>{error}</span><button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
         {notice && <div className="toast" role="status"><CheckCheck size={18} />{notice}</div>}
         {tab === 'search' && <>
@@ -191,10 +196,12 @@ export default function Workspace() {
         </>}
         {tab === 'history' && <section className="history-list">{!history.length ? <div className="empty"><Clock3 size={32} /><h3>Todavía no hay búsquedas.</h3><p>Tu historial se guarda en este ordenador.</p><button className="primary" onClick={() => setTab('search')}>Buscar oportunidades</button></div> : history.map(h => <button key={h.id} className="history-row" onClick={() => openRun(h.id)}><span className="history-symbol"><Search size={20} /></span><span><strong>{roles[h.query.role || 'sales']}</strong><small>{date(h.created_at)} · {h.query.market === 'any' ? 'Todos los mercados' : h.query.market} · Últimos {h.query.days} días</small></span><span className="history-status">{statuses[h.status]}</span><ChevronRight size={18} /></button>)}</section>}
         {tab === 'sources' && config && <Sources config={config} onRefresh={async () => { const next = await api<Config>('config'); setConfig(next); setQuery(old => ({ ...old, sources: [...new Set([...(old.sources || []), ...next.sources.filter(s => s.available && !config.sources.some(previous => previous.code === s.code && previous.available)).map(s => s.code)])].filter(code => next.sources.some(s => s.code === code && s.available)) })); }} />}
+        {tab === 'classifications' && <ClassificationsPanel />}
+        {tab === 'review' && <ReviewPanel />}
       </main>
     </div>
     <dialog ref={dialog} onClose={() => setDetail(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }}>
-      {detail && <div className="detail"><div className="detail-top"><span className="eyebrow">REVISAR OPORTUNIDAD</span><button className="icon-button" aria-label="Cerrar detalle" onClick={() => dialog.current?.close()}><X size={20} /></button></div><p className="job-company">{detail.company}</p><h2>{detail.title}</h2><p className="detail-compensation">{compensation(detail)}</p><div className="detail-signals"><h3><Sparkles size={16} /> Por qué aparece</h3>{detail.reasons.map(r => <p key={r}><Check size={14} /> {r}</p>)}</div>{detail.warnings.length > 0 && <div className="detail-warnings"><h3>Antes de compartir, confirma</h3><ul>{detail.warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}{run && <AIAnalysis key={detail.id} runId={run.id} jobId={detail.id} />}<h3>Descripción original</h3><div className="description">{detail.description || 'La fuente no incluye una descripción.'}</div><div className="provenance"><strong>Fuente: {detail.source}</strong><span>Publicada: {date(detail.published_at)} · Capturada: {date(detail.captured_at)}</span><span>No se ha confirmado que siga aceptando candidaturas.</span></div><div className="detail-actions"><a className="primary" href={detail.source_url} target="_blank" rel="noopener noreferrer">Ver oferta original <ExternalLink size={16} /></a><button onClick={() => copyJobs([detail])}><Copy size={16} /> Copiar</button></div></div>}
+      {detail && <div className="detail"><div className="detail-top"><span className="eyebrow">REVISAR OPORTUNIDAD</span><button className="icon-button" aria-label="Cerrar detalle" onClick={() => dialog.current?.close()}><X size={20} /></button></div><p className="job-company">{detail.company}</p><h2>{detail.title}</h2><p className="detail-compensation">{compensation(detail)}</p><div className="detail-signals"><h3><Sparkles size={16} /> Por qué aparece</h3>{detail.reasons.map(r => <p key={r}><Check size={14} /> {r}</p>)}</div>{detail.warnings.length > 0 && <div className="detail-warnings"><h3>Antes de compartir, confirma</h3><ul>{detail.warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}{run && <AIAnalysis key={detail.id} runId={run.id} jobId={detail.id} />}<JobClassification key={'class-' + detail.id} jobId={detail.id} /><h3>Descripción original</h3><div className="description">{detail.description || 'La fuente no incluye una descripción.'}</div><div className="provenance"><strong>Fuente: {detail.source}</strong><span>Publicada: {date(detail.published_at)} · Capturada: {date(detail.captured_at)}</span><span>No se ha confirmado que siga aceptando candidaturas.</span></div><div className="detail-actions"><a className="primary" href={detail.source_url} target="_blank" rel="noopener noreferrer">Ver oferta original <ExternalLink size={16} /></a><button onClick={() => copyJobs([detail])}><Copy size={16} /> Copiar</button></div></div>}
     </dialog>
   </div>;
 }

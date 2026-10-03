@@ -13,7 +13,9 @@ test('operator can configure search, inspect sources and use mobile navigation',
   await expect(page.getByLabel('Exigir evidencia de español (incluye bilingües)')).toBeChecked();
   await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Himalayas', exact: true })).toBeVisible();
-  await expect(page.getByText('API pública activa', { exact: true })).toHaveCount(6);
+  // El catálogo público crece con cada incremento: cada fuente conectada lleva su badge.
+  const config = await (await page.request.get('/api/backend/config')).json();
+  await expect(page.getByText('API pública activa', { exact: true })).toHaveCount(config.sources.filter((s: { available: boolean; category: string }) => s.available && s.category !== 'Mis conexiones').length);
   await expect(page.getByRole('heading', { name: 'InfoJobs', exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Oportunidades', exact: true }).click();

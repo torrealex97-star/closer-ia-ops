@@ -55,6 +55,19 @@ def test_three_roles_and_closing_evidence_for_commercial(api):
     assert client.post('/v1/opportunities/search', json={'role': 'sales'}).status_code == 422
 
 
+def test_extra_roles_hidden_by_default_and_selectable_explicitly(api):
+    """AE/SDR no salen en la vista general sin opt-in, pero elegirlos en el
+    desplegable es el opt-in: no puede devolver 0 habiendo ofertas del rol."""
+    client, _ = api
+    text = 'Buscamos una profesional para nuestro equipo de ventas. Trabajo remoto. Tu misión es cerrar su inscripción.'
+    add(text, 'Account Executive SaaS', identity='ae-direct')
+    assert client.post('/v1/opportunities/search', json={}).json()['total'] == 0
+    assert client.post('/v1/opportunities/search', json={'include_extra_roles': True, 'include_bilingual': True}).json()['total'] == 1
+    chosen = client.post('/v1/opportunities/search', json={'role': 'account_executive', 'include_bilingual': True}).json()
+    assert chosen['total'] == 1 and chosen['items'][0]['role'] == 'account_executive'
+    assert chosen['selection_total'] == 0  # fuera del top de excelencia WDC
+
+
 def test_student_bookmarks_and_org_scope(api, monkeypatch):
     client, _ = api
     add('Buscamos una closer para nuestro equipo de ventas. Trabajo remoto.')

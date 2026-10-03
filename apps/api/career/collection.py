@@ -328,6 +328,21 @@ async def collect(run_id, organization):
         sources = json.loads(db.execute('SELECT sources FROM collection_runs WHERE org_id=? AND id=?', (organization, run_id)).fetchone()['sources'])
         state = 'partial' if any(s['status'] != 'completed' or s.get('warning') for s in sources) else 'completed'
         db.execute('UPDATE collection_runs SET status=?,completed_at=? WHERE org_id=? AND id=?', (state, now(), organization, run_id))
+    # Clasificación LLM masiva tras la recogida (ADR-007, opt-in massive_after_collection):
+    # la cola se llena aquí pero el gasto ocurre en el worker de clasificación, con su propio
+    # límite diario y caché. Un fallo aquí nunca invalida la recogida ya persistida.
+    try:
+        from .classification import trigger_massive_classification
+        trigger_massive_classification(organization)
+    except Exception:
+        logger.exception('classification_massive_hook_failed org=%s', organization)
+    # Snapshot del embudo por fuente del día (append idempotente): la línea base que decide
+    # dónde atacar el escrapeo amplio. Un fallo aquí nunca invalida la recogida persistida.
+    try:
+        from .funnel import save_snapshot
+        save_snapshot(organization, run_id)
+    except Exception:
+        logger.exception('funnel_snapshot_failed org=%s', organization)
 
 
 async def collection_loop():

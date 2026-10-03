@@ -7,10 +7,12 @@ import type { components } from '../../../packages/contracts/api';
 
 type Status = components['schemas']['CollectionStatus'];
 type Settings = components['schemas']['CollectionSettings'];
+type Funnel = components['schemas']['FunnelDay'];
 const states: Record<string, string> = { queued: 'En cola', running: 'Actualizando', completed: 'Actualizada', partial: 'Actualizada con avisos', failed: 'No disponible' };
 
 export default function CollectionPanel({ editable = false }: { editable?: boolean }) {
   const [status, setStatus] = useState<Status | null>(null);
+  const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [form, setForm] = useState<Settings | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,6 +25,7 @@ export default function CollectionPanel({ editable = false }: { editable?: boole
       try {
         const value = await request<Status>('collection');
         if (!stopped) { setStatus(value); setForm(old => old || value.settings); setError(''); }
+        try { const funnelValue = await request<Funnel>('funnel'); if (!stopped) setFunnel(funnelValue); } catch { /* el embudo nunca debe tumbes el panel */ }
       } catch (e) { if (!stopped) setError((e as Error).message); }
       finally { pending = false; }
     }
@@ -56,6 +59,10 @@ export default function CollectionPanel({ editable = false }: { editable?: boole
         <p className="inline-hint">Una recogida al día entre todas las fuentes conectadas. Repetir el botón no vuelve a cobrar. La app y el ordenador deben estar encendidos; al abrir después de la hora, recoge el día actual sin recuperar días anteriores.</p>
         <p className="inline-hint">Las APIs y feeds públicos se recogen sin Apify y continúan aunque se agote el presupuesto de scraping.</p>
         {status.latest && <details><summary>Estado de cada fuente</summary><div className="sources-progress">{status.latest.sources.map(source => <div className="source-progress" key={source.code}><strong>{source.name}</strong><small>{states[source.status] || source.status} · {source.accepted} con encaje</small>{source.warning && <p>{source.warning}</p>}</div>)}</div></details>}
+        {funnel && <details className="funnel-panel"><summary>Embudo del día · {funnel.total.elegibles} elegibles · {funnel.total.seleccionadas} seleccionadas</summary>
+          <div className="sources-progress">{funnel.rows.map(row => <div className="source-progress" key={row.source}><strong>{row.source_name}</strong><small>{row.revisadas} revisadas → {row.matching} con encaje → {row.elegibles} elegibles → {row.seleccionadas} seleccionadas</small>{row.failure && <p>{row.failure}</p>}</div>)}</div>
+          <p className="inline-hint">Las mismas puertas que ve la alumna: con encaje = filtro común del catálogo; elegibles = perfil + idioma + frescura; seleccionadas = top de excelencia (máximo 2 por empresa). Esta línea base decide dónde ampliar el escrapeo gratuito; una fuente que falla no oculta a las demás.</p>
+        </details>}
       </>}
     </>}
   </section>;

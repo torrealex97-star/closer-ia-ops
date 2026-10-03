@@ -96,6 +96,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/google/companies/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Google Companies Run
+         * @description Vigilancia de empresas objetivo (canal LinkedIn): una búsqueda google_jobs por empresa,
+         *     bajo el presupuesto SerpApi reservado; las que no caben quedan pendientes.
+         */
+        post: operations["google_companies_run_v1_google_companies_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/source-connections/{connection_id}/check": {
         parameters: {
             query?: never;
@@ -375,6 +396,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/funnel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Funnel */
+        get: operations["funnel_v1_funnel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Classification Status */
+        get: operations["classification_status_v1_ai_classification_get"];
+        /** Configure Classification */
+        put: operations["configure_classification_v1_ai_classification_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/classify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Classify */
+        post: operations["classify_v1_ai_classify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/classifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Classifications List
+         * @description Listado admin: estado, resultado y evidencia por oferta. Nunca expone el
+         *     contenido enviado al proveedor ni claves; la trazabilidad es legible, no cruda.
+         */
+        get: operations["classifications_list_v1_ai_classifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/classifications/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Classification Detail */
+        get: operations["classification_detail_v1_ai_classifications__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/opportunities/search": {
         parameters: {
             query?: never;
@@ -386,6 +497,105 @@ export interface paths {
         put?: never;
         /** Search */
         post: operations["search_v1_opportunities_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wdc/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Opportunities
+         * @description Admin: listado de WDCOpportunities con estado derivado y trazabilidad mínima.
+         */
+        get: operations["list_opportunities_v1_wdc_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wdc/opportunities/{opportunity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Opportunity */
+        get: operations["get_opportunity_v1_wdc_opportunities__opportunity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wdc/opportunities/{opportunity_id}/student": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student View
+         * @description Preview de alumna con exactamente el DTO permitido (para el renderer de publicación).
+         */
+        get: operations["student_view_v1_wdc_opportunities__opportunity_id__student_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wdc/opportunities/{opportunity_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review
+         * @description Revisión editorial: crea versión nueva e inmutable y mueve el puntero; el raw no cambia.
+         */
+        post: operations["review_v1_wdc_opportunities__opportunity_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wdc/opportunities/{opportunity_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Opportunity
+         * @description Verificación real de vigencia (spec 17): un GET acotado y contenido corroborante.
+         *     HTTP 200 solo nunca basta: el cuerpo debe mencionar el título o la empresa del anuncio.
+         *     Escribe verification_events (TTL por fuente) + evidencia raw inmutable + estado de vigencia.
+         */
+        post: operations["verify_opportunity_v1_wdc_opportunities__opportunity_id__verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -665,6 +875,38 @@ export interface components {
             /** Job Id */
             job_id: string;
         };
+        /** ClassificationStatus */
+        ClassificationStatus: {
+            /** Enabled */
+            enabled: boolean;
+            /** Has Token */
+            has_token: boolean;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Daily Limit */
+            daily_limit: number;
+            /** Used Today */
+            used_today: number;
+            /**
+             * Massive After Collection
+             * @default false
+             */
+            massive_after_collection: boolean;
+        };
+        /** ClassifyRequest */
+        ClassifyRequest: {
+            /** Job Ids */
+            job_ids: string[];
+            /** Role */
+            role?: ("digital_sales" | "sales" | "closer" | "setter" | "cold_caller" | "account_executive" | "sdr" | "custom") | null;
+            /**
+             * Retry Failed
+             * @default false
+             */
+            retry_failed: boolean;
+        };
         /** CollectionRun */
         CollectionRun: {
             /** Id */
@@ -821,6 +1063,43 @@ export interface components {
              */
             format: "csv" | "json" | "xlsx";
         };
+        /** FunnelDay */
+        FunnelDay: {
+            /** Day */
+            day: string;
+            /** Rows */
+            rows: components["schemas"]["FunnelRow"][];
+            total: components["schemas"]["FunnelRow"];
+        };
+        /** FunnelRow */
+        FunnelRow: {
+            /** Source */
+            source: string;
+            /** Source Name */
+            source_name: string;
+            /**
+             * Revisadas
+             * @default 0
+             */
+            revisadas: number;
+            /**
+             * Matching
+             * @default 0
+             */
+            matching: number;
+            /**
+             * Elegibles
+             * @default 0
+             */
+            elegibles: number;
+            /**
+             * Seleccionadas
+             * @default 0
+             */
+            seleccionadas: number;
+            /** Failure */
+            failure?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -876,6 +1155,47 @@ export interface components {
              */
             starred: boolean;
         };
+        /**
+         * JobEligibility
+         * @description Hechos de elegibilidad separados; vacío/null = desconocido, nunca worldwide implícito.
+         */
+        JobEligibility: {
+            /** Employer Country */
+            employer_country?: string | null;
+            /**
+             * Customer Markets
+             * @default []
+             */
+            customer_markets: string[];
+            /**
+             * Allowed Worker Countries
+             * @default []
+             */
+            allowed_worker_countries: string[];
+            /**
+             * Excluded Worker Countries
+             * @default []
+             */
+            excluded_worker_countries: string[];
+            /** Residency Required */
+            residency_required?: boolean | null;
+            /** Work Authorization Requirements */
+            work_authorization_requirements?: string | null;
+            /** Timezone Overlap */
+            timezone_overlap?: string | null;
+            /**
+             * Languages
+             * @default []
+             */
+            languages: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Backfilled
+             * @default false
+             */
+            backfilled: boolean;
+        };
         /** Opportunity */
         Opportunity: {
             /** Id */
@@ -884,7 +1204,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "closer" | "setter" | "cold_caller";
+            role: "closer" | "setter" | "cold_caller" | "account_executive" | "sdr";
             /** Role Label */
             role_label: string;
             /** Original Title */
@@ -919,6 +1239,13 @@ export interface components {
             source_url: string;
             /** Starred */
             starred: boolean;
+            /** Excellence Rank */
+            excellence_rank?: number | null;
+            /**
+             * Is Selected
+             * @default false
+             */
+            is_selected: boolean;
         };
         /** OpportunityList */
         OpportunityList: {
@@ -926,11 +1253,16 @@ export interface components {
             items: components["schemas"]["Opportunity"][];
             /** Total */
             total: number;
+            /**
+             * Selection Total
+             * @default 0
+             */
+            selection_total: number;
         };
         /** OpportunityQuery */
         OpportunityQuery: {
             /** Role */
-            role?: ("closer" | "setter" | "cold_caller") | null;
+            role?: ("closer" | "setter" | "cold_caller" | "account_executive" | "sdr") | null;
             /**
              * Market
              * @default any
@@ -952,6 +1284,11 @@ export interface components {
              * @default false
              */
             starred_only: boolean;
+            /**
+             * Include Extra Roles
+             * @default false
+             */
+            include_extra_roles: boolean;
         };
         /** PrepareSource */
         PrepareSource: {
@@ -984,6 +1321,26 @@ export interface components {
         ResolveRequest: {
             /** Reviewed Apify Console */
             reviewed_apify_console: boolean;
+        };
+        /** ReviewRequest */
+        ReviewRequest: {
+            /**
+             * Editorial Status
+             * @enum {string}
+             */
+            editorial_status: "draft" | "needs_review" | "approved" | "published" | "withdrawn";
+            /** Version Payload */
+            version_payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * Locale
+             * @default es
+             * @enum {string}
+             */
+            locale: "es" | "en";
+            /** Reviewed By */
+            reviewed_by?: string | null;
         };
         /** SavedRequest */
         SavedRequest: {
@@ -1250,6 +1607,102 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** VerificationResult */
+        VerificationResult: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "open" | "closed" | "unknown";
+            /** Method */
+            method: string;
+            /** Checked At */
+            checked_at: string;
+            /** Valid Until */
+            valid_until: string | null;
+            /** Reason Code */
+            reason_code: string;
+            /** Evidence Raw Id */
+            evidence_raw_id: string | null;
+            /**
+             * Opportunity Status
+             * @enum {string}
+             */
+            opportunity_status: "active" | "verifying" | "closed";
+            /** Next Step Enabled */
+            next_step_enabled: boolean;
+            /** Status Reason */
+            status_reason: string | null;
+        };
+        /**
+         * VerifyRequest
+         * @description El operador decide la URL comprobada; por defecto la del anuncio original.
+         */
+        VerifyRequest: {
+            /** Url */
+            url?: string | null;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * WDCOpportunityDTO
+         * @description DTO admin: proyección + trazabilidad mínima para operar con honestidad.
+         */
+        WDCOpportunityDTO: {
+            /** Id */
+            id: string;
+            /** Job Id */
+            job_id: string;
+            /** Current Version Id */
+            current_version_id: string | null;
+            /** Version */
+            version: number | null;
+            /**
+             * Editorial Status
+             * @enum {string}
+             */
+            editorial_status: "draft" | "needs_review" | "approved" | "published" | "withdrawn";
+            /**
+             * Opportunity Status
+             * @enum {string}
+             */
+            opportunity_status: "active" | "verifying" | "closed";
+            /** Last Verified At */
+            last_verified_at: string | null;
+            /** Verified Until */
+            verified_until: string | null;
+            /** Status Reason */
+            status_reason: string | null;
+            /**
+             * Connection Type
+             * @enum {string}
+             */
+            connection_type: "direct_partner" | "direct_recruiter" | "direct_company" | "external_application" | "marketplace_application" | "community_opportunity";
+            /** Locale */
+            locale: string;
+            /** Version Payload */
+            version_payload: {
+                [key: string]: unknown;
+            };
+            eligibility: components["schemas"]["JobEligibility"];
+            /** Job Snapshot */
+            job_snapshot: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * WDCOpportunityList
+         * @description Listado admin: el total cuenta el filtro completo, no solo la página devuelta.
+         */
+        WDCOpportunityList: {
+            /** Items */
+            items: components["schemas"]["WDCOpportunityDTO"][];
+            /** Total */
+            total: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -1427,6 +1880,37 @@ export interface operations {
         };
     };
     google_check_v1_google_check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_companies_run_v1_google_companies_run_post: {
         parameters: {
             query?: never;
             header?: {
@@ -2119,6 +2603,204 @@ export interface operations {
             };
         };
     };
+    funnel_v1_funnel_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FunnelDay"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classification_status_v1_ai_classification_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassificationStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    configure_classification_v1_ai_classification_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassificationStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classify_v1_ai_classify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classifications_list_v1_ai_classifications_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classification_detail_v1_ai_classifications__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_v1_opportunities_search_post: {
         parameters: {
             query?: never;
@@ -2141,6 +2823,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpportunityList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_opportunities_v1_wdc_opportunities_get: {
+        parameters: {
+            query?: {
+                editorial_status?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WDCOpportunityList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_opportunity_v1_wdc_opportunities__opportunity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_view_v1_wdc_opportunities__opportunity_id__student_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_v1_wdc_opportunities__opportunity_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_opportunity_v1_wdc_opportunities__opportunity_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["VerifyRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationResult"];
                 };
             };
             /** @description Validation Error */

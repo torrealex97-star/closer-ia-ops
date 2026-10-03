@@ -122,6 +122,37 @@ def normalize(source, row):
             "salary_min": number(detected.get("salary")) if isinstance(detected.get("salary"), (int, float)) else None,
             "salary_max": None, "salary_currency": None, "salary_period": None,
         }
+    if source == "freehire":
+        # API pública de freehire.me (verificada 2026-09-29). El enriquecimiento de la
+        # fuente trae salario ya normalizado; no se convierte moneda ni se inventa
+        # periodicidad. reality.class llegó filtrado en batches; se recodifica ubicación.
+        enrichment = row.get("enrichment") if isinstance(row.get("enrichment"), dict) else {}
+        period = {"year": "annual", "month": "monthly", "day": "daily", "hour": "hourly"}.get(enrichment.get("salary_period"))
+        locations = [str(v) for v in (row.get("cities") or []) if isinstance(v, str) and str(v).strip()]
+        countries = [str(v) for v in (row.get("countries") or []) if isinstance(v, str)]
+        if countries:
+            # Código de país legible para la alumna (la API usa ISO-2 en mayúsculas o
+            # minúsculas según la fuente de origen); sin inventar ciudades no declaradas.
+            labels = {"ES": "España", "DE": "Alemania", "FR": "Francia", "IT": "Italia",
+                      "NL": "Países Bajos", "PT": "Portugal", "GB": "Reino Unido", "US": "Estados Unidos",
+                      "MX": "México", "AR": "Argentina", "CO": "Colombia", "CL": "Chile", "BR": "Brasil",
+                      "PE": "Perú", "EC": "Ecuador", "UY": "Uruguay", "VE": "Venezuela",
+                      "CR": "Costa Rica", "PA": "Panamá", "DO": "República Dominicana", "IE": "Irlanda"}
+            locations = [labels.get(c.upper(), c) if len(c) == 2 else c for c in countries] + locations
+        elif str(row.get("location") or "").strip():
+            locations = [str(row.get("location")).strip()]
+        return {
+            "title": plain(row.get("title")), "company": plain(row.get("company")) or "Empresa no indicada",
+            "description": plain(row.get("description")),
+            "source_url": safe_url(row.get("url")), "application_url": safe_url(row.get("url")),
+            "locations": locations,
+            "published_at": date_value(row.get("posted_at") or row.get("created_at")),
+            "expires_at": None,
+            "work_mode": {"remote": "remote", "hybrid": "hybrid", "onsite": "exclusivamente presencial"}.get(row.get("work_mode"), ""),
+            "salary_min": number(enrichment.get("salary_min")), "salary_max": number(enrichment.get("salary_max")),
+            "salary_currency": enrichment.get("salary_currency") if isinstance(enrichment.get("salary_currency"), str) else None,
+            "salary_period": period,
+        }
     if source == "getonbrd-public":
         attrs = row.get("attributes", {})
         item = normalize_mapped(row, {"title": "attributes.title", "source_url": "links.public_url", "locations": "attributes.countries", "published_at": "attributes.published_at"})
@@ -454,6 +485,8 @@ def ingest(candidate, connector, query, run_id, organization):
         job_id = db.execute("SELECT id FROM jobs WHERE org_id=? AND posting_id=?", (organization, posting_id)).fetchone()["id"]
         from .catalog import remember
         remember(db, organization, job_id, raw['captured_at'])
+        from .domain import ensure_opportunity
+        ensure_opportunity(db, organization, job_id, item)
         score, reasons, warnings = matching
         item.pop("expires_at")
         item.pop("work_mode", None)

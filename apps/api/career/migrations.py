@@ -55,7 +55,81 @@ MIGRATIONS = [(2, [
     "UPDATE company_target SET monitoring='linkedin_guest' WHERE slug='webifly-es'",
     "UPDATE company_target SET monitoring='linkedin_guest' WHERE slug='sales-beast-group'",
     # Kämpe: oferta cerrada, sin canal activo verificado; se mantiene en seguimiento manual.
+]), (11, [
+    # Clasificación LLM de oportunidades (ADR-007): una fila por oferta y versión de
+    # esquema; inferencias sobre evidencia con cita literal. Opt-in, nunca en el scraper.
+    '''CREATE TABLE IF NOT EXISTS job_classifications (
+      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL,
+      input_hash TEXT NOT NULL, status TEXT NOT NULL,
+      payload TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT,
+      UNIQUE(org_id, job_id, input_hash)
+    )''',
+    'CREATE INDEX IF NOT EXISTS job_class_queue ON job_classifications(status, created_at)',
+]), (12, [
+    # P01B WDCOpportunity: proyección versionada para alumna + verificación de vigencia +
+    # elegibilidad separada. Backfill conservador: draft/verifying, sin active masivo,
+    # connection_type=external_application (nunca direct_company sin evidencia registrada).
+    '''CREATE TABLE IF NOT EXISTS opportunities (
+      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL,
+      current_version_id TEXT, editorial_status TEXT NOT NULL DEFAULT 'draft',
+      opportunity_status TEXT NOT NULL DEFAULT 'verifying',
+      last_verified_at TEXT, verified_until TEXT, status_reason TEXT,
+      connection_type TEXT NOT NULL DEFAULT 'external_application',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      UNIQUE(org_id, job_id), UNIQUE(org_id, id),
+      FOREIGN KEY(org_id, job_id) REFERENCES jobs(org_id, id)
+    )''',
+    'CREATE INDEX IF NOT EXISTS opp_editorial ON opportunities(org_id, editorial_status, updated_at)',
+    '''CREATE TABLE IF NOT EXISTS opportunity_versions (
+      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, opportunity_id TEXT NOT NULL,
+      version INTEGER NOT NULL, locale TEXT NOT NULL DEFAULT 'es',
+      payload TEXT NOT NULL, job_revision_hash TEXT NOT NULL DEFAULT '',
+      presentation_schema_version TEXT NOT NULL DEFAULT '1',
+      created_by TEXT NOT NULL, selection_method TEXT NOT NULL DEFAULT 'deterministic_rule',
+      selection_policy_version TEXT NOT NULL DEFAULT '1',
+      created_at TEXT NOT NULL, reviewed_by TEXT, reviewed_at TEXT,
+      UNIQUE(org_id, opportunity_id, locale, version),
+      FOREIGN KEY(org_id, opportunity_id) REFERENCES opportunities(org_id, id)
+    )''',
+    '''CREATE TABLE IF NOT EXISTS verification_events (
+      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL,
+      posting_id TEXT, checked_at TEXT NOT NULL, result TEXT NOT NULL,
+      method TEXT NOT NULL, evidence_raw_id TEXT, valid_until TEXT,
+      reason_code TEXT, verifier_version TEXT NOT NULL DEFAULT '1',
+      FOREIGN KEY(org_id, job_id) REFERENCES jobs(org_id, id)
+    )''',
+    'CREATE INDEX IF NOT EXISTS verification_job ON verification_events(org_id, job_id, checked_at)',
+    '''CREATE TABLE IF NOT EXISTS job_eligibility (
+      org_id TEXT NOT NULL, job_id TEXT NOT NULL, facts TEXT NOT NULL, updated_at TEXT NOT NULL,
+      PRIMARY KEY(org_id, job_id),
+      FOREIGN KEY(org_id, job_id) REFERENCES jobs(org_id, id)
+    )''',
+]), (13, [
+    # Embudo diario por fuente (Bloque A del plan): una fila por organización y día con
+    # las etapas revisadas→matching→elegibles→seleccionadas por fuente. Evidencia append-only:
+    # ni prune() ni la caducidad de 10 días borran la medición histórica.
+    '''CREATE TABLE IF NOT EXISTS source_funnel_daily (
+      org_id TEXT NOT NULL, day TEXT NOT NULL, rows TEXT NOT NULL, captured_at TEXT NOT NULL,
+      PRIMARY KEY(org_id, day)
+    )''',
 ])]
+
+
+def _backfill_opportunities(db):
+    """Versión 1 literal por oferta existente (sin LLM ni campos inventados);
+    idempotente por UNIQUE(org_id, job_id)."""
+    from .domain import backfill_opportunity
+    rows = db.execute('''SELECT j.org_id, j.id, p.payload FROM jobs j
+        JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id''').fetchall()
+    created = 0
+    for row in rows:
+        try:
+            # Indexación posicional: la migración también corre con conexiones sqlite crudas.
+            posting = json.loads(row[2])
+        except (ValueError, TypeError):
+            continue
+        created += backfill_opportunity(db, row[0], row[1], posting)
+    return created
 
 
 def migrate(db):
@@ -66,6 +140,8 @@ def migrate(db):
         for sql in statements:
             db.execute(sql)
         db.execute('INSERT INTO schema_version VALUES(?)', (version,))
+        if version == 12:
+            _backfill_opportunities(db)
     seed_company_targets(db)
 
 

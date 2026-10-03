@@ -350,9 +350,16 @@ def google_serpapi_connector(dork: str, gl: str = "es", hl: str = "es"):
             data = json.loads(await fetch("https://serpapi.com/search.json", params, ttl=0))
             if not isinstance(data, dict):
                 raise ProviderError("SerpApi ha cambiado su formato de respuesta")
-            if data.get("error"):
-                raise ProviderError(f"SerpApi: {data['error']}")
+            error = data.get("error") or ""
+            if error:
+                # "Google hasn't returned any results" es un dork sin ofertas hoy, no un
+                # fallo del proveedor: termina este dork sin ocultar los demás resultados.
+                if "returned any results" in error.lower():
+                    return
+                raise ProviderError(f"SerpApi: {error}")
             rows = data.get("jobs_results")
+            if rows is None:
+                return
             if not isinstance(rows, list):
                 raise ProviderError("SerpApi no devolvió jobs_results")
             batch = []
@@ -401,9 +408,17 @@ class GoogleCompaniesSerpApi:
             data = json.loads(await fetch("https://serpapi.com/search.json", params, ttl=0))
             if not isinstance(data, dict):
                 raise ProviderError("SerpApi ha cambiado su formato de respuesta")
-            if data.get("error"):
-                raise ProviderError(f"SerpApi: {data['error']}")
+            error = data.get("error") or ""
+            if error:
+                # "Google hasn't returned any results" no es un fallo del proveedor: la
+                # empresa objetivo no tiene ofertas visibles hoy. Una fuente sin ofertas
+                # no debe ocultar los resultados exitosos de las demás empresas.
+                if "returned any results" in error.lower():
+                    continue
+                raise ProviderError(f"SerpApi: {error}")
             rows = data.get("jobs_results")
+            if rows is None:
+                continue  # Sin resultados: misma situación, siguiente empresa.
             if not isinstance(rows, list):
                 raise ProviderError("SerpApi no devolvió jobs_results")
             batch = []
@@ -419,6 +434,58 @@ class GoogleCompaniesSerpApi:
                     batch.append(Candidate(str(job_id), row))
             if batch:
                 yield batch
+
+
+class FreeHire:
+    """API pública keyless de freehire.me: agregador MIT que rastrea 92 ATS (Workday,
+    Greenhouse, Lever, Ashby…) y publica ofertas directas de la empresa. Verificado
+    2026-09-29: GET /api/v1/jobs/search responde sin credencial con category=sales,
+    work_mode, regions/countries, posted_within_days, sort y limit máximo 100 por página
+    (offset+limit <= 10000). Capa FREE de ADR-009: no consume presupuesto de scraping,
+    sin claves ni cuentas personales, y el enlace es el original de la empresa."""
+    provider = "official_json_v1"
+    BASE = "https://freehire.me/api/v1"
+    # Realidad de la publicación según freehire: solo 'fresh' y sin señal cuentan;
+    # 'stale' y 'likely-evergreen' se excluyen para no presentar como nueva una ficha
+    # que su origen repinta en cada rastreo.
+    KEEP_REALITY = {"fresh", None}
+
+    def __init__(self, code="freehire", name="FreeHire"):
+        self.code, self.name = code, name
+
+    async def batches(self, query: SearchQuery) -> AsyncIterator[list[Candidate]]:
+        # España y LATAM son grupos OR de geografía en freehire; 'EU' mapea a region=eu
+        # y 'US'/'any' a la búsqueda global: un puesto de EE. UU. no es elegible
+        # España/LATAM por sí solo y el resto del pipeline ya filtra idioma y modalidad.
+        params: dict = {"category": "sales", "limit": "100", "sort": "posted_at", "order": "desc"}
+        if query.market == "ES":
+            params["countries"] = "ES"
+        elif query.market == "EU":
+            params["regions"] = "eu"
+        elif query.market == "LATAM":
+            params["regions"] = "latam"
+        offset, pages = 0, 0
+        while pages < 4:
+            data = json.loads(await fetch(self.BASE + "/jobs/search",
+                                          {**params, "offset": str(offset)}, ttl=1800))
+            if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+                raise ProviderError("El formato de FreeHire ha cambiado")
+            batch = []
+            for row in data["data"]:
+                if not isinstance(row, dict) or not row.get("public_slug") or not row.get("url"):
+                    continue
+                reality = row.get("reality") if isinstance(row.get("reality"), dict) else {}
+                if reality.get("class") not in self.KEEP_REALITY:
+                    continue
+                batch.append(Candidate(row["public_slug"], row))
+            if batch:
+                yield batch
+            pages += 1
+            meta = data.get("meta") or {}
+            total = meta.get("total") if isinstance(meta.get("total"), int) else 0
+            if offset + 100 >= total or len(data["data"]) < 100:
+                break
+            offset += 100
 
 
 class GetOnBoard:
@@ -438,3 +505,4 @@ class GetOnBoard:
 
 
 REGISTRY[GetOnBoard.code] = GetOnBoard()
+REGISTRY[FreeHire().code] = FreeHire()

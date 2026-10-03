@@ -271,6 +271,45 @@
         }
       }
     },
+    "/v1/google/companies/run": {
+      "post": {
+        "summary": "Google Companies Run",
+        "description": "Vigilancia de empresas objetivo (canal LinkedIn): una b\u00fasqueda google_jobs por empresa,\nbajo el presupuesto SerpApi reservado; las que no caben quedan pendientes.",
+        "operationId": "google_companies_run_v1_google_companies_run_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/source-connections/{connection_id}/check": {
       "post": {
         "summary": "Check",
@@ -1170,6 +1209,270 @@
         }
       }
     },
+    "/v1/funnel": {
+      "get": {
+        "summary": "Funnel",
+        "operationId": "funnel_v1_funnel_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelDay"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/classification": {
+      "get": {
+        "summary": "Classification Status",
+        "operationId": "classification_status_v1_ai_classification_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassificationStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Configure Classification",
+        "operationId": "configure_classification_v1_ai_classification_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassificationStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/classify": {
+      "post": {
+        "summary": "Classify",
+        "operationId": "classify_v1_ai_classify_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/classifications": {
+      "get": {
+        "summary": "Classifications List",
+        "description": "Listado admin: estado, resultado y evidencia por oferta. Nunca expone el\ncontenido enviado al proveedor ni claves; la trazabilidad es legible, no cruda.",
+        "operationId": "classifications_list_v1_ai_classifications_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/classifications/{job_id}": {
+      "get": {
+        "summary": "Classification Detail",
+        "operationId": "classification_detail_v1_ai_classifications__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/opportunities/search": {
       "post": {
         "summary": "Search",
@@ -1203,6 +1506,293 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpportunityList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wdc/opportunities": {
+      "get": {
+        "summary": "List Opportunities",
+        "description": "Admin: listado de WDCOpportunities con estado derivado y trazabilidad m\u00ednima.",
+        "operationId": "list_opportunities_v1_wdc_opportunities_get",
+        "parameters": [
+          {
+            "name": "editorial_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Editorial Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WDCOpportunityList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wdc/opportunities/{opportunity_id}": {
+      "get": {
+        "summary": "Get Opportunity",
+        "operationId": "get_opportunity_v1_wdc_opportunities__opportunity_id__get",
+        "parameters": [
+          {
+            "name": "opportunity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Opportunity Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wdc/opportunities/{opportunity_id}/student": {
+      "get": {
+        "summary": "Student View",
+        "description": "Preview de alumna con exactamente el DTO permitido (para el renderer de publicaci\u00f3n).",
+        "operationId": "student_view_v1_wdc_opportunities__opportunity_id__student_get",
+        "parameters": [
+          {
+            "name": "opportunity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Opportunity Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wdc/opportunities/{opportunity_id}/review": {
+      "post": {
+        "summary": "Review",
+        "description": "Revisi\u00f3n editorial: crea versi\u00f3n nueva e inmutable y mueve el puntero; el raw no cambia.",
+        "operationId": "review_v1_wdc_opportunities__opportunity_id__review_post",
+        "parameters": [
+          {
+            "name": "opportunity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Opportunity Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wdc/opportunities/{opportunity_id}/verify": {
+      "post": {
+        "summary": "Verify Opportunity",
+        "description": "Verificaci\u00f3n real de vigencia (spec 17): un GET acotado y contenido corroborante.\nHTTP 200 solo nunca basta: el cuerpo debe mencionar el t\u00edtulo o la empresa del anuncio.\nEscribe verification_events (TTL por fuente) + evidencia raw inmutable + estado de vigencia.",
+        "operationId": "verify_opportunity_v1_wdc_opportunities__opportunity_id__verify_post",
+        "parameters": [
+          {
+            "name": "opportunity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Opportunity Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/VerifyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationResult"
                 }
               }
             }
@@ -2006,6 +2596,93 @@
         ],
         "title": "AnalyzeRequest"
       },
+      "ClassificationStatus": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "has_token": {
+            "type": "boolean",
+            "title": "Has Token"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "daily_limit": {
+            "type": "integer",
+            "title": "Daily Limit"
+          },
+          "used_today": {
+            "type": "integer",
+            "title": "Used Today"
+          },
+          "massive_after_collection": {
+            "type": "boolean",
+            "title": "Massive After Collection",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "has_token",
+          "provider",
+          "model",
+          "daily_limit",
+          "used_today"
+        ],
+        "title": "ClassificationStatus"
+      },
+      "ClassifyRequest": {
+        "properties": {
+          "job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Job Ids"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "digital_sales",
+                  "sales",
+                  "closer",
+                  "setter",
+                  "cold_caller",
+                  "account_executive",
+                  "sdr",
+                  "custom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "retry_failed": {
+            "type": "boolean",
+            "title": "Retry Failed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_ids"
+        ],
+        "title": "ClassifyRequest"
+      },
       "CollectionRun": {
         "properties": {
           "id": {
@@ -2315,6 +2992,84 @@
         ],
         "title": "ExportRequest"
       },
+      "FunnelDay": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total": {
+            "$ref": "#/components/schemas/FunnelRow"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "rows",
+          "total"
+        ],
+        "title": "FunnelDay"
+      },
+      "FunnelRow": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "revisadas": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revisadas",
+            "default": 0
+          },
+          "matching": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Matching",
+            "default": 0
+          },
+          "elegibles": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Elegibles",
+            "default": 0
+          },
+          "seleccionadas": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Seleccionadas",
+            "default": 0
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "source_name"
+        ],
+        "title": "FunnelRow"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2498,6 +3253,95 @@
         ],
         "title": "Job"
       },
+      "JobEligibility": {
+        "properties": {
+          "employer_country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Country"
+          },
+          "customer_markets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Customer Markets",
+            "default": []
+          },
+          "allowed_worker_countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Worker Countries",
+            "default": []
+          },
+          "excluded_worker_countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded Worker Countries",
+            "default": []
+          },
+          "residency_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residency Required"
+          },
+          "work_authorization_requirements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Authorization Requirements"
+          },
+          "timezone_overlap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone Overlap"
+          },
+          "languages": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Languages",
+            "default": []
+          },
+          "backfilled": {
+            "type": "boolean",
+            "title": "Backfilled",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "JobEligibility",
+        "description": "Hechos de elegibilidad separados; vac\u00edo/null = desconocido, nunca worldwide impl\u00edcito."
+      },
       "Opportunity": {
         "properties": {
           "id": {
@@ -2509,7 +3353,9 @@
             "enum": [
               "closer",
               "setter",
-              "cold_caller"
+              "cold_caller",
+              "account_executive",
+              "sdr"
             ],
             "title": "Role"
           },
@@ -2587,6 +3433,22 @@
           "starred": {
             "type": "boolean",
             "title": "Starred"
+          },
+          "excellence_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excellence Rank"
+          },
+          "is_selected": {
+            "type": "boolean",
+            "title": "Is Selected",
+            "default": false
           }
         },
         "type": "object",
@@ -2625,6 +3487,12 @@
           "total": {
             "type": "integer",
             "title": "Total"
+          },
+          "selection_total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Selection Total",
+            "default": 0
           }
         },
         "type": "object",
@@ -2643,7 +3511,9 @@
                 "enum": [
                   "closer",
                   "setter",
-                  "cold_caller"
+                  "cold_caller",
+                  "account_executive",
+                  "sdr"
                 ]
               },
               {
@@ -2679,6 +3549,11 @@
           "starred_only": {
             "type": "boolean",
             "title": "Starred Only",
+            "default": false
+          },
+          "include_extra_roles": {
+            "type": "boolean",
+            "title": "Include Extra Roles",
             "default": false
           }
         },
@@ -2744,6 +3619,52 @@
           "reviewed_apify_console"
         ],
         "title": "ResolveRequest"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "editorial_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "needs_review",
+              "approved",
+              "published",
+              "withdrawn"
+            ],
+            "title": "Editorial Status"
+          },
+          "version_payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Version Payload"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Locale",
+            "default": "es"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "editorial_status",
+          "version_payload"
+        ],
+        "title": "ReviewRequest"
       },
       "SavedRequest": {
         "properties": {
@@ -3259,6 +4180,270 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerificationResult": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "unknown"
+            ],
+            "title": "Result"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "evidence_raw_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Raw Id"
+          },
+          "opportunity_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "verifying",
+              "closed"
+            ],
+            "title": "Opportunity Status"
+          },
+          "next_step_enabled": {
+            "type": "boolean",
+            "title": "Next Step Enabled"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result",
+          "method",
+          "checked_at",
+          "valid_until",
+          "reason_code",
+          "evidence_raw_id",
+          "opportunity_status",
+          "next_step_enabled",
+          "status_reason"
+        ],
+        "title": "VerificationResult"
+      },
+      "VerifyRequest": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "VerifyRequest",
+        "description": "El operador decide la URL comprobada; por defecto la del anuncio original."
+      },
+      "WDCOpportunityDTO": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "current_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "editorial_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "needs_review",
+              "approved",
+              "published",
+              "withdrawn"
+            ],
+            "title": "Editorial Status"
+          },
+          "opportunity_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "verifying",
+              "closed"
+            ],
+            "title": "Opportunity Status"
+          },
+          "last_verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Verified At"
+          },
+          "verified_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Until"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "connection_type": {
+            "type": "string",
+            "enum": [
+              "direct_partner",
+              "direct_recruiter",
+              "direct_company",
+              "external_application",
+              "marketplace_application",
+              "community_opportunity"
+            ],
+            "title": "Connection Type"
+          },
+          "locale": {
+            "type": "string",
+            "title": "Locale"
+          },
+          "version_payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Version Payload"
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/JobEligibility"
+          },
+          "job_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Job Snapshot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_id",
+          "current_version_id",
+          "version",
+          "editorial_status",
+          "opportunity_status",
+          "last_verified_at",
+          "verified_until",
+          "status_reason",
+          "connection_type",
+          "locale",
+          "version_payload",
+          "eligibility",
+          "job_snapshot"
+        ],
+        "title": "WDCOpportunityDTO",
+        "description": "DTO admin: proyecci\u00f3n + trazabilidad m\u00ednima para operar con honestidad."
+      },
+      "WDCOpportunityList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WDCOpportunityDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "WDCOpportunityList",
+        "description": "Listado admin: el total cuenta el filtro completo, no solo la p\u00e1gina devuelta."
       }
     }
   }
