@@ -12,7 +12,7 @@ def audit():
 
 
 PUBLIC = {
-    'himalayas': ('Búsqueda API', ['Palabras clave', 'País', 'Orden reciente'], 'España primero; hasta tres páginas por término y mercado.'),
+    'himalayas': ('Búsqueda API', ['Palabras clave', 'País', 'Orden reciente'], 'España primero; hasta diez páginas por término y mercado, parando en página vacía.'),
     'getonbrd-public': ('API por categoría', ['Categoría ventas'], 'No admite todos los filtros WDC en origen; idioma y modalidad se comprueban al importar.'),
     'remotive': ('API por categoría', ['Categoría ventas'], 'Consulta de ventas cacheada seis horas. El resto de requisitos se comprueba al importar.'),
     'weworkremotely': ('RSS de ventas y marketing', ['Categoría ventas y marketing'], 'Feed de categoría; no garantiza búsqueda por palabras clave. Validación local final.'),

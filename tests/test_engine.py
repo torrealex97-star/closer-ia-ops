@@ -96,8 +96,8 @@ def test_auth_and_empty_state(client):
     assert client.get("/v1/config", headers={"Authorization": ""}).status_code == 401
     assert client.get("/v1/search-runs").json() == []
     assert client.get("/v1/config").json()["mode"] == "local"
-    # 22 públicas anteriores + FreeHire (capa FREE de SPEC-002, disponible sin configurar).
-    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 23
+    # 22 públicas + 2 JobToday (cobertura A2) + FreeHire (capa FREE de SPEC-002, disponible sin configurar).
+    assert sum(s["available"] for s in client.get("/v1/config").json()["sources"]) == 25
     freehire = next(s for s in client.get("/v1/config").json()["sources"] if s["code"] == "freehire")
     assert freehire["available"] is True and freehire["requires"] == "none"
 
@@ -280,6 +280,71 @@ def test_expansion_connectors_jobicy_rss(monkeypatch):
     assert item["company"] == "Acme" and item["title"] == "Closer"
     item = normalize("jobspresso", asyncio.run(collect(REGISTRY["jobspresso"]))[0].payload)
     assert item["title"] == "Closer de ventas" and item["company"] == "Empresa no indicada"
+
+
+def test_free_scraping_paginates_wide_until_real_end(monkeypatch):
+    """A2: los topes autoimpuestos no cortan antes de que lo haga la fuente real."""
+    calls = []
+
+    async def fake_fetch(url, params=None, ttl=900):
+        calls.append((url, dict(params or {})))
+        if "himalayas.app" in url:
+            page = int(params["page"])
+            if page > 6:  # la fuente se agota en la 6; la 7 (vacía) se pide y corta el bucle
+                return json.dumps({"jobs": []})
+            guid = f"https://h/{params.get('country')}/{params['q']}/p{page}"
+            return json.dumps({"jobs": [{"guid": guid}]})
+        raise AssertionError(url)
+    monkeypatch.setattr("career.connectors.fetch", fake_fetch)
+    async def collect():
+        return [c async for batch in REGISTRY["himalayas"].batches(SearchQuery(role="digital_sales")) for c in batch]
+    rows = asyncio.run(collect())
+    pages = sorted(int(p["page"]) for u, p in calls if "himalayas" in u)
+    assert max(pages) >= 4                      # cruza el viejo tope de 3 páginas
+    assert max(pages) == 7                      # pide la primera página vacía y ahí para
+    terms_seen = {p["q"] for u, p in calls if "himalayas" in u}
+    # vocabulario canónico ampliado, no términos inventados:
+    assert {"closers", "televentas", "captacion de alumnos"} <= terms_seen
+    assert len(rows) == len({c.external_id for c in rows})  # dedupe por guid se mantiene
+
+
+def test_freehire_past_four_pages_until_meta_end(monkeypatch):
+    calls = []
+
+    async def fake_fetch(url, params=None, ttl=900):
+        assert "freehire.me/api/v1/jobs/search" in url
+        offset = int(params["offset"])
+        calls.append(offset)
+        rows = [{"public_slug": f"s{offset}-{i}", "url": f"https://empresa.example/{offset}-{i}"} for i in range(100)]
+        if offset == 900:
+            rows = rows[:50]  # última página corta: el final real de la fuente
+        return json.dumps({"data": rows, "meta": {"total": 950}})
+    monkeypatch.setattr("career.connectors.fetch", fake_fetch)
+    async def collect():
+        return [c async for batch in REGISTRY["freehire"].batches(SearchQuery()) for c in batch]
+    rows = asyncio.run(collect())
+    assert calls == [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]  # cruza el viejo tope de 4
+    assert len(rows) == 950
+
+
+def test_getonbrd_paginates_up_to_new_ceiling(monkeypatch):
+    calls = []
+
+    async def fake_fetch(url, params=None, ttl=900):
+        calls.append(int(params["page"]))
+        return json.dumps({"data": [{"id": f"p{params['page']}-{i}"} for i in range(100)],
+                           "meta": {"total_pages": 25}})
+    monkeypatch.setattr("career.connectors.fetch", fake_fetch)
+    async def collect():
+        return [c async for batch in REGISTRY["getonbrd-public"].batches(SearchQuery()) for c in batch]
+    asyncio.run(collect())
+    assert calls == list(range(1, 11))  # techo nuevo de 10 páginas (el viejo era 3)
+
+
+def test_jobtoday_new_slugs_are_the_verified_ones():
+    """Cobertura completa A2: solo slugs verificados contra el sitio real (2026-10-04)."""
+    assert REGISTRY["jobtoday-ventas"].url == "https://jobtoday.com/es/trabajos-ventas"
+    assert REGISTRY["jobtoday-comercial"].url == "https://jobtoday.com/es/trabajos-como-comercial"
 
 
 def test_ats_connectors_and_watchlist(monkeypatch, tmp_path):

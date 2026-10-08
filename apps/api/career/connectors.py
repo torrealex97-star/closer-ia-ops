@@ -61,13 +61,16 @@ class Himalayas:
     provider = "official_json_v1"
 
     async def batches(self, query: SearchQuery) -> AsyncIterator[list[Candidate]]:
+        # Términos alineados con el vocabulario canónico (vocabulary.py); el descarte
+        # es local y gratis, así que se consulta ancho y el embudo mide el yield real.
         terms = {
-            "digital_sales": ["closer", "setter", "cold caller", "comercial", "cerrador", "venta de alto valor"],
-            "cold_caller": ["cold caller", "cold calling", "llamadas en frio"],
-            "closer": ["closer", "cerrador", "venta de alto valor"],
+            "digital_sales": ["closer", "setter", "cold caller", "comercial", "cerrador", "venta de alto valor",
+                              "closers", "televentas", "televendedor", "captacion de alumnos", "experto en ventas"],
+            "cold_caller": ["cold caller", "cold calling", "llamadas en frio", "televentas", "televendedor"],
+            "closer": ["closer", "cerrador", "venta de alto valor", "closers", "closer de ventas"],
             "setter": ["appointment setter", "appointment setting"],
             "sdr": ["sales development", "business development representative"],
-            "account_executive": ["account executive"],
+            "account_executive": ["account executive", "ejecutivo comercial"],
             "sales": ["closer", "setter", "comercial digital", "ventas"],
             "custom": [query.keywords],
         }[query.role]
@@ -77,7 +80,10 @@ class Himalayas:
         markets = ['ES', None] if query.market == 'any' else [query.market if query.market in {'ES', 'US'} else None]
         for country in markets:
             for term in terms:
-                for page in range(1, 4):
+                # Escrapeo amplio (A2): hasta 10 páginas por término y mercado, parando
+                # en la primera página vacía (el API real termina mucho antes en casi
+                # todos los términos; el techo solo limita los más poblados).
+                for page in range(1, 11):
                     params = {"q": term, "sort": "recent", "page": page}
                     if country:
                         params["country"] = country
@@ -320,6 +326,10 @@ for connector in [
     # 'setter' responde 410 Gone (verificado 2026-09-23); 'telemarketing' cubre televenta España.
     JobToday("jobtoday-telemarketing", "JobToday Telemarketing", "telemarketing"),
     JobToday("jobtoday-remoto", "JobToday Comercial remoto", "ventas-remoto"),
+    # Cobertura completa (A2): slugs verificados 2026-10-04 ('ventas' 706 ofertas,
+    # 'como-comercial' 628; 'comercial' redirige a 'como-comercial').
+    JobToday("jobtoday-ventas", "JobToday Ventas", "ventas"),
+    JobToday("jobtoday-comercial", "JobToday Comercial", "como-comercial"),
 ]:
     REGISTRY[connector.code] = connector
 
@@ -465,7 +475,10 @@ class FreeHire:
         elif query.market == "LATAM":
             params["regions"] = "latam"
         offset, pages = 0, 0
-        while pages < 4:
+        # Escrapeo amplio (A2): el corte real lo da meta.total / última página corta;
+        # el techo de 15 páginas (1.500 ofertas) solo limita pools mucho mayores
+        # que los observados (~300 por mercado).
+        while pages < 15:
             data = json.loads(await fetch(self.BASE + "/jobs/search",
                                           {**params, "offset": str(offset)}, ttl=1800))
             if not isinstance(data, dict) or not isinstance(data.get("data"), list):
@@ -495,7 +508,9 @@ class GetOnBoard:
     url = "https://www.getonbrd.com"
 
     async def batches(self, query):
-        for page in range(1, 4):
+        # Escrapeo amplio (A2): el corte real lo da meta.total_pages; el techo solo
+        # protege frente a un API que ignore la paginación.
+        for page in range(1, 11):
             data = json.loads(await fetch("https://www.getonbrd.com/api/v0/categories/sales/jobs", {"per_page": 100, "page": page}, ttl=3600))
             if not isinstance(data, dict) or not isinstance(data.get("data"), list):
                 raise ProviderError("Get on Board ha cambiado su formato")
