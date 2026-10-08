@@ -1,5 +1,11 @@
 # Estado
 
+## Fase 2: exportación de datos bloqueada por TCC pese a reintentos con permiso concedido — 2026-10-09 (sesión 2)
+
+- Objetivo del turno: con la app local supuestamente viva, exportar la SQLite real y cargar el schema `career` de Supabase. Resultado: NO EJECUTADO, con evidencia. La app no escucha en NINGÚN puerto probado (8100, 3100, 8787, 5177, 3000, 8000 → 000/conexión rechazada; lsof sin listeners python/node en 8100/3100) a lo largo de ~10 minutos con reintentos espaciados. El usuario eligió «dar permiso TCC», pero la copia de `.local/career.sqlite3` siguió denegada (7 intentos de cp espaciados 20-90 s → Operation not permitted; también sqlite3/cat/od/python URI read-only). Interpretación honesta: el permiso TCC no se aplicó al proceso sandbox de esta sesión (Freebuff Desktop probablemente necesita reinicio del app para recoger el permiso de Carpeta de Documents), o la ventana aún no se concedió en Ajustes.
+- Lección operativa registrada: el patrón «app viva → exportar por HTTP» y «TCC concedido → copiar a /tmp» están ambos listos y probados en diseño; el bloqueador es del entorno (sandbox TCC de macOS), no del código. En la próxima sesión: (a) reiniciar Freebuff Desktop tras conceder el permiso, o (b) arrancar `npm run dev` y confirmar con el usuario que ve «Uvicorn running» antes de reintentar.
+- Sin efectos secundarios: 0 filas escritas en Supabase en este turno (por diseño, sin exportación no se carga nada), 0 cambios de código, repo limpio.
+
 ## Fase 2 iniciada: esquema Postgres `career` creado en Supabase — 2026-10-09
 
 - Auditoría previa: el proyecto Supabase `growth-ops-app` (rgcbveflosqgxrcqlqzv, eu-west-1, Postgres 17, ACTIVE_HEALTHY) tiene 114 tablas de otra app en `public` (CRM: contacts, campaigns, appointments...) y NINGUNA tabla del career-platform. Decisión de aislamiento: schema dedicado `career` — nunca mezclar con `public` (mismo principio de separación de evidencias; el CRM existente no se toca).
