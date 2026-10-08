@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 export const metadata: Metadata = {
-  title: 'Oportunidades · WDC',
+  title: 'Closer IA OPs',
   description: 'Encuentra y selecciona oportunidades profesionales para tus alumnas.',
   robots: { index: false, follow: false },
 };
