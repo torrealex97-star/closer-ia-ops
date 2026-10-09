@@ -24,29 +24,42 @@ async def fetch(url: str, params: dict | None = None, ttl: int = 900, user_agent
     if cached:
         return cached["payload"]
     headers = {"User-Agent": user_agent or USER_AGENT}
+    # Redirects (301/308...) seguidos manualmente: el destino resuelto queda cacheado bajo la URL
+    # original, así que los consumidores no cambian; las fuentes que renombran rutas (p. ej. JobToday
+    # renombró trabajos-closer-venta → trabajos-closer-de-ventas) dejan de romper la recogida.
     async with httpx.AsyncClient(timeout=18, follow_redirects=False, headers=headers) as client:
-        for attempt in range(2):
-            try:
-                async with client.stream("GET", url, params=params) as response:
-                    if response.status_code == 429 or response.status_code >= 500:
-                        if attempt == 0:
-                            await asyncio.sleep(1)
-                            continue
-                    response.raise_for_status()
-                    chunks = bytearray()
-                    async for chunk in response.aiter_bytes():
-                        chunks.extend(chunk)
-                        if len(chunks) > 12_000_000:
-                            raise ProviderError("Respuesta demasiado grande")
-                    payload = chunks.decode("utf-8")
-                with connect() as db:
-                    db.execute("INSERT OR REPLACE INTO provider_cache VALUES(?,?,?)", (key, payload, time.time() + ttl))
-                return payload
-            except (httpx.HTTPError, UnicodeError) as error:
-                if attempt == 1:
-                    raise ProviderError("La fuente no responde o ha limitado las consultas. Reintenta más tarde.") from error
-                await asyncio.sleep(1)
-    raise ProviderError("Fuente no disponible")
+        current = url
+        for redirect in range(4):
+            for attempt in range(2):
+                try:
+                    async with client.stream("GET", current, params=params if redirect == 0 else None) as response:
+                        if response.status_code in {301, 302, 303, 307, 308}:
+                            location = response.headers.get("location", "").strip()
+                            if not location:
+                                raise ProviderError("La fuente devolvió un redirect sin destino")
+                            current = str(httpx.URL(current).join(location))
+                            break
+                        if response.status_code == 429 or response.status_code >= 500:
+                            if attempt == 0:
+                                await asyncio.sleep(1)
+                                continue
+                        response.raise_for_status()
+                        chunks = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            chunks.extend(chunk)
+                            if len(chunks) > 12_000_000:
+                                raise ProviderError("Respuesta demasiado grande")
+                        payload = chunks.decode("utf-8")
+                    with connect() as db:
+                        db.execute("INSERT OR REPLACE INTO provider_cache VALUES(?,?,?)", (key, payload, time.time() + ttl))
+                    return payload
+                except (httpx.HTTPError, UnicodeError) as error:
+                    if attempt == 1:
+                        raise ProviderError("La fuente no responde o ha limitado las consultas. Reintenta más tarde.") from error
+                    await asyncio.sleep(1)
+            else:
+                raise ProviderError("Fuente no disponible")
+    raise ProviderError("Demasiados redirects de la fuente")
 
 
 @dataclass(frozen=True)

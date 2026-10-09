@@ -1,15 +1,51 @@
-"""Read public Apify metadata only; never launch actors or read credentials."""
+"""Read public Apify metadata only; never launch actors or read credentials.
+
+Además audita los slugs JobToday contra el sitio real: detecta renombrados
+(redirects 301/308) y rutas muertas antes de que rompan la recogida diaria.
+"""
 import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
+from career.connectors import REGISTRY, JobToday
 from career.sources import CATALOG
 from career.source_strategy import actor_matches
 
 QUERIES = {'laborum': 'bumeran', 'europe-language': 'europe language jobs',
            'linkedin-posts': 'linkedin posts', 'facebook': 'facebook posts',
            'company': 'greenhouse jobs', 'custom': 'structured jobs'}
+
+async def audit_jobtoday_slugs(client):
+    """Check periódico de los slugs JobToday del REGISTRY: el destino real de cada
+    ruta (redirect o 200) queda registrado como evidencia; un renombrado se detecta
+    aquí antes de que la recogida falle. Nunca reescribe slugs: solo informa."""
+    semaphore = asyncio.Semaphore(2)
+
+    async def check(connector):
+        async with semaphore:
+            record = {'checked_at': datetime.now(timezone.utc).isoformat(), 'url': connector.url,
+                      'status': 'ok', 'canonical_url': connector.url, 'http_status': None}
+            try:
+                response = await client.get(connector.url, follow_redirects=False,
+                                            headers={'User-Agent': connector.BROWSER_UA})
+                record['http_status'] = response.status_code
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get('location', '').strip()
+                    record['status'] = 'renamed'
+                    record['canonical_url'] = str(response.url.join(location)) if location else connector.url
+                    record['renamed_from'] = connector.url
+                elif response.status_code == 410:
+                    record['status'] = 'gone'
+                elif response.status_code != 200:
+                    record['status'] = 'unavailable'
+            except httpx.HTTPError:
+                record['status'] = 'unreachable'
+            print(connector.code, record['status'], record['canonical_url'], flush=True)
+            return connector.code, record
+
+    return {'checked_at': datetime.now(timezone.utc).isoformat(),
+            'slugs': dict(await asyncio.gather(*(check(c) for c in REGISTRY.values() if isinstance(c, JobToday))))}
 
 async def main():
     semaphore = asyncio.Semaphore(3)
@@ -53,6 +89,8 @@ async def main():
             print(code, record['status'], [x['actor'] for x in record['candidates']], flush=True)
             return code, record
         results = dict(await asyncio.gather(*(audit(row) for row in CATALOG)))
-    Path('apps/api/career/source_audit.json').write_text(json.dumps(results, ensure_ascii=False, indent=2) + '\n')
+        jobtoday = await audit_jobtoday_slugs(client)
+    Path('apps/api/career/source_audit.json').write_text(json.dumps(
+        {'apify': results, 'jobtoday_slugs': jobtoday}, ensure_ascii=False, indent=2, default=str) + '\n')
 
 asyncio.run(main())

@@ -348,6 +348,50 @@ def test_jobtoday_new_slugs_are_the_verified_ones():
     assert REGISTRY["jobtoday-comercial"].url == "https://jobtoday.com/es/trabajos-comercial"
 
 
+def test_fetch_follows_cached_redirect(monkeypatch, tmp_path):
+    """El fetch cacheado sigue 301/308 y cachea el contenido bajo la URL original:
+    los renombrados de rutas (JobToday 2026-10-09) no rompen la recogida."""
+    monkeypatch.setenv("CAREER_DB", str(tmp_path / "redirect.sqlite3"))
+    from career import connectors
+    from career.db import initialize
+    initialize()
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, status, headers=None):
+            self.status_code = status
+            self.headers = headers or {}
+            self.url = ""
+        async def aiter_bytes(self):
+            yield b"<html>contenido real</html>"
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise connectors.httpx.HTTPStatusError("error", request=None, response=None)
+
+    class FakeClient:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        def stream(self, method, url, params=None):
+            calls.append(url)
+            response = FakeResponse(308, {"location": "https://ejemplo.com/nueva-ruta"}) if "vieja-ruta" in url else FakeResponse(200)
+            response.url = url
+            return _AsyncCtx(response)
+
+    class _AsyncCtx:
+        def __init__(self, response): self.response = response
+        async def __aenter__(self): return self.response
+        async def __aexit__(self, *a): return False
+
+    monkeypatch.setattr(connectors.httpx, "AsyncClient", FakeClient)
+    payload = asyncio.run(connectors.fetch("https://ejemplo.com/vieja-ruta", ttl=300))
+    assert calls == ["https://ejemplo.com/vieja-ruta", "https://ejemplo.com/nueva-ruta"]
+    assert payload == "<html>contenido real</html>"
+    # La segunda llamada se sirve de caché (una sola petición HTTP nueva no ocurre)
+    payload2 = asyncio.run(connectors.fetch("https://ejemplo.com/vieja-ruta", ttl=300))
+    assert payload2 == "<html>contenido real</html>" and len(calls) == 2
+
+
 def test_ats_connectors_and_watchlist(monkeypatch, tmp_path):
     monkeypatch.setenv("CAREER_DB", str(tmp_path / "watchlist.sqlite3"))
     monkeypatch.setenv("CAREER_ORG_ID", "local-wdc")

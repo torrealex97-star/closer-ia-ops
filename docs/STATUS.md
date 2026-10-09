@@ -1,5 +1,13 @@
 # Estado
 
+## JobToday resiliente: fetch sigue redirects y check periódico de slugs — 2026-10-09 (sesión 6)
+
+- Objetivo del turno: que un renombrado de slugs como el de ayer (closer-venta → closer-de-ventas) no vuelva a romper la recogida. Dos piezas:
+- **1. Redirect en el fetch cacheado** (`connectors.fetch`): sigue manualmente 301/302/303/307/308 (hasta 4 saltos) y cachea el contenido bajo la URL original — los consumidores no cambian y el coste de red no se duplica. Bug encontrado por el test nuevo y corregido: el join del destino debe hacerse con `httpx.URL(current).join(location)` explícito (con str plano, `.join()` concatena y el loop de redirects nunca termina → «Demasiados redirects»). Los redirects no se reintentan como errores 5xx (se resuelven en el mismo intento).
+- **2. Check periódico de slugs** en `scripts/audit_sources.py`: `audit_jobtoday_slugs()` comprueba cada slug JobToday del REGISTRY contra el sitio real (semáforo 2, UA de navegador) y registra evidencia en `source_audit.json` (`status`: ok/renamed/gone/unavailable/unreachable + `canonical_url` + `renamed_from`). Detecta el renombrado antes de que falle la recogida; **nunca reescribe slugs** (información, no auto-modificación). Bug de integración corregido: la llamada quedó fuera del bloque `async with` (RuntimeError client closed) — verificado ejecutando el check real.
+- Evidencia real (2026-10-09, después del fix): los 5 slugs del REGISTRY responden 200 → `ok` (closer-de-ventas, telemarketing, ventas-remoto, ventas, comercial).
+- Verificación: suite completa en clon con el diff exacto sobre 5ed53d3 — **pytest 158 passed** (157 previos + test nuevo `test_fetch_follows_cached_redirect`, que prueba redirect seguido + caché bajo URL original) y **ruff All checks passed** (incluye scripts).
+
 ## Fase 2 reintentada (sesión 5): las 4 vías de exportación siguen bloqueadas — 2026-10-09
 
 - Reintentos verificados este turno: (1) app local muerta (8100/3100 → 000); (2) shell TCC: cp/read de `.local/career.sqlite3` → Operation not permitted (el cp falla incluso a nivel de cwd del sandbox); (3) herramienta read_files, que sí accede a Documents, devuelve [BLOCKED] para la SQLite; (4) terminal compartida del usuario: terminal_list = 0 terminales. Conclusión: la exportación requiere acción del usuario (copiar a /tmp desde su propia terminal, reiniciar Freebuff Desktop para activar el TCC concedido, o arrancar la app y exportar por HTTP). Supabase sin tocar: 25 tablas, 0 filas. Repo en 3c8b188.
