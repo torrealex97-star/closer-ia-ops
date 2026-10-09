@@ -342,9 +342,10 @@ def test_getonbrd_paginates_up_to_new_ceiling(monkeypatch):
 
 
 def test_jobtoday_new_slugs_are_the_verified_ones():
-    """Cobertura completa A2: solo slugs verificados contra el sitio real (2026-10-04)."""
+    """Cobertura completa A2: solo slugs verificados contra el sitio real.
+    Re-verificados 2026-10-09: 'como-comercial' ahora redirige 308 al canónico 'comercial'."""
     assert REGISTRY["jobtoday-ventas"].url == "https://jobtoday.com/es/trabajos-ventas"
-    assert REGISTRY["jobtoday-comercial"].url == "https://jobtoday.com/es/trabajos-como-comercial"
+    assert REGISTRY["jobtoday-comercial"].url == "https://jobtoday.com/es/trabajos-comercial"
 
 
 def test_ats_connectors_and_watchlist(monkeypatch, tmp_path):
@@ -578,10 +579,10 @@ def test_jobtoday_embedded_listing_contract(client, monkeypatch):
     html = '<html><script id="__NEXT_DATA__" type="application/json">' + json.dumps(
         {'props': {'pageProps': {'feed': {'sections': [{'items': [{'payload': payload}]}]}}}}) + '</script></html>'
     async def fake_fetch(url, params=None, ttl=900, user_agent=None):
-        assert 'jobtoday.com/es/trabajos-closer-venta' in url
+        assert 'jobtoday.com/es/trabajos-closer-de-ventas' in url
         return html
     monkeypatch.setattr(connectors, 'fetch', fake_fetch)
-    connector = JobToday('jobtoday', 'JobToday España', 'closer-venta')
+    connector = JobToday('jobtoday', 'JobToday España', 'closer-de-ventas')
     async def collect():
         return [row async for batch in connector.batches(SearchQuery()) for row in batch]
     rows = asyncio.run(collect())

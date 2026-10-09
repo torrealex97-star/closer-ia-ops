@@ -25,7 +25,7 @@ PUBLIC = {
     'remotefirstjobs': ('RSS de ventas', [], 'Feed de la categoría ventas con descripción completa; validación local final.'),
     'jobspresso': ('RSS general', [], 'Ofertas curadas sin filtro de categoría; se filtra al importar.'),
     'remotojob': ('RSS general', [], 'Vacantes diarias en español; sin filtro de categoría en origen. Validación local.'),
-    'jobtoday': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (closer)'], 'Ofertas comerciales España del listado closer-venta; sin keywords en origen. Validación local final.'),
+    'jobtoday': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (closer)'], 'Ofertas comerciales España del listado closer-de-ventas; sin keywords en origen. Slugs re-verificados 2026-10-09.'),
     'jobtoday-telemarketing': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (telemarketing)'], 'Listado televenta España; sin keywords en origen. Validación local final. La ruta setter devuelve 410 Gone.'),
     'jobtoday-remoto': ('Listado embebido (NEXT_DATA)', ['Ruta por keyword (ventas-remoto)'], 'Listado comercial remoto España; sin keywords en origen. Validación local final.'),
     'closers-avenue': ('Sin listado público', [], 'Su bolsa devuelve 500 (2026-09-23). Entrada informativa: requiere Actor opt-in o acceso autorizado; no extraíble hoy.'),

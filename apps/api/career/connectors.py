@@ -322,14 +322,16 @@ for connector in [
     RssJobs("jobspresso", "Jobspresso", "https://www.jobspresso.co/?feed=job_feed"),
     # Bolsa remota hispana: anuncios redactados en español, verificado 2026-09-23.
     RssJobs("remotojob", "RemotoJOB", "https://remotojob.com/feed/"),
-    JobToday("jobtoday", "JobToday España", "closer-venta"),
+    JobToday("jobtoday", "JobToday España", "closer-de-ventas"),
     # 'setter' responde 410 Gone (verificado 2026-09-23); 'telemarketing' cubre televenta España.
     JobToday("jobtoday-telemarketing", "JobToday Telemarketing", "telemarketing"),
     JobToday("jobtoday-remoto", "JobToday Comercial remoto", "ventas-remoto"),
-    # Cobertura completa (A2): slugs verificados 2026-10-04 ('ventas' 706 ofertas,
-    # 'como-comercial' 628; 'comercial' redirige a 'como-comercial').
+    # Cobertura completa (A2): slugs verificados contra el sitio real. Re-verificados
+    # 2026-10-09: 'ventas' y 'comercial' responden 200 con __NEXT_DATA__; el slug
+    # 'como-comercial' ahora redirige 308 a 'comercial' (se usa el canónico) y
+    # 'closer-venta' redirige 308 a 'closer-de-ventas'.
     JobToday("jobtoday-ventas", "JobToday Ventas", "ventas"),
-    JobToday("jobtoday-comercial", "JobToday Comercial", "como-comercial"),
+    JobToday("jobtoday-comercial", "JobToday Comercial", "comercial"),
 ]:
     REGISTRY[connector.code] = connector
 
