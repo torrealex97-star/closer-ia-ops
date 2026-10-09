@@ -1,5 +1,9 @@
 # Estado
 
+## Fase 2 reintentada (sesión 5): las 4 vías de exportación siguen bloqueadas — 2026-10-09
+
+- Reintentos verificados este turno: (1) app local muerta (8100/3100 → 000); (2) shell TCC: cp/read de `.local/career.sqlite3` → Operation not permitted (el cp falla incluso a nivel de cwd del sandbox); (3) herramienta read_files, que sí accede a Documents, devuelve [BLOCKED] para la SQLite; (4) terminal compartida del usuario: terminal_list = 0 terminales. Conclusión: la exportación requiere acción del usuario (copiar a /tmp desde su propia terminal, reiniciar Freebuff Desktop para activar el TCC concedido, o arrancar la app y exportar por HTTP). Supabase sin tocar: 25 tablas, 0 filas. Repo en 3c8b188.
+
 ## Motor cloud: ofertas de España en la web sin depender del Mac — 2026-10-09 (sesión 4)
 
 - Decisión con el usuario (opción elegida): construir el motor en la nube. El diagnóstico previo: app.womendigitalclosers.com (Vercel) no puede recoger ofertas por diseño actual — el proxy `/api/backend` apunta a `127.0.0.1:8100` de la Mac y Vercel no lo alcanza; además `CAREER_LOCAL_TOKEN` nunca existiría en Vercel (por diseño, 503). El arranque local sigue bloqueado por TCC del sandbox.
