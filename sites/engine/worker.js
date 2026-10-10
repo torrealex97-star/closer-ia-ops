@@ -174,7 +174,83 @@ async function ensureSchema(db) {
       UNIQUE(org_id, opportunity_id, version))`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_catalog_expiry ON catalog_entries(org_id, expires_at)'),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_runs_created ON collection_runs(org_id, created_at)'),
+    // Evidencia del audit periódico de slugs JobToday (append-only, como raw_items):
+    // una fila por (slug, día) con el destino real; nunca reescribe el slug de la fuente.
+    db.prepare(`CREATE TABLE IF NOT EXISTS slug_audit (
+      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, source TEXT NOT NULL, slug TEXT NOT NULL,
+      checked_at TEXT NOT NULL, day TEXT NOT NULL, status TEXT NOT NULL,
+      http_status INTEGER, requested_url TEXT NOT NULL, canonical_url TEXT, renamed_from TEXT,
+      UNIQUE(org_id, source, day))`),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_slug_audit_day ON slug_audit(org_id, day)'),
   ]);
+}
+
+// ------ audit periódico de slugs JobToday ------
+// Equivalente en la nube de audit_jobtoday_slugs de scripts/audit_sources.py:
+// comprueba el destino real de cada ruta (200 aquí, 301/302/303/307/308 renombrado,
+// 410 gone) ANTES de que falle la recogida; registra evidencia en D1 sin tocar slugs.
+const REDIRECT_HINT = new Set([301, 302, 303, 307, 308]);
+
+function jobTodaySources() {
+  return SOURCES.filter(s => s.kind === 'jobtoday');
+}
+
+async function auditSlug(source) {
+  const url = `https://jobtoday.com/es/trabajos-${source.slug}`;
+  const record = { checked_at: now(), url, status: 'ok', canonical_url: url, http_status: null };
+  try {
+    const response = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' },
+      redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    record.http_status = response.status;
+    if (REDIRECT_HINT.has(response.status)) {
+      const location = response.headers.get('location')?.trim() || '';
+      record.status = 'renamed';
+      record.renamed_from = url;
+      if (location) record.canonical_url = new URL(location, url).toString();
+    } else if (response.status === 410) {
+      record.status = 'gone';
+    } else if (response.status !== 200) {
+      record.status = 'unavailable';
+    }
+  } catch (error) {
+    record.status = 'unreachable';
+    record.warning = String(error.message || error).slice(0, 200);
+  }
+  return record;
+}
+
+async function runSlugAudit(env) {
+  const db = env.DB;
+  const day = dayKey();
+  const results = await Promise.all(jobTodaySources().map(async source => {
+    const record = await auditSlug(source);
+    record.slug = source.slug; record.source = source.code; record.day = day;
+    return record;
+  }));
+  const statements = results.map(record => db.prepare(`INSERT INTO slug_audit
+    (id,org_id,source,slug,checked_at,day,status,http_status,requested_url,canonical_url,renamed_from)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(org_id, source, day) DO NOTHING`)
+    .bind('slug-' + stableId('a', `${ORG}|${record.source}|${record.day}`), ORG, record.source,
+      record.slug, record.checked_at, record.day, record.status, record.http_status,
+      record.url, record.canonical_url, record.renamed_from ?? null));
+  await db.batch(statements);
+  return { day, slugs: results.map(({ source, slug, status, http_status, canonical_url, renamed_from }) =>
+    ({ source, slug, status, http_status: http_status ?? null, canonical_url, renamed_from: renamed_from ?? null })) };
+}
+
+async function handleAudit(request, env) {
+  const db = env.DB;
+  await ensureSchema(db);
+  const day = dayKey();
+  const existing = await db.prepare(
+    'SELECT source,slug,status,http_status,canonical_url,renamed_from,checked_at FROM slug_audit WHERE org_id=? AND day=? ORDER BY source')
+    .bind(ORG, day).all();
+  if (existing.results.length >= jobTodaySources().length) {
+    return Response.json({ day, cached: true, slugs: existing.results }, { headers: corsHeaders(request) });
+  }
+  const result = await runSlugAudit(env);
+  return Response.json({ ...result, cached: false }, { headers: corsHeaders(request) });
 }
 
 // ------ recogida ------
@@ -212,7 +288,10 @@ async function runCollection(env, force = false) {
   }
   await db.prepare('UPDATE collection_runs SET status=?, sources=?, completed_at=? WHERE id=?')
     .bind('completed', JSON.stringify(states), now(), runId).run();
-  return { run_id: runId, sources: states };
+  // Audit de slugs forma parte de la recogida: si un slug cambió, el resultado lo muestra
+  // como renamed/gone antes de que el extractor falle.
+  const slugAudit = await runSlugAudit(env).catch(error => ({ error: String(error.message || error).slice(0, 200) }));
+  return { run_id: runId, sources: states, slug_audit: slugAudit };
 }
 
 async function ingestBatch(db, source, candidates) {
@@ -325,7 +404,9 @@ const corsHeaders = request => ({
 // ------ entrada ------
 export default {
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(runCollection(env));
+    ctx.waitUntil(runCollection(env).catch(() => {}));
+    // Audit de slugs en cada tick programado: cubre también días sin lecturas.
+    ctx.waitUntil(runSlugAudit(env).catch(() => {}));
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -336,6 +417,7 @@ export default {
       return handleOffers(request, env, url);
     }
     if (url.pathname === '/api/status') return handleStatus(env);
+    if (url.pathname === '/api/audit') return handleAudit(request, env);
     if (url.pathname === '/api/collect' && request.method === 'POST') {
       if (!env.COLLECT_TOKEN || request.headers.get('X-Collect-Token') !== env.COLLECT_TOKEN) {
         return Response.json({ detail: 'No autorizado' }, { status: 401 });

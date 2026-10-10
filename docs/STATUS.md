@@ -1,5 +1,17 @@
 # Estado
 
+## Audit de slugs JobToday en el motor cloud (Worker) — 2026-10-10 (sesión 7)
+
+- Objetivo del turno: que el audit periódico de slugs también cubra el despliegue cloud, no solo el auditor local. Implementación equivalente a `audit_jobtoday_slugs` de `scripts/audit_sources.py` pero en el Worker ([sites/engine/worker.js](../sites/engine/worker.js)):
+  - **Tabla `slug_audit` en D1** (esquema aditivo): una fila por (fuente, día) con `status` (ok/renamed/gone/unavailable/unreachable), `http_status`, `canonical_url` y `renamed_from`. Append-only como la evidencia raw: `ON CONFLICT DO NOTHING` por día, nunca reescribe slugs ni decisiones.
+  - **`GET /api/audit`** (público, con CORS como las demás lecturas): primera llamada del día ejecuta el check real (semáforo via `Promise.all`, `redirect: 'manual'`, UA de navegador, timeout 15 s) y persiste en D1; llamadas siguientes del mismo día responden desde D1 con `cached: true` — el check real se ejecuta una vez por día.
+  - **Integrado en la recogida**: `runCollection` ejecuta el audit al final de cada run y lo devuelve en la respuesta del run (`slug_audit`); un renombrado se ve antes de que el extractor falle.
+  - **`scheduled`**: además de la recogida, lanza el audit en cada tick — cubre días sin lecturas (nota: el cron del manifest sigue pendiente de configurar, igual que en la sesión 4).
+- **Verificación en workerd (wrangler dev + D1 local)**: `/api/audit` contra jobtoday.com real → 5/5 `ok` HTTP 200 (los 5 slugs canónicos); segunda llamada → `cached: true`; filas visibles en D1 vía `wrangler d1 execute`. **Test de renombrado**: servidor mock local que responde 308 con `Location` absoluta; `auditSlug` detecta `status=renamed`, guarda el destino (`canonical_url`) y la URL original (`renamed_from`). Un bug del test en sí (constante no importada al módulo extraído) se detectó con el mismo test y se corrigió; el worker real tiene la constante inline.
+- **Deploy a preview**: succeed ( Sites, mismo preview URL). **Verificación E2E en el Worker real**: primer GET `/api/audit` → HTTP 200, 5/5 slugs `ok` con HTTP 200, `cached: false`; el motor sigue entero (`/api/status`: 231 raw_items, 227 catalog, último run 2026-10-09 completed). Evidencia de producción-like registrada, sin secrets ni datos nuevos en la respuesta.
+- Suite backend intacta en clon aislado (mismo patrón por TCC de siempre): **pytest 157 passed + 1 skipped** y **ruff All checks passed**; el cambio de esta sesión es solo en el Worker (no toca Python).
+- Limitaciones honestas: (1) el cron programado no está en el manifest — el audit corre en recogida lazy y en `scheduled` cuando haya cron; (2) producción de Sites sigue sin publicar (solo preview); (3) el audit cloud y el local comparten semántica pero no código (`auditSlug` en JS vs `audit_jobtoday_slugs` en Python) — estados idénticos por diseño, no por paquete compartido.
+
 ## JobToday resiliente: fetch sigue redirects y check periódico de slugs — 2026-10-09 (sesión 6)
 
 - Objetivo del turno: que un renombrado de slugs como el de ayer (closer-venta → closer-de-ventas) no vuelva a romper la recogida. Dos piezas:
