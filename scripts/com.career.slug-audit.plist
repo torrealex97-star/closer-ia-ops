@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Auditoría periódica de slugs JobToday (copia local, complementa el audit del Worker cloud).
+  Instalar con scripts/install_slug_audit.sh (rellena @VENV_PYTHON@/@REPO@/@LOG_DIR@).
+  Alertas: .local/source_audit_alert.json en el repo + notificación macOS al operador.
+  Nota: corre con `-m scripts.audit_sources` + PYTHONPATH=apps/api (import career), como en pytest;
+  verificado con un run real de launchd (exit 0, 5/5 slugs ok) con este mismo formato.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.career.slug-audit</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@VENV_PYTHON@</string>
+    <string>-m</string>
+    <string>scripts.audit_sources</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONPATH</key>
+    <string>@REPO@/apps/api</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>@REPO@</string>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/last-run.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/last-run.err</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

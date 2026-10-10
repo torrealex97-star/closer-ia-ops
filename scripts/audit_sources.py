@@ -5,6 +5,8 @@ Además audita los slugs JobToday contra el sitio real: detecta renombrados
 """
 import asyncio
 import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
@@ -90,7 +92,48 @@ async def main():
             return code, record
         results = dict(await asyncio.gather(*(audit(row) for row in CATALOG)))
         jobtoday = await audit_jobtoday_slugs(client)
-    Path('apps/api/career/source_audit.json').write_text(json.dumps(
-        {'apify': results, 'jobtoday_slugs': jobtoday}, ensure_ascii=False, indent=2, default=str) + '\n')
+    report = {'apify': results, 'jobtoday_slugs': jobtoday}
+    Path('apps/api/career/source_audit.json').write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str) + '\n')
+    write_launchd_alert(report)
+
+
+def slug_alerts(report):
+    """Alertas por slug JobToday en estado renamed o gone (los demás estados
+    son fallos transitorios de red, no requieren acción del operador)."""
+    slugs = report.get('jobtoday_slugs', {}).get('slugs', {})
+    return [
+        {'code': code, 'status': record['status'], 'url': record.get('url'),
+         'canonical_url': record.get('canonical_url'),
+         'renamed_from': record.get('renamed_from'),
+         'http_status': record.get('http_status'), 'checked_at': record.get('checked_at')}
+        for code, record in slugs.items() if record['status'] in {'renamed', 'gone'}]
+
+
+def write_launchd_alert(report, alert_dir='.local'):
+    """Alerta para la tarea programada: persiste .local/source_audit_alert.json
+    (estado para que el operador lo consulte sin abrir logs)."""
+    alerts = slug_alerts(report)
+    payload = {'has_alerts': bool(alerts), 'checked_at': report.get('jobtoday_slugs', {}).get('checked_at'), 'alerts': alerts}
+    path = Path(alert_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    (path / 'source_audit_alert.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n')
+    log_alert(payload)
+    return payload
+
+
+def log_alert(payload, stream=None):
+    """Imprime el resultado y, si hay renamed/gone, emite una notificación macOS."""
+    stream = stream or sys.stderr
+    if not payload['has_alerts']:
+        print('SLUG AUDIT OK: no renamed/gone', flush=True)
+        return
+    lines = [f"{a['code']}: {a['status']} -> {a.get('canonical_url')} (desde {a.get('renamed_from') or a.get('url')}, HTTP {a.get('http_status')})" for a in payload['alerts']]
+    message = 'JobToday slug audit: ' + ' | '.join(lines)
+    print(message, flush=True, file=stream)
+    # Notificación de escritorio: el operador la vea sin abrir logs ni la UI.
+    subprocess.run(['/usr/bin/osascript', '-e',
+                    f'display notification "{message}" with title "WDC slug audit" sound name "Sosumi"'],
+                   check=False, capture_output=True)
+
 
 asyncio.run(main())
