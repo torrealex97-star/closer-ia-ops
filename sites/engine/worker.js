@@ -78,7 +78,7 @@ async function sourceGreenhouse(source) {
 }
 
 async function sourceAshby(source) {
-  const data = JSON.parse(await fetchText(`https://api.ashbyhq.com/posting-api/board/${source.slug}`));
+  const data = JSON.parse(await fetchText(`https://api.ashbyhq.com/posting-api/job-board/${source.slug}`));
   return (data.jobs || []).slice(0, MAX_ITEMS_PER_SOURCE).map(j => ({ external_id: String(j.id || j.jobUrl), payload: {
     title: j.title, company: source.name.split(' · ')[0], location: pick(j, 'location', 'secondaryAddressesText'),
     url: j.jobUrl, posted_at: j.publishedAt ? new Date(j.publishedAt).toISOString() : null, raw: j,
@@ -341,6 +341,12 @@ const ROLE_KEYWORDS = {
 const ES_HINTS = ['españa', 'spain', 'madrid', 'barcelona', 'valencia', 'sevilla', 'málaga', 'malaga', 'bilbao', 'zaragoza', 'remoto', 'europa'];
 const NON_ES_HINTS = ['florida', 'texas', 'california', 'new york', 'london', 'londres', 'oklahoma', 'mississippi', 'georgia', 'st. petersburg', 'atlanta', 'nashville', 'dallas', 'okc'];
 
+// Perfil detectado por palabras explícitas del título/ubicación; null si ninguna aparece (nunca se asume).
+function detectRole(payload) {
+  const haystack = `${payload.title ?? ''} ${payload.location ?? ''}`.toLowerCase();
+  return Object.keys(ROLE_KEYWORDS).find(role => ROLE_KEYWORDS[role].some(k => haystack.includes(k))) ?? null;
+}
+
 function matchesQuery(payload, query) {
   const haystack = `${payload.title ?? ''} ${payload.location ?? ''}`.toLowerCase();
   if (query.role && !ROLE_KEYWORDS[query.role].some(k => haystack.includes(k))) return false;
@@ -371,7 +377,7 @@ async function handleOffers(request, env, url) {
     ORDER BY c.first_seen_at DESC LIMIT 500`).bind(ORG, now()).all();
   const offers = rows.results
     .map(r => { const p = JSON.parse(r.payload); return {
-      job_id: r.job_id, title: p.title, company: p.company, location: p.location, url: p.url,
+      job_id: r.job_id, role: detectRole(p), title: p.title, company: p.company, location: p.location, url: p.url,
       salary: p.salary ?? null, posted_at: p.posted_at ?? null, application_type: 'unknown',
       source_first_seen_at: r.first_seen_at,
     }; })
