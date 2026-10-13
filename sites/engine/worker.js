@@ -24,6 +24,13 @@ const SOURCES = [
   { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
   { code: 'himalayas', name: 'Himalayas', kind: 'himalayas' },
   { code: 'weworkremotely', name: 'We Work Remotely · ventas', kind: 'rss', slug: 'https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss' },
+  // Añadidas 2026-10-13 con posibilidad de verificación real hoy:
+  // GetOnBoard API pública (verificada 2026-10-13: 200, categorías ventas LATAM, 21 páginas);
+  // FreeHire ES (200, 2941 totales, reality.class filtrable) y FreeHire LATAM.
+  // RemotoJOB RSS 404 hoy — se queda fuera (fallo visible y tradicional en otros modos).
+  { code: 'getonbrd', name: 'Get on Board · ventas', kind: 'getonbrd' },
+  { code: 'freehire', name: 'FreeHire España', kind: 'freehire', region: 'es' },
+  { code: 'freehire-latam', name: 'FreeHire LATAM', kind: 'freehire', region: 'latam' },
 ];
 
 // ------ utilidades ------
@@ -139,9 +146,61 @@ async function sourceRss(source) {
   });
 }
 
+async function sourceGetOnBoard() {
+  // API pública v0 de getonbrd.com, categoría 'sales' (verificada 2026-10-13, 21 páginas).
+  const all = [];
+  for (let page = 1; page <= 10; page++) {
+    const data = JSON.parse(await fetchText(`https://www.getonbrd.com/api/v0/categories/sales/jobs?per_page=50&page=${page}`));
+    const rows = data.data || [];
+    for (const row of rows) {
+      const a = row.attributes ?? {};
+      const external = String(row.id ?? '');
+      if (!external || !a.title) continue;
+      // La empresa y la modalidad llegan como relación {data:{id}}; sin incluir el nombre
+      // viene en el listado publico: queda 'Empresa no indicada' honesto a nivel de lista.
+      all.push({ external_id: external, payload: {
+        title: a.title, company: typeof a.company === 'string' ? a.company : null, location: Array.isArray(a.countries) ? a.countries.join(', ') : a.countries,
+        url: (row.links && row.links.public_url) || null,
+        posted_at: a.published_at != null ? new Date(Number(a.published_at) < 2e10 ? Number(a.published_at) * 1000 : Number(a.published_at)).toISOString() : null, raw: row,
+      } });
+    }
+    const totalPages = data.meta?.total_pages;
+    if (!totalPages || page >= totalPages) break;
+  }
+  return all.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
+async function sourceFreehire(source) {
+  // API pública v1 de freehire.me (agregador de 92 ATS, verificada 2026-10-13:
+  // 2941 ofertas); igual que el conector local, solo 'fresh'/sin señal cuentan:
+  // 'stale' y 'likely-evergreen' son fichas repintadas, no novedades.
+  const params = new URLSearchParams({ category: 'sales', limit: '100', sort: 'posted_at', order: 'desc' });
+  if (source.region === 'es') params.set('countries', 'ES');
+  if (source.region === 'latam') params.set('regions', 'latam');
+  const all = [];
+  for (let offset = 0; offset < 1500; offset += 100) {
+    const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`));
+    const rows = data.data || [];
+    for (const row of rows) {
+      const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
+      if (reality.class && !['fresh', null, undefined].includes(reality.class)) continue;
+      const external = String(row.public_slug || row.url || '');
+ if (!external || !row.url) continue;
+      all.push({ external_id: external.slice(-120), payload: {
+        title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.join(', ') : (row.location || null),
+        url: row.url, posted_at: row.posted_at ?? null, raw: row,
+      } });
+    }
+    const total = data.meta?.total; const pageLen = rows.length;
+    if (!Number.isFinite(total) || offset + 100 >= total || pageLen < 100) break;
+  }
+  return all.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
 const EXTRACTORS = {
   jobtoday: sourceJobToday, greenhouse: sourceGreenhouse, ashby: sourceAshby,
   recruitee: sourceRecruitee, teamtailor: sourceTeamtailorRss, himalayas: sourceHimalayas, rss: sourceRss,
+  getonbrd: sourceGetOnBoard, freehire: sourceFreehire,
 };
 
 // ------ esquema D1 (additiva, versionada; equivalente del núcleo local) ------

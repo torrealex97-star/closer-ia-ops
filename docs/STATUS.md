@@ -1,5 +1,15 @@
 # Estado
 
+## 3 fuentes nuevas en español (GetOnBoard, FreeHire ES, FreeHire LATAM) en producción — 2026-10-13 (sesión 10)
+
+- Objetivo del turno: añadir fuentes públicas de ofertas en español (España/LATAM) al motor cloud sin inventar nada: candidatos verificados HOY contra la red antes de decidir.
+  - **Verificación real de candidatos (2026-10-13, UA navegador)**: GetOnBoard API v0 `getonbrd.com/api/v0/categories/sales/jobs` → 200, 21 páginas de ventas LATAM (BDR México, Inside Sales…); FreeHire `freehire.me/api/v1/jobs/search?category=sales&countries=ES` → 200, 2.941 totales con `reality.class` filtrable; RemotoJOB RSS remotojob.com/feed → **404 hoy, descartada**; Remotive categoria=sales → 16 ofertas, 0 España (descartada por volumen inútil); Jobicy seller → todo en inglés (no pasa el gate de español desin bipáginas). WWR RSS sigue viva (110 items).
+  - **Añadidas al Worker** ([sites/engine/worker.js](sites/engine/worker.js)): `getonbrd` (API v0, corte por meta.total_pages, entity company no resuelta en el listado público → 'Empresa no indicada' honesto), `freehire` (countries=ES) y `freehire-latam` (regions=latam), ambas filtrando `reality.class` a fresh/None como el conector local (stale/likely-evergreen son fichas repintadas, no novedades). Total: 16 fuentes activas en el motor cloud.
+- **Verificación en workerd real** (wrangler dev + D1 limpio, recogida completa): 16 fuentes → 14 completed + 1 failed conocida (Ashby Pennylane 401, preexistente) → **905 raw_items, 903 catálogo activo**; por fuente nueva: **getonbrd 62, freehire 300, freehire-latam 300** (techo 300 MAX_ITEMS_PER_SOURCE: en latam habría más; es el límite honesto de la edición actual).
+- **Vista alumna mejorada de verdad**: search any → **8 elegibles en español** (antes solo 1): Selection Book (closer, Guatemala/México), ConstructionTech SaaS (Chile), Corporativo Lumston (México), minders (Argentina/Chile), Moova (México), TD Synnex (España), Codurance (España); selección = 1 (dominio: 1 empresa con score top). closer/ES → 1.
+- **Notas honestas**: (1) FreeHire ES reporta países como 'es' en minúscula — el filtro ES del motor cloud matchea por texto (contiene 'españa' no está en el conjunto; 'spain' y ciudades sí; sin embargo FreeHire ES trae ofertas en inglés con countries ['es','gb'] y el gate de idioma las excluye; lo dejan pasar las escritas en español) — el mercado ES del motor queda corto pero correcto; (2) getonbrd sin empresa resuelta en el listado público (solo id de relación) → 'Empresa no indicada'; si el operador quiere el nombre, es una fetch extra por oferta (fuera de este turno); (3) el techo MAX_ITEMS_PER_SOURCE=300 trunca freehire-latam (la página real tiene más de 300): tope del modo actual, revisable.
+- Deploy: pendiente de commitear/push (siguiente turno).
+
 ## Vista de alumna sirve datos reales desde el motor cloud — 2026-10-13 (sesión 9)
 
 - Objetivo del turno: que app.womendigitalclosers.com funcione de verdad — frontend Vercel + motor cloud (Sites) sin depender del Mac. Antes del turno: el dominio desplegaba pero sin datos (el proxy llamaba a la Mac, y el motor cloud solo estaba en preview con otra API). Tres piezas:
