@@ -380,6 +380,232 @@ async function handleOffers(request, env, url) {
   return Response.json({ total: offers.length, offers }, { headers: corsHeaders(request) });
 }
 
+// ------ superficie de la vista de alumna (contrato Opportunity del proxy /api/backend) ------
+// Espejo en JS de apps/api/career/opportunities.py: mismos filtros (rol por vocabulario en el
+// título, mercado España por señales fuertes, frescura), ranking España-primero y selección
+// de excelencia (top 20, máx. 2 por empresa, AE/SDR fuera del top). Lo que la fuente no declara
+// se muestra como 'No indicado'/sin datos; nunca se infiere application_type (unknown).
+const ROLE_LABELS = { closer: 'Closer', setter: 'Setter', cold_caller: 'Cold Caller',
+  account_executive: 'Ejecutivo comercial', sdr: 'SDR / BDR' };
+const ROLE_PRIORITY = { closer: 0, setter: 1, cold_caller: 2, account_executive: 9, sdr: 10 };
+const EXTRA_ROLES = new Set(['account_executive', 'sdr']);
+const TOP_TARGET = 20;
+const MARKET_HINTS = {
+  EU: ['europa', 'europe', 'european union', 'reino unido', 'portugal', 'francia', 'alemania', 'irlanda', 'paises bajos'],
+  LATAM: ['mexico', 'argentina', 'colombia', 'chile', 'peru', 'ecuador', 'uruguay', 'venezuela',
+    'guatemala', 'honduras', 'el salvador', 'nicaragua', 'panama', 'costa rica', 'latin america', 'latam'],
+  US: NON_ES_HINTS,
+};
+
+const fold = text => (text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// La fuente puede devolver la ubicación como lista o el momento de publicación como epoch;
+// el contrato de la vista (Opportunity) es location: string y published_at: ISO string | null.
+const asText = v => {
+  if (v == null || v === '') return null;
+  if (Array.isArray(v)) return v.map(x => (Array.isArray(x) ? asText(x) : String(x ?? '').trim())).filter(Boolean).join(', ') || null;
+  if (typeof v === 'object') return null; // estructura inesperada: mejor 'ubícacion por confirmar' que volcar JSON
+  return String(v).trim() || null;
+};
+const isoWhen = v => {
+  const t = asText(v);
+  if (t == null) return null;
+  if (/^\d+$/.test(t)) return new Date(Number(t) < 2e10 ? Number(t) * 1000 : Number(t)).toISOString();
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
+function plain(value) {
+  let text = String(value ?? '');
+  text = text.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+  text = text.replace(/<\/?(p|div|li|br|h[1-6])\b[^>]*>/gi, '\n');
+  text = text.replace(/<[^>]+>/g, '');
+  return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, entity) => {
+    if (ENTITIES[entity]) return ENTITIES[entity];
+    if (entity.startsWith('#x')) return String.fromCodePoint(parseInt(entity.slice(2), 16));
+    if (entity.startsWith('#')) return String.fromCodePoint(parseInt(entity.slice(1), 10));
+    return m;
+  }).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, 20000);
+}
+
+// La descripción vive en el raw de la fuente (ya almacenado en qué apuntaba p.raw);
+// ningún campo se inventa: si la fuente no trae cuerpo, la ficha queda honestamente vacía.
+function descriptionOf(p) {
+  const raw = p.raw ?? {};
+  return plain(raw.description || raw.descriptionDeMarkdown || raw.content || raw.jobDescription
+    || raw.excerpt || raw.descriptionPlain || '');
+}
+
+function excerpt(details, pattern, fallback) {
+  for (const line of details.split(/\n+|(?<=[.!?])\s+/)) {
+    if (pattern.test(fold(line))) return line.replace(/\s+/g, ' ').trim().slice(0, 230);
+  }
+  return fallback;
+}
+
+const COMP_WORDS = /\b(?:salario|sueldo|compensacion|remuneracion|pago|comisiones|salary|compensation|pay rate)\b/;
+const VARIABLE_WORDS = /\b(?:comision|commission|ote|promedio|potencial|hasta)\b/;
+
+// El idioma: 3+ palabras distintivas del español o requisito explícito; sin inferir nada más.
+const LANG_ES = /\b(?:buscamos|ofrecemos|equipo|ventas|puesto|funciones|formacion|trabajar|nuestro|nuestra|tienes|seras|salario|horario|comisiones|necesitamos|incorporacion|llamadas|remuneracion|contratamos|tareas)\b/;
+const LANG_EN_REQ = /\b(?:bilingual|bilingue|fluent|fluency|required|must|proficient|speaking|spoken|communication|requiere|requerido|dominio|nativo|hablantes|idioma|atencion|clientes)\b/;
+const LANG_EN = /\b(?:english|ingles)\b/;
+
+function spainSignal(p) { return ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase().includes(k)); }
+function nonSpain(p) { return NON_ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''}`.toLowerCase().includes(k)); }
+
+const ROLE_EVAL_ORDER = ['cold_caller', 'setter', 'closer', 'account_executive', 'sdr'];
+function classifyRole(p, text) {
+  // Determinista y con la misma prioridad que presentation.py: primero el título de toda
+  // la vida, después la evidencia en el texto de la oferta; nunca se inventa familia.
+  for (const role of ROLE_EVAL_ORDER) {
+    if (ROLE_KEYWORDS[role].some(k => fold(p.title ?? '').includes(k))) return role;
+  }
+  for (const role of ROLE_EVAL_ORDER) {
+    if (ROLE_KEYWORDS[role].some(k => text.includes(k))) return role;
+  }
+  return null;
+}
+
+async function handleStudentSearch(request, env) {
+  const db = env.DB;
+  await ensureSchema(db);
+  let body;
+  try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 }); }
+  const role = body?.role ?? null;
+  if (role && !ROLE_KEYWORDS[role]) return Response.json({ detail: 'Perfil no válido' }, { status: 422 });
+  const market = ['any', 'ES', 'EU', 'LATAM', 'US'].includes(body?.market) ? body.market : 'any';
+  const days = Number.isInteger(body?.days) && body.days >= 1 && body.days <= 10 ? body.days : 10;
+  const includeBilingual = body?.include_bilingual === true;
+  const starredOnly = body?.starred_only === true;
+  const includeExtraRoles = body?.include_extra_roles !== false;
+
+  const rows = await db.prepare(`
+    SELECT j.id AS job_id, j.starred AS starred, p.payload AS payload, p.source AS source, c.expires_at
+    FROM catalog_entries c
+    JOIN jobs j ON j.org_id=c.org_id AND j.id=c.job_id
+    JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+    WHERE c.org_id=? AND c.expires_at > ?
+    ORDER BY c.first_seen_at DESC, j.id LIMIT 800`).bind(ORG, now()).all();
+
+  const items = [];
+  const evidence = new Set();
+  const quality = {};
+  for (const row of rows.results) {
+    if (starredOnly && !row.starred) continue;
+    const p = JSON.parse(row.payload);
+    const text = `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase();
+    const derivedRole = classifyRole(p, text);
+    if (!derivedRole) continue; // sin clasificación determinista no pasa como superficie alumna
+    if (role && derivedRole !== role) continue;
+    if (market === 'ES') {
+      if (nonSpain(p) || !spainSignal(p)) continue;
+    } else if (market !== 'any') {
+      // Mercados sin cobertura propia del motor: se exponen solo los que traen país explícito.
+      const hay = fold(`${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`);
+      if (!MARKET_HINTS[market].some(k => hay.includes(k))) continue;
+    }
+    const description = descriptionOf(p);
+    const langES = (description.match(new RegExp(LANG_ES.source, 'g')) || []).length >= 3;
+    const enRequired = Boolean(description.match(LANG_EN)) && Boolean(description.match(LANG_EN_REQ));
+    if (!includeBilingual && (!langES || enRequired)) continue;
+    if (p.url && evidence.has(p.url)) continue;
+    evidence.add(p.url);
+    const titleHit = ROLE_KEYWORDS[derivedRole].some(k => fold(p.title ?? '').includes(k));
+    // Compensación: salario estructurado; si no, la cita literal del anuncio; nunca se inventa.
+    let pay = 'Importe no publicado';
+    let note = 'Pregunta por el fijo y las comisiones antes de avanzar.';
+    const salary = p.salary ?? null;
+    if (typeof salary === 'string' && salary.trim()) {
+      pay = salary.trim();
+      note = VARIABLE_WORDS.test(fold(pay)) ? 'La parte variable no es un ingreso garantizado.' : 'Importe anunciado; confirma periodicidad y condiciones.';
+    } else if (salary && typeof salary === 'object') {
+      const low = salary.from ?? salary.min; const high = salary.to ?? salary.max;
+      const amount = v => Number(v) ? String(Math.round(Number(v))).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : null;
+      if (low && high) pay = `${amount(low)} – ${amount(high)} ${salary.currencyCode ?? ''}`.trim();
+      else if (low || high) pay = `${low ? 'Desde' : 'Hasta'} ${amount(low ?? high)} ${salary.currencyCode ?? ''}`.trim();
+      if (pay !== 'Importe no publicado') {
+        note = VARIABLE_WORDS.test(fold(pay)) ? 'La parte variable no es un ingreso garantizado.' : 'Importe anunciado; confirma periodicidad y condiciones.';
+      }
+    } else {
+      const evidenceLine = excerpt(description, COMP_WORDS, '');
+      if (evidenceLine && /\d|base|fijo|comision/.test(fold(evidenceLine))) pay = evidenceLine;
+    }
+    const workText = fold(`${p.title ?? ''} ${p.location ?? ''} ${description.slice(0, 4000)}`);
+    const modality = /\b(hybrid|hibrid[oa]|semi[ -]?presencial)\b/.test(workText) ? 'Híbrido'
+      : /\b(remote|remot[oa]|teletrabajo|home office|work from home)\b/.test(workText) ? 'Remoto' : 'Presencial u híbrido';
+    const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
+    if (ages !== null && Number.isFinite(ages) && ages > days) continue;
+    items.push({
+      id: row.job_id,
+      role: derivedRole,
+      role_label: ROLE_LABELS[derivedRole],
+      original_title: p.title ?? '',
+      company: p.company ?? 'Empresa no indicada',
+      compensation: pay,
+      compensation_note: note,
+      modality,
+      location: asText(p.location) ?? 'Ubicación por confirmar',
+      language: langES ? 'Anuncio en español' : 'Anuncio original en inglés',
+      experience: /\bexperiencia\b/.test(fold(description)) ? excerpt(description, /\bexperiencia\b/, 'Experiencia no especificada') : 'Experiencia no especificada',
+      schedule: excerpt(description, /\b(?:jornada|horario|disponibilidad|\d+\s*horas?\s*(?:semanal|a la semana))\b/, 'Horario no especificado'),
+      contract: excerpt(description, /\b(?:contrato|contractor|freelance|autonom[oa])\b/, 'Contrato no especificado'),
+      description,
+      published_at: isoWhen(p.posted_at) ?? null,
+      expires_at: row.expires_at,
+      source_name: SOURCES.find(s => s.code === row.source)?.name ?? row.source,
+      source_url: p.url,
+      starred: Boolean(row.starred),
+      excellence_rank: null,
+      is_selected: false,
+    });
+    quality[row.job_id] = {
+      es: spainSignal(p) ? 0 : 1,
+      score: (titleHit ? 50 : 25) + (ages !== null && ages <= 3 ? 20 : 10) + (!pay.startsWith('Importe no publicado') ? 1 : 0),
+      published_ts: ages !== null ? Date.now() - ages * 86400000 : 0,
+      role: derivedRole,
+    };
+  }
+
+  // Ranking España-primero (sin interpretar remoto como worldwide) y selección top-20:
+  // el mismo comportamiento que la vista local, para que el dominio no Romance estilos distintos.
+  const ranked = [...items].sort((a, b) => {
+    const qa = quality[a.id]; const qb = quality[b.id];
+    return [qa.es - qb.es, qb.score - qa.score, qb.published_ts - qa.published_ts,
+      ROLE_PRIORITY[qa.role] - ROLE_PRIORITY[qb.role]][0];
+  });
+  const selected = [];
+  const counts = {};
+  for (const offer of ranked) {
+    if (selected.length >= TOP_TARGET) break;
+    if (EXTRA_ROLES.has(offer.role)) continue;
+    const company = offer.company.trim().toLowerCase();
+    if ((counts[company] ?? 0) >= 2) continue;
+    counts[company] = (counts[company] ?? 0) + 1;
+    selected.push(offer);
+  }
+  const selectedIds = new Set(selected.map(o => o.id));
+  ranked.forEach((offer, index) => {
+    offer.excellence_rank = selectedIds.has(offer.id) ? index + 1 : null;
+    offer.is_selected = selectedIds.has(offer.id);
+  });
+  return Response.json({ items: ranked, total: ranked.length, selection_total: selected.length },
+    { headers: corsHeaders(request) });
+}
+
+async function handleStar(request, env, jobId) {
+  if (!/^[A-Za-z0-9-]+$/.test(jobId)) return Response.json({ detail: 'Id no válido' }, { status: 400 });
+  let body;
+  try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 }); }
+  if (typeof body?.starred !== 'boolean') return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 });
+  await ensureSchema(env.DB);
+  const result = await env.DB.prepare('UPDATE jobs SET starred=? WHERE id=? AND org_id=?')
+    .bind(body.starred ? 1 : 0, jobId, ORG).run();
+  if (!result.meta.changes) return Response.json({ detail: 'Oferta no encontrada' }, { status: 404 });
+  return Response.json({ ok: true }, { headers: corsHeaders(request) });
+}
+
 async function handleStatus(env) {
   const db = env.DB;
   await ensureSchema(db);
@@ -398,7 +624,7 @@ async function handleStatus(env) {
 const corsHeaders = request => ({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, X-Collect-Token',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PATCH',
 });
 
 // ------ entrada ------
@@ -425,6 +651,16 @@ export default {
       const result = await runCollection(env, true);
       return Response.json(result);
     }
-    return env.ASSETS.fetch(request);
+    // Superficie de la vista de alumna (consumida por el proxy /api/backend de Next en el dominio):
+    const starMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/star$/);
+    if (url.pathname === '/v1/opportunities/search' && request.method === 'POST') return handleStudentSearch(request, env);
+    if (starMatch && request.method === 'PATCH') return handleStar(request, env, starMatch[1]);
+    if (url.pathname.startsWith('/v1/')) {
+      // El modo hospedado solo expone la vista de alumna; el admin con fichas de edición sigue
+      // siendo el modo local del operador. Explícito para no servir HTML de assets por accidente.
+      return Response.json({ detail: 'Ruta no disponible en modo hospedado' }, { status: 404 });
+    }
+    if (env.ASSETS) return env.ASSETS.fetch(request);
+    return Response.json({ engine: 'closer-ia-ops-engine', hint: 'Lecturas: /api/offers · /api/status · /api/audit' });
   },
 };
