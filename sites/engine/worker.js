@@ -16,6 +16,16 @@ const SOURCES = [
   { code: 'jobtoday-remoto', name: 'JobToday Comercial remoto', kind: 'jobtoday', slug: 'ventas-remoto' },
   { code: 'jobtoday-ventas', name: 'JobToday Ventas', kind: 'jobtoday', slug: 'ventas' },
   { code: 'jobtoday-comercial', name: 'JobToday Comercial', kind: 'jobtoday', slug: 'comercial' },
+  // Slugs verificados hoy 2026-10-13 (200 + __NEXT_DATA__, 48–68 ofertas cada uno):
+  // cobertura comercial amplia en español (servicio al cliente, call center,
+  // ejecutivo comercial, venta asistida, agente/vendedor/representante).
+  { code: 'jobtoday-servicio-cliente', name: 'JobToday Servicio al cliente', kind: 'jobtoday', slug: 'servicio-al-cliente' },
+  { code: 'jobtoday-call-center', name: 'JobToday Call Center', kind: 'jobtoday', slug: 'call-center' },
+  { code: 'jobtoday-ejecutivo', name: 'JobToday Ejecutivo comercial', kind: 'jobtoday', slug: 'ejecutivo-comercial' },
+  { code: 'jobtoday-asistente-ventas', name: 'JobToday Asistente de ventas', kind: 'jobtoday', slug: 'asistente-de-ventas' },
+  { code: 'jobtoday-agente-comercial', name: 'JobToday Agente comercial', kind: 'jobtoday', slug: 'agente-comercial' },
+  { code: 'jobtoday-vendedor', name: 'JobToday Vendedor', kind: 'jobtoday', slug: 'vendedor' },
+  { code: 'jobtoday-representante', name: 'JobToday Representante', kind: 'jobtoday', slug: 'representante' },
   { code: 'ats-greenhouse-cabify', name: 'Cabify · Greenhouse', kind: 'greenhouse', slug: 'cabify' },
   { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
   { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
@@ -512,8 +522,11 @@ function excerpt(details, pattern, fallback) {
 const COMP_WORDS = /\b(?:salario|sueldo|compensacion|remuneracion|pago|comisiones|salary|compensation|pay rate)\b/;
 const VARIABLE_WORDS = /\b(?:comision|commission|ote|promedio|potencial|hasta)\b/;
 
-// El idioma: 3+ palabras distintivas del español o requisito explícito; sin inferir nada más.
-const LANG_ES = /\b(?:buscamos|ofrecemos|equipo|ventas|puesto|funciones|formacion|trabajar|nuestro|nuestra|tienes|seras|salario|horario|comisiones|necesitamos|incorporacion|llamadas|remuneracion|contratamos|tareas)\b/;
+// El idioma: 3+ lexemas distintivos del español; sin inferir nada. Vocabulario ampliado
+// 2026-10-13 con el lenguaje real de las ofertas de JobToday/LATAM del sector comercial
+// (experiencia, cliente, campaña, capacitación, postúlate): presencia fuerte de español,
+// no solo fórmulas formales tipo 'buscamos/ofrecemos'.
+const LANG_ES = /\b(?:buscamos|ofrecemos|equipo|ventas|puesto|funciones|formacion|trabajar|nuestro|nuestra|tienes|seras|salario|horario|comisiones|necesitamos|incorporacion|llamadas|remuneracion|contratamos|tareas|experiencia|clientes?|telefono|sms|mail|lider|liderar|exito|crecimiento|capacitacion|entrenamiento|campana|incentivos|candidat[oa]s?|requisitos?|responsabilidades|interesad[oa]s|postul[ae]tes?|carrera|lunes|viernes|sabado|disciplina|proactiv[oa]|objetivos?|empresas?|persona|oferta|semana|mensual|seguimiento|proceso|convocatoria|entrevista)\b/g;
 const LANG_EN_REQ = /\b(?:bilingual|bilingue|fluent|fluency|required|must|proficient|speaking|spoken|communication|requiere|requerido|dominio|nativo|hablantes|idioma|atencion|clientes)\b/;
 const LANG_EN = /\b(?:english|ingles)\b/;
 
@@ -572,7 +585,7 @@ async function handleStudentSearch(request, env) {
       if (!MARKET_HINTS[market].some(k => hay.includes(k))) continue;
     }
     const description = descriptionOf(p);
-    const langES = (description.match(new RegExp(LANG_ES.source, 'g')) || []).length >= 3;
+    const langES = (description.match(LANG_ES) || []).length >= 3;
     const enRequired = Boolean(description.match(LANG_EN)) && Boolean(description.match(LANG_EN_REQ));
     if (!includeBilingual && (!langES || enRequired)) continue;
     if (p.url && evidence.has(p.url)) continue;
