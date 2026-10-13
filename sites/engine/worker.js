@@ -148,8 +148,10 @@ async function sourceRss(source) {
 
 async function sourceGetOnBoard() {
   // API pública v0 de getonbrd.com, categoría 'sales' (verificada 2026-10-13, 21 páginas).
+  // Tope 2 páginas: en Cloudflare los fetch del Worker cuentan subrequests (límites del plan);
+  // 13 fuentes × varias páginas en la misma invocación agotó la cuota el primer run real.
   const all = [];
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; page <= 2; page++) {
     const data = JSON.parse(await fetchText(`https://www.getonbrd.com/api/v0/categories/sales/jobs?per_page=50&page=${page}`));
     const rows = data.data || [];
     for (const row of rows) {
@@ -177,15 +179,19 @@ async function sourceFreehire(source) {
   const params = new URLSearchParams({ category: 'sales', limit: '100', sort: 'posted_at', order: 'desc' });
   if (source.region === 'es') params.set('countries', 'ES');
   if (source.region === 'latam') params.set('regions', 'latam');
+  // LATAM es el pool más grande y el último en la secuencia de subrequests del run;
+  // a 2 páginas siguió agotando la cuota del plan: queda a 1 página (100 más recientes).
+  const maxPages = source.region === 'latam' ? 1 : 2;
   const all = [];
-  for (let offset = 0; offset < 1500; offset += 100) {
+  for (let page = 0; page < maxPages; page++) {
+    const offset = page * 100;
     const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`));
     const rows = data.data || [];
     for (const row of rows) {
       const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
       if (reality.class && !['fresh', null, undefined].includes(reality.class)) continue;
       const external = String(row.public_slug || row.url || '');
- if (!external || !row.url) continue;
+      if (!external || !row.url) continue;
       all.push({ external_id: external.slice(-120), payload: {
         title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.join(', ') : (row.location || null),
         url: row.url, posted_at: row.posted_at ?? null, raw: row,
