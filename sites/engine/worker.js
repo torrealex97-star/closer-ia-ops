@@ -24,6 +24,9 @@ const SOURCES = [
   // comercial/comercial 2-2, closer/núcleo) mantiene casi toda la cobertura única.
   { code: 'jobtoday-agente-comercial', name: 'JobToday Agente comercial', kind: 'jobtoday', slug: 'agente-comercial' },
   { code: 'jobtoday-vendedor', name: 'JobToday Vendedor', kind: 'jobtoday', slug: 'vendedor' },
+  // Añadido tras medir ROI 2026-10-14 (sesión 16): 48 ítems, 48 URLs únicas,
+  // 23 NUEVAS vs catálogo real — la mejor ampliación por subrequest medida.
+  { code: 'jobtoday-asesor-de-ventas', name: 'JobToday Asesor de ventas', kind: 'jobtoday', slug: 'asesor-de-ventas' },
   { code: 'himalayas', name: 'Himalayas', kind: 'himalayas' },
   { code: 'weworkremotely', name: 'We Work Remotely · ventas', kind: 'rss', slug: 'https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss' },
   // Añadidas 2026-10-13 con posibilidad de verificación real hoy:
@@ -34,14 +37,12 @@ const SOURCES = [
   { code: 'freehire', name: 'FreeHire España', kind: 'freehire', region: 'es' },
   { code: 'freehire-latam', name: 'FreeHire LATAM', kind: 'freehire', region: 'latam' },
   // ATS al final: el budget de subrequests por invocación se agotaba antes de
-  // terminar (<25 fuentes = errores 'Too many subrequests'). Las fuentes con
-  // mayor valor WDC van primero; si el budget no llega, caen las ATS
-  // de acompañamiento y el fallo queda visible en el estado de la fuente.
-  { code: 'ats-greenhouse-cabify', name: 'Cabify · Greenhouse', kind: 'greenhouse', slug: 'cabify' },
-  { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
-  { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
+  // terminar (<25 fuentes = errores 'Too many subrequests'). Recorte por ROI
+  // 2026-10-14 (sesión 16): fuera greenhouse ×3 y recruitee (4 subrequests x
+  // 4 días consecutivos de 0 elegibles); queda monestcapital (única ATS con
+  // closers reales) y ashby-pennylane (fallo 401 del proveedor visible: si
+  // reabre su board vuelve a producir; borrada escondería el hallazgo).
   { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
-  { code: 'ats-recruitee-livestorm', name: 'Livestorm · Recruitee', kind: 'recruitee', slug: 'livestorm' },
   { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
 ];
 
@@ -366,10 +367,15 @@ async function runCollection(env, force = false) {
   for (const source of SOURCES) {
     try {
       setState(source.code, { status: 'running' });
+      // Ingest diferenciada (optimización D1 2026-10-14): los external_ids con el
+      // mismo content_hash del run anterior no reescriben evidencia ni duplicados.
+      const seen = new Set();
+      for (const row of (await db.prepare('SELECT external_id, content_hash FROM raw_items WHERE org_id=? AND source=?')
+        .bind(ORG, source.code).all()).results) seen.add(`${row.external_id}|${row.content_hash}`);
       const candidates = await EXTRACTORS[source.kind](source);
       let accepted = 0;
       for (let i = 0; i < candidates.length; i += 50) {
-        await ingestBatch(db, source, candidates.slice(i, i + 50));
+        await ingestBatch(db, source, candidates.slice(i, i + 50), seen);
         accepted += Math.min(50, candidates.length - i);
         setState(source.code, { fetched: accepted, accepted });
       }
@@ -386,15 +392,29 @@ async function runCollection(env, force = false) {
   return { run_id: runId, sources: states, slug_audit: slugAudit };
 }
 
-async function ingestBatch(db, source, candidates) {
+async function ingestBatch(db, source, candidates, seen) {
+  // Camino barato vs camino completo: la hash de contenido es de {titulo, empresa, url}.
+  // Ya conocida (visto en raw_items de esta fuente): la evidencia raw es inmutable y
+  // no se reinserta; los lotes D1 son transaccionales, así que existe todo lo demás
+  // del run original → solo refresca la vigencia del catálogo (ventana 10 días).
+  // Coste: 1 escrita por oferta conocida (antes 6). Una edición real del anuncio
+  // cambia el hash y vuelve al camino completo (raw nuevo + payload + tickets).
   const captured = now();
   const statements = [];
   for (const candidate of candidates) {
     const p = candidate.payload;
     if (!p.title || !p.url) continue; // sin título o enlace no hay oferta verificable
     const contentHash = await sha256(JSON.stringify({ t: p.title, c: p.company, u: p.url }));
-    const rawId = 'raw-' + crypto.randomUUID();
     const jobId = stableId('job', `${source.code}|${candidate.external_id}`);
+    if (seen.has(`${candidate.external_id}|${contentHash}`)) {
+      statements.push(
+        db.prepare(`INSERT INTO catalog_entries (org_id,job_id,first_seen_at,expires_at) VALUES (?,?,?,?)
+          ON CONFLICT(org_id, job_id) DO UPDATE SET expires_at=excluded.expires_at`)
+          .bind(ORG, jobId, captured, new Date(Date.parse(captured) + 10 * 86400000).toISOString().replace('Z', '+00:00')),
+      );
+      continue;
+    }
+    const rawId = 'raw-' + crypto.randomUUID();
     const postingId = stableId('post', `${source.code}|${candidate.external_id}`);
     statements.push(
       db.prepare('INSERT OR IGNORE INTO raw_items (id,org_id,source,provider,external_id,content_hash,payload,captured_at) VALUES (?,?,?,?,?,?,?,?)')
