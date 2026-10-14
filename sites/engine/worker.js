@@ -17,21 +17,13 @@ const SOURCES = [
   { code: 'jobtoday-ventas', name: 'JobToday Ventas', kind: 'jobtoday', slug: 'ventas' },
   { code: 'jobtoday-comercial', name: 'JobToday Comercial', kind: 'jobtoday', slug: 'comercial' },
   // Slugs verificados hoy 2026-10-13 (200 + __NEXT_DATA__, 48–68 ofertas cada uno):
-  // cobertura comercial amplia en español (servicio al cliente, call center,
-  // ejecutivo comercial, venta asistida, agente/vendedor/representante).
-  { code: 'jobtoday-servicio-cliente', name: 'JobToday Servicio al cliente', kind: 'jobtoday', slug: 'servicio-al-cliente' },
-  { code: 'jobtoday-call-center', name: 'JobToday Call Center', kind: 'jobtoday', slug: 'call-center' },
-  { code: 'jobtoday-ejecutivo', name: 'JobToday Ejecutivo comercial', kind: 'jobtoday', slug: 'ejecutivo-comercial' },
-  { code: 'jobtoday-asistente-ventas', name: 'JobToday Asistente de ventas', kind: 'jobtoday', slug: 'asistente-de-ventas' },
+  // cobertura comercial amplia en español. Bajado a 7 slugs (2026-10-14): el budget
+  // de subrequests por invocación se agotaba y FreeHire LATAM quedaba fuera; los
+  // anuncios de JobToday se replican entre slugs y el dedup por URL los colapsa,
+  // así que conservar los slugs de mayor rendimiento (vendedor 15, agente
+  // comercial/comercial 2-2, closer/núcleo) mantiene casi toda la cobertura única.
   { code: 'jobtoday-agente-comercial', name: 'JobToday Agente comercial', kind: 'jobtoday', slug: 'agente-comercial' },
   { code: 'jobtoday-vendedor', name: 'JobToday Vendedor', kind: 'jobtoday', slug: 'vendedor' },
-  { code: 'jobtoday-representante', name: 'JobToday Representante', kind: 'jobtoday', slug: 'representante' },
-  { code: 'ats-greenhouse-cabify', name: 'Cabify · Greenhouse', kind: 'greenhouse', slug: 'cabify' },
-  { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
-  { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
-  { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
-  { code: 'ats-recruitee-livestorm', name: 'Livestorm · Recruitee', kind: 'recruitee', slug: 'livestorm' },
-  { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
   { code: 'himalayas', name: 'Himalayas', kind: 'himalayas' },
   { code: 'weworkremotely', name: 'We Work Remotely · ventas', kind: 'rss', slug: 'https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss' },
   // Añadidas 2026-10-13 con posibilidad de verificación real hoy:
@@ -41,6 +33,16 @@ const SOURCES = [
   { code: 'getonbrd', name: 'Get on Board · ventas', kind: 'getonbrd' },
   { code: 'freehire', name: 'FreeHire España', kind: 'freehire', region: 'es' },
   { code: 'freehire-latam', name: 'FreeHire LATAM', kind: 'freehire', region: 'latam' },
+  // ATS al final: el budget de subrequests por invocación se agotaba antes de
+  // terminar (<25 fuentes = errores 'Too many subrequests'). Las fuentes con
+  // mayor valor WDC van primero; si el budget no llega, caen las ATS
+  // de acompañamiento y el fallo queda visible en el estado de la fuente.
+  { code: 'ats-greenhouse-cabify', name: 'Cabify · Greenhouse', kind: 'greenhouse', slug: 'cabify' },
+  { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
+  { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
+  { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
+  { code: 'ats-recruitee-livestorm', name: 'Livestorm · Recruitee', kind: 'recruitee', slug: 'livestorm' },
+  { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
 ];
 
 // ------ utilidades ------
@@ -78,10 +80,21 @@ async function sourceJobToday(source) {
   return rows.slice(0, MAX_ITEMS_PER_SOURCE).map(row => {
     const external = String(row.key || row.canonicalUrl || '');
     if (!external) return null;
+    // Modelo real de JobToday (verificado contra payloads 2026-10-14):
+    // título del puesto en row.role, entidad contratante en companyName,
+    // dirección legible en row.address, cuerpo completo en row.description,
+    // fecha como createDate (epoch ms) o postedSecondsAgo (edad). Si el
+    // extractor usa claves que no existen (title, workplaceAddress) el
+    // ingestBatch descarta silenciosamente cada candidato: no hay ofertas.
+    const postedAt = row.createDate ? new Date(Number(row.createDate)).toISOString()
+      : (row.postedSecondsAgo != null ? new Date(Date.now() - Number(row.postedSecondsAgo) * 1000).toISOString() : null);
     return { external_id: external, payload: {
-      title: pick(row, 'title', 'positionName'), company: pick(row, 'company', 'companyName'),
-      location: pick(row, 'workplaceAddress', 'location', 'city'), url: row.canonicalUrl ? `https://jobtoday.com${row.canonicalUrl}` : null,
-      salary: pick(row, 'salary'), posted_at: row.createDate ? new Date(row.createDate).toISOString() : null, raw: row,
+      title: pick(row, 'title', 'positionName', 'role', 'companyName'),
+      company: row.companyName ?? row.company?.name ?? null,
+      location: pick(row, 'address', 'workplaceAddress', 'location', 'city'),
+      url: row.canonicalUrl ? (row.canonicalUrl.startsWith('http') ? row.canonicalUrl : `https://jobtoday.com${row.canonicalUrl}`) : null,
+      salary: pick(row, 'salary'),
+      posted_at: postedAt, raw: row,
     } };
   }).filter(Boolean);
 }
@@ -403,12 +416,79 @@ async function ingestBatch(db, source, candidates) {
 }
 
 // ------ API de lectura ------
+// Vocabulario canónico de la app (apps/api/career/vocabulary.py, ROLE_FAMILIES,
+// términos ya plegados): el motor cloud clasifica con la misma lista de verdad
+// que presentation.py, ahora mismo espejada aquí. Actualizado 2026-10-14.
 const ROLE_KEYWORDS = {
-  closer: ['closer', 'cierre de ventas', 'comercial de cierre'],
-  setter: ['setter', 'qualificador'],
-  cold_caller: ['cold call', 'telemarketing', 'televentas', 'televendedor'],
-  account_executive: ['account executive', 'ejecutivo comercial', 'executive'],
-  sdr: ['sdr', 'sales development'],
+  closer: [
+    'closer', 'closer de ventas', 'closer comercial', 'closer high ticket',
+    'high ticket closer', 'high-ticket closer', 'closer high-ticket', 'closer de alto ticket', 'closer senior', 'closer b2c',
+    'closer b2b', 'closer remoto', 'closser', 'clouser', 'sales closer',
+    'especialista en cierre', 'experto en cierre de ventas', 'cerrador de ventas',
+    'cerrador comercial', 'cerrador high ticket', 'cerrador de ventas inmobiliarias',
+    'cerradora de ventas', 'comercial closer', 'vendedor consultivo',
+    'asesor de ventas consultivas', 'venta consultiva', 'ventas consultivas',
+    'consultative sales', 'solution selling', 'ventas complejas',
+    'full-cycle sales', 'full cycle sales', 'end-to-end sales',
+    'closing specialist', 'closing consultant', 'conversion specialist',
+    'enrollment advisor', 'enrollment counselor', 'enrollment specialist',
+    'enrollment consultant', 'admissions advisor', 'admissions associate',
+    'admissions counselor', 'admissions officer', 'admissions consultant',
+    'asesor de admisiones', 'asesora de admisiones', 'asesor/a de admisiones',
+    'agente de admisiones', 'especialista de admisiones', 'ejecutivo de admisiones',
+    'admisiones', 'asesor educativo', 'asesora educativa', 'consultor educativo',
+    'orientador academico', 'orientadora academica', 'orientador educativo',
+    'asesor de formacion', 'asesor comercial educativo', 'asesor de matricula',
+    'ejecutivo de matricula', 'asesor de bootcamp', 'venta de formacion',
+    'venta de cursos', 'venta de masters', 'venta de bootcamps',
+    'student advisor', 'student enrollment advisor', 'student recruitment advisor',
+    'programme advisor', 'program advisor', 'education advisor',
+    'academic advisor', 'course advisor', 'bootcamp advisor',
+    'patient advisor', 'patient coordinator', 'treatment coordinator',
+    'treatment consultant', 'healthcare sales', 'medical sales advisor',
+    'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones',
+  ],
+  setter: [
+    'setter', 'appointment setter', 'sales setter', 'high-ticket setter',
+    'high ticket setter', 'setter de ventas', 'setter comercial', 'setter digital',
+    'setter b2b', 'setter b2c', 'setter closer', 'setter/closer', 'setter + closer',
+    'appointment booker', 'appointment coordinator', 'agendador de citas',
+    'agendadora de citas', 'generador de citas', 'concertador de citas',
+    'concertador comercial', 'captador de citas', 'captador de leads',
+    'cualificador de leads', 'calificador de leads', 'lead qualifier',
+    'lead qualification specialist', 'sales appointment setter',
+    'business appointment setter', 'teleconcertador', 'teleoperador comercial',
+    'lead generation specialist', 'lead generation',
+    'especialista en generacion de leads', 'especialista en prospeccion',
+  ],
+  cold_caller: [
+    'cold caller', 'cold calling', 'llamadas en frio',
+    'prospector telefonico', 'prospectora telefonica', 'prospeccion telefonica',
+  ],
+  account_executive: [
+    'account executive', 'ejecutivo de cuentas', 'ejecutiva de cuentas',
+    'account manager', 'sales executive', 'sales consultant', 'sales advisor',
+    'sales specialist', 'sales representative', 'commercial advisor',
+    'commercial executive', 'business development executive',
+    'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas',
+    'ejecutiva de ventas', 'asesor comercial', 'asesora comercial',
+    'asesor/a comercial', 'asesor comercial senior', 'representante comercial',
+    'representante de ventas', 'representante de ventas senior', 'agente comercial',
+    'agente de ventas', 'gestor comercial', 'gestora comercial', 'gestor de ventas',
+    'especialista comercial', 'profesional de ventas', 'tecnico comercial',
+    'tecnica comercial', 'televendedor', 'televendedora', 'televentas',
+    'telemarketing', 'ventas telefonicas', 'ventas por videollamada',
+    'consultor comercial', 'consultora comercial', 'consultor de ventas',
+    'asesor de ventas', 'asesora de ventas',
+    'asesor de programas', 'asesor de cursos', 'asesor de masters',
+    'comercial digital', 'comercial online', 'inside sales',
+    'inside sales representative', 'inside sales specialist',
+    'inbound sales representative', 'outbound sales representative',
+    'business development manager',
+    'sales account executive', 'senior sales executive', 'remote sales consultant',
+    'high-ticket sales consultant', 'high ticket sales consultant',
+  ],
+  sdr: ['sdr', 'bdr', 'sales development', 'sales development representative'],
 };
 // Señal fuerte de mercado España: la palabra España/país/ciudad explícita o 'remoto' en español.
 // No se usa 'es' ni 'europe' como hints sueltos (subcadenas triviales y demasiados falsos positivos);
@@ -533,10 +613,13 @@ const LANG_EN = /\b(?:english|ingles)\b/;
 function spainSignal(p) { return ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase().includes(k)); }
 function nonSpain(p) { return NON_ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''}`.toLowerCase().includes(k)); }
 
-const ROLE_EVAL_ORDER = ['cold_caller', 'setter', 'closer', 'account_executive', 'sdr'];
+const ROLE_EVAL_ORDER = ['closer', 'setter', 'cold_caller', 'account_executive', 'sdr'];
 function classifyRole(p, text) {
   // Determinista y con la misma prioridad que presentation.py: primero el título de toda
   // la vida, después la evidencia en el texto de la oferta; nunca se inventa familia.
+  // 'closer' va primero (2026-10-14): su keyword es la menos ambigua y los títulos
+  // combinados 'Setter y Closer de Ventas' (núcleo exacto del perfil WDC) no deben
+  // clasificarse como setter solo por el orden de evaluación.
   for (const role of ROLE_EVAL_ORDER) {
     if (ROLE_KEYWORDS[role].some(k => fold(p.title ?? '').includes(k))) return role;
   }
@@ -585,8 +668,15 @@ async function handleStudentSearch(request, env) {
       if (!MARKET_HINTS[market].some(k => hay.includes(k))) continue;
     }
     const description = descriptionOf(p);
-    const langES = (description.match(LANG_ES) || []).length >= 3;
-    const enRequired = Boolean(description.match(LANG_EN)) && Boolean(description.match(LANG_EN_REQ));
+    // El regex de lexemas va sin acentos: se evalúa sobre el texto plegado (fold),
+    // nunca sobre el original — 'formación' sin plegar no matchea 'formacion'.
+    const hayES = fold(description);
+    // Portugués ≠ español: los lexémas legales compuestos se confunden al plegar
+    // ('vendas' tiene forma ES distinta, 'comissões'→'comissoes', 'você'→'voce').
+    // Un anuncio portugués nunca es oferta en español, ni siquiera opt-in bilingüe.
+    if (/\b(?:vendas|voce|comissoes|portugues|brasil)\b/.test(hayES)) continue;
+    const langES = (hayES.match(LANG_ES) || []).length >= 3;
+    const enRequired = Boolean(hayES.match(LANG_EN)) && Boolean(hayES.match(LANG_EN_REQ));
     if (!includeBilingual && (!langES || enRequired)) continue;
     if (p.url && evidence.has(p.url)) continue;
     evidence.add(p.url);
@@ -599,10 +689,14 @@ async function handleStudentSearch(request, env) {
       pay = salary.trim();
       note = VARIABLE_WORDS.test(fold(pay)) ? 'La parte variable no es un ingreso garantizado.' : 'Importe anunciado; confirma periodicidad y condiciones.';
     } else if (salary && typeof salary === 'object') {
+      // JobToday expresa paga no estructurada como texto libre (extraOptions:
+      // 'Comisiones', 'Salario + comisiones'): se expone tal cual, con su nota.
+      const extra = typeof salary.extraOptions === 'string' && salary.extraOptions.trim() ? salary.extraOptions.trim() : null;
       const low = salary.from ?? salary.min; const high = salary.to ?? salary.max;
       const amount = v => Number(v) ? String(Math.round(Number(v))).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : null;
       if (low && high) pay = `${amount(low)} – ${amount(high)} ${salary.currencyCode ?? ''}`.trim();
       else if (low || high) pay = `${low ? 'Desde' : 'Hasta'} ${amount(low ?? high)} ${salary.currencyCode ?? ''}`.trim();
+      else if (extra) pay = extra;
       if (pay !== 'Importe no publicado') {
         note = VARIABLE_WORDS.test(fold(pay)) ? 'La parte variable no es un ingreso garantizado.' : 'Importe anunciado; confirma periodicidad y condiciones.';
       }
