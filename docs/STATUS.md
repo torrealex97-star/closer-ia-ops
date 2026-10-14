@@ -1,5 +1,36 @@
 # Estado
 
+## Análisis del embudo por fuente y ROI de subrequests — 2026-10-14 (sesión 16)
+
+- Objetivo: tras una recogida completa con el código de `main` (los 4 fixes pendientes de deploy), recomendar por números qué fuente ampliar y cuál retirar. Metodología: wrangler dev local con D1 limpia + recogida forzada (`run-5aa36213`, 18/18 fuentes completadas; la cola ATS completó todas porque workerd local no tiene el límite de subrequests de producción — en producción ese presupuesto sigue siendo el factor real), tabla desde `/api/funnel` + desglose de la vista alumna desde `/v1/opportunities/search`.
+
+| fuente | subreq | revisadas | elegibles | eleg/sub | nota |
+|---|---|---|---|---|---|
+| FreeHire ES (3 págs) | 3 | 238 | **25** | **8.3** | mejor agregador; 23 AE + 2 SDR, 0 closer |
+| JobToday vendedor | 1 | 48 | **14** | **14.0** | antes "todo dedup", hoy top: deriva de datos, no fiable como promedio |
+| JobToday comercial / agente-comercial / ventas | 3×1 | 48×3 | 8 juntos | ~2.7 c/u | motor estable de AE |
+| GetOnBoard (2 págs) | 2 | 62 | 7 | **3.5** | 2 closers ES reales + 3 AE + 2 SDR |
+| FreeHire LATAM (1 pág) | 1 | 55 | 3 | 3.0 | |
+| Himalayas (3 términos) | 3 | 54 | 5 | 1.7 | pero: **20 de los 24 closers bilingües** → es el motor de closer, ROI por rol no por cómputo plano |
+| JobToday closer/telemarketing/remoto | 3×1 | 15/37/73 | **0** | 0 | el slug núcleo `closer-de-ventas` hoy trae feed corto (15) y envejecido (5 en catálogo, 0 elegibles hoy) — deriva del día, no motivo de retirarlo |
+| WWR | 1 | 100 | 0 ES | — | control de mercado; 1 closer inglés con bilingüe on |
+| Greenhouse ×3 (cabify/wallapop/typeform) | 3 | 86 | **0** | 0 | 3 subrequests sin elegibles |
+| Recruitee Livestorm | 1 | 2 | **0** | 0 | |
+| Ashby Pennylane | 1 | – | 0 | 0 | HTTP 401 del proveedor, preexistente |
+| Teamtailor Monest | 1 | 5 | 0 hoy | — | sus 2 closers del día 13 caducaron del filtro de frescura |
+
+- **Vista alumna del lote**: Spanish-puro 62 elegibles (52 AE, 4 closer, 5 SDR, 1 setter), selección 5; bilingüe on → 255 (closer 24: himalayas 20, getonbrd 2, WWR 1, vendedor 1). Closer ES-puro 4.
+- **Slugs JobToday candidatos medidos contra el catálogo real hoy** (fetch del sitio + comparación de URLs canónicas contra las 745 del catálogo):
+  - **asesor-de-ventas: 48 ítems, 48 URLs únicas, 23 NUEVAS** → ~23 postings nuevas por 1 subrequest; a la conversión observada de slugs comercial (~28 % día-1) estimo ~6-7 elegibles/subrequest: la mejor ampliación disponible.
+  - ventas-b2b: 81 ítems, 33 únicas, 17 nuevas → subrequest con solape alto entre slugs; segunda opción.
+- **Recomendación por ROI** (a aplicar tras el deploy en producción):
+  1. **Añadir `jobtoday-asesor-de-ventas`** (+1 subrequest, ~2/3 del valor medido de freehire página extra sin su coste de 3).
+  2. **Retirar 4 ATS del tail**: greenhouse ×3 + recruitee (4 subrequests, 0 elegibles sostenidos). Con eso el budget de producción GANA 3 subrequests netos aún sumando el slug nuevo.
+  3. **Mantener teamtailor-monestcapital** (única ATS que ha dado closers reales, 1 subrequest) y WWR (control, ya documentado) y el slug núcleo closer (el 0 de hoy es deriva del feed).
+  4. **Himalayas se mantiene**: su ROI anémico en cómputo plano engaña — con bilingüe on aporta 83 % del suministro de closer, el rol escaso del embudo.
+  5. Presupuesto D1: el slug nuevo añade ~48 filas (raw+posting+job+catálogo+opportunity) por recogida; la cuota diaria de escritas (10k) ya se agota algunos días — la optimización del ingest (no reintentar filas ya presentes) sigue siendo la palanca estructural pendiente.
+- Limitaciones honestas: conversión estimada de asesor-de-ventas, no verificada in-ingest (exigiría añadir el slug y recoger de verdad); el ROI por día fluctúa con la rotación de las listas (vendedor 0→14 en un día); en producción la cola ATS puede quedar cortada por presupuesto real, así que retirarla de SOURCES la elimina tam bien del fallo visible.
+
 ## Endpoint /api/funnel con revisadas→elegibles→seleccionadas por fuente — 2026-10-14 (sesión 15)
 
 - Objetivo: poder vigilar el embudo por fuente sin scripts externos. Añadido `GET /api/funnel` (solo lectura, mismo público que /api/status) en [sites/engine/worker.js](sites/engine/worker.js).
