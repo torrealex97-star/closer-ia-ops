@@ -19,6 +19,7 @@
 | ATS monestcapital | 5 | 2 | **2** | 2 closers reales (High-Ticket trading) |
 
 - **Fix aplicado en workerd en [sites/engine/worker.js](sites/engine/worker.js)**: `descriptionOf` ahora lee `raw.attributes?.description` (nivel JSON:API de GetOnBoard); además el texto de clasificación de roles usa ese mismo cuerpo plegado (`fold`) en vez de un campo inexistente del payload. Resultado E2E local: **closer ES-puro 4→6, bilingüe opt-in 20→26, total ES 44→51**; GetOnBoard aporta 7 de esos elegibles (antes 0). Coste del fix: CERO subrequests extra.
+- **Seleccionadas (top de excelencia) por fuente**, mismo lote del día: GetOnBoard 2, Himalayas 2, JobToday Comercial remoto 1, JobToday Vendedor 1, jobtoday-servicio-cliente 1 (posting de la era de 12 slugs aún viva en el catálogo). Nota de atribución: el dedup por URL asigna cada anuncio a la primera fuente de la operación, así que la columna por fuente es aproximada dentro de la familia JobToday.
 - **Decisión de ampliación por ROI (subrequest→elegible ES)**:
   1. **FreeHire ES página 3** (+1 subrequest ≈ +100 revisadas ≈ +13 elegibles): mejor ratio disponible hoy.
   2. **JobToday slugs de closer puro saturados**: el feed de `closer-de-ventas` es corto (5–17 anuncios); validar nuevos (`ventas-b2b` 81 offers, `asesor-de-ventas` 48 verificado 2026-10-14 con 200+payload) medida su conversion incremental real tras dedup — no añadir a ciegas.
