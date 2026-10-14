@@ -204,7 +204,11 @@ async function sourceFreehire(source) {
   if (source.region === 'latam') params.set('regions', 'latam');
   // LATAM es el pool más grande y el último en la secuencia de subrequests del run;
   // a 2 páginas siguió agotando la cuota del plan: queda a 1 página (100 más recientes).
-  const maxPages = source.region === 'latam' ? 1 : 2;
+  // ES a 3 páginas (2026-10-14): la página 3 (offset 200) midió 14 elegibles
+  // ES por 100 revisadas, la mejor de las tres: p1 4, p2 9 — la p1 está llena de
+  // fichas repintadas que el filtro reality descarta). Coste: +1 subrequest que
+  // absorbe la cola ATS.
+  const maxPages = source.region === 'latam' ? 1 : 3;
   const all = [];
   for (let page = 0; page < maxPages; page++) {
     const offset = page * 100;

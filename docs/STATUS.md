@@ -1,5 +1,14 @@
 # Estado
 
+## FreeHire España a 3 páginas: +12 elegibles ES netos por +1 subrequest — 2026-10-14 (sesión 14)
+
+- Objetivo: añadir la página 3 de FreeHire ES y medir el aporte incremental real con el budget de subrequests actual.
+  - **Medición directa de las 3 páginas de la API (100 ads/página, filtros vigentes del worker replicados)**: p1 +0 → 4 elegibles (27 fichas repintadas); p2 +100 → 9 (22 repintadas); **p3 +200 → 14 elegibles (14 account_executive, 0 closer, 12 repintadas, 1 PT)** — la mejor conversión (14%) porque las páginas profundas están más frescas y el filtro reality limpia la p1.
+  - **Cambio en [sites/engine/worker.js](sites/engine/worker.js)**: `maxPages` de FreeHire pasa de 2 a 3 para región ES (LATAM sigue a 1 por su pool mayor). Coste: +1 subrequest por invocación.
+  - **Verificación E2E en workerd (recogida completa)**: freehire ES pasa de ~150 a **239 postings (239 URLs únicas, cero duplicados internos)**; elegibles de FreeHire ES en la superficie: 13 → **25 (+12 netos)**; embudo total ES: 51 → **62** (la diferencia −1 la absorbe el dedup con otras fuentes). Closer ES se queda en 6 (la p3 aporta AE, no closer). Ninguna fuente cayó por budget en el local (solo Ashby 401 del proveedor, preexistente).
+  - **Coste de producción esperado**: la cola ATS pierde 1 fuente más (3 completa hoy → previsiblemente 2); todas las fuentes WDC siguen completando. A verificar en el próximo deploy (cuota D1 writes, reset 00:00 UTC), junto con filtro PT + fix GetOnBoard.
+- Nota honesta: el aporte es en account_executive, perfecto para el perfil comercial digital completo de la alumna; el perfil closer no mejora con esta página.
+
 ## Análisis del embudo diario por fuente + fix GetOnBoard (descripciones anidadas) — 2026-10-14 (sesión 13)
 
 - Objetivo: medir revisadas → elegibles → seleccionadas por fuente para decidir qué ampliar primero. Datos del catálogo D1 con los filtros vigentes del worker replicados en script (revisadas = postings guardados, elegibles = pasan rol+idioma+recencia con dedup URL, seleccionadas = top de excelencia (is_selected/excellence_rank de la vista alumna)).
