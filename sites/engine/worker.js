@@ -635,18 +635,12 @@ function classifyRole(p, text) {
   return null;
 }
 
-async function handleStudentSearch(request, env) {
+// Núcleo de la vista alumna, compartido por /v1/opportunities/search y /api/funnel:
+// mismo gate de rol/idioma/dedupe y mismo ranking, sin duplicar la lógica.
+// opts: { role, market, days, includeBilingual, starredOnly, includeExtraRoles }.
+// Devuelve { ranked, total, selectionTotal }: solo lectura del catálogo.
+async function studentSurface(env, { role, market, days, includeBilingual, starredOnly, includeExtraRoles }) {
   const db = env.DB;
-  await ensureSchema(db);
-  let body;
-  try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 }); }
-  const role = body?.role ?? null;
-  if (role && !ROLE_KEYWORDS[role]) return Response.json({ detail: 'Perfil no válido' }, { status: 422 });
-  const market = ['any', 'ES', 'EU', 'LATAM', 'US'].includes(body?.market) ? body.market : 'any';
-  const days = Number.isInteger(body?.days) && body.days >= 1 && body.days <= 10 ? body.days : 10;
-  const includeBilingual = body?.include_bilingual === true;
-  const starredOnly = body?.starred_only === true;
-  const includeExtraRoles = body?.include_extra_roles !== false;
 
   const rows = await db.prepare(`
     SELECT j.id AS job_id, j.starred AS starred, p.payload AS payload, p.source AS source, c.expires_at
@@ -735,6 +729,7 @@ async function handleStudentSearch(request, env) {
       description,
       published_at: isoWhen(p.posted_at) ?? null,
       expires_at: row.expires_at,
+      source_code: row.source,
       source_name: SOURCES.find(s => s.code === row.source)?.name ?? row.source,
       source_url: p.url,
       starred: Boolean(row.starred),
@@ -771,8 +766,22 @@ async function handleStudentSearch(request, env) {
     offer.excellence_rank = selectedIds.has(offer.id) ? index + 1 : null;
     offer.is_selected = selectedIds.has(offer.id);
   });
-  return Response.json({ items: ranked, total: ranked.length, selection_total: selected.length },
-    { headers: corsHeaders(request) });
+  return { ranked, total: ranked.length, selectionTotal: selected.length };
+}
+
+async function handleStudentSearch(request, env) {
+  await ensureSchema(env.DB);
+  let body;
+  try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 }); }
+  const role = body?.role ?? null;
+  if (role && !ROLE_KEYWORDS[role]) return Response.json({ detail: 'Perfil no válido' }, { status: 422 });
+  const market = ['any', 'ES', 'EU', 'LATAM', 'US'].includes(body?.market) ? body.market : 'any';
+  const days = Number.isInteger(body?.days) && body.days >= 1 && body.days <= 10 ? body.days : 10;
+  const includeBilingual = body?.include_bilingual === true;
+  const starredOnly = body?.starred_only === true;
+  const includeExtraRoles = body?.include_extra_roles !== false;
+  const { ranked, total, selectionTotal } = await studentSurface(env, { role, market, days, includeBilingual, starredOnly, includeExtraRoles });
+  return Response.json({ items: ranked, total, selection_total: selectionTotal }, { headers: corsHeaders(request) });
 }
 
 async function handleStar(request, env, jobId) {
@@ -785,6 +794,62 @@ async function handleStar(request, env, jobId) {
     .bind(body.starred ? 1 : 0, jobId, ORG).run();
   if (!result.meta.changes) return Response.json({ detail: 'Oferta no encontrada' }, { status: 404 });
   return Response.json({ ok: true }, { headers: corsHeaders(request) });
+}
+
+// Embudo por fuente (solo lectura): revisadas del último run (estado por fuente,
+// la misma contabilidad honesta de aceptadas que deja el run), catálogo vivo por
+// fuente y elegibles/seleccionadas del catálogo con la vista alumna por defecto
+// (ES por gate, bilingüe opt-in off, frescura 10 días). Los elegibles son del
+// catálogo actual, no delta del run: el mismo cuerpo alimenta varias recogidas.
+async function handleFunnel(env) {
+  const db = env.DB;
+  await ensureSchema(db);
+  const { ranked, selectionTotal } = await studentSurface(env, {
+    role: null, market: 'any', days: 10, includeBilingual: false,
+    starredOnly: false, includeExtraRoles: true,
+  });
+  const bySource = new Map(SOURCES.map(s => [s.code, {
+    code: s.code, name: s.name, elegible: 0, seleccionada: 0, roles: {},
+  }]));
+  for (const offer of ranked) {
+    const row = bySource.get(offer.source_code);
+    if (!row) continue;
+    row.elegible += 1;
+    if (offer.is_selected) row.seleccionada += 1;
+    row.roles[offer.role] = (row.roles[offer.role] ?? 0) + 1;
+  }
+  const cat = await db.prepare(`
+    SELECT p.source AS code, count(*) AS n FROM catalog_entries c
+    JOIN jobs j ON j.org_id=c.org_id AND j.id=c.job_id
+    JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+    WHERE c.org_id=? AND c.expires_at > ? GROUP BY p.source`).bind(ORG, now()).all();
+  for (const row of cat.results) {
+    const entry = bySource.get(row.code);
+    if (entry) entry.catalogo = row.n;
+  }
+  const run = await db.prepare('SELECT id,day,status,sources FROM collection_runs WHERE org_id=? ORDER BY created_at DESC LIMIT 1').bind(ORG).first();
+  const postFor = new Map(((run && JSON.parse(run.sources)) || []).map(s => [s.code, s]));
+  const sources = [...bySource.values()].filter(r => r.catalogo || postFor.has(r.code)).map(r => {
+    const post = postFor.get(r.code);
+    return {
+      ...r,
+      revisadas: post ? post.accepted : null,
+      run_status: post ? post.status : null,
+      fuente: post && post.status !== 'completed' ? (post.warning || undefined) : undefined,
+    };
+  });
+  return Response.json({
+    engine: 'closer-ia-ops-engine', org: ORG,
+    generated_at: now(),
+    last_run: run ? { id: run.id, day: run.day, status: run.status } : null,
+    totales: {
+      revisadas: sources.reduce((n, s) => n + (s.revisadas ?? 0), 0),
+      catalogo: sources.reduce((n, s) => n + (s.catalogo ?? 0), 0),
+      elegible: ranked.length,
+      seleccionada: selectionTotal,
+    },
+    sources,
+  });
 }
 
 async function handleStatus(env) {
@@ -824,6 +889,7 @@ export default {
       return handleOffers(request, env, url);
     }
     if (url.pathname === '/api/status') return handleStatus(env);
+    if (url.pathname === '/api/funnel') return handleFunnel(env);
     if (url.pathname === '/api/audit') return handleAudit(request, env);
     if (url.pathname === '/api/collect' && request.method === 'POST') {
       if (!env.COLLECT_TOKEN || request.headers.get('X-Collect-Token') !== env.COLLECT_TOKEN) {

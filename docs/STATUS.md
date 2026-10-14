@@ -1,5 +1,15 @@
 # Estado
 
+## Endpoint /api/funnel con revisadas→elegibles→seleccionadas por fuente — 2026-10-14 (sesión 15)
+
+- Objetivo: poder vigilar el embudo por fuente sin scripts externos. Añadido `GET /api/funnel` (solo lectura, mismo público que /api/status) en [sites/engine/worker.js](sites/engine/worker.js).
+  - **Refactor previo**: el núcleo de la vista alumna se extrajo a `studentSurface(env, opts)` (mismo gate de rol/idioma/dedupe y ranking exactos); `handleStudentSearch` lo reutiliza y `/api/funnel` solo agrega — sin duplicar lógica de filtrado en dos ramas.
+    - El campo `source_code` se añade a los items de la búsqueda (los contratos del frontend generan sus tipos desde OpenAPI de la app local; el surface cloud es JSON flexible y granularmente versionado a mano).
+  - **Respuesta**: `totales` (revisadas del último run, catálogo vivo, elegibles, seleccionadas), `sources` por código con `revisadas` (aceptadas del último run), `run_status`/warning de la fuente, `catalogo` (postings vivas), `elegible` y `seleccionada` (aggregados del catálogo con la vista por defecto: bilingüe off, frescura 10 días) y desglose `roles`. Los elegibles son del catálogo actual, no deltas por run: el mismo cuerpo alimenta varias recogidas entre regeneraciones.
+  - **Verificación en workerd**: regresión de la búsqueda intacta (total 62, closer 6 con el catálogo actual); /api/funnel devuelve la tabla completa (freehire 239 revisadas/25 elegibles, getonbrd 62/7 con 2 seleccionadas, WWR 105/0, greenhouse 0 elegibles…), total revisadas 922, catálogo 840, elegible 62, seleccionada 6.
+  - **Prueba de no-regresión con código anterior paralelo** (puertos 8797/8798 sobre el mismo catálogo): closer+bilingüe = 18 en ambos — la diferencia con las 26 de la mañana es deriva de datos (ofertas que cruzan el límite de frescura entre recogidas y rotación de listas de las fuentes), no efecto del refactor. Documentado para evitar alarmas futuras.
+  - **Deploy**: pendiente al reset de cuota como la sesión 14 (viaja con filtro PT, fix GetOnBoard y la página 3 de FreeHire).
+
 ## FreeHire España a 3 páginas: +12 elegibles ES netos por +1 subrequest — 2026-10-14 (sesión 14)
 
 - Objetivo: añadir la página 3 de FreeHire ES y medir el aporte incremental real con el budget de subrequests actual.
