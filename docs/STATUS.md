@@ -23,7 +23,7 @@
 - **Regla de decisión pre-comprometida para el slug nuevo** (mide el embudo real del slug en producción tras la primera recogida post-deploy y ajusta si conviene; así la decisión es mecánica, no subjetiva): leer en `/api/funnel` el campo `jobs` y `elegible` de `jobtoday-asesor-de-ventas` tras la 1ª recogida y tras 48 h de recogidas reales.
   - ≥3 elegibles ES/día sostenidos → se mantiene (est. workerd: 11 el día 1).
   - 1-2/día → se mantiene 7 días más (el coste es 1 subrequest; bajo ese ratio sigue siendo rentable frente al pool de AE de freehire p3, 4.7/sub).
-  - ~0 con ≥40 revisadas → retirar (como greenhouse/recruitee) y dar el subrequest a probar `ventas-b2b` (33 únicas/17 nuevas medidas el城乡 16).
+  - ~0 con ≥40 revisadas → retirar (como greenhouse/recruitee) y dar el subrequest a probar `ventas-b2b` (33 únicas / 17 nuevas, medidas en la sesión 16).
   - La retirada/añadido SIEMPRE leyendo finnel real, nunca el ratio del día 1 solo (lección vendedor: 0→14 en un día).
 
 ## Recambio de fuentes por ROI + ingest D1 barato (causa raíz de las pausas diarias) — 2026-10-14 (sesión 17)
