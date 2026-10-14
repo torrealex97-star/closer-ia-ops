@@ -1,5 +1,32 @@
 # Estado
 
+## Análisis del embudo diario por fuente + fix GetOnBoard (descripciones anidadas) — 2026-10-14 (sesión 13)
+
+- Objetivo: medir revisadas → elegibles → seleccionadas por fuente para decidir qué ampliar primero. Datos del catálogo D1 con los filtros vigentes del worker replicados en script (revisadas = postings guardados, elegibles = pasan rol+idioma+recencia con dedup URL, seleccionadas = top de excelencia (is_selected/excellence_rank de la vista alumna)).
+
+| fuente | revisadas | elegibles ES | closer ES | nota |
+|---|---|---|---|---|
+| JobToday closer-de-ventas | 5 | **5 (100%)** | **5** | núcleo exacto del perfil pero feed corto |
+| JobToday ventas/comercial/agente-comercial | 48–49 c/u | 13–14 c/u (27–29%) | 0 | motor de AE |
+| JobToday remoto/telemarketing | 25/11 | 4/6 | 2/0 | |
+| JobToday vendedor | 49 | con dup: +15 en superficie | 0 | todo duplicado de otros slugs por URL |
+| Himalayas | 51 | 5 | 1 | +18 closers vía opt-in bilingüe (EN/ES dual) |
+| WWR | 105 | **0** | 0 | 100% inglés; sigue solo por feed de control |
+| GetOnBoard | 62 | **0 → 7 con el fix de hoy** | 0 → **2** | descripción anidada en `attributes.description` que `descriptionOf` no miraba |
+| FreeHire ES | 152 | 13 (9%) | 0 | coste 2 subrequests |
+| FreeHire LATAM | 55 | 3 (5%) | 0 | 9 PT rechazados con el filtro nuevo |
+| ATS greenhouse (cabify/wallapop/typeform) | 86 | 0 | 0 | 82 sin_rol (no son perfiles WDC) |
+| ATS monestcapital | 5 | 2 | **2** | 2 closers reales (High-Ticket trading) |
+
+- **Fix aplicado en workerd en [sites/engine/worker.js](sites/engine/worker.js)**: `descriptionOf` ahora lee `raw.attributes?.description` (nivel JSON:API de GetOnBoard); además el texto de clasificación de roles usa ese mismo cuerpo plegado (`fold`) en vez de un campo inexistente del payload. Resultado E2E local: **closer ES-puro 4→6, bilingüe opt-in 20→26, total ES 44→51**; GetOnBoard aporta 7 de esos elegibles (antes 0). Coste del fix: CERO subrequests extra.
+- **Decisión de ampliación por ROI (subrequest→elegible ES)**:
+  1. **FreeHire ES página 3** (+1 subrequest ≈ +100 revisadas ≈ +13 elegibles): mejor ratio disponible hoy.
+  2. **JobToday slugs de closer puro saturados**: el feed de `closer-de-ventas` es corto (5–17 anuncios); validar nuevos (`ventas-b2b` 81 offers, `asesor-de-ventas` 48 verificado 2026-10-14 con 200+payload) medida su conversion incremental real tras dedup — no añadir a ciegas.
+  3. **Duplicados de JobToday**: los 7 slugs comparten el mismo anuncio; si el budget aprieta, quitar `vendedor` (todo dedup) liberaría 1 subrequest sin perder ofertas visibles salvo la atribución de fuente.
+  4. **ATS greenhouse ×3 (0 elegibles, 3 subrequests)**: candidatos a retirar del tail si se necesita budget; monestcapital se queda (2 closers reales).
+  5. **WWR**: 0 elegibles ES pero cero costo neto — decisión de mantener-la documentada como control de mercado inglés.
+- Deploy pendiente de la cuota diaria D1 writes (reset 00:00 UTC): este fix viaja con el de la sesión 12 (filtro PT) en el próximo deploy + collect. Verificado solo en workerd; producción sin verificar hasta entonces.
+
 ## Motor corregido y deployado en producción: embudo closer medido en el dominio — 2026-10-14 (sesión 12) [commit a01a6d6, push a main]
 
 - Objetivo del turno: deployar al reset de cuota lo pendiente de la sesión 11 y monstrar y corregir los bugs reales que aparecieron en producción. Cuatro bugs encontrados, verificados en workerd y corregidos en [sites/engine/worker.js](sites/engine/worker.js):

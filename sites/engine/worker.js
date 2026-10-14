@@ -588,7 +588,9 @@ function plain(value) {
 // ningún campo se inventa: si la fuente no trae cuerpo, la ficha queda honestamente vacía.
 function descriptionOf(p) {
   const raw = p.raw ?? {};
-  return plain(raw.description || raw.descriptionDeMarkdown || raw.content || raw.jobDescription
+  // GetOnBoard (JSON:API) anida el cuerpo en attributes.description: con solo el
+  // listado raíz el gate no ve español y la fuente entera caía a 0 elegibles.
+  return plain(raw.description || raw.attributes?.description || raw.descriptionDeMarkdown || raw.content || raw.jobDescription
     || raw.excerpt || raw.descriptionPlain || '');
 }
 
@@ -656,8 +658,12 @@ async function handleStudentSearch(request, env) {
   for (const row of rows.results) {
     if (starredOnly && !row.starred) continue;
     const p = JSON.parse(row.payload);
-    const text = `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase();
-    const derivedRole = classifyRole(p, text);
+    // El cuerpo vive en el raw de la fuente (attributes.description en JSON:API,
+    // raw.description en RSS): es la misma evidencia que usa el gate de idioma,
+    // plegada para matchear los lexemas canónicos sin acento.
+    const description = descriptionOf(p);
+    const text = `${p.title ?? ''} ${p.location ?? ''} ${description}`;
+    const derivedRole = classifyRole(p, fold(text));
     if (!derivedRole) continue; // sin clasificación determinista no pasa como superficie alumna
     if (role && derivedRole !== role) continue;
     if (market === 'ES') {
@@ -667,7 +673,6 @@ async function handleStudentSearch(request, env) {
       const hay = fold(`${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`);
       if (!MARKET_HINTS[market].some(k => hay.includes(k))) continue;
     }
-    const description = descriptionOf(p);
     // El regex de lexemas va sin acentos: se evalúa sobre el texto plegado (fold),
     // nunca sobre el original — 'formación' sin plegar no matchea 'formacion'.
     const hayES = fold(description);
