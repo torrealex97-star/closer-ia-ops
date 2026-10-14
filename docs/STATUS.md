@@ -1,5 +1,12 @@
 # Estado
 
+## Cron del engine: handler verificado y manifest preparado (sesión 18) — 2026-10-14
+
+- Objetivo del paso 3 de la hoja de ruta: refresco automático por trigger programado sin depender de lecturas lazy. Dos piezas listas y una pendiente del reset de cuota:
+  - **Handler `scheduled()` verificado en workerd** (`wrangler dev --test-scheduled`, D1 limpia): `GET /__scheduled?cron=0 */6 * * *` → "Ran scheduled event" y la recogida completa corrió sola hasta `completed 15/15` (rec-adsor de la sesión 17); y el segundo tick inmediato **se saltó** la recogida (mismo run id/completed_at en `/api/status`): el umbral de 6 h anti-duplicados del engine hace de guardia con cron cada 6 h — dos ticks no fabrican dos recogidas.
+  - **Manifest del cron preparado en fichero separado** [deploy-manifest-cron.json](sites/engine/deploy-manifest-cron.json): igual que el normal + `"crons": ["0 */6 * * *"]` (cada 6 h). El schema de Sites deploy no document ese campo: se DEPLOYA EN PREVIEW primero y se lee el receipt — si rechaza el campo, se deploya producción con el manifest normal y el refresco sigue siendo perezoso (sin impacto). Si preview lo acepta, la subida a producción usa este fichero.
+- Pendiente tras el reset de 00:00 UTC: deploy del cron en preview → receipt → producción (viaja con los 6 fixes de las sesiones 14-17).
+
 ## Recambio de fuentes por ROI + ingest D1 barato (causa raíz de las pausas diarias) — 2026-10-14 (sesión 17)
 
 - Objetivo: aplicar los pasos menos bloqueantes de la hoja de ruta a 100 % mientras el deploy espera el reset de cuota. Dos cambios en [sites/engine/worker.js](sites/engine/worker.js), verificados con doble recogida real en workerd.
