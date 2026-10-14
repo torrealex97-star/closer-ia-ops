@@ -1,5 +1,20 @@
 # Estado
 
+## Refresco condicional de vigencia: ofertas conocidas cuestan 0 escritas en la mayoría de los ticks (sesión 19) — 2026-10-14
+
+- **Causa/finalidad:** tras el ingest barato quedaba el último componente que aún escalaba con el tamaño del catálogo: el refresco de vigencia (1 escrita por oferta conocida POR TICK, ~40 escritas por oferta en su vida útil de 10 días con tick cada 6 h). Ahora el refresco es condicional: solo se paga cuando la ventana de 10 días queda a punto de vencer (<2 días de vida) o si la fila del catálogo no existe/carece de fecha (defensa anti-huérfano). Una oferta conocida pasa de ~40 escritas de vigencia en su vida a **1-2**. El presupuesto diario estimado del ingest baja de ~1,6-2,5k a **~1,3k escritas/día** con los mismos datos.
+  - Implementación en [worker.js](sites/engine/worker.js): constantes `CATALOG_WINDOW_MS` (10 d, antes inline) y `REFRESH_AHEAD_MS` (2 d); la precarga por fuente cambia a un JOIN (raw_items→job_postings→jobs→catalog_entries LEFT) que trae `expires_at` por candidata conocida, y el camino barato hace `continue` a coste 0 mientras `expires_at > ahora + 2 días`. Las invariantes del repo no cambian: raw sigue inmutable/append-only y una edición real del anuncio (hash distinto) va al camino completo.
+- **Verificación en workerd real** (wrangler dev + D1 limpia con `--persist-to` fresco, mismas 15 fuentes: 14 completed + 1 preexistente Ashby Pennylane 401; 794 raws en la collect 1 → 798 tras goteo de tablas en vivo; `node --check` PASS):
+  - **Collect 2 (todo fresco) → 0 escritas de catálogo**: checksum SQL byte-idéntico de `expires_at`/`first_seen_at` (n=792, suma en segundos exacta) antes/después. Sin esta mejora, este tick habría pagado 792 escritas.
+  - **Collect 3 (rama "por vencer")**: 5 filas retro-fechadas a +1 día con `UPDATE` directos (simulación de envejecimiento) y recogida forzada → las 5 refrescadas a **+10,00 días** en el mismo tick, **sin tocar** las 787 originales (checksum: el delta total del día lo explican con exactitud las 5 filas refrescadas; las ofertas nuevas del camino completo se auditan aparte).
+  - **Collect 4 steady state → de nuevo idéntica** (n=798, checksums exp/fs iguales): estado estable verificado dos veces.
+  - Sanity de lecturas tras la edición: `/api/status` (800 raws), `/api/funnel` y `POST /v1/opportunities/search` (61 items, shape `items`) leen el catálogo con vigencia condicional. Servidor de prueba detenido y puerto 8799 libre.
+- **Ahorro estimado**: el camino barato pagaba 1 escrita/oferta/tick → con ~1.000 ofertas conocidas serían ~4.000 escritas/día (el 40% del techo de 10k SOLO en refrescos redundantes); con la ventana condicional se elimina casi todo ese volumen de refrescos innecesarios. El contador real de escritas se mide en el production deploy después del reset de cuota.
+- **Nota de staging (instrucciones):** el `.dev.vars` de la copia en /tmp de pruebas sobrescribe el `COLLECT_TOKEN` de `[vars]` (causa del 401 inicial del test); hay que cambiar ese valor del `.dev.vars` (no se imprime) o eliminar el fichero;
+- Suite backend: 163 passed (sin cambios Python; cinta de no-regresión). Sin enriquecimiento de IA ejecutado.
+
+## Cron del engine: handler verificado y manifest preparado (sesión 18) — 2026-10-14
+
 ## Cron del engine: handler verificado y manifest preparado (sesión 18) — 2026-10-14
 
 - Objetivo del paso 3 de la hoja de ruta: refresco automático por trigger programado sin depender de lecturas lazy. Dos piezas listas y una pendiente del reset de cuota:

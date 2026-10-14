@@ -7,6 +7,12 @@ const ORG = 'cloud-wdc';
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36';
 const COLLECTION_INTERVAL_MS = 6 * 60 * 60 * 1000; // refresco si la última recogida > 6 h
 const MAX_ITEMS_PER_SOURCE = 300;
+// Vigencia del catálogo: ventana de 10 días; el refresco (escrita D1) solo se
+// paga cuando la ventana queda a punto de vencer (< REFRESH_AHEAD_MS de vida).
+// Con tick cada 6 h, una oferta conocida pasa de ~40 escritas de vigencia en su
+// vida útil a ~1-2: el componente que aún escalaba con el catálogo cae ~10×.
+const CATALOG_WINDOW_MS = 10 * 86400000;
+const REFRESH_AHEAD_MS = 2 * 86400000;
 
 // Fuentes públicas de España verificadas (JobToday slugs canónicos verificados 2026-10-09;
 // ATS de la watchlist WDC; sin claves ni scraping autenticado).
@@ -367,15 +373,25 @@ async function runCollection(env, force = false) {
   for (const source of SOURCES) {
     try {
       setState(source.code, { status: 'running' });
-      // Ingest diferenciada (optimización D1 2026-10-14): los external_ids con el
-      // mismo content_hash del run anterior no reescriben evidencia ni duplicados.
-      const seen = new Set();
-      for (const row of (await db.prepare('SELECT external_id, content_hash FROM raw_items WHERE org_id=? AND source=?')
-        .bind(ORG, source.code).all()).results) seen.add(`${row.external_id}|${row.content_hash}`);
+      // Ingest diferenciada (optimización D1 2026-10-14 + refresco condicional):
+      // los external_ids con el mismo content_hash del run anterior no reescriben
+      // evidencia ni duplicados; y de cada uno traemos la vigencia vigente del
+      // catálogo para decidir en el camino barato si toca refrescar o seguir 0-coste.
+      const known = new Map(); // `${external_id}|${content_hash}` → expires_at (ms)
+      for (const row of (await db.prepare(
+        `SELECT r.external_id AS external_id, r.content_hash AS content_hash, c.expires_at AS expires_at
+           FROM raw_items r
+           JOIN job_postings p ON p.org_id=r.org_id AND p.source=r.source AND p.external_id=r.external_id
+           JOIN jobs j ON j.org_id=p.org_id AND j.posting_id=p.id
+           LEFT JOIN catalog_entries c ON c.org_id=j.org_id AND c.job_id=j.id
+          WHERE r.org_id=? AND r.source=?`)
+        .bind(ORG, source.code).all()).results) {
+        known.set(`${row.external_id}|${row.content_hash}`, row.expires_at ? Date.parse(row.expires_at) : NaN);
+      }
       const candidates = await EXTRACTORS[source.kind](source);
       let accepted = 0;
       for (let i = 0; i < candidates.length; i += 50) {
-        await ingestBatch(db, source, candidates.slice(i, i + 50), seen);
+        await ingestBatch(db, source, candidates.slice(i, i + 50), known);
         accepted += Math.min(50, candidates.length - i);
         setState(source.code, { fetched: accepted, accepted });
       }
@@ -392,13 +408,14 @@ async function runCollection(env, force = false) {
   return { run_id: runId, sources: states, slug_audit: slugAudit };
 }
 
-async function ingestBatch(db, source, candidates, seen) {
+async function ingestBatch(db, source, candidates, known) {
   // Camino barato vs camino completo: la hash de contenido es de {titulo, empresa, url}.
   // Ya conocida (visto en raw_items de esta fuente): la evidencia raw es inmutable y
   // no se reinserta; los lotes D1 son transaccionales, así que existe todo lo demás
-  // del run original → solo refresca la vigencia del catálogo (ventana 10 días).
-  // Coste: 1 escrita por oferta conocida (antes 6). Una edición real del anuncio
-  // cambia el hash y vuelve al camino completo (raw nuevo + payload + tickets).
+  // del run original. La vigencia del catálogo solo se refresca cuando la ventana
+  // (10 días) queda por vencer (< REFRESH_AHEAD_MS): mientras esté fresca, 0 escritas.
+  // Una edición real del anuncio cambia el hash y vuelve al camino completo
+  // (raw nuevo + payload + tickets).
   const captured = now();
   const statements = [];
   for (const candidate of candidates) {
@@ -406,11 +423,14 @@ async function ingestBatch(db, source, candidates, seen) {
     if (!p.title || !p.url) continue; // sin título o enlace no hay oferta verificable
     const contentHash = await sha256(JSON.stringify({ t: p.title, c: p.company, u: p.url }));
     const jobId = stableId('job', `${source.code}|${candidate.external_id}`);
-    if (seen.has(`${candidate.external_id}|${contentHash}`)) {
+    const knownExpiry = known.get(`${candidate.external_id}|${contentHash}`);
+    if (Number.isFinite(knownExpiry) && knownExpiry > Date.parse(captured) + REFRESH_AHEAD_MS) continue;
+    // Vigencia fresca: la fila del catálogo sigue viva > REFRESH_AHEAD_MS → 0 escritas.
+    if (known.has(`${candidate.external_id}|${contentHash}`)) {
       statements.push(
         db.prepare(`INSERT INTO catalog_entries (org_id,job_id,first_seen_at,expires_at) VALUES (?,?,?,?)
           ON CONFLICT(org_id, job_id) DO UPDATE SET expires_at=excluded.expires_at`)
-          .bind(ORG, jobId, captured, new Date(Date.parse(captured) + 10 * 86400000).toISOString().replace('Z', '+00:00')),
+          .bind(ORG, jobId, captured, new Date(Date.parse(captured) + CATALOG_WINDOW_MS).toISOString().replace('Z', '+00:00')),
       );
       continue;
     }
@@ -425,7 +445,7 @@ async function ingestBatch(db, source, candidates, seen) {
       db.prepare('INSERT OR IGNORE INTO jobs (id,org_id,posting_id) VALUES (?,?,?)').bind(jobId, ORG, postingId),
       db.prepare(`INSERT INTO catalog_entries (org_id,job_id,first_seen_at,expires_at) VALUES (?,?,?,?)
         ON CONFLICT(org_id, job_id) DO UPDATE SET expires_at=excluded.expires_at`)
-        .bind(ORG, jobId, captured, new Date(Date.parse(captured) + 10 * 86400000).toISOString().replace('Z', '+00:00')),
+        .bind(ORG, jobId, captured, new Date(Date.parse(captured) + CATALOG_WINDOW_MS).toISOString().replace('Z', '+00:00')),
       db.prepare('INSERT OR IGNORE INTO opportunities (id,org_id,job_id,editorial_status,opportunity_status,connection_type,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)')
         .bind('opp-' + jobId.slice(4), ORG, jobId, 'draft', 'verifying', 'external_application', captured, captured),
       db.prepare(`INSERT OR IGNORE INTO opportunity_versions (id,org_id,opportunity_id,version,payload,created_by,created_at)
