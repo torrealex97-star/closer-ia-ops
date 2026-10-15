@@ -441,6 +441,41 @@ function versionPayloadError(payload) {
   return null;
 }
 
+async function handleAdminDetail(request, env, opportunityId) {
+  // Detalle para la UI del panel web (port fase 4): snapshot del anuncio original
+  // (raw, inmutado), payload real de la versión actual (sea raw-shape del collector
+  // o presentación de una revisión) y vigencia. La UI mapea ambas formas de payload;
+  // nunca inventa campos que el payload no trae.
+  const db = env.DB;
+  await ensureSchema(db);
+  const row = await db.prepare(
+    `SELECT o.id AS opportunity_id, o.current_version_id, o.editorial_status, o.opportunity_status, o.connection_type, o.created_at, o.updated_at,
+            j.id AS job_id, p.source, p.payload AS posting_payload, p.external_id
+       FROM opportunities o
+       JOIN jobs j ON j.org_id=o.org_id AND j.id=o.job_id
+       JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+      WHERE o.org_id=? AND o.id=?`).bind(ORG, opportunityId).first();
+  if (!row) return Response.json({ detail: 'Oportunidad no encontrada' }, { status: 404 });
+  // OJO: el alias del id es opportunity_id (row.id no existe en este SELECT):
+  // bindear una columna inexistente llegó a D1 como undefined (500 en workerd).
+  const version = row.current_version_id
+    ? await db.prepare('SELECT version, locale, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? AND id=?').bind(ORG, row.opportunity_id, row.current_version_id).first()
+    : await db.prepare('SELECT version, locale, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? ORDER BY version DESC LIMIT 1').bind(ORG, row.opportunity_id).first();
+  const vig = await db.prepare('SELECT expires_at FROM catalog_entries WHERE org_id=? AND job_id=?').bind(ORG, row.job_id).first();
+  const expiresMs = vig?.expires_at ? Date.parse(vig.expires_at) : NaN;
+  const posting = JSON.parse(row.posting_payload);
+  return Response.json({
+    id: row.opportunity_id, job_id: row.job_id, source: row.source, external_id: row.external_id,
+    editorial_status: row.editorial_status, opportunity_status: row.opportunity_status,
+    connection_type: row.connection_type, created_at: row.created_at, updated_at: row.updated_at,
+    version: version?.version ?? null, version_locale: version?.locale ?? null,
+    version_payload: version ? JSON.parse(version.payload) : null,
+    job_snapshot: { title: posting.title ?? null, company: posting.company ?? null, location: posting.location ?? null,
+      salary: posting.salary ?? null, posted_at: posting.posted_at ?? null, source_url: posting.url ?? null, source: row.source },
+    vigencia: { expires_at: vig?.expires_at ?? null, activa: Number.isFinite(expiresMs) && Date.now() < expiresMs },
+  }, { headers: corsHeaders(request) });
+}
+
 async function handleAdminReview(request, env, opportunityId) {
   let body;
   try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo JSON inválido' }, { status: 400 }); }
@@ -1105,10 +1140,9 @@ export default {
       // válida 401. Los gastos (Apify/AI/SerpApi) NO viven aquí.
       const adminCheck = requireAdmin(request, env);
       if (adminCheck) return adminCheck;
-      if (request.method === 'PATCH') {
-        if (!adminMatch[1]) return Response.json({ detail: 'Ruta no disponible en modo hospedado' }, { status: 404 });
-        return handleAdminReview(request, env, adminMatch[1]);
-      }
+      if (request.method === 'PATCH' && adminMatch[1]) return handleAdminReview(request, env, adminMatch[1]);
+      if (request.method === 'GET' && adminMatch[1]) return handleAdminDetail(request, env, adminMatch[1]);
+      if (!adminMatch[1] && request.method === 'PATCH') return Response.json({ detail: 'PATCH requiere el id de la oportunidad: /v1/admin/opportunities/{id}' }, { status: 404 });
       const p = url.searchParams;
       const status = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'].includes(p.get('status') || '') ? p.get('status') : null;
       const source = /^[a-z0-9-]{1,40}$/.test(p.get('source') || '') ? p.get('source') : null;
