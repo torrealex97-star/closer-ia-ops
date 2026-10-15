@@ -384,6 +384,17 @@ async function handleAudit(request, env) {
   return Response.json({ ...result, cached: false, forced: force }, { headers: corsHeaders(request) });
 }
 
+// ------ admin (lector del panel cloud, sesión 27) ------
+// El panel admin de la app vive por turnos en el Mac (FastAPI/SQLite). Este port a
+// internet va por fases; fase 1 = lectura del catálogo cloud. GATE: la cabecera
+// X-Admin-Token debe coincidir con el secreto ADMIN_TOKEN; si no existe, 401
+// (seguro por defecto: sin token desplegado, la superficie admin está cerrada).
+function requireAdmin(request, env) {
+  if (!env.ADMIN_TOKEN) return Response.json({ detail: 'Admin no configurado en el engine' }, { status: 403 });
+  if (request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN) return Response.json({ detail: 'No autorizado' }, { status: 401 });
+  return null;
+}
+
 // ------ recogida ------
 async function runCollection(env, force = false) {
   const db = env.DB;
@@ -970,6 +981,34 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(request) });
+    if (url.pathname === '/v1/admin/opportunities') {
+      // Superficie admin de LECTURA del catálogo cloud (port fase 1 del panel, sesión 27):
+      // listado editorial con filtros básicos. Protegida por ADMIN_TOKEN (secreto de
+      // producción); sin cabecera válida 401. Los gastos (Apify/AI/SerpPy) NO viven aquí.
+      const adminCheck = requireAdmin(request, env);
+      if (adminCheck) return adminCheck;
+      const p = url.searchParams;
+      const status = ['draft', 'approved', 'rejected', 'published'].includes(p.get('status') || '') ? p.get('status') : null;
+      const source = /^[a-z0-9-]{1,40}$/.test(p.get('source') || '') ? p.get('source') : null;
+      const limit = Math.min(Math.max(Number(p.get('limit')) || 50, 1), 200);
+      const rows = await env.DB.prepare(`
+        SELECT o.id AS opportunity_id, o.org_id, o.editorial_status, o.opportunity_status, o.connection_type, o.created_at, o.updated_at,
+               j.id AS job_id, p.source, p.payload
+          FROM opportunities o
+          JOIN jobs j ON j.org_id=o.org_id AND j.id=o.job_id
+          JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+         WHERE o.org_id=? ${status ? 'AND o.editorial_status=?' : ''} ${source ? 'AND p.source=?' : ''}
+         ORDER BY o.created_at DESC LIMIT ?`).bind(ORG, ...(status ? [status] : []), ...(source ? [source] : []), limit).all();
+      const counter = await env.DB.prepare(`
+        SELECT editorial_status, COUNT(*) AS n FROM opportunities WHERE org_id=? GROUP BY editorial_status`).bind(ORG).all();
+      const items = rows.results.map(r => {
+        const payload = JSON.parse(r.payload);
+        return { id: r.id, job_id: r.job_id, original_title: payload.title ?? null, company: payload.company ?? null, source_url: payload.url ?? null,
+          source: r.source, editorial_status: r.editorial_status, opportunity_status: r.opportunity_status,
+          connection_type: r.connection_type, created_at: r.created_at, updated_at: r.updated_at };
+      });
+      return Response.json({ items, total: rows.results.length, counts: Object.fromEntries(counter.results.map(c => [c.editorial_status, c.n])) }, { headers: corsHeaders(request) });
+    }
     if (url.pathname === '/api/offers') {
       // Refresco perezoso: si la última recogida es vieja, lanza una en segundo plano sin bloquear la lectura.
       ctx.waitUntil(runCollection(env).catch(() => {}));
