@@ -342,14 +342,20 @@ async function handleAudit(request, env) {
   const db = env.DB;
   await ensureSchema(db);
   const day = dayKey();
-  const existing = await db.prepare(
-    'SELECT source,slug,status,http_status,canonical_url,renamed_from,checked_at FROM slug_audit WHERE org_id=? AND day=? ORDER BY source')
-    .bind(ORG, day).all();
-  if (existing.results.length >= jobTodaySources().length) {
-    return Response.json({ day, cached: true, slugs: existing.results }, { headers: corsHeaders(request) });
+  // ?force=1: rerun en vivo del audit (8 fetches HTTP en su propia petición, con
+  // el presupuesto de subrequests entero). Útil cuando el audit diario se escribió
+  // desde un run con el presupuesto ya tapado; la fila del día mane igual (DO NOTHING).
+  const force = new URL(request.url).searchParams.get('force') === '1';
+  if (!force) {
+    const existing = await db.prepare(
+      'SELECT source,slug,status,http_status,canonical_url,renamed_from,checked_at FROM slug_audit WHERE org_id=? AND day=? ORDER BY source')
+      .bind(ORG, day).all();
+    if (existing.results.length >= jobTodaySources().length) {
+      return Response.json({ day, cached: true, slugs: existing.results }, { headers: corsHeaders(request) });
+    }
   }
   const result = await runSlugAudit(env);
-  return Response.json({ ...result, cached: false }, { headers: corsHeaders(request) });
+  return Response.json({ ...result, cached: false, forced: force }, { headers: corsHeaders(request) });
 }
 
 // ------ recogida ------
@@ -365,6 +371,8 @@ async function runCollection(env, force = false) {
   }
   const runId = 'run-' + crypto.randomUUID();
   const day = dayKey();
+  // Primera vez del día: audit de slugs antes del ingest (presupuesto de subrequests fresco).
+  const slugAudit = await ensureDaySlugAudit(env).catch(error => ({ error: String(error.message || error).slice(0, 200) }));
   const states = SOURCES.map(s => ({ code: s.code, name: s.name, status: 'queued', fetched: 0, accepted: 0 }));
   await db.prepare('INSERT INTO collection_runs (id,org_id,day,status,sources,created_at) VALUES (?,?,?,?,?,?)')
     .bind(runId, ORG, day, 'running', JSON.stringify(states), now()).run();
@@ -402,9 +410,8 @@ async function runCollection(env, force = false) {
   }
   await db.prepare('UPDATE collection_runs SET status=?, sources=?, completed_at=? WHERE id=?')
     .bind('completed', JSON.stringify(states), now(), runId).run();
-  // Audit de slugs forma parte de la recogida: si un slug cambió, el resultado lo muestra
-  // como renamed/gone antes de que el extractor falle.
-  const slugAudit = await runSlugAudit(env).catch(error => ({ error: String(error.message || error).slice(0, 200) }));
+  // El resultado del audit diario (corrido al principio de este run) viaja en la respuesta:
+  // si un slug cambió, el operador lo ve renamed/gone antes de que el extractor falle.
   return { run_id: runId, sources: states, slug_audit: slugAudit };
 }
 
