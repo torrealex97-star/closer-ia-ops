@@ -75,6 +75,13 @@ ROLE_FAMILIES = {
         'telemarketing', 'ventas telefonicas', 'ventas por videollamada',
         'consultor comercial', 'consultora comercial', 'consultor de ventas',
         'asesor de ventas', 'asesora de ventas',
+        # Variantes con barra del mercado español, plegadas con evidencia del slug
+        # asesor-de-ventas (sesión 22, 2026-10-15): 17/48 anuncios comerciales reales
+        # quedaban sin familia. La familia closer NO se pliega (ver worker.js).
+        'asesor/a de ventas',
+        'asesor inmobiliario', 'asesor/a inmobiliario', 'asesor/a inmobiliario/a',
+        'asesores inmobiliarios', 'agente inmobiliario', 'agentes inmobiliarios',
+        'agente inmobiliario/a', 'vendedor', 'vendedora', 'vendedor/a',
         'asesor de programas', 'asesor de cursos', 'asesor de masters',
         'comercial digital', 'comercial online', 'inside sales',
         'inside sales representative', 'inside sales specialist',

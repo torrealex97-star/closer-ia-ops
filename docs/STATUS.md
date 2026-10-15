@@ -1,5 +1,14 @@
 # Estado
 
+## Vocabulario de roles plegado con evidencia del embudo: 17/48 sin familia → 5 y +10 elegibles ES (sesión 22) — 2026-10-15
+
+- **Análisis pedido**: revisar con las elegibles de `jobtoday-asesor-de-ventas` si el vocabulario closer debe pligarse con más sinónimos del mercado español y qué fuga generaba.
+- **Método**: los 48 anuncios con URL del slug (HTTP real, `__NEXT_DATA__`) pasados por un clasificador espejo del engine (mismos `ROLE_KEYWORDS`, `ROLE_EVAL_ORDER` y gates). Resultado ANTES: 29 AE + 2 closer + **17 sin familia** (fuga real del embudo, ~35% del slug). DEPUÉS con los sinónimos añadidos: 43 clasificados + 5 realmente ambiguos (‘Asesor/a’ liso de gimnasio, ‘Asesor/a Energético’, ‘Asesores y Jefes de Equipo’ — fuera a propósito, no se inventa familia sin evidencia).
+- **Decisión sobre la familia closer (no se pliega)**: los 2 closer del slug son legítimos con evidencia literal (‘venta consultiva’, ‘asesor de admisiones’) y plegar `asesor comercial` / `asesor de ventas` liso hacia closer re-clasificaría ~30 anuncios de AE y diluiría el cierre puro. El orden de evaluación (closer primero) ya garantiza que un servicio educativo/admisiones vaya a closer por su lexema específico; el AE liso (energía, seguros, inmobiliario) es honestamente account_executive.
+- **Lexemes añadidos a account_executive** ([worker.js](sites/engine/worker.js) y espejo [vocabulary.py](apps/api/career/vocabulary.py)): `asesor/a de ventas` (la variante con barra no existía), `asesor inmobiliario`, `asesor/a inmobiliario/a`, `asesores inmobiliarios`, `agente inmobiliario`, `agentes inmobiliarios`, `vendedor`, `vendedora`, `vendedor/a`. Fuera a propósito: título jefatura, genérico comercial liso (riesgo de direcciones comerciales sin exclusión explícita en el espejo cloud).
+- **Efecto medido en producción** (deploy receipt `succeeded`, idempotencia `11de3f20`, op `f6bafe3f`, 16:04 UTC; la clasificación es en lectura, no precisa collect): `/v1/opportunities/search` {} 48→**59 items**, ES 32→**42**; familia closer intacta (3 ES; seleccionadas 4). El embudo `/api/funnel` reflejará el delta en la próxima recogida (hoy trae el corte del último run).
+- **Regression**: nuevo test en [test_opportunities.py](tests/test_opportunities.py) — variantes con barra/inmobiliarias → account_executive, admisiones+venta consultiva sigue closer, ‘Asesor/a’ liso ambiguo → None. Suite Python del módulo: 23/23 PASS.
+
 ## «Al menos 10-20 buenas ofertas» en la vista alumna: bucket ampliado + cobertura closer (sesión 21) — 2026-10-15
 
 - **Petición**: tras ver que el filtro «España + Closer» devuelve 3 ofertas, presentar ≥10-20 buenas al usuario de la vista alumna sin inventar elegibilidad.

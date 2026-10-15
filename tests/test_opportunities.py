@@ -168,3 +168,19 @@ def test_cold_caller_presentation_uses_canonical_vocabulary(monkeypatch):
     monkeypatch.setitem(ROLE_FAMILIES, 'cold_caller', [*ROLE_FAMILIES['cold_caller'], 'prospector de llamadas salientes'])
     assert professional_role('Prospector de llamadas salientes', '') == 'cold_caller'
     assert professional_role('Coordinación telefónica de soporte', '') is None
+
+
+def test_variantes_con_barra_e_inmobiliarias_pliegan_en_account_executive():
+    """Sesión 22 (evidencia del slug asesor-de-ventas): 17/48 anuncios comerciales reales
+    quedaban sin familia por variantes no plegadas. La familia closer no se pliega:
+    los títulos consultivos/admisiones ganan por orden de evaluación, y el AE liso
+    ('asesor comercial' energía, seguros) sigue siendo account_executive."""
+    from career.presentation import professional_role
+    for title in ['Asesor/a de Ventas', 'ASESOR INMOBILIARIO', 'Asesor/a Inmobiliario/a',
+                  'AGENTE INMOBILIARIO/A – CAPTACIÓN Y VENTAS', 'Vendedor/a',
+                  'Asesor/a Comercial Energía | fijo + comisiones']:
+        assert professional_role(title, 'Ventas y captación de inmuebles. Comisiones.') == 'account_executive', title
+    # Cierre consultivo/admisiones con evidencia literal sigue siendo closer:
+    assert professional_role('Asesor/a de Admisiones y Ventas', 'venta consultiva y cierre de matrículas') == 'closer'
+    # Ambiguos honestos sin familia (no se inventa):
+    assert professional_role('Asesor/a', 'gimnasio y fitness') is None
