@@ -395,6 +395,120 @@ function requireAdmin(request, env) {
   return null;
 }
 
+// ------ admin (port fase 2: revisión editorial, sesión 28) ------
+// MISMO CONTRATO que POST /opportunities/{id}/review del núcleo local (domain.py):
+// la revisión crea una versión NUEVA e inmutable y mueve el puntero; el raw y las
+// versiones previas no cambian. El payload es reemplazo completo con extra=forbid
+// (un campo desconocido del formulario se NOMBRA en el 422; no se descarta en silencio).
+// Reglas de publicación espejadas: sin modalidad determinada no se publica;
+// no se publica cerrada; el siguiente paso solo con vigencia activa verificada;
+// con vigencia activa el CTA se habilita solo (aquí la vigencia es catalog_entries).
+const EDITORIAL_STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
+const APPLICATION_TYPES = ['company_ats', 'external_platform', 'marketplace', 'wdc_referral', 'email', 'contact_form', 'community_contact', 'unknown'];
+const LIST_FIELDS = ['what_they_are_looking_for', 'what_you_would_do', 'language_requirements', 'why_it_may_be_interesting'];
+const STR_FIELDS = ['headline', 'role', 'short_summary', 'compensation_summary', 'location_summary', 'experience_summary'];
+const NEXT_STEP_FIELDS = ['action', 'label', 'destination_label', 'destination_domain', 'requires_account', 'enabled', 'disabled_reason'];
+
+function versionPayloadError(payload) {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return 'version_payload debe ser un objeto';
+  const unknown = Object.keys(payload).filter(k => !STR_FIELDS.includes(k) && !LIST_FIELDS.includes(k)
+    && !['application_type', 'application_url', 'next_step'].includes(k));
+  if (unknown.length) return 'Campos no permitidos en version_payload: ' + unknown.sort().join(', ');
+  for (const f of ['headline', 'role']) {
+    if (typeof payload[f] !== 'string' || !payload[f].trim()) return `${f}: Field required (cadena no vacía)`;
+  }
+  for (const f of STR_FIELDS) {
+    if (payload[f] !== undefined && typeof payload[f] !== 'string') return `${f}: debe ser cadena`;
+  }
+  for (const f of LIST_FIELDS) {
+    if (payload[f] !== undefined && (!Array.isArray(payload[f]) || payload[f].some(x => typeof x !== 'string')))
+      return `${f}: debe ser lista de cadenas`;
+  }
+  if (payload.application_type !== undefined && !APPLICATION_TYPES.includes(payload.application_type))
+    return 'application_type: valor fuera del vocabulario canónico';
+  if (payload.application_url !== undefined && payload.application_url !== null
+      && !/^https:\/\//.test(payload.application_url))
+    return 'application_url: debe ser https pública (no se permiten direcciones locales)';
+  if (payload.next_step !== undefined) {
+    const ns = payload.next_step;
+    if (typeof ns !== 'object' || ns === null || Array.isArray(ns)) return 'next_step: debe ser objeto';
+    const extra = Object.keys(ns).filter(k => !NEXT_STEP_FIELDS.includes(k));
+    if (extra.length) return 'Campos no permitidos en next_step: ' + extra.sort().join(', ');
+    if ('enabled' in ns && typeof ns.enabled !== 'boolean') return 'next_step.enabled: debe ser booleano';
+    if ('action' in ns && typeof ns.action !== 'string') return 'next_step.action: debe ser cadena';
+    if ('label' in ns && typeof ns.label !== 'string') return 'next_step.label: debe ser cadena';
+  }
+  return null;
+}
+
+async function handleAdminReview(request, env, opportunityId) {
+  let body;
+  try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo JSON inválido' }, { status: 400 }); }
+  if (typeof body !== 'object' || body === null) return Response.json({ detail: 'Cuerpo JSON inválido' }, { status: 400 });
+  const { editorial_status, version_payload, locale, reviewed_by } = body;
+  const finalLocale = locale === undefined ? 'es' : locale;
+  if (!EDITORIAL_STATUSES.includes(editorial_status))
+    return Response.json({ detail: 'editorial_status: valor fuera del vocabulario canónico (draft|needs_review|approved|published|withdrawn)' }, { status: 422 });
+  if (!['es', 'en'].includes(finalLocale)) return Response.json({ detail: 'locale: debe ser es o en' }, { status: 422 });
+  if (reviewed_by !== undefined && reviewed_by !== null && typeof reviewed_by !== 'string')
+    return Response.json({ detail: 'reviewed_by: debe ser cadena o null' }, { status: 422 });
+  const validation = versionPayloadError(version_payload);
+  if (validation) return Response.json({ detail: validation }, { status: 422 });
+
+  const db = env.DB;
+  await ensureSchema(db);
+  const row = await db.prepare('SELECT * FROM opportunities WHERE org_id=? AND id=?').bind(ORG, opportunityId).first();
+  if (!row) return Response.json({ detail: 'Oportunidad no encontrada' }, { status: 404 });
+  // Puntero con fallback: los items recogidos antes de setear current_version_id
+  // en el ingest (sesión 28) siguen revisables si su versión inicial existe.
+  let previousVersionId = row.current_version_id;
+  if (!previousVersionId) {
+    const prev = await db.prepare('SELECT id FROM opportunity_versions WHERE org_id=? AND opportunity_id=? ORDER BY version DESC LIMIT 1').bind(ORG, row.id).first();
+    previousVersionId = prev?.id ?? null;
+  }
+  if (!previousVersionId) return Response.json({ detail: 'La oportunidad no tiene versión que revisar' }, { status: 409 });
+
+  // Reglas de publicación (domain.py) con la vigencia real del catálogo cloud:
+  // duration activa = catalog_entries.expires_at en el futuro.
+  const payload = JSON.parse(JSON.stringify(version_payload));
+  if (payload.next_step === undefined) payload.next_step = { enabled: false };
+  const vig = await db.prepare('SELECT expires_at FROM catalog_entries WHERE org_id=? AND job_id=?').bind(ORG, row.job_id).first();
+  const expiresMs = vig?.expires_at ? Date.parse(vig.expires_at) : NaN;
+  const vigenciaActiva = Number.isFinite(expiresMs) && Date.now() < expiresMs;
+  // En el cloud la fila está 'verifying' hasta que exista verificación dedicada:
+  // vigencia vencida del catálogo = cerrada para la regla de publicación
+  // (verificado en workerd 2026-10-15: sin esto, una vencida se publicaba).
+  const cerrada = row.opportunity_status === 'closed' || (Number.isFinite(expiresMs) && !vigenciaActiva);
+  if (editorial_status === 'published') {
+    if ((payload.application_type ?? 'unknown') === 'unknown')
+      return Response.json({ detail: 'No se publica sin modalidad de candidatura determinada; usa needs_review' }, { status: 422 });
+    if (cerrada) return Response.json({ detail: 'No se publica una oportunidad cerrada' }, { status: 409 });
+    if (payload.next_step.enabled && !vigenciaActiva)
+      return Response.json({ detail: 'El siguiente paso solo se habilita con vigencia activa verificada' }, { status: 409 });
+  }
+  // Con vigencia activa el CTA se habilita solo: su disponibilidad deriva de la
+  // verificación, no de que el operador recuerde un flag oculto.
+  if (vigenciaActiva && payload.application_url && !payload.next_step.enabled) {
+    payload.next_step.enabled = true;
+    delete payload.next_step.disabled_reason;
+  }
+  const maxVersion = await db.prepare('SELECT max(version) AS v FROM opportunity_versions WHERE org_id=? AND opportunity_id=?').bind(ORG, row.id).first();
+  const created = now();
+  const newId = 'ver-' + crypto.randomUUID();
+  await db.batch([
+    db.prepare(`INSERT INTO opportunity_versions (id,org_id,opportunity_id,version,locale,payload,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)`)
+      .bind(newId, ORG, row.id, (maxVersion?.v ?? 0) + 1, finalLocale, JSON.stringify(payload), 'admin', created),
+    db.prepare('UPDATE opportunities SET current_version_id=?, editorial_status=?, updated_at=? WHERE org_id=? AND id=?')
+      .bind(newId, editorial_status, created, ORG, row.id),
+  ]);
+  return Response.json({
+    id: row.id, job_id: row.job_id, current_version_id: newId,
+    version: (maxVersion?.v ?? 0) + 1, editorial_status, opportunity_status: row.opportunity_status,
+    connection_type: row.connection_type, locale: finalLocale, updated_at: created,
+    vigencia_activa: vigenciaActiva, cta_auto_enabled: vigenciaActiva && Boolean(payload.application_url),
+  }, { headers: corsHeaders(request) });
+}
+
 // ------ recogida ------
 async function runCollection(env, force = false) {
   const db = env.DB;
@@ -494,8 +608,10 @@ async function ingestBatch(db, source, candidates, known) {
       db.prepare(`INSERT INTO catalog_entries (org_id,job_id,first_seen_at,expires_at) VALUES (?,?,?,?)
         ON CONFLICT(org_id, job_id) DO UPDATE SET expires_at=excluded.expires_at`)
         .bind(ORG, jobId, captured, new Date(Date.parse(captured) + CATALOG_WINDOW_MS).toISOString().replace('Z', '+00:00')),
-      db.prepare('INSERT OR IGNORE INTO opportunities (id,org_id,job_id,editorial_status,opportunity_status,connection_type,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)')
-        .bind('opp-' + jobId.slice(4), ORG, jobId, 'draft', 'verifying', 'external_application', captured, captured),
+      // El puntero nace seteado: sin esto el PATCH de revisión editorial no
+      // encuentra la versión inicial (verificado en producción 2026-10-15, sesión 28).
+      db.prepare('INSERT OR IGNORE INTO opportunities (id,org_id,job_id,current_version_id,editorial_status,opportunity_status,connection_type,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+        .bind('opp-' + jobId.slice(4), ORG, jobId, 'ver-' + jobId.slice(4) + '-1', 'draft', 'verifying', 'external_application', captured, captured),
       db.prepare(`INSERT OR IGNORE INTO opportunity_versions (id,org_id,opportunity_id,version,payload,created_by,created_at)
         VALUES (?,?,?,?,?,?,?)`)
         .bind('ver-' + jobId.slice(4) + '-1', ORG, 'opp-' + jobId.slice(4), 1,
@@ -981,14 +1097,20 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(request) });
-    if (url.pathname === '/v1/admin/opportunities') {
-      // Superficie admin de LECTURA del catálogo cloud (port fase 1 del panel, sesión 27):
-      // listado editorial con filtros básicos. Protegida por ADMIN_TOKEN (secreto de
-      // producción); sin cabecera válida 401. Los gastos (Apify/AI/SerpPy) NO viven aquí.
+    const adminMatch = url.pathname.match(/^\/v1\/admin\/opportunities(?:\/([a-zA-Z0-9-]{1,64}))?$/);
+    if (adminMatch) {
+      // Superficie admin del catálogo cloud (port del panel por fases): fase 1 =
+      // LECTURA con filtros; fase 2 = PATCH de revisión editorial con versiones
+      // inmutables. Ambas bajo ADMIN_TOKEN (secreto de producción); sin cabecera
+      // válida 401. Los gastos (Apify/AI/SerpApi) NO viven aquí.
       const adminCheck = requireAdmin(request, env);
       if (adminCheck) return adminCheck;
+      if (request.method === 'PATCH') {
+        if (!adminMatch[1]) return Response.json({ detail: 'Ruta no disponible en modo hospedado' }, { status: 404 });
+        return handleAdminReview(request, env, adminMatch[1]);
+      }
       const p = url.searchParams;
-      const status = ['draft', 'approved', 'rejected', 'published'].includes(p.get('status') || '') ? p.get('status') : null;
+      const status = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'].includes(p.get('status') || '') ? p.get('status') : null;
       const source = /^[a-z0-9-]{1,40}$/.test(p.get('source') || '') ? p.get('source') : null;
       const limit = Math.min(Math.max(Number(p.get('limit')) || 50, 1), 200);
       const rows = await env.DB.prepare(`
@@ -1003,7 +1125,7 @@ export default {
         SELECT editorial_status, COUNT(*) AS n FROM opportunities WHERE org_id=? GROUP BY editorial_status`).bind(ORG).all();
       const items = rows.results.map(r => {
         const payload = JSON.parse(r.payload);
-        return { id: r.id, job_id: r.job_id, original_title: payload.title ?? null, company: payload.company ?? null, source_url: payload.url ?? null,
+        return { id: r.opportunity_id, job_id: r.job_id, original_title: payload.title ?? null, company: payload.company ?? null, source_url: payload.url ?? null,
           source: r.source, editorial_status: r.editorial_status, opportunity_status: r.opportunity_status,
           connection_type: r.connection_type, created_at: r.created_at, updated_at: r.updated_at };
       });
