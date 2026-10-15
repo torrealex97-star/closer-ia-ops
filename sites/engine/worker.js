@@ -371,7 +371,13 @@ async function handleAudit(request, env) {
   // ?force=1: rerun en vivo del audit (8 fetches HTTP en su propia petición, con
   // el presupuesto de subrequests entero). Útil cuando el audit diario se escribió
   // desde un run con el presupuesto ya tapado; la fila del día mane igual (DO NOTHING).
+  // Audit run-1 finding 3: force quema subrequests/escrituras de SU cuota → solo
+  // con credencial admin. La lectura cacheada del día sigue pública (solo lectura).
   const force = new URL(request.url).searchParams.get('force') === '1';
+  if (force) {
+    const adminCheck = requireAdmin(request, env);
+    if (adminCheck) return adminCheck;
+  }
   if (!force) {
     const existing = await db.prepare(
       'SELECT source,slug,status,http_status,canonical_url,renamed_from,checked_at FROM slug_audit WHERE org_id=? AND day=? ORDER BY source')
@@ -775,6 +781,8 @@ async function handleOffers(request, env, url) {
     FROM catalog_entries c
     JOIN jobs j ON j.org_id=c.org_id AND j.id=c.job_id
     JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+    JOIN opportunities o ON o.org_id=c.org_id AND o.job_id=c.job_id
+      AND o.editorial_status IN ('approved','published')
     WHERE c.org_id=? AND c.expires_at > ?
     ORDER BY c.first_seen_at DESC LIMIT 500`).bind(ORG, now()).all();
   const offers = rows.results
@@ -886,9 +894,15 @@ function classifyRole(p, text) {
 
 // Núcleo de la vista alumna, compartido por /v1/opportunities/search y /api/funnel:
 // mismo gate de rol/idioma/dedupe y mismo ranking, sin duplicar la lógica.
-// opts: { role, market, days, includeBilingual, starredOnly, includeExtraRoles }.
-// Devuelve { ranked, total, selectionTotal }: solo lectura del catálogo.
-async function studentSurface(env, { role, market, days, includeBilingual, starredOnly, includeExtraRoles }) {
+// opts: { role, market, days, includeBilingual, starredOnly, includeExtraRoles,
+// editorialOnly }.
+// editorialOnly (default true): la superficie pública solo sirve ofertas con
+// revisión editorial humana (evolución del fix del audit run-1 finding 1: los
+// drafts recién recogidos NO salen a la alumna; spec 15 — revisión antes de
+// exposición). approved y published son ambos estados revisados por el operador.
+// handleFunnel la pide en false: es el diagnóstico HUNT del operador (recuento
+// del embudo que guía ampliar/retirar fuentes); expone agregados, no contenido.
+async function studentSurface(env, { role, market, days, includeBilingual, starredOnly, includeExtraRoles, editorialOnly = true }) {
   const db = env.DB;
 
   const rows = await db.prepare(`
@@ -896,6 +910,8 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     FROM catalog_entries c
     JOIN jobs j ON j.org_id=c.org_id AND j.id=c.job_id
     JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+    ${editorialOnly ? `JOIN opportunities o ON o.org_id=c.org_id AND o.job_id=c.job_id
+      AND o.editorial_status IN ('approved','published')` : ''}
     WHERE c.org_id=? AND c.expires_at > ?
     ORDER BY c.first_seen_at DESC, j.id LIMIT 800`).bind(ORG, now()).all();
 
@@ -1034,6 +1050,12 @@ async function handleStudentSearch(request, env) {
 }
 
 async function handleStar(request, env, jobId) {
+  // Audit run-1 finding 2: PATCH star es MUTACIÓN de estado compartido (el marcador
+  // usa starred_only de la superficie); exige credencial admin como el resto de
+  // escrituras. Local no cambia (backend FastAPI propio); en modo hospedado la
+  // vista alumna guarda en su navegador (localStorage) sin tocar este endpoint.
+  const adminCheck = requireAdmin(request, env);
+  if (adminCheck) return adminCheck;
   if (!/^[A-Za-z0-9-]+$/.test(jobId)) return Response.json({ detail: 'Id no válido' }, { status: 400 });
   let body;
   try { body = await request.json(); } catch { return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 }); }
@@ -1055,7 +1077,7 @@ async function handleFunnel(env) {
   await ensureSchema(db);
   const { ranked, selectionTotal } = await studentSurface(env, {
     role: null, market: 'any', days: 10, includeBilingual: false,
-    starredOnly: false, includeExtraRoles: true,
+    starredOnly: false, includeExtraRoles: true, editorialOnly: false,
   });
   const bySource = new Map(SOURCES.map(s => [s.code, {
     code: s.code, name: s.name, elegible: 0, seleccionada: 0, roles: {},

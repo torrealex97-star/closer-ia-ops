@@ -23,8 +23,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) return new Response(null, { status: 400 });
   if (engine) {
     const key = path.join('/');
-    const isStar = /^jobs\/[a-zA-Z0-9-]+\/star$/.test(key);
-    if (!(HOSTED_PATHS.has(key) || (isStar && request.method === 'PATCH'))) {
+    // Hosted: solo lectura de la superficie alumna. star es mutación con credencial
+    // admin en el engine (fix audit run-1 finding 2); la vista alumna guarda en su
+    // navegador, así que el proxy ya no reenvía star en modo hospedado.
+    if (!HOSTED_PATHS.has(key)) {
       return Response.json({ detail: 'No disponible en el despliegue hospedado: la vista de alumna es la superficie pública.' }, { status: 404 });
     }
   }

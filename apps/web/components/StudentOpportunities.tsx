@@ -46,7 +46,7 @@ const rank = (offer: Offer) => offer.is_selected && offer.excellence_rank && off
 
 // WDC student: compare companies and conditions, then choose her next step.
 // Existing paper/terracotta tokens, quiet borders, 24px cards; pay is the focal fact.
-export default function StudentOpportunities() {
+export default function StudentOpportunities({ hosted = false }: { hosted?: boolean }) {
   const [query, setQuery] = useState<Query>(defaults);
   const [applied, setApplied] = useState<Query>(defaults);
   const [items, setItems] = useState<Offer[]>([]);
@@ -57,6 +57,10 @@ export default function StudentOpportunities() {
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<Offer | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Modo hospedado: guardar es un marcador de ESTE navegador (fix audit run-1
+  // finding 2 — sin credencial individual todavía, la vista alumna no muta el
+  // catálogo compartido del operador). El motor admin mantiene su marcador propio.
+  const [localSaves, setLocalSaves] = useState<string[]>([]);
   const sequence = useRef(0);
   const dialog = useRef<HTMLDialogElement>(null);
   // Tras el montaje (nunca durante la hidratación): la URL restaura el contexto de la alumna.
@@ -65,9 +69,19 @@ export default function StudentOpportunities() {
     if (fromUrl) { setQuery(fromUrl); setApplied(fromUrl); }
   }, []);
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = JSON.parse(window.localStorage.getItem('wdc_saved_offers') ?? '[]');
+      if (Array.isArray(stored)) setLocalSaves(stored.filter((id): id is string => typeof id === 'string'));
+    } catch { /* marcador corrupto: sin guardadas, nunca se rompe la vista */ }
+  }, []);
+  useEffect(() => {
     let stopped = false;
     const id = ++sequence.current;
-    setBusy(true); setError(''); setWider(null); request<Results>('opportunities/search', saved ? { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: true, include_extra_roles: true } : applied)
+    setBusy(true); setError(''); setWider(null);
+    // Hosted: Guardadas son las marcadas en Este navegador (filtrado en cliente);
+    // el marcador starred_only del engine queda como curación del operador.
+    request<Results>('opportunities/search', saved ? (hosted ? { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: false, include_extra_roles: true } : { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: true, include_extra_roles: true }) : applied)
       .then(result => {
         if (!stopped && sequence.current === id) { setItems(result.items); setSelectionTotal(result.selection_total ?? 0); }
         // Filtro estrecho con pocas ofertas: presentamos también el hueco más amplio
@@ -89,19 +103,32 @@ export default function StudentOpportunities() {
       .catch(e => { if (!stopped) setError(e.message); })
       .finally(() => { if (!stopped) setBusy(false); });
     return () => { stopped = true; };
-  }, [applied, saved]);
+  }, [applied, saved, hosted]);
   useEffect(() => {
     if (detail && dialog.current && !dialog.current.open) dialog.current.showModal();
   }, [detail]);
+  const isStarred = (offer: Offer) => hosted ? localSaves.includes(offer.id) : offer.starred;
   async function star(offer: Offer) {
     setSaving(offer.id); setError('');
     try {
-      await request(`jobs/${offer.id}/star`, { starred: !offer.starred }, 'PATCH');
-      setItems(old => old.map(item => item.id === offer.id ? { ...item, starred: !item.starred } : item).filter(item => !saved || item.starred));
-      setDetail(old => old?.id === offer.id ? { ...old, starred: !old.starred } : old);
+      if (hosted) {
+        // Marcador local de la alumna: persiste en SU navegador y nunca toca el engine.
+        const next = localSaves.includes(offer.id) ? localSaves.filter(id => id !== offer.id) : [...localSaves, offer.id];
+        localStorage.setItem('wdc_saved_offers', JSON.stringify(next));
+        setLocalSaves(next);
+        const after = (item: Offer): Offer => ({ ...item, starred: next.includes(item.id) });
+        setItems(old => old.map(after).filter(item => !saved || next.includes(item.id)));
+        setDetail(old => old ? { ...old, starred: next.includes(old.id) } : old);
+      } else {
+        await request(`jobs/${offer.id}/star`, { starred: !offer.starred }, 'PATCH');
+        setItems(old => old.map(item => item.id === offer.id ? { ...item, starred: !item.starred } : item).filter(item => !saved || item.starred));
+        setDetail(old => old?.id === offer.id ? { ...old, starred: !old.starred } : old);
+      }
     } catch (e) { setError((e as Error).message); }
     finally { setSaving(null); }
   }
+  // Guardadas en modo hospedado: el marcador vive en este navegador.
+  const visible = saved && hosted ? items.filter(isStarred) : items;
   return <div className="shell student-shell">
     <aside className="sidebar">
       <a className="brand" href="/" aria-label="WDC · Inicio"><span className="brand-mark">w.</span><span>Women Digital<br /><strong>Closer</strong></span></a>
@@ -119,10 +146,10 @@ export default function StudentOpportunities() {
           <div className="student-preferences"><span>En español · remoto o híbrido</span><label className="check-label"><input type="checkbox" checked={query.include_bilingual} onChange={e => setQuery({ ...query, include_bilingual: e.target.checked })} />También oportunidades bilingües español / inglés</label></div>
         </form>}
         {error && <p className="alert error" role="alert">{error}</p>}
-        <section className="student-results" aria-busy={busy}><div className="results-heading"><h2>{saved ? 'Tus oportunidades guardadas' : 'Oportunidades para explorar'} <span>{busy ? '…' : items.length + (wider?.length ?? 0)}</span></h2><span className="student-freshness">Actualización diaria</span></div>
+        <section className="student-results" aria-busy={busy}><div className="results-heading"><h2>{saved ? 'Tus oportunidades guardadas' : 'Oportunidades para explorar'} <span>{busy ? '…' : visible.length + (wider?.length ?? 0)}</span></h2><span className="student-freshness">Actualización diaria</span></div>
           {!saved && !busy && selectionTotal > 0 && <p className="selection-note">Selección del día: las {selectionTotal} que mejor cumplen los requisitos van primero. Puedes explorar el resto del catálogo debajo.</p>}
-          {busy ? <div className="empty"><LoaderCircle className="spin" size={24} /><p>Buscando oportunidades…</p></div> : !items.length ? <div className="empty"><Compass size={32} strokeWidth={1.3} /><h3>{saved ? 'Guarda las que te hagan dar el siguiente paso.' : 'Aún no hay oportunidades con estos criterios.'}</h3><p>{saved ? 'Pulsa el marcador de una oferta para volver a verla aquí.' : 'Puedes elegir otro perfil o mercado. Seguimos buscando nuevas oportunidades en español.'}</p></div> :          <div className="opportunity-grid">{items.map(offer => <article className="opportunity-card" key={offer.id}>
-            <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</span></div><button className={`icon-button ${offer.starred ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${offer.starred ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={offer.starred ? 'currentColor' : 'none'} /></button></div>
+          {busy ? <div className="empty"><LoaderCircle className="spin" size={24} /><p>Buscando oportunidades…</p></div> : !visible.length ? <div className="empty"><Compass size={32} strokeWidth={1.3} /><h3>{saved ? 'Guarda las que te hagan dar el siguiente paso.' : 'Aún no hay oportunidades con estos criterios.'}</h3><p>{saved ? 'Pulsa el marcador de una oferta para volver a verla aquí.' : 'Puedes elegir otro perfil o mercado. Seguimos buscando nuevas oportunidades en español.'}</p></div> :          <div className="opportunity-grid">{visible.map(offer => <article className="opportunity-card" key={offer.id}>
+            <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
             <div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{offer.compensation}</h3><p>{offer.compensation_note}</p></div>
             <dl className="opportunity-facts"><div><dt>Modalidad y ubicación</dt><dd><Globe2 size={14} />{offer.modality} · {offer.location}</dd></div><div><dt>Idioma</dt><dd>{offer.language}</dd></div><div><dt>Jornada</dt><dd>{offer.schedule}</dd></div><div><dt>Experiencia</dt><dd>{offer.experience}</dd></div><div><dt>Contrato</dt><dd>{offer.contract}</dd></div></dl>
             <div className="opportunity-footer"><div><small>Publicada: {date(offer.published_at)}</small><a href={offer.source_url} target="_blank" rel="noopener noreferrer">Publicado en {offer.source_name}</a></div><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
@@ -131,7 +158,7 @@ export default function StudentOpportunities() {
             <h3>{items.length} con tu filtro · {wider.length} más del catálogo {applied.market !== 'any' ? 'con tu mercado' : 'comercial en español'}</h3>
             <p>Con tu filtro de perfil no aparecían suficientes {applied.role ? `ofertas de ${label(applied.role)}` : 'ofertas en tu mercado'}; estas vienen del mismo catálogo real con el filtro ampliado.</p>
             <div className="opportunity-grid">{wider.map(offer => <article className="opportunity-card" key={offer.id}>
-              <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}</span></div><button className={`icon-button ${offer.starred ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${offer.starred ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={offer.starred ? 'currentColor' : 'none'} /></button></div>
+              <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
               <div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{offer.compensation}</h3><p>{offer.compensation_note}</p></div>
               <div className="opportunity-footer"><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
             </article>)}</div>
@@ -140,6 +167,6 @@ export default function StudentOpportunities() {
         <p className="footnote"><BriefcaseBusiness size={14} />Tú eliges dónde avanzar. Revisa las condiciones y presenta tu candidatura en el proceso de la empresa.</p>
       </main>
     </div>
-    <dialog ref={dialog} onClose={() => setDetail(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }}>{detail && <div className="detail"><div className="detail-top"><span className="eyebrow">TU SIGUIENTE PASO</span><button className="icon-button" aria-label="Cerrar oportunidad" onClick={() => dialog.current?.close()}><X size={20} /></button></div><p className="job-company">{detail.company}</p><h2>{detail.role_label}</h2><p>{detail.original_title}</p><div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{detail.compensation}</h3><p>{detail.compensation_note}</p></div><p>{detail.modality} · {detail.location} · {detail.language}</p><h3>Lo que cuenta la empresa</h3><div className="description">{detail.description}</div><div className="provenance"><span>Publicada: {date(detail.published_at)}</span><span>Publicación de {detail.source_name}. Confirma que el proceso siga abierto antes de enviar tu candidatura.</span></div><div className="detail-actions"><a className="primary" href={detail.source_url} target="_blank" rel="noopener noreferrer">Ver proceso de candidatura<ArrowUpRight size={16} /></a><button disabled={saving === detail.id} onClick={() => void star(detail)}><Bookmark size={16} />{detail.starred ? 'Quitar de guardadas' : 'Guardar oportunidad'}</button></div><p className="inline-hint">Continuarás en la publicación original. Abrir el enlace no envía tu candidatura.</p></div>}</dialog>
+    <dialog ref={dialog} onClose={() => setDetail(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }}>{detail && <div className="detail"><div className="detail-top"><span className="eyebrow">TU SIGUIENTE PASO</span><button className="icon-button" aria-label="Cerrar oportunidad" onClick={() => dialog.current?.close()}><X size={20} /></button></div><p className="job-company">{detail.company}</p><h2>{detail.role_label}</h2><p>{detail.original_title}</p><div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{detail.compensation}</h3><p>{detail.compensation_note}</p></div><p>{detail.modality} · {detail.location} · {detail.language}</p><h3>Lo que cuenta la empresa</h3><div className="description">{detail.description}</div><div className="provenance"><span>Publicada: {date(detail.published_at)}</span><span>Publicación de {detail.source_name}. Confirma que el proceso siga abierto antes de enviar tu candidatura.</span></div><div className="detail-actions"><a className="primary" href={detail.source_url} target="_blank" rel="noopener noreferrer">Ver proceso de candidatura<ArrowUpRight size={16} /></a><button disabled={saving === detail.id} onClick={() => void star(detail)}><Bookmark size={16} />{isStarred(detail) ? 'Quitar de guardadas' : 'Guardar oportunidad'}</button></div><p className="inline-hint">Continuarás en la publicación original. Abrir el enlace no envía tu candidatura.</p></div>}</dialog>
   </div>;
 }
