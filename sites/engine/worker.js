@@ -975,6 +975,13 @@ export default {
       ctx.waitUntil(runCollection(env).catch(() => {}));
       return handleOffers(request, env, url);
     }
+    if (url.pathname === '/v1/opportunities/search') {
+      // Refresco perezoso en la superficie de la alumna (elección del operador 2026-10-15,
+      // mientras el schema de Sites deploy no acepte `crons`): una lectura con la última
+      // recogida >6 h lanza la recogida en 2º plano. El umbral anti-duplicados interno de
+      // runCollection (6 h) evita que dos lecturas juntas paguen dos veces.
+      ctx.waitUntil(runCollection(env).catch(() => {}));
+    }
     if (url.pathname === '/api/status') return handleStatus(env);
     if (url.pathname === '/api/funnel') return handleFunnel(env);
     if (url.pathname === '/api/audit') return handleAudit(request, env);
