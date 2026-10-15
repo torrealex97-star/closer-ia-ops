@@ -1,5 +1,12 @@
 # Estado
 
+## LinkedIn: por qué no está y las dos vías verificadas (sesión 25) — 2026-10-15
+
+- **Por qué LinkedIn no puede entrar como conector cloud**: LinkedIn no tiene API pública de jobs (la Job Posting API es para socios autorizados y no acepta socios nuevos) y sus términos prohíben crawlers/extracción. Los scrapers sin login (Apify ~1 US$/1000, Bright Data 5000 free/mes) existen pero no son compatibles con esos términos — el repo no añade fuentes no verificables.
+- **Vía 1 — SerpApi (free 250 búsquedas/mes; Starter 25 US$/1000)**: TODO el circuito ya está construido en la app local (conector [connectors.py](apps/api/career/connectors.py), UI Integraciones → SerpApi, presupuesto diario ADR-009, recogida con la clave activa). Pendiente SOLO de que el usuario cree la cuenta en serpapi.com y pegue su clave en Fuentes → Integraciones → SerpApi (y la compruebe con `POST /integrations/serpapi/check`, que gasta 1 búsqueda de prueba). Los dorks google_jobs devuelven ofertas de LinkedIn indexadas.
+- **Vía 2 — ATS públicos de las empresas objetivo: cacería con HTTP real y resultado NEGATIVO**: probados los 4 subdominios estándar (greenhouse/ashby/teamtailor/recruitee) para las 7 empresas de la watchlist — todos 404/DNS-fail salvo `talent.recruitee.com` que es un board genérico de consultora RRHH (1 oferta no comercial, no objetivo) y NO se añade. Coincide con que la vigilancia de estas empresas es canal `linkedin_guest` (migraciones). No hay ATS público adicional que añadir sin información nueva.
+- **El cloud mantiene su alcance por fuentes libres verificadas; LinkedIn llega con la clave SerpApi del usuario en la app local, nunca al collector público (no gasta crédito ajeno sin orden explícita).**
+
 ## Sin cron por schema (Sites rechaza `crons`) + refresco perezoso en la superficie alumna (sesión 24) — 2026-10-15
 
 - **Deploy del cron con `deploy-manifest-cron.json`: RECHAZADO en preview** — el schema de Sites deploy no acepta el campo `crons` (error `invalid_site_request / invalid deploy manifest`); A/B verificado: el mismo manifest SIN el campo despliega `succeeded` (idempotencia `91e0d7c4`, mismo request_hash que el deploy de producción). Por la secuencia anti-riesgo de la sesión 18, producción NO subió con el cron: mantiene el manifest normal.
