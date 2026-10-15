@@ -26,13 +26,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const token = process.env.CAREER_ADMIN_TOKEN;
   if (!token) return Response.json({ detail: 'El token del engine no está configurado en este despliegue.' }, { status: 503 });
   const { path } = await context.params;
-  if (path.length > 4 || path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) return new Response(null, { status: 400 });
-  if (!['GET', 'PATCH'].includes(request.method)) return Response.json({ detail: 'Método no permitido en el proxy admin.' }, { status: 405 });
+  if (path.length > 4 || path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) return new Response(null, { status: 400 });  // Fase 3: POST admite la verificación de vigencia (opportunities/{id}/verify).
+  if (!['GET', 'PATCH', 'POST'].includes(request.method)) return Response.json({ detail: 'Método no permitido en el proxy admin.' }, { status: 405 });
   try {
     const upstream = await fetch(`${engine}/v1/admin/${path.join('/')}${request.nextUrl.search}`, {
       method: request.method,
       headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
-      body: request.method === 'PATCH' ? await request.text() : undefined,
+      body: ['PATCH', 'POST'].includes(request.method) ? await request.text() : undefined,
       cache: 'no-store', signal: AbortSignal.timeout(30000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store' });
@@ -43,5 +43,4 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return Response.json({ detail: 'El engine cloud no responde.' }, { status: 503 });
   }
 }
-
-export { proxy as GET, proxy as PATCH };
+export { proxy as GET, proxy as PATCH, proxy as POST };

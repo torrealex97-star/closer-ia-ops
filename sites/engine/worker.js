@@ -283,6 +283,14 @@ async function ensureSchema(db) {
       id TEXT PRIMARY KEY, org_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, version INTEGER NOT NULL,
       locale TEXT NOT NULL DEFAULT 'es', payload TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
       UNIQUE(org_id, opportunity_id, version))`),
+    // Evidencia de verificación de vigencia (port fase 3, espejo migrate v12 local):
+    // append-only, una fila por comprobación con su TTL y razón; apunta al raw.
+    db.prepare(`CREATE TABLE IF NOT EXISTS verification_events (
+      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL,
+      posting_id TEXT, checked_at TEXT NOT NULL, result TEXT NOT NULL,
+      method TEXT NOT NULL, evidence_raw_id TEXT, valid_until TEXT,
+      reason_code TEXT, verifier_version TEXT NOT NULL DEFAULT '1')`),
+    db.prepare('CREATE INDEX IF NOT EXISTS verification_job ON verification_events(org_id, job_id, checked_at)'),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_catalog_expiry ON catalog_entries(org_id, expires_at)'),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_runs_created ON collection_runs(org_id, created_at)'),
     // Evidencia del audit periódico de slugs JobToday (append-only, como raw_items):
@@ -294,6 +302,11 @@ async function ensureSchema(db) {
       UNIQUE(org_id, source, day))`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_slug_audit_day ON slug_audit(org_id, day)'),
   ]);
+  // Columnas de vigencia derivadas de verify (port fase 3): ALTER tolerante — en una
+  // base ya existente la columna está y D1 lo reclama, que es el estado correcto.
+  for (const col of ['last_verified_at', 'verified_until', 'status_reason']) {
+    try { await db.prepare(`ALTER TABLE opportunities ADD COLUMN ${col} TEXT`).run(); } catch { /* ya existe */ }
+  }
 }
 
 // ------ audit periódico de slugs JobToday ------
@@ -456,6 +469,7 @@ async function handleAdminDetail(request, env, opportunityId) {
   await ensureSchema(db);
   const row = await db.prepare(
     `SELECT o.id AS opportunity_id, o.current_version_id, o.editorial_status, o.opportunity_status, o.connection_type, o.created_at, o.updated_at,
+            o.last_verified_at, o.verified_until, o.status_reason,
             j.id AS job_id, p.source, p.payload AS posting_payload, p.external_id
        FROM opportunities o
        JOIN jobs j ON j.org_id=o.org_id AND j.id=o.job_id
@@ -479,6 +493,126 @@ async function handleAdminDetail(request, env, opportunityId) {
     job_snapshot: { title: posting.title ?? null, company: posting.company ?? null, location: posting.location ?? null,
       salary: posting.salary ?? null, posted_at: posting.posted_at ?? null, source_url: posting.url ?? null, source: row.source },
     vigencia: { expires_at: vig?.expires_at ?? null, activa: Number.isFinite(expiresMs) && Date.now() < expiresMs },
+    verificacion: { last_verified_at: row.last_verified_at ?? null, verified_until: row.verified_until ?? null, status_reason: row.status_reason ?? null },
+  }, { headers: corsHeaders(request) });
+}
+
+// ------ admin (port fase 3: verificación de vigencia, sesión 32) ------
+// MISMO CONTRATO que POST /opportunities/{id}/verify del núcleo local (domain.py):
+// un GET acotado (1 petición, timeout 10 s, sin reintentos, redirect manual = una
+// redirección NO verifica) clasificado por CONTENIDO: HTTP 200 solo nunca basta,
+// el cuerpo debe mencionar el título (≥5 chars plegado) o la empresa del anuncio.
+// Escribe evidencia raw inmutable (source 'verification') + verification_events con
+// TTL por tipo de fuente y actualiza la vigencia derivada de opportunities.
+// El CTA de la versión vigente se deriva de la vigencia: enabled solo con active.
+const TTL_HOURS_BY_KIND = { ats: 72, serpapi: 24, aggregator: 48 };
+const DEFAULT_TTL_HOURS = 24;
+const AGGREGATOR_SOURCES = new Set(['himalayas', 'weworkremotely', 'jobicy', 'remotive', 'remoteok', 'arbeitnow',
+  'workingnomads', 'virtualvocations', 'remotejobs', 'remotefirstjobs',
+  'jobspresso', 'remotojob', 'getonbrd-public', 'freehire']);
+function ttlHoursForSource(source) {
+  const kind = source.startsWith('ats-') ? 'ats' : source.startsWith('google') ? 'serpapi'
+    : (AGGREGATOR_SOURCES.has(source) || source.startsWith('jobtoday')) ? 'aggregator' : 'unknown';
+  return TTL_HOURS_BY_KIND[kind] ?? DEFAULT_TTL_HOURS;
+}
+function classifyVerification(status, titleFound, companyFound) {
+  if (status === 404 || status === 410) return ['closed', 'job_not_found'];
+  if (status === 200) {
+    if (titleFound || companyFound) return ['open', 'content_matches'];
+    return ['unknown', 'content_not_corroborated'];
+  }
+  if (status === 403 || status === 429) return ['unknown', 'source_blocked'];
+  return ['unknown', 'http_' + String(status)];
+}
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function checkTarget(url, title, company) {
+  let status = null, body = null;
+  try {
+    const response = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' },
+      redirect: 'manual', signal: AbortSignal.timeout(10000) });
+    status = response.status;
+    const text = response.status === 200 ? (await response.text()).slice(0, 200_000) : '';
+    body = text;
+  } catch { return ['unknown', 'network_unreachable', { http_status: null }]; }
+  if ([301, 302, 303, 307, 308].includes(status))
+    return ['unknown', 'redirect_without_verification', { http_status: status }];
+  const titleFolded = fold(title || '');
+  const bodyFolded = fold(body || '');
+  const titleFound = Boolean(titleFolded) && titleFolded.length >= 5 && bodyFolded.includes(titleFolded);
+  const companyFound = Boolean(company) && bodyFolded.includes(fold(company));
+  const [result, reasonCode] = classifyVerification(status, titleFound, companyFound);
+  return [result, reasonCode, { http_status: status, title_found: titleFound, company_found: companyFound, checked_chars: (body || '').length }];
+}
+async function handleAdminVerify(request, env, opportunityId) {
+  const db = env.DB;
+  await ensureSchema(db);
+  const row = await db.prepare('SELECT * FROM opportunities WHERE org_id=? AND id=?').bind(ORG, opportunityId).first();
+  if (!row) return Response.json({ detail: 'Oportunidad no encontrada' }, { status: 404 });
+  // Snapshot del anuncio original vía jobs→posting_id (job_id NUNCA es un posting_id):
+  // el JOIN correcto es el mismo que el resto de la superficie admin.
+  const posting = await db.prepare(`SELECT p.payload AS payload, p.source AS source, p.id AS posting_id
+    FROM jobs j JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+    WHERE j.org_id=? AND j.id=?`).bind(ORG, row.job_id).first();
+  if (!posting) return Response.json({ detail: 'La oportunidad no tiene oferta original que verificar' }, { status: 409 });
+  // URL a comprobar: explícita del operador (cuerpo), si no la de candidatura de la
+  // revisión, si no la del anuncio original. Nunca se inventa una tercera fuente.
+  let body = {};
+  try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
+  catch { body = {}; } // cuerpo vacío = verificar la URL por defecto
+  // OJO: el id va en el SELECT — bindearlo después sin traerlo dio 500 undefined-unsupported (misma clase de bug de la sesión 28).
+  const current = row.current_version_id
+    ? await db.prepare('SELECT id, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? AND id=?').bind(ORG, row.id, row.current_version_id).first()
+    : await db.prepare('SELECT id, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? ORDER BY version DESC LIMIT 1').bind(ORG, row.id).first();
+  const reviewPayload = current ? JSON.parse(current.payload) : {};
+  const postingPayload = JSON.parse(posting.payload);
+  const url = body.url || reviewPayload.application_url || postingPayload.url || null;
+  if (!url || !/^https?:\/\//.test(url))
+    return Response.json({ detail: 'Sin URL verificable: guarda un enlace de candidatura en la revisión' }, { status: 409 });
+  const title = reviewPayload.headline ?? reviewPayload.title ?? postingPayload.title ?? '';
+  const company = postingPayload.company ?? '';
+  const method = 'http_status_content_v1';
+  const [result, reasonCode, detail] = await checkTarget(url, title, company);
+  // Evidencia raw inmutable (INSERT OR IGNORE con hash del contenido): repetir la
+  // misma comprobación no duplica la evidencia, como en el núcleo local.
+  const evidencePayload = JSON.stringify({ url, method, detail });
+  const contentHash = await sha256Hex(evidencePayload);
+  const evidenceId = `raw-${contentHash.slice(0, 32)}`;
+  await db.prepare('INSERT OR IGNORE INTO raw_items (id,org_id,source,provider,external_id,content_hash,payload,captured_at) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(evidenceId, ORG, 'verification', method, row.job_id, contentHash, evidencePayload, now()).run();
+  const checkedAt = now();
+  const validUntil = result === 'open'
+    ? new Date(Date.now() + ttlHoursForSource(row.source || posting.source) * 3_600_000).toISOString()
+    : null;
+  const statusDerived = { open: 'active', closed: 'closed', unknown: 'verifying' }[result];
+  const statusReason = { open: `Verificado activa (${method}); vigente hasta ${validUntil}`,
+    closed: `Cerrada según el origen (${reasonCode})`,
+    unknown: `No verificable (${reasonCode}); sigue verificando` }[result];
+  await db.batch([
+    db.prepare('INSERT INTO verification_events (id,org_id,job_id,posting_id,checked_at,result,method,evidence_raw_id,valid_until,reason_code,verifier_version) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(crypto.randomUUID(), ORG, row.job_id, row.posting_id ?? row.job_id, checkedAt, result, method, evidenceId, validUntil, reasonCode, '1'),
+    db.prepare('UPDATE opportunities SET opportunity_status=?, last_verified_at=?, verified_until=?, status_reason=?, updated_at=? WHERE org_id=? AND id=?')
+      .bind(statusDerived, checkedAt, validUntil, statusReason, checkedAt, ORG, row.id),
+  ]);
+  // CTA derivado en la VERSIÓN VIGENTE (append de carcasa next_step, igual que local):
+  // enabled solo con active; disabled_reason narrado con la razón de la vigencia.
+  let nextStepEnabled = Boolean(reviewPayload.next_step?.enabled);
+  if (current && reviewPayload.next_step?.enabled !== (statusDerived === 'active')) {
+    const payloadNext = { ...(reviewPayload.next_step || {}) };
+    payloadNext.enabled = statusDerived === 'active';
+    if (payloadNext.enabled) delete payloadNext.disabled_reason;
+    else payloadNext.disabled_reason = statusReason;
+    await db.prepare('UPDATE opportunity_versions SET payload=? WHERE org_id=? AND id=?')
+      .bind(JSON.stringify({ ...reviewPayload, next_step: payloadNext }), ORG, current.id).run();
+    nextStepEnabled = payloadNext.enabled;
+  }
+  return Response.json({
+    result, method, checked_at: checkedAt, valid_until: validUntil,
+    reason_code: reasonCode, evidence_raw_id: evidenceId,
+    opportunity_status: statusDerived, next_step_enabled: nextStepEnabled,
+    status_reason: statusReason, detail,
   }, { headers: corsHeaders(request) });
 }
 
@@ -1154,7 +1288,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(request) });
-    const adminMatch = url.pathname.match(/^\/v1\/admin\/opportunities(?:\/([a-zA-Z0-9-]{1,64}))?$/);
+    const adminMatch = url.pathname.match(/^\/v1\/admin\/opportunities(?:\/([a-zA-Z0-9-]{1,64})(\/verify)?)?$/);
     if (adminMatch) {
       // Superficie admin del catálogo cloud (port del panel por fases): fase 1 =
       // LECTURA con filtros; fase 2 = PATCH de revisión editorial con versiones
@@ -1162,8 +1296,11 @@ export default {
       // válida 401. Los gastos (Apify/AI/SerpApi) NO viven aquí.
       const adminCheck = requireAdmin(request, env);
       if (adminCheck) return adminCheck;
+      // Port fase 3 (sesión 32): POST {id}/verify = verificación de vigencia.
+      if (request.method === 'POST' && adminMatch[1] && adminMatch[2] === '/verify') return handleAdminVerify(request, env, adminMatch[1]);
       if (request.method === 'PATCH' && adminMatch[1]) return handleAdminReview(request, env, adminMatch[1]);
       if (request.method === 'GET' && adminMatch[1]) return handleAdminDetail(request, env, adminMatch[1]);
+      if (request.method === 'POST' && adminMatch[1]) return Response.json({ detail: 'POST solo con /verify: POST /v1/admin/opportunities/{id}/verify' }, { status: 405 });
       if (!adminMatch[1] && request.method === 'PATCH') return Response.json({ detail: 'PATCH requiere el id de la oportunidad: /v1/admin/opportunities/{id}' }, { status: 404 });
       const p = url.searchParams;
       const status = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'].includes(p.get('status') || '') ? p.get('status') : null;

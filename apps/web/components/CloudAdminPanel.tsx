@@ -28,7 +28,10 @@ type VersionPayload = {
   next_step?: NextStep; [k: string]: unknown;
 };
 type Item = { id: string; job_id: string; original_title: string | null; company: string | null; source_url: string | null; source: string; editorial_status: string; opportunity_status: string; connection_type: string; created_at: string; updated_at: string };
-type Detail = Item & { version: number | null; version_payload: VersionPayload | null; job_snapshot: { title: string | null; company: string | null; location: string | null; salary: string | null; posted_at: string | null; source_url: string | null; source: string }; vigencia: { expires_at: string | null; activa: boolean } };
+// Veredicto espejo del POST /verify (fase 3): mismo shape que VerificationResult local.
+type Verification = { result: 'open' | 'closed' | 'unknown'; method: string; checked_at: string; valid_until: string | null; reason_code: string; opportunity_status: string; next_step_enabled: boolean; status_reason: string | null };
+const VERDICT: Record<string, string> = { open: 'Activa en el origen', closed: 'Cerrada en el origen', unknown: 'No verificable ahora' };
+type Detail = Item & { version: number | null; version_payload: VersionPayload | null; job_snapshot: { title: string | null; company: string | null; location: string | null; salary: string | null; posted_at: string | null; source_url: string | null; source: string }; vigencia: { expires_at: string | null; activa: boolean }; verificacion: { last_verified_at: string | null; verified_until: string | null; status_reason: string | null } };
 type Counts = Record<string, number>;
 const date = (value?: string | null) => value ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(value)) : '—';
 const tag = (status: string) => ({ draft: 'source-tag', needs_review: 'review-tag', approved: 'source-tag ok', published: 'source-tag ok', withdrawn: 'source-tag' }[status] || 'source-tag');
@@ -56,6 +59,8 @@ export default function CloudAdminPanel() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [draft, setDraft] = useState<VersionPayload | null>(null);
   const [saving, setSaving] = useState(false);
+  const [verification, setVerification] = useState<Verification | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     fetch('/api/admin/session').then(r => r.json()).then((s: { configured?: boolean; authenticated?: boolean }) => {
@@ -87,8 +92,20 @@ export default function CloudAdminPanel() {
   }
   useEffect(() => { if (authState === 'in') refresh(filter); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [filter, authState]);
 
+  // Fase 3: verificación REAL de vigencia contra el engine (un GET acotado con
+  // corroboración de contenido). El veredicto llega con su vigencia y razón.
+  async function verify() {
+    if (!detail) return;
+    setVerifying(true); setError('');
+    try {
+      const outcome = await admin<Verification>(`opportunities/${detail.id}/verify`, { method: 'POST', body: '{}' });
+      setVerification(outcome);
+      setDetail(old => old ? { ...old, opportunity_status: outcome.opportunity_status, verificacion: { last_verified_at: outcome.checked_at, verified_until: outcome.valid_until, status_reason: outcome.status_reason } } : old);
+    } catch (err) { setError((err as Error).message); }
+    finally { setVerifying(false); }
+  }
   async function open(item: Item) {
-    setError('');
+    setError(''); setVerification(null);
     try {
       const d = await admin<Detail>(`opportunities/${item.id}`);
       setDetail(d);
@@ -174,7 +191,9 @@ export default function CloudAdminPanel() {
       {detail && draft && <div className="detail">
         <div className="detail-top"><span className="eyebrow">REVISIÓN EDITORIAL · catálogo cloud{detail.version ? ` · v${detail.version}` : ''}</span>
           <button className="icon-button" aria-label="Cerrar revisión" onClick={() => setDetail(null)}><X size={20} /></button></div>
-        <p className="job-company">{detail.job_snapshot.company} · {ACTIVITY[detail.opportunity_status]} · vigencia: {detail.vigencia.activa ? `activa hasta ${date(detail.vigencia.expires_at)}` : 'sin vigencia activa'}</p>
+        <p className="job-company">{detail.job_snapshot.company} · {ACTIVITY[detail.opportunity_status]} · vigencia: {detail.vigencia.activa ? `activa hasta ${date(detail.vigencia.expires_at)}` : 'sin vigencia activa'}
+          {detail.verificacion?.last_verified_at && <span className="muted" style={{ fontSize: 12 }}> · verificado: {date(detail.verificacion.last_verified_at)}{detail.verificacion.verified_until ? ` · vigente hasta: ${date(detail.verificacion.verified_until)}` : ''}{detail.verificacion.status_reason ? ` · ${detail.verificacion.status_reason}` : ''}</span>}</p>
+        {verification && <p className="muted" style={{ fontSize: 12 }} role="status">{VERDICT[verification.result]} · {verification.reason_code} · vigente hasta: {date(verification.valid_until)} → {ACTIVITY[verification.opportunity_status]}{verification.next_step_enabled ? ' · CTA habilitado' : ' · CTA deshabilitado'}</p>}
         <h2>{draft.headline}</h2>
         <label>Título (headline)<input maxLength={180} value={draft.headline} onChange={e => setDraft({ ...draft, headline: e.target.value })} /></label>
         <label>Rol<em className="muted" style={{ fontSize: 11 }}>Vocabulario canónico</em>
@@ -196,6 +215,7 @@ export default function CloudAdminPanel() {
         </div>
         {detail.job_snapshot.source_url && <p className="muted" style={{ fontSize: 12 }}>Anuncio original: <a href={detail.job_snapshot.source_url} target="_blank" rel="noopener noreferrer">{detail.job_snapshot.source_url.slice(0, 70)}… <ExternalLink size={12} /></a></p>}
         <div className="detail-actions" style={{ flexWrap: 'wrap' }}>
+          <button disabled={verifying} onClick={() => void verify()} title="Un GET acotado a la URL del anuncio: activa solo con contenido corroborante; guardado con evidencia y TTL por fuente"><RefreshCcw size={15} />{verifying ? 'Verificando…' : 'Verificar vigencia'}</button>
           <button disabled={saving} onClick={() => submit('needs_review')}><Send size={14} /> Guardar como a revisar</button>
           <button disabled={saving} onClick={() => submit('draft')}>Guardar borrador</button>
           <button className="primary" disabled={saving} onClick={() => submit('approved')}><Check size={15} /> Aprobar</button>
