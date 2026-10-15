@@ -33,6 +33,18 @@ const SOURCES = [
   // Añadido tras medir ROI 2026-10-14 (sesión 16): 48 ítems, 48 URLs únicas,
   // 23 NUEVAS vs catálogo real — la mejor ampliación por subrequest medida.
   { code: 'jobtoday-asesor-de-ventas', name: 'JobToday Asesor de ventas', kind: 'jobtoday', slug: 'asesor-de-ventas' },
+  // Ampliación familia closer (2026-10-15): slugs verificados hoy contra el sitio
+  // real (200 + __NEXT_DATA__): 'closers' 8 ítems y 'closer-remoto' 7 — perfiles
+  // reales de closer/setter en español (Skool Scaling, Manager Sales,
+  // Bastida&Farina, Hispaconex, Hotmart). Motivación: con la familia estricta
+  // 'closer' la vista alumna en España rendía solo 3-4; los solapes entre slugs
+  // se dedupean por URL en la superficie, y un 401/410 en algún slug no oculta
+  // las demás fuentes ('closser' es 410 y 'closer-ventas' 308→ canónico, nada que añadir).
+  { code: 'jobtoday-closers', name: 'JobToday Closers', kind: 'jobtoday', slug: 'closers' },
+  { code: 'jobtoday-closer-remoto', name: 'JobToday Closer remoto', kind: 'jobtoday', slug: 'closer-remoto' },
+  // Himalayas a 1 término (budget 2026-10-15): hoy 3 fetches produjeron 0 elegibles
+  // en producción (45 revisadas); 'closer' es su término con yield medido. Si el
+  // funnel diurno vuelve a pedir cobertura, se restauran los 3 términos.
   { code: 'himalayas', name: 'Himalayas', kind: 'himalayas' },
   { code: 'weworkremotely', name: 'We Work Remotely · ventas', kind: 'rss', slug: 'https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss' },
   // Añadidas 2026-10-13 con posibilidad de verificación real hoy:
@@ -42,13 +54,13 @@ const SOURCES = [
   { code: 'getonbrd', name: 'Get on Board · ventas', kind: 'getonbrd' },
   { code: 'freehire', name: 'FreeHire España', kind: 'freehire', region: 'es' },
   { code: 'freehire-latam', name: 'FreeHire LATAM', kind: 'freehire', region: 'latam' },
-  // ATS al final: el budget de subrequests por invocación se agotaba antes de
-  // terminar (<25 fuentes = errores 'Too many subrequests'). Recorte por ROI
-  // 2026-10-14 (sesión 16): fuera greenhouse ×3 y recruitee (4 subrequests x
-  // 4 días consecutivos de 0 elegibles); queda monestcapital (única ATS con
-  // closers reales) y ashby-pennylane (fallo 401 del proveedor visible: si
-  // reabre su board vuelve a producir; borrada escondería el hallazgo).
-  { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
+  // ATS al final: el budget de subrequests por invocación (~20 fetches medidos
+  // 2026-10-15) se agotaba antes de terminar. Recorte por ROI 2026-10-14 (sesión
+  // 16): fuera greenhouse ×3 y recruitee. Hoy 2026-10-15: fuera también
+  // ashby-pennylane — 401 del proveedor TODOS los días (evidencia en funnels 14→15)
+  // = 1 subrequest garantido en 0; si WDC reabre su board, se re-añade con el
+  // hallazgo ya documentado aquí. Queda monestcapital (única ATS con closers reales).
+  { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
   { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
 ];
 
@@ -146,7 +158,7 @@ async function sourceTeamtailorRss(source) {
 
 async function sourceHimalayas() {
   // Términos del vocabulario comercial (no inventados; un término = una búsqueda pública).
-  const terms = ['closer', 'ventas', 'sales'];
+  const terms = ['closer']; // 1 fetch (budget de subrequests 2026-10-15; ver comentario en SOURCES)
   const all = [];
   for (const term of terms) {
     const data = JSON.parse(await fetchText(`https://himalayas.app/jobs/api/search?q=${encodeURIComponent(term)}&sort=recent&page=1`));
@@ -338,6 +350,20 @@ async function runSlugAudit(env) {
     ({ source, slug, status, http_status: http_status ?? null, canonical_url, renamed_from: renamed_from ?? null })) };
 }
 
+// El audit diario vive aquí y lo consume el principio de runCollection: corre UNA
+// vez por día (sus filas en slug_audit hacen de cache con ON CONFLICT DO NOTHING)
+// y siempre ANTES del ingest, con el presupuesto de ~50 subrequests de producción
+// fresco (la versión de cola agotaba el presupuesto: 8/8 unreachable instantáneo,
+// evidencia 2026-10-15 con el mismo checked_at al ms y sin http_status).
+async function ensureDaySlugAudit(env) {
+  const db = env.DB;
+  const day = dayKey();
+  const existing = await db.prepare('SELECT status,http_status FROM slug_audit WHERE org_id=? AND day=?')
+    .bind(ORG, day).all();
+  if (existing.results.length >= jobTodaySources().length) return { day, cached: true, slugs: existing.results };
+  return runSlugAudit(env);
+}
+
 async function handleAudit(request, env) {
   const db = env.DB;
   await ensureSchema(db);
@@ -371,8 +397,12 @@ async function runCollection(env, force = false) {
   }
   const runId = 'run-' + crypto.randomUUID();
   const day = dayKey();
-  // Primera vez del día: audit de slugs antes del ingest (presupuesto de subrequests fresco).
-  const slugAudit = await ensureDaySlugAudit(env).catch(error => ({ error: String(error.message || error).slice(0, 200) }));
+  // El audit de slugs NO corre dentro de la recogida: con 17 fuentes, audit (10 fetches)
+  // + ingest supera el presupuesto de subrequests por invocación y las fuentes de la
+  // cola quedan cortadas (2026-10-15: 9/17 completadas y 8 con 'Too many subrequests').
+  // Vive en /api/audit (invocación propia, budget entero; ?force=1 rerun) y, cuando
+  // se deploye el cron, tendrá su propio trigger; ensureDaySlugAudit queda para ese uso.
+  const slugAudit = null;
   const states = SOURCES.map(s => ({ code: s.code, name: s.name, status: 'queued', fetched: 0, accepted: 0 }));
   await db.prepare('INSERT INTO collection_runs (id,org_id,day,status,sources,created_at) VALUES (?,?,?,?,?,?)')
     .bind(runId, ORG, day, 'running', JSON.stringify(states), now()).run();
@@ -412,7 +442,7 @@ async function runCollection(env, force = false) {
     .bind('completed', JSON.stringify(states), now(), runId).run();
   // El resultado del audit diario (corrido al principio de este run) viaja en la respuesta:
   // si un slug cambió, el operador lo ve renamed/gone antes de que el extractor falle.
-  return { run_id: runId, sources: states, slug_audit: slugAudit };
+  return slugAudit ? { run_id: runId, sources: states, slug_audit: slugAudit } : { run_id: runId, sources: states };
 }
 
 async function ingestBatch(db, source, candidates, known) {

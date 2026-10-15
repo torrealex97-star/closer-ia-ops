@@ -29,6 +29,10 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .student-search{margin-bottom:32px}
 .student-preferences{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:20px;color:var(--secondary);font-size:12px}
 .student-results{margin-top:32px}
+.wider-bucket{margin-top:36px;padding-top:24px;border-top:1px solid var(--line)}
+.wider-bucket h3{font-family:'Libre Caslon Display',Georgia,serif;font-size:22px;font-weight:400;line-height:1.25}
+.wider-bucket>p{margin:10px 0 20px;color:var(--secondary);font-size:12px;max-width:640px}
+.wider-bucket .opportunity-grid{margin-top:6px}
 .opportunity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
 .opportunity-card{background:var(--sheet);border:1px solid var(--line);border-radius:var(--radius);padding:24px;display:flex;flex-direction:column;min-width:0}
 .opportunity-company{display:flex;align-items:center;gap:12px}

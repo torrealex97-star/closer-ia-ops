@@ -10,6 +10,8 @@ type Query = components['schemas']['OpportunityQuery'];
 type Results = components['schemas']['OpportunityList'];
 const defaults: Query = { role: null, market: 'any', days: 10, include_bilingual: false, starred_only: false, include_extra_roles: false };
 const ROLES = ['closer', 'setter', 'cold_caller', 'account_executive', 'sdr'] as const;
+const ROLE_LABELS: Record<NonNullable<Query['role']>, string> = { closer: 'las del perfil Closer', setter: 'las del perfil Setter', cold_caller: 'las del perfil Cold Caller', account_executive: 'las de Ejecutivo comercial', sdr: 'las de SDR / BDR' };
+function label(role: NonNullable<Query['role']>): string { return ROLE_LABELS[role]; }
 const MARKETS = ['any', 'ES', 'EU', 'LATAM', 'US'] as const;
 // La alumna conserva su contexto: los filtros aplicados viven en la URL (compartible/recargable),
 // validados contra las opciones reales del desplegable para no inventar estados.
@@ -48,6 +50,7 @@ export default function StudentOpportunities() {
   const [query, setQuery] = useState<Query>(defaults);
   const [applied, setApplied] = useState<Query>(defaults);
   const [items, setItems] = useState<Offer[]>([]);
+  const [wider, setWider] = useState<Offer[] | null>(null); // hueco ampliado cuando el filtro estrecho devuelve <10
   const [selectionTotal, setSelectionTotal] = useState(0);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -64,8 +67,25 @@ export default function StudentOpportunities() {
   useEffect(() => {
     let stopped = false;
     const id = ++sequence.current;
-    setBusy(true); setError('');      request<Results>('opportunities/search', saved ? { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: true, include_extra_roles: true } : applied)
-      .then(result => { if (!stopped && sequence.current === id) { setItems(result.items); setSelectionTotal(result.selection_total ?? 0); } })
+    setBusy(true); setError(''); setWider(null); request<Results>('opportunities/search', saved ? { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: true, include_extra_roles: true } : applied)
+      .then(result => {
+        if (!stopped && sequence.current === id) { setItems(result.items); setSelectionTotal(result.selection_total ?? 0); }
+        // Filtro estrecho con pocas ofertas: presentamos también el hueco más amplio
+        // (mismo mercado y días, sin filtro de rol) rotulado como tal, con los mismos
+        // datos reales del motor — la alumna compara sin creer que el catálogo se vació.
+        if (!stopped && !saved && result.items.length < 10 && (applied.role || applied.market !== 'any')) {
+          return new Promise<Results>((resolve, reject) => {
+            request<Results>('opportunities/search', { ...applied, role: null, starred_only: false, include_bilingual: true })
+              .then(resolve, reject);
+          }).then(widerResult => {
+            if (stopped || sequence.current !== id) return null;
+            const seen = new Set(result.items.map(item => item.id));
+            setWider(widerResult.items.filter(item => !seen.has(item.id)).slice(0, Math.max(0, 20 - result.items.length)));
+            return null;
+          });
+        }
+        return null;
+      })
       .catch(e => { if (!stopped) setError(e.message); })
       .finally(() => { if (!stopped) setBusy(false); });
     return () => { stopped = true; };
@@ -99,7 +119,7 @@ export default function StudentOpportunities() {
           <div className="student-preferences"><span>En español · remoto o híbrido</span><label className="check-label"><input type="checkbox" checked={query.include_bilingual} onChange={e => setQuery({ ...query, include_bilingual: e.target.checked })} />También oportunidades bilingües español / inglés</label></div>
         </form>}
         {error && <p className="alert error" role="alert">{error}</p>}
-        <section className="student-results" aria-busy={busy}><div className="results-heading"><h2>{saved ? 'Tus oportunidades guardadas' : 'Oportunidades para explorar'} <span>{busy ? '…' : items.length}</span></h2><span className="student-freshness">Actualización diaria</span></div>
+        <section className="student-results" aria-busy={busy}><div className="results-heading"><h2>{saved ? 'Tus oportunidades guardadas' : 'Oportunidades para explorar'} <span>{busy ? '…' : items.length + (wider?.length ?? 0)}</span></h2><span className="student-freshness">Actualización diaria</span></div>
           {!saved && !busy && selectionTotal > 0 && <p className="selection-note">Selección del día: las {selectionTotal} que mejor cumplen los requisitos van primero. Puedes explorar el resto del catálogo debajo.</p>}
           {busy ? <div className="empty"><LoaderCircle className="spin" size={24} /><p>Buscando oportunidades…</p></div> : !items.length ? <div className="empty"><Compass size={32} strokeWidth={1.3} /><h3>{saved ? 'Guarda las que te hagan dar el siguiente paso.' : 'Aún no hay oportunidades con estos criterios.'}</h3><p>{saved ? 'Pulsa el marcador de una oferta para volver a verla aquí.' : 'Puedes elegir otro perfil o mercado. Seguimos buscando nuevas oportunidades en español.'}</p></div> :          <div className="opportunity-grid">{items.map(offer => <article className="opportunity-card" key={offer.id}>
             <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</span></div><button className={`icon-button ${offer.starred ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${offer.starred ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={offer.starred ? 'currentColor' : 'none'} /></button></div>
@@ -107,6 +127,15 @@ export default function StudentOpportunities() {
             <dl className="opportunity-facts"><div><dt>Modalidad y ubicación</dt><dd><Globe2 size={14} />{offer.modality} · {offer.location}</dd></div><div><dt>Idioma</dt><dd>{offer.language}</dd></div><div><dt>Jornada</dt><dd>{offer.schedule}</dd></div><div><dt>Experiencia</dt><dd>{offer.experience}</dd></div><div><dt>Contrato</dt><dd>{offer.contract}</dd></div></dl>
             <div className="opportunity-footer"><div><small>Publicada: {date(offer.published_at)}</small><a href={offer.source_url} target="_blank" rel="noopener noreferrer">Publicado en {offer.source_name}</a></div><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
           </article>)}</div>}
+          {!saved && !busy && wider?.length ? <div className="wider-bucket">
+            <h3>{items.length} con tu filtro · {wider.length} más del catálogo {applied.market !== 'any' ? 'con tu mercado' : 'comercial en español'}</h3>
+            <p>Con tu filtro de perfil no aparecían suficientes {applied.role ? `ofertas de ${label(applied.role)}` : 'ofertas en tu mercado'}; estas vienen del mismo catálogo real con el filtro ampliado.</p>
+            <div className="opportunity-grid">{wider.map(offer => <article className="opportunity-card" key={offer.id}>
+              <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}</span></div><button className={`icon-button ${offer.starred ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${offer.starred ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={offer.starred ? 'currentColor' : 'none'} /></button></div>
+              <div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{offer.compensation}</h3><p>{offer.compensation_note}</p></div>
+              <div className="opportunity-footer"><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
+            </article>)}</div>
+          </div> : null}
         </section>
         <p className="footnote"><BriefcaseBusiness size={14} />Tú eliges dónde avanzar. Revisa las condiciones y presenta tu candidatura en el proceso de la empresa.</p>
       </main>

@@ -19,7 +19,7 @@ test('student sees three profiles and decision facts without operational control
   await expect(page.getByText(/scraper|Apify|presupuesto|para tus alumnas|encaje \/100/i)).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('cold_caller');
   await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
-  await expect.poll(() => requests.at(-1)?.role).toBe('cold_caller');
+  await expect.poll(() => requests.some(r => r.role === 'cold_caller')).toBe(true);
   await page.getByRole('button', { name: 'Ver oportunidad', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ver proceso de candidatura' })).toHaveAttribute('href', offer.source_url);
@@ -40,13 +40,13 @@ test('student filters survive a reload via the URL', async ({ page }) => {
   await expect.poll(() => requests.length).toBeGreaterThan(0);
   expect(requests.at(-1)?.role).toBeNull();
   await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('cold_caller');
+  // El bucket ampliado (filtro estrecho <10) dispara una segunda petición role:null;
+  // las aserciones aíslan las peticiones primarias en vez de mirar la última.
   await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
-  await expect.poll(() => requests.at(-1)?.role).toBe('cold_caller');
+  await expect.poll(() => requests.some(r => r.role === 'cold_caller')).toBe(true);
   expect(new URL(page.url()).searchParams.get('role')).toBe('cold_caller');
   await page.reload();
-  await expect.poll(() => requests.length).toBeGreaterThan(1);
-  expect(requests.at(-1)?.role).toBe('cold_caller');
-  expect(requests.at(-1)?.include_extra_roles).toBe(true);
+  await expect.poll(() => requests.filter(r => r.role === 'cold_caller').length).toBeGreaterThan(1);
   await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('');
   await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
   await expect.poll(() => requests.at(-1)?.role).toBeNull();
@@ -76,4 +76,25 @@ test('student saves an opportunity and bilingual notices are an explicit choice'
   await page.getByLabel('También oportunidades bilingües español / inglés').check();
   await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
   await expect.poll(() => bilingual).toBe(true);
+});
+
+test('un filtro estrecho con pocas ofertas se completa con el hueco ampliado, rotulado', async ({ page }) => {
+  const closerOffers = Array.from({ length: 3 }, (_, i) => ({ ...offer, id: `closer-${i}` }));
+  const widerOffers = Array.from({ length: 13 }, (_, i) => ({ ...offer, id: `wider-${i}`, role: 'account_executive', role_label: 'Ejecutivo comercial', original_title: 'AE comercial de ventas' }));
+  await page.route('**/api/backend/opportunities/search', route => {
+    const body = route.request().postDataJSON() as { role?: string | null };
+    return route.fulfill({ json: body.role === 'closer' ? { items: closerOffers, total: 3 } : { items: [...closerOffers, ...widerOffers], total: 16 } });
+  });
+  await page.goto('/');
+  expect(new URL(page.url()).search).toBe('');
+  await page.getByRole('combobox', { name: 'Perfil profesional' }).selectOption('closer');
+  await page.getByRole('combobox', { name: 'Desde dónde quieres trabajar' }).selectOption('ES');
+  await page.getByRole('button', { name: 'Ver oportunidades', exact: true }).click();
+  // La petición primaria conserva su filtro; el bucket ampliado va por separado
+  await expect(page.getByText('3 con tu filtro · 13 más del catálogo con tu mercado')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Oportunidades para explorar/ }).locator('span')).toHaveText('16');
+  await expect(page.locator('.wider-bucket').getByText('Ejecutivo comercial').first()).toBeVisible();
+  // Las del bucket comparten ficha pero el filtro sigue activo en la URL
+  expect(new URL(page.url()).searchParams.get('role')).toBe('closer');
+  expect(new URL(page.url()).searchParams.get('market')).toBe('ES');
 });
