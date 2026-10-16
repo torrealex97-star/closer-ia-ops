@@ -51,4 +51,54 @@ def test_collect_keeps_going_when_one_site_fails_and_pauses_between_searches():
 
 
 def test_sites_match_panel_source_codes():
-    assert set(jc.SITES) == {'indeed', 'linkedin', 'google'}
+    assert set(jc.SITES) == {'indeed', 'linkedin', 'glassdoor', 'google'}
+
+
+def test_kwargs_use_the_real_country_parameter_and_spanish_settings():
+    kw = jc.build_kwargs('indeed', 'closer de ventas', env={})
+    assert kw['country_indeed'] == 'Spain' and 'country_indexed' not in kw
+    assert kw['search_term'] == '"closer de ventas"'   # Indeed: frase exacta
+    assert kw['site_name'] == ['indeed'] and kw['location'] == 'España' and kw['hours_old'] == 240 and kw['description_format'] == 'plain'
+    assert 'fetch_description' not in kw and 'proxies' not in kw
+
+
+def test_linkedin_fetches_descriptions_and_uses_english_location_unless_disabled():
+    kw = jc.build_kwargs('linkedin', 'setter de ventas', env={})
+    assert kw['fetch_description'] is True and kw['location'] == 'Spain'
+    assert 'fetch_description' not in jc.build_kwargs('linkedin', 'x', env={'LINKEDIN_FETCH_DESCRIPTION': '0'})
+
+
+def test_google_gets_its_own_search_term_and_proxies_come_from_env():
+    kw = jc.build_kwargs('google', 'closer high ticket', env={'JOBSPY_PROXIES': 'http://p1:8080, http://p2:8080'})
+    assert 'closer high ticket' in kw['google_search_term'] and 'España' in kw['google_search_term']
+    assert kw['proxies'] == ['http://p1:8080', 'http://p2:8080']
+
+
+def test_kwargs_are_valid_for_the_installed_jobspy():
+    """Si JobSpy está instalado, todos los argumentos existen en su firma y pasan SU validación (como scrape_jobs)."""
+    import inspect
+
+    import pytest
+    jobspy = pytest.importorskip('jobspy')
+    params = set(inspect.signature(jobspy.scrape_jobs).parameters)
+    for site in jc.SITES:
+        kw = jc.build_kwargs(site, 'closer de ventas', env={'JOBSPY_PROXIES': 'http://p:1'})
+        assert set(kw) <= params, set(kw) - params
+        model = getattr(jobspy.model, 'ScraperInput', None)
+        if model is not None:   # versiones recientes validan la entrada con este modelo; el país debe ser España
+            checked = model.model_validate({**kw, 'site_name': kw['site_name']})
+            assert str(getattr(checked.country_indeed, 'name', checked.country_indeed)).upper() == 'SPAIN'
+
+
+def test_only_indeed_gets_an_exact_phrase_query():
+    assert jc.query_for('indeed', 'setter de ventas') == '"setter de ventas"'
+    assert jc.query_for('linkedin', 'setter de ventas') == 'setter de ventas'
+
+
+def test_jobspy_failure_notes_are_reported_without_stopping_the_run():
+    def scrape(site, query):
+        return [row(id=f'{site}-{query}')], ['linkedin: response status code 429']
+
+    results, errors = jc.collect(['linkedin'], scrape, sleep=lambda _: None)
+    assert len(results['linkedin']) == len(jc.QUERIES)
+    assert errors[0] == 'linkedin/closer de ventas: linkedin: response status code 429'

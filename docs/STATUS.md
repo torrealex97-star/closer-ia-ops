@@ -1,5 +1,13 @@
 # Estado
 
+## JobSpy revisado contra su repositorio: bug de país corregido, commit fijado y mejoras (sesión 39) — 2026-10-16
+
+- **Qué se hizo antes de forma incorrecta**: el recolector se escribió con la API de memoria. Al leer el código real: el parámetro de país es `country_indeed` (yo usaba `country_indexed`): PyPI 1.3.0 lo ignoraba y Indeed habría buscado en EE. UU.; la versión de GitHub falla con `TypeError`. Corregido y **verificado con la validación propia de JobSpy** (`ScraperInput`) en `tests/test_jobspy_collect.py` (11 tests).
+- **Adoptado de JobSpy (leyendo `speedyapply/JobSpy` @ `1988484`)**: workflow con **commit fijado** (más reciente que PyPI); `fetch_description` (LinkedIn necesita descripción para comprobar idioma/perfil); `description_format='plain'`; ubicación por sitio; **frase exacta** en Indeed (su FAQ: busca también en la descripción); **Glassdoor** añadido (soporta España); informe de `attrs['errors'/'warnings']` por sitio (distingue «bloqueado» de «sin ofertas», va como nota de la entrada); proxies opcionales (`JOBSPY_PROXIES`).
+- **Mejoras propias**: salario literal en euros rescatado del texto (JobSpy solo lo extrae para EE. UU.; `lib/salary.ts`, descarta bonus/comisiones/inversión); la vista de alumna muestra lo que la fuente declara (`is_remote` → Remoto, `job_type` → jornada/contrato); sin descripción (LinkedIn sin detalle) basta título en español + ubicación en España explícita.
+- **No integrado**: el actor de Apify `aakash19/jobspy` (de pago, esquema de entrada sin documentar, un mantenedor; no se pudo leer su esquema por la red restringida). Ver [EXTERNAL_SOURCES.md](EXTERNAL_SOURCES.md) §5.
+- **Verificación**: `tests/admin-auth/run.sh` 28/28 + paridad + csv + salario + interfaz; `pytest` jobspy 11/11; typecheck, build y ruff OK. Nada probado contra los sitios reales.
+
 ## Control de fuentes externas, vigencia automática, CSV y cabeceras de seguridad (sesión 38) — 2026-10-16
 
 - **Pausar y reanudar fuentes externas** (solo propietario; tabla `public.source_settings`, migración `source_settings`): una fuente pausada no se recoge (cron y botón), su `/api/ingest` devuelve `paused` y no guarda nada (queda registrado), y sus ofertas dejan de verse para las alumnas hasta reanudarla. Tabla de las 6 fuentes (InfoJobs, Adzuna, Jooble, Indeed, LinkedIn, Google Jobs) con estado y botón en Fuentes externas; el catálogo de Fuentes muestra «Pausada».

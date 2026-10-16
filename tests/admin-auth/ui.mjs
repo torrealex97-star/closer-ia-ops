@@ -67,9 +67,9 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
   await page.getByText('Closer de ventas').first().waitFor();
   assert.equal(await page.locator('table').last().locator('tbody tr').count(), 1); // closer + España; el de Texas y el setter quedan fuera
-  assert.equal(await page.locator('table').first().locator('tbody tr').count(), 6); // fuentes conocidas: 3 APIs + 3 de JobSpy
+  assert.equal(await page.locator('table').first().locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
   await page.getByRole('button', { name: 'Pausar InfoJobs' }).click(); await page.getByText(/infojobs: pausada/).waitFor();
-  assert.ok(await page.getByRole('button', { name: 'Reanudar InfoJobs' }).isVisible());
+  await page.getByRole('button', { name: 'Reanudar InfoJobs' }).waitFor(); // espera a que la tabla recargue con el nuevo estado
   await page.getByRole('button', { name: 'Reanudar InfoJobs' }).click(); await page.getByText(/infojobs: reanudada/).waitFor();
   await page.getByLabel('Seleccionar todas las visibles').check();
   await page.getByRole('button', { name: 'Verificar vigencia' }).click(); await page.getByText(/Activa · content_matches/).waitFor();

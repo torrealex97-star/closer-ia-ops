@@ -8,7 +8,7 @@ import { ROLE_LABELS, roleFromTitle, spainSignal, type RoleFamily } from '../lib
 // Llegan como borradores; una alumna solo ve lo que apruebas aquí y que además cumple las reglas básicas de la vista.
 type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null };
 type Data = { offers: Offer[]; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[] };
-const KNOWN = [['infojobs', 'InfoJobs', 'API oficial'], ['adzuna', 'Adzuna', 'API oficial'], ['jooble', 'Jooble', 'API oficial'], ['indeed', 'Indeed', 'JobSpy'], ['linkedin', 'LinkedIn', 'JobSpy'], ['google', 'Google Jobs', 'JobSpy']] as const;
+const KNOWN = [['infojobs', 'InfoJobs', 'API oficial'], ['adzuna', 'Adzuna', 'API oficial'], ['jooble', 'Jooble', 'API oficial'], ['indeed', 'Indeed', 'JobSpy'], ['linkedin', 'LinkedIn', 'JobSpy'], ['glassdoor', 'Glassdoor', 'JobSpy'], ['google', 'Google Jobs', 'JobSpy']] as const;
 const STATUS: Record<string, string> = { draft: 'Borrador', needs_review: 'A revisar', approved: 'Aprobada', published: 'Publicada', withdrawn: 'Retirada' };
 const VERDICT: Record<string, string> = { open: 'Activa', closed: 'Cerrada', unknown: 'No verificable' };
 const fmt = (v: string | null) => v ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '—';
@@ -92,7 +92,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   }
 
   return <section aria-label="Fuentes externas">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. LinkedIn, Indeed y Google Jobs llegan desde el workflow de GitHub con JobSpy. Todo entra como borrador; las alumnas solo ven lo que apruebes. Estas ofertas enlazan siempre al anuncio original.</p>
+    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. LinkedIn, Indeed, Glassdoor y Google Jobs llegan desde el workflow de GitHub con JobSpy. Todo entra como borrador; las alumnas solo ven lo que apruebes. Estas ofertas enlazan siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
     <div className="admin-toolbar" style={{ justifyContent: 'flex-end' }}>

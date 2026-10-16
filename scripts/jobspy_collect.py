@@ -1,12 +1,12 @@
 """Recolector programado de ofertas en España con JobSpy (open source, MIT) -> /api/ingest del panel.
 
-Qué hace: busca ofertas de closer/setter/comercial en Indeed, LinkedIn y Google Jobs con volumen bajo y pausas,
+Qué hace: busca ofertas de closer/setter/comercial en Indeed, LinkedIn, Glassdoor y Google Jobs con volumen bajo y pausas,
 y envía los candidatos como BORRADORES. Una alumna solo ve lo que un operador apruebe en el panel.
 Decisión de riesgo: estas webs prohíben el scraping en sus condiciones de uso; el operador lo asume (ADR-011).
 No guarda datos de contacto: se descartan los correos que JobSpy encuentra y se limpian teléfonos del texto.
 
 Uso (lo lanza .github/workflows/jobspy-collect.yml):
-  INGEST_URL=https://app.../api/ingest INGEST_TOKEN=... python scripts/jobspy_collect.py [--dry-run] [--sites indeed,linkedin,google]
+  INGEST_URL=https://app.../api/ingest INGEST_TOKEN=... python scripts/jobspy_collect.py [--dry-run] [--sites indeed,linkedin,glassdoor,google]
 """
 import argparse
 import json
@@ -17,11 +17,12 @@ import time
 import urllib.request
 
 QUERIES = ['closer de ventas', 'closer high ticket', 'setter de ventas', 'televenta', 'asesor comercial', 'ejecutivo comercial', 'cold caller']
-SITES = ('indeed', 'linkedin', 'google')   # el código de la fuente en el panel coincide con el nombre del sitio
+SITES = ('indeed', 'linkedin', 'glassdoor', 'google')   # el código de la fuente en el panel coincide con el nombre del sitio
 RESULTS_WANTED = 20
 HOURS_OLD = 240           # 10 días: la ventana del catálogo
 PAUSE_SECONDS = 10        # pausa entre búsquedas para no castigar a los sitios
 BATCH = 100
+LOCATIONS = {'indeed': 'España', 'linkedin': 'Spain', 'glassdoor': 'España', 'google': 'España'}   # LinkedIn resuelve mejor el nombre en inglés
 
 
 def clean(value):
@@ -80,7 +81,9 @@ def collect(sites, scrape, sleep=time.sleep, pause=PAUSE_SECONDS):
     for site in sites:
         for query in QUERIES:
             try:
-                rows = scrape(site, query)
+                result = scrape(site, query)
+                rows, notes = result if isinstance(result, tuple) else (result, [])
+                errors.extend(f'{site}/{query}: {note}' for note in notes)
                 found[site].extend(map_rows(rows, site))
             except Exception as error:  # noqa: BLE001 - cada sitio falla a su manera
                 errors.append(f'{site}/{query}: {type(error).__name__}')
@@ -89,14 +92,42 @@ def collect(sites, scrape, sleep=time.sleep, pause=PAUSE_SECONDS):
     return {site: list({c['external_id']: c for c in items}.values()) for site, items in found.items()}, errors
 
 
-def jobspy_scrape(site, query):
-    from jobspy import scrape_jobs  # import tardío: solo hace falta al ejecutar el recolector
-    kwargs = dict(site_name=[site], search_term=query, location='España', results_wanted=RESULTS_WANTED, hours_old=HOURS_OLD,
-                  country_indexed='Spain', linkedin_fetch_description=False, verbose=0)
+def query_for(site, query):
+    """Indeed busca también en la descripción y devuelve roles ajenos: la frase exacta entre comillas lo evita (FAQ de JobSpy)."""
+    return f'"{query}"' if site == 'indeed' else query
+
+
+def build_kwargs(site, query, env=None):
+    """Argumentos de scrape_jobs verificados contra la firma de JobSpy 1.3.0 (tests/test_jobspy_collect.py los comprueba)."""
+    env = os.environ if env is None else env
+    kwargs = dict(
+        site_name=[site], search_term=query_for(site, query), results_wanted=RESULTS_WANTED, hours_old=HOURS_OLD,
+        # OJO: el parámetro se llama country_indeed (JobSpy ignora los desconocidos y buscaría en EE. UU.). Aplica a Indeed y Glassdoor.
+        country_indeed='Spain',
+        location=LOCATIONS.get(site, 'España'),
+        description_format='plain',    # sin Markdown ni HTML en el texto que verá el panel
+        verbose=0,
+    )
+    if site == 'linkedin' and env.get('LINKEDIN_FETCH_DESCRIPTION', '1') != '0':
+        # Sin descripción no se puede comprobar idioma ni perfil: cuesta una petición extra por oferta.
+        kwargs['fetch_description'] = True
     if site == 'google':
         kwargs['google_search_term'] = f'{query} empleo en España en los últimos 10 días'
-    frame = scrape_jobs(**kwargs)
-    return frame.drop(columns=['emails'], errors='ignore').to_dict('records')
+    proxies = [p.strip() for p in env.get('JOBSPY_PROXIES', '').split(',') if p.strip()]
+    if proxies:
+        kwargs['proxies'] = proxies    # los runners de GitHub a veces son bloqueados: proxy opcional como secreto
+    return kwargs
+
+
+def jobspy_scrape(site, query):
+    from jobspy import scrape_jobs  # import tardío: solo hace falta al ejecutar el recolector
+    frame = scrape_jobs(**build_kwargs(site, query))
+    rows = frame.drop(columns=['emails', 'skills'], errors='ignore').to_dict('records')
+    # JobSpy (>=1.3.0 en GitHub) informa de qué sitio falló o qué opción ignoró en frame.attrs: distingue «bloqueado» de «sin ofertas».
+    attrs = getattr(frame, 'attrs', {}) or {}
+    notes = [f'{name}: {message}' for name, message in (attrs.get('errors') or {}).items()]
+    notes += [f'{name}: {w}' for name, ws in (attrs.get('warnings') or {}).items() for w in ws]
+    return rows, notes
 
 
 def main(argv=None):

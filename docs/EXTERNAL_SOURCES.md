@@ -9,7 +9,7 @@ Se recogen solas cada día a las 06:00 UTC y desde el botón «Recoger APIs ahor
 3. **Jooble**: jooble.org/api/about → clave. Pégala tal cual.
 4. Pulsa «Probar» en cada una (no gasta crédito) y luego «Recoger APIs ahora».
 
-## 2. JobSpy (Indeed, LinkedIn, Google Jobs) en GitHub Actions
+## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
 2. Vercel → proyecto → Settings → Environment Variables: `INGEST_TOKEN` = ese token (Production).
 3. GitHub → repo → Settings → Secrets and variables → Actions: `INGEST_TOKEN` = el mismo token e `INGEST_URL` = `https://app.womendigitalclosers.com/api/ingest`.
@@ -23,3 +23,12 @@ Los runners de GitHub a veces son bloqueados por LinkedIn/Indeed: un fallo apare
 - **Pausar/reanudar** una fuente: Panel → Fuentes externas → tabla de fuentes (solo propietario). Pausada = no se recoge, no se acepta y no se muestra.
 - **Vigencia**: cada día el cron revisa las aprobadas y retira las cerradas en origen. LinkedIn/Indeed suelen bloquear la comprobación («no verificable»): esas se mantienen.
 - **Exportar**: botón «Exportar CSV» en Probar ofertas y en Fuentes externas.
+
+## 5. Notas de JobSpy (revisado el código de speedyapply/JobSpy)
+- El workflow instala un **commit fijado** del repositorio (`1988484`, 2026-10-14), más reciente que PyPI 1.3.0. Para actualizar, revisa los cambios y cambia el SHA en el workflow.
+- El país se pasa con `country_indeed='Spain'` (aplica a Indeed y Glassdoor). El nombre de parámetro importa: la versión de GitHub falla con otro nombre y PyPI lo ignoraría y buscaría en EE. UU.
+- Indeed busca también en la descripción: se usa **frase exacta** entre comillas. LinkedIn usa `location='Spain'` y descarga la descripción (una petición extra por oferta; se desactiva con la variable `LINKEDIN_FETCH_DESCRIPTION=0`).
+- JobSpy informa en `attrs['errors']`/`attrs['warnings']` de qué sitio falló: el recolector lo recoge y lo envía como nota de la entrada, para distinguir «bloqueado» de «sin ofertas».
+- LinkedIn limita ráfagas (429) y los runners de GitHub pueden ser bloqueados: el secreto opcional `JOBSPY_PROXIES` (proxies separados por coma) se pasa a JobSpy.
+- JobSpy solo extrae salario del texto para EE. UU.; aquí se rescata la frase literal en euros con periodo o bruto/neto (`lib/salary.ts`).
+- **Actor de Apify `aakash19/jobspy`** (envoltorio de pago de JobSpy, comunidad, 1 usuario mensual): no se ha integrado. Pros: proxies de Apify, sin bloqueo de IP de GitHub. Contras: coste por uso de plataforma, esquema de entrada no documentado en su ficha y un único mantenedor. Si se quiere, se conecta desde la app local (Fuentes → Apify guiado, que descubre el esquema de entrada) o se añade aquí como fuente de pago desactivada por defecto.

@@ -1,10 +1,11 @@
+import { salaryFromText } from './salary';
 import { serviceRest } from './supabaseAuth';
 
 // Fuentes externas (APIs con clave y recolectores programados). Los candidatos llegan tal cual los da la fuente,
 // sin datos de contacto de personas, y no son visibles para una alumna hasta que un operador los aprueba.
 export const ORG = 'cloud-wdc';
 export type Candidate = { external_id: string; title: string; company?: string | null; location?: string | null; url: string; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown> };
-export type ExternalOffer = { id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null };
+export type ExternalOffer = { raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null };
 export const SOURCE_RE = /^[a-z0-9-]{2,40}$/;
 const MAX_CANDIDATES = 300;
 
@@ -31,7 +32,9 @@ export function sanitize(input: unknown): Candidate | null {
   const description = typeof c.description === 'string' ? scrub(c.description).slice(0, 6000) || null : null;
   const rawIn = c.raw && typeof c.raw === 'object' ? c.raw as Record<string, unknown> : {};
   const raw = Object.fromEntries(Object.entries(rawIn).filter(([k, v]) => RAW_KEYS.includes(k) && ['string', 'number', 'boolean'].includes(typeof v)));
-  return { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary: clip(c.salary, 200), description, posted_at, raw };
+  // Sin salario estructurado, se rescata la frase literal del texto (solo con importe en € y periodo o bruto/neto).
+  const salary = clip(c.salary, 200) ?? (typeof c.description === 'string' ? salaryFromText(c.description) : null);
+  return { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary, description, posted_at, raw };
 }
 
 export async function pausedSources(): Promise<Set<string>> {
@@ -70,7 +73,7 @@ export async function ingest(source: string, via: string, candidates: unknown[],
   return { received, accepted, rejected: received - accepted };
 }
 
-const COLS = 'id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result';
+const COLS = 'raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result';
 export async function listOffers(opts: { status?: string; source?: string; limit?: number; onlyLive?: boolean }): Promise<ExternalOffer[] | null> {
   const q = [`org_id=eq.${ORG}`, `select=${COLS}`, 'order=posted_at.desc.nullslast,first_seen_at.desc', `limit=${Math.min(opts.limit ?? 200, 500)}`];
   if (opts.status) q.push(`editorial_status=eq.${encodeURIComponent(opts.status)}`);

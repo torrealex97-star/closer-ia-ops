@@ -149,6 +149,16 @@ await step('ingest: cerrado sin token; valida el cuerpo; limpia datos personales
   assert.deepEqual(Object.keys(stored.raw), ['site']); assert.equal(stored.editorial_status, 'draft');
   assert.equal(state.ingestRuns[0].source, 'indeed');
 });
+await step('ingest: rescata el salario literal del texto cuando la fuente no lo trae', async () => {
+  const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [
+    { external_id: 's1', title: 'Closer', url: 'https://es.indeed.com/s1', description: 'Ofrecemos 24.000 - 30.000 € brutos/año más comisiones y formación continua en el equipo' },
+    { external_id: 's2', title: 'Closer', url: 'https://es.indeed.com/s2', description: 'Bonus de 1.000 € mensuales por objetivos', salary: '1.500 € / mes' },
+    { external_id: 's3', title: 'Closer', url: 'https://es.indeed.com/s3', description: 'Más de 2.000 clientes' },
+  ] } });
+  assert.equal(r.status, 200);
+  const by = id => [...state.external.values()].find(o => o.external_id === id);
+  assert.equal(by('s1').salary, '24.000 - 30.000 € brutos/año'); assert.equal(by('s2').salary, '1.500 € / mes'); assert.equal(by('s3').salary, null);
+});
 await step('ingest: repetir una oferta no pisa su estado editorial', async () => {
   const offer = [...state.external.values()].find(o => o.external_id === 'a1'); offer.editorial_status = 'approved';
   const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [{ external_id: 'a1', title: 'Closer de ventas (actualizada)', url: 'https://es.indeed.com/viewjob?jk=a1' }] } });
@@ -194,9 +204,18 @@ await step('vista de alumna: suma solo externas aprobadas que cumplen perfil, Es
   const r = await search({}); assert.equal(r.status, 200);
   const urls = r.json.items.map(i => i.source_url);
   assert.ok(urls.includes('https://es.indeed.com/viewjob?jk=a1'), 'externa aprobada visible');
+  // Sin descripción (p. ej. LinkedIn sin detalle): visible si el título es español y la ubicación es España explícita.
+  const noDesc = { id: crypto.randomUUID(), source: 'linkedin', external_id: 'nd1', title: 'Closer de ventas', company: 'Delta', location: 'Madrid, España', url: 'https://www.linkedin.com/jobs/view/nd1', description: null, editorial_status: 'approved', posted_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString() };
+  const noDescUs = { ...noDesc, id: crypto.randomUUID(), external_id: 'nd2', url: 'https://www.linkedin.com/jobs/view/nd2', location: 'Houston, Texas' };
+  state.external.set('l|nd1', noDesc); state.external.set('l|nd2', noDescUs);
+  const again = (await search({})).json.items.map(i => i.source_url);
+  assert.ok(again.includes(noDesc.url), 'sin descripción pero título español + España: visible'); assert.ok(!again.includes(noDescUs.url), 'sin descripción y sin España: no');
   assert.ok(!urls.some(u => u.includes('ejemplo.es') || u.includes('127.0.0.1:8792/page/ok')), 'fuera de España/inglés no');
   assert.ok(!urls.some(u => u.includes('adzuna')), 'borrador no');
   const item = r.json.items.find(i => i.source_url.includes('a1')); assert.equal(item.role_label, 'Closer'); assert.equal(item.id.startsWith('ext-'), true);
+  // Lo que declara la fuente (is_remote, job_type) se muestra; lo demás sigue «no indicado».
+  assert.equal(item.modality, 'Modalidad no indicada'); ext.a1.raw = { site: 'indeed', is_remote: true, job_type: 'fulltime, permanent' };
+  const declared = (await search({})).json.items.find(i => i.source_url.includes('a1')); assert.equal(declared.modality, 'Remoto'); assert.equal(declared.schedule, 'Jornada completa'); assert.equal(declared.contract, 'Indefinido');
   assert.equal(r.json.total, r.json.items.length);
   assert.ok((await search({ role: 'setter' })).json.items.every(i => !i.source_url.includes('a1')));
   assert.ok((await search({ market: 'EU' })).json.items.every(i => !i.id.startsWith('ext-')));
