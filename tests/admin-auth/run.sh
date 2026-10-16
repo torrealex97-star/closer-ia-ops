@@ -16,4 +16,5 @@ node --experimental-strip-types tests/admin-auth/parity.mjs 2>/dev/null
 node --experimental-strip-types tests/admin-auth/csv.mjs 2>/dev/null
 node --experimental-strip-types tests/admin-auth/salary.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/score.mjs 2>/dev/null
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/aireview.mjs 2>/dev/null
 BASE="http://127.0.0.1:$PORT" node tests/admin-auth/ui.mjs

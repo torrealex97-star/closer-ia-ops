@@ -6,7 +6,7 @@ import { serviceRest } from './supabaseAuth';
 // sin datos de contacto de personas, y no son visibles para una alumna hasta que un operador los aprueba.
 export const ORG = 'cloud-wdc';
 export type Candidate = { external_id: string; title: string; company?: string | null; location?: string | null; url: string; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown> };
-export type ExternalOffer = { role?: string | null; spain?: boolean | null; score?: number; also_seen?: string[]; raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null };
+export type ExternalOffer = { role?: string | null; spain?: boolean | null; score?: number; also_seen?: string[]; raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null; ai_review?: Record<string, unknown> | null };
 export const SOURCE_RE = /^[a-z0-9-]{2,40}$/;
 export const MAX_CANDIDATES = 300;
 const STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
@@ -77,7 +77,7 @@ export async function ingest(source: string, via: string, candidates: unknown[],
   return { received, accepted, rejected: received - accepted };
 }
 
-const COLS = 'role,spain,score,also_seen,raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result';
+const COLS = 'role,spain,score,also_seen,raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result,ai_review';
 export async function listOffers(opts: { status?: string; statuses?: string[]; source?: string; limit?: number; onlyLive?: boolean; byScore?: boolean }): Promise<ExternalOffer[] | null> {
   const q = [`org_id=eq.${ORG}`, `select=${COLS}`, opts.byScore ? 'order=score.desc,posted_at.desc.nullslast' : 'order=posted_at.desc.nullslast,first_seen_at.desc', `limit=${Math.min(opts.limit ?? 200, 1000)}`];
   if (opts.status) q.push(`editorial_status=eq.${encodeURIComponent(opts.status)}`);
@@ -165,7 +165,7 @@ export async function refreshVigencia(max = 20): Promise<{ checked: number; with
 }
 
 // ---- Escala: filtros, orden y paginación en el servidor (miles de ofertas) ----
-export type PageQuery = { status?: string; source?: string; role?: string; spain?: boolean; minScore?: number; q?: string; sort?: 'score' | 'recent'; limit?: number; offset?: number };
+export type PageQuery = { status?: string; source?: string; role?: string; spain?: boolean; minScore?: number; ai?: 'human' | 'withdraw' | 'approve' | 'none'; q?: string; sort?: 'score' | 'recent'; limit?: number; offset?: number };
 
 function pageFilters(p: PageQuery): string[] {
   const f = [`org_id=eq.${ORG}`, `expires_at=gt.${encodeURIComponent(new Date().toISOString())}`];
@@ -174,6 +174,8 @@ function pageFilters(p: PageQuery): string[] {
   if (p.role === 'none') f.push('role=is.null'); else if (p.role && /^[a-z_]{2,30}$/.test(p.role)) f.push(`role=eq.${p.role}`);
   if (p.spain) f.push('spain=is.true');
   if (p.minScore && p.minScore > 0) f.push(`score=gte.${Math.min(100, Math.floor(p.minScore))}`);
+  // Filtro por lo que decidiría el revisor IA: «human» = cola humana (revisión pendiente de una persona).
+  if (p.ai === 'none') f.push('ai_review=is.null'); else if (p.ai) f.push(`ai_review->>would_decide=eq.${p.ai}`);
   const q = (p.q ?? '').replace(/[^\p{L}\p{N} .-]/gu, ' ').trim().slice(0, 60);
   if (q) f.push(`or=(title.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`);
   return f;

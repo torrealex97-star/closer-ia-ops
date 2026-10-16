@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { collectAll } from '../../../../lib/collectors';
 import { dailyApify } from '../../../../lib/apify';
 import { publicBaseUrl } from '../../../../lib/adminAuth';
+import { runAiReview, weeklyAiReport } from '../../../../lib/aiReview';
 import { refreshVigencia } from '../../../../lib/external';
 
 export const dynamic = 'force-dynamic';
@@ -19,5 +20,8 @@ export async function GET(request: NextRequest) {
   const vigencia = await refreshVigencia().catch(() => ({ checked: 0, withdrawn: 0 }));
   // Actores de Apify marcados como diarios (si hay presupuesto) y recogida de lo que haya terminado.
   const apify = await dailyApify(publicBaseUrl(request)).catch(() => ({ started: [], harvested: [] }));
-  return Response.json({ outcomes, vigencia, apify });
+  // Revisor IA dentro del mismo cron (sin crons nuevos): shadow salvo AI_REVIEW_MODE=live. Un fallo no tumba el resto.
+  const aiReview = await runAiReview().catch(() => ({ skipped: 'error' }));
+  const report = new Date().getUTCDay() === 1 ? await weeklyAiReport().catch(() => false) : null;
+  return Response.json({ outcomes, vigencia, apify, aiReview, weeklyReport: report });
 }
