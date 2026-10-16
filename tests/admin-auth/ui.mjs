@@ -65,9 +65,10 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   mk('x1', {}); mk('x2', { location: 'Austin, Texas', spain: false, score: 20 }); mk('x3', { title: 'Setter de ventas', location: 'Valencia', role: 'setter', score: 60 });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
+  await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Métricas · últimos 14 días/);
   await page.getByText('Closer de ventas').first().waitFor();
   assert.equal(await page.locator('table').last().locator('tbody tr').count(), 1); // closer + España; el de Texas y el setter quedan fuera
-  assert.equal(await page.locator('table').first().locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
+  assert.equal(await page.locator('table').nth(1).locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
   await page.getByRole('button', { name: 'Pausar InfoJobs' }).click(); await page.getByText(/infojobs: pausada/).waitFor();
   await page.getByRole('button', { name: 'Reanudar InfoJobs' }).waitFor(); // espera a que la tabla recargue con el nuevo estado
   await page.getByRole('button', { name: 'Reanudar InfoJobs' }).click(); await page.getByText(/infojobs: reanudada/).waitFor();
