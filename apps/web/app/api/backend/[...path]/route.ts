@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { externalForStudent } from '../../../../lib/externalSurface';
 
 export const dynamic = 'force-dynamic';
 const allowed = new Set(['127.0.0.1:3100', 'localhost:3100']);
@@ -33,19 +34,31 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
   }
   const token = !engine ? process.env.CAREER_LOCAL_TOKEN : null;
+  const requestBody = ['GET', 'HEAD'].includes(request.method) ? '' : await request.text();
   try {
     // Los parámetros de consulta son parte del contrato (p. ej. editorial_status del listado WDC).
     const upstream = await fetch(`${upstreamOrigin}/v1/${path.join('/')}${request.nextUrl.search}`, {
       method: request.method,
       headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
                      : { 'Content-Type': 'application/json' },
-      body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.text(),
+      body: requestBody || undefined,
       cache: 'no-store', signal: AbortSignal.timeout(path[0] === 'source-assistant' ? 55000 : 45000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     for (const name of ['content-type', 'content-disposition']) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
+    }
+    // Hosted: la búsqueda de alumna suma las ofertas externas aprobadas a las del motor (sin duplicar enlaces).
+    if (engine && upstream.ok && path.join('/') === 'opportunities/search' && request.method === 'POST') {
+      try {
+        const body = JSON.parse(requestBody) as { role?: string | null; market?: string; days?: number; include_bilingual?: boolean; starred_only?: boolean };
+        const mine = await upstream.clone().json() as { items: Array<{ source_url: string }>; total: number };
+        const extra = await externalForStudent({ role: body.role ?? null, market: body.market ?? 'any', days: Number(body.days) || 10, include_bilingual: Boolean(body.include_bilingual), starred_only: Boolean(body.starred_only) }).catch(() => []);
+        const seen = new Set(mine.items.map(i => i.source_url));
+        const items = [...mine.items, ...extra.filter(e => !seen.has(e.source_url))];
+        return Response.json({ ...mine, items, total: items.length }, { headers });
+      } catch { /* si algo falla, se devuelve la respuesta del motor tal cual */ }
     }
     return new Response(upstream.body, { status: upstream.status, headers });
   } catch {

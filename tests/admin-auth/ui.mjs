@@ -60,6 +60,20 @@ await step('Revisión una a una: guardar una oferta con payload raw ya no da 422
   await page.getByRole('button', { name: /Desarrollador Backend/ }).click(); await page.getByLabel('Título (headline)').waitFor();
   await page.getByRole('button', { name: 'Guardar borrador' }).click(); await page.getByText(/Guardado: Borrador/).waitFor();
 });
+await step('Fuentes externas: filtra closers de España, verifica y aprueba; el catálogo marca la fuente como externa', async () => {
+  const mk = (id, over) => state.external.set(id, { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'http://127.0.0.1:8792/page/ok', salary: null, description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa', posted_at: new Date().toISOString(), editorial_status: 'draft', verified_result: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), ...over });
+  mk('x1', {}); mk('x2', { location: 'Austin, Texas' }); mk('x3', { title: 'Setter de ventas', location: 'Valencia' });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
+  await page.getByText('Closer de ventas').first().waitFor();
+  assert.equal(await page.locator('table tbody tr').count(), 1); // closer + España; el de Texas y el setter quedan fuera
+  await page.getByLabel('Seleccionar todas las visibles').check();
+  await page.getByRole('button', { name: 'Verificar vigencia' }).click(); await page.getByText(/Activa · content_matches/).waitFor();
+  await page.getByRole('button', { name: /^Aprobar/ }).click(); await page.getByText(/1 oferta\(s\) → Aprobada/).waitFor();
+  assert.equal([...state.external.values()].filter(o => o.editorial_status === 'approved').length, 1);
+  await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
+  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 3 activas/).waitFor();
+});
 await step('móvil: Resumen sin scroll horizontal', async () => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Resumen' }).click(); await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();

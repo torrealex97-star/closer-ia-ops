@@ -4,9 +4,9 @@ import { ArrowRight, LoaderCircle, RefreshCcw } from 'lucide-react';
 
 // Resumen: cuánto falta para el objetivo (ofertas de closer en España visibles para las alumnas) y qué hacer ahora.
 export const TARGET_CLOSERS_ES = 20;
-type Overview = { engine: { catalog_active: number; last_run: { day: string; status: string } | null } | null; sources: Array<{ code: string; name: string; run_status: string | null }>; pool: { eligible: number | null; by_role: Record<string, number> } };
+type Overview = { external?: { pending: number; sources: Array<{ source: string; live: number; approved: number }> }; engine: { catalog_active: number; last_run: { day: string; status: string } | null } | null; sources: Array<{ code: string; name: string; run_status: string | null }>; pool: { eligible: number | null; by_role: Record<string, number> } };
 type Student = { items: Array<{ id: string }>; total: number };
-type Go = (tab: 'quick' | 'review' | 'catalog' | 'sources' | 'apis') => void;
+type Go = (tab: 'quick' | 'external' | 'review' | 'catalog' | 'sources' | 'apis') => void;
 
 async function get<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -43,13 +43,15 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
   const visible = closers ?? 0;
   const pct = Math.min(100, Math.round((visible / TARGET_CLOSERS_ES) * 100));
   const waiting = (counts.draft ?? 0) + (counts.needs_review ?? 0);
+  const extPending = overview?.external?.pending ?? 0;
   const failed = overview?.sources.filter(s => s.run_status === 'failed') ?? [];
   const poolClosers = overview?.pool.by_role.closer ?? 0;
   const reached = visible >= TARGET_CLOSERS_ES;
   const steps: Array<{ text: string; action: string; tab: Parameters<Go>[0] }> = [];
   if (!reached && waiting > 0) steps.push({ text: `Hay ${waiting} oferta(s) sin revisar. Filtra por Closer, verifica y aprueba las buenas.`, action: 'Abrir revisión rápida', tab: 'quick' });
+  if (!reached && extPending > 0) steps.push({ text: `Hay ${extPending} oferta(s) de fuentes externas (InfoJobs, Adzuna, Jooble, JobSpy) por revisar.`, action: 'Revisar externas', tab: 'external' });
   if (failed.length) steps.push({ text: `${failed.length} fuente(s) fallan en la última recogida: ${failed.slice(0, 3).map(f => f.name).join(', ')}${failed.length > 3 ? '…' : ''}.`, action: 'Ver fuentes', tab: 'sources' });
-  if (!reached && waiting === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más fuentes o claves de proveedores.', action: 'Ver APIs y fuentes', tab: 'apis' });
+  if (!reached && waiting === 0 && extPending === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más fuentes o claves de proveedores.', action: 'Ver APIs y fuentes', tab: 'apis' });
   if (reached && !steps.length) steps.push({ text: 'Objetivo cumplido. Prueba la vista de alumna para comprobar cómo se ve.', action: 'Probar ofertas', tab: 'catalog' });
 
   return <section aria-label="Resumen">

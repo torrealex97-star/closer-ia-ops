@@ -6,7 +6,7 @@ export function startMocks({ authPort, enginePort }) {
   const state = {
     users: new Map([['owner@test.dev', { id: 'u1', password: 'Correcta-12345' }]]),
     admins: [{ email: 'owner@test.dev', role: 'owner', invited_by: 'bootstrap', created_at: '2026-10-16T00:00:00Z' }],
-    connections: new Map(), tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
+    connections: new Map(), external: new Map(), ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
   };
   const send = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
@@ -77,6 +77,41 @@ export function startMocks({ authPort, enginePort }) {
       if (req.method === 'PATCH') { Object.assign(state.connections.get(eq) ?? {}, body); return send(res, 204, {}); }
       if (req.method === 'DELETE') { state.connections.delete(eq); return send(res, 204, {}); }
     }
+    if (url.pathname === '/rest/v1/rpc/external_upsert' && req.method === 'POST') {
+      let n = 0;
+      for (const r of body.p_rows) {
+        const key = `${body.p_source}|${r.external_id}`; const old = state.external.get(key);
+        state.external.set(key, old ? { ...old, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined)), last_seen_at: new Date().toISOString() } : { id: crypto.randomUUID(), source: body.p_source, editorial_status: 'draft', verified_result: null, verified_at: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 10 * 864e5).toISOString(), raw: {}, ...r });
+        n++;
+      }
+      return send(res, 200, n);
+    }
+    if (url.pathname === '/rest/v1/external_ingest_runs') {
+      if (req.method === 'POST') { state.ingestRuns.unshift({ ...body, created_at: new Date().toISOString() }); return send(res, 201, {}); }
+      return send(res, 200, state.ingestRuns);
+    }
+    if (url.pathname === '/rest/v1/external_offers') {
+      const q = Object.fromEntries(url.searchParams); const ids = q.id?.startsWith('in.(') ? q.id.slice(4, -1).split(',') : q.id?.startsWith('eq.') ? [q.id.slice(3)] : null;
+      let rows = [...state.external.values()];
+      if (ids) rows = rows.filter(r => ids.includes(r.id));
+      if (q.editorial_status) rows = rows.filter(r => `eq.${r.editorial_status}` === q.editorial_status);
+      if (q.source) rows = rows.filter(r => `eq.${r.source}` === q.source);
+      if (q.expires_at?.startsWith('gt.')) rows = rows.filter(r => r.expires_at > decodeURIComponent(q.expires_at.slice(3)));
+      if (req.method === 'PATCH') { for (const r of rows) Object.assign(r, body); return send(res, 200, rows); }
+      return send(res, 200, rows.slice(0, Number(q.limit) || 200));
+    }
+    // APIs oficiales simuladas: InfoJobs (Basic), Adzuna (app_id/app_key) y Jooble (clave en la ruta).
+    if (url.pathname === '/api/9/offer') {
+      if (req.headers.authorization !== 'Basic ' + Buffer.from('cid:good-key-1234').toString('base64')) return send(res, 401, {});
+      return send(res, 200, { offers: [{ id: 'ij-1', title: 'Closer de ventas high ticket', author: { name: 'Acme' }, city: 'Madrid', province: { value: 'Madrid' }, link: 'https://www.infojobs.net/oferta-ij-1', salaryDescription: '30.000 €/año', published: '2026-10-15T08:00:00Z' }] });
+    }
+    if (url.pathname === '/v1/api/jobs/es/search/1') {
+      if (url.searchParams.get('app_key') !== 'good-key-1234') return send(res, 401, {});
+      return send(res, 200, { results: [{ id: 123, title: 'Closer comercial remoto', company: { display_name: 'Beta' }, location: { display_name: 'Barcelona, España' }, redirect_url: 'https://www.adzuna.es/details/123', created: '2026-10-14T08:00:00Z', description: 'Buscamos una persona con experiencia en ventas para incorporar al equipo comercial de la empresa.' }] });
+    }
+    if (url.pathname === '/api/good-key-1234' && req.method === 'POST') {
+      return send(res, 200, { jobs: [{ id: 77, title: 'Setter de ventas', company: 'Gamma', location: 'Valencia', link: 'https://es.jooble.org/desc/77', snippet: 'Llama a leads para agendar citas de ventas con el equipo.', updated: '2026-10-13T08:00:00Z' }] });
+    }
     // Proveedores externos simulados: solo la clave «good-key» es válida.
     const key = bearer || url.searchParams.get('api_key');
     if (['/v2/users/me', '/account.json', '/openai/v1/models', '/v1/models'].includes(url.pathname)) { state.providerCalls = (state.providerCalls ?? 0) + 1; return send(res, key === 'good-key-1234' ? 200 : 401, {}); }
@@ -93,6 +128,8 @@ export function startMocks({ authPort, enginePort }) {
   ];
   const engine = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const body = ['POST', 'PATCH'].includes(req.method) ? await read(req) : {};
+    if (url.pathname === '/page/ok') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<h1>Closer de ventas en Madrid</h1>'); }
+    if (url.pathname === '/page/gone') return send(res, 404, {});
     if (url.pathname === '/api/status') return send(res, 200, { catalog_active: 12, raw_items: 300, latest_run: { day: '2026-10-16', status: 'completed', completed_at: '2026-10-16T08:00:00Z', sources: [] } });
     if (url.pathname === '/api/funnel') return send(res, 200, { totales: { elegible: 9 }, sources: [{ code: 'jobtoday', name: 'JobToday España', revisadas: 16, catalogo: 10, elegible: 4, seleccionada: 1, run_status: 'completed', roles: { closer: 3, account_executive: 1 } }, { code: 'ats-ashby-pennylane', name: 'Pennylane', revisadas: null, catalogo: 0, elegible: 0, seleccionada: 0, run_status: 'failed', fuente: 'HTTP 401', roles: {} }, { code: 'jobtoday-closers', name: 'JobToday Closers', revisadas: 5, catalogo: 5, elegible: 5, seleccionada: 0, run_status: 'completed', roles: { closer: 4 } }] });
     if (url.pathname === '/api/audit') return send(res, 200, { day: '2026-10-16', slugs: [{ source: 'jobtoday', slug: 'closer-de-ventas', status: 'ok', http_status: 200, canonical_url: null }] });

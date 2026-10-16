@@ -4,7 +4,8 @@ import { KeyRound, LoaderCircle, PlugZap, Trash2 } from 'lucide-react';
 
 type Connection = { provider: string; name: string; configured: boolean; last4: string | null; updated_by: string | null; updated_at: string | null; last_test_at: string | null; last_test_ok: boolean | null; last_test_detail: string | null };
 const fmt = (v: string | null) => v ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '—';
-const PURPOSE: Record<string, string> = { apify: 'Extracción de portales con actores de Apify.', serpapi: 'Búsqueda de ofertas indexadas en Google (incluye LinkedIn).', groq: 'Clasificación y resúmenes con IA (proveedor por defecto).', openai: 'Análisis individual de ofertas con IA.' };
+const PURPOSE: Record<string, string> = { apify: 'Extracción de portales con actores de Apify.', serpapi: 'Búsqueda de ofertas indexadas en Google (incluye LinkedIn).', groq: 'Clasificación y resúmenes con IA (proveedor por defecto).', openai: 'Análisis individual de ofertas con IA.',
+  infojobs: 'API oficial de InfoJobs (cuenta de desarrollador gratuita, con aprobación). Formato: client_id:client_secret.', adzuna: 'API de Adzuna (clave gratuita). Formato: app_id:app_key.', jooble: 'API de Jooble (clave gratuita).' };
 
 async function api<T>(init?: RequestInit, query = ''): Promise<T> {
   const response = await fetch(`/api/admin/connections${query}`, { headers: { 'Content-Type': 'application/json' }, ...init });
