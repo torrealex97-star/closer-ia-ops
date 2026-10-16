@@ -75,6 +75,7 @@ export async function authHealthy(): Promise<boolean> {
 // ---- lista cerrada de operadores (tabla public.admin_users, solo service role) ----
 const rest = (path: string, init: RequestInit = {}) =>
   call(`/rest/v1/${path}`, { key: serviceKey(), ...init });
+export const serviceRest = rest;
 
 export async function adminRole(email: string): Promise<AdminRole | null> {
   const response = await rest(`admin_users?email=eq.${encodeURIComponent(email)}&select=role&limit=1`);

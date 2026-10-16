@@ -97,6 +97,40 @@ await step('baja: no puedes quitarte a ti ni al último propietario; quitar cort
   assert.ok([401, 403].includes((await call('/api/admin/opportunities')).status));
   jar = owner;
 });
+await step('APIs: sin clave al principio; guardar cifrada; nunca se devuelve en claro; probar válida/ inválida', async () => {
+  let r = await call('/api/admin/connections'); assert.equal(r.status, 200);
+  assert.equal(r.json.connections.length, 4); assert.ok(r.json.connections.every(c => !c.configured));
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'nope', secret: 'good-key-1234' } })).status, 422);
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'groq', secret: 'corta' } })).status, 422);
+  assert.equal((await call('/api/admin/connections', { method: 'POST', body: { provider: 'groq' } })).status, 404); // sin clave guardada
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'groq', secret: 'good-key-1234' } })).status, 200);
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'serpapi', secret: 'bad-key-99999' } })).status, 200);
+  const stored = state.connections.get('groq').secret_ciphertext;
+  assert.ok(!stored.includes('good-key-1234') && stored.split('.').length === 3);
+  r = await call('/api/admin/connections'); const groq = r.json.connections.find(c => c.provider === 'groq');
+  assert.equal(groq.configured, true); assert.equal(groq.last4, '1234');
+  assert.ok(!JSON.stringify(r.json).includes('good-key') && !JSON.stringify(r.json).includes('ciphertext'));
+  assert.deepEqual((await call('/api/admin/connections', { method: 'POST', body: { provider: 'groq' } })).json, { ok: true, detail: 'Clave válida' });
+  const bad = await call('/api/admin/connections', { method: 'POST', body: { provider: 'serpapi' } });
+  assert.equal(bad.json.ok, false); assert.match(bad.json.detail, /rechazada/);
+  const o = (await call('/api/admin/overview')).json.paid;
+  assert.equal(o.find(p => p.id === 'groq').status, 'ok'); assert.equal(o.find(p => p.id === 'serpapi').status, 'error'); assert.equal(o.find(p => p.id === 'apify').status, 'not_configured');
+});
+await step('APIs: un administrador (no propietario) puede ver y probar pero no guardar ni borrar', async () => {
+  state.users.set('adm@test.dev', { id: 'u7', password: 'Admin-pass-12345' }); state.admins.push({ email: 'adm@test.dev', role: 'admin', invited_by: 'x', created_at: new Date().toISOString() });
+  const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });
+  assert.equal((await call('/api/admin/connections')).status, 200);
+  assert.equal((await call('/api/admin/connections', { method: 'POST', body: { provider: 'groq' } })).status, 200);
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'groq', secret: 'good-key-1234' } })).status, 403);
+  assert.equal((await call('/api/admin/connections?provider=groq', { method: 'DELETE' })).status, 403);
+  jar = saved;
+});
+await step('APIs: borrar quita la clave', async () => {
+  assert.equal((await call('/api/admin/connections?provider=groq', { method: 'DELETE' })).status, 200);
+  assert.ok(!state.connections.has('groq'));
+  assert.equal((await call('/api/admin/connections')).json.connections.find(c => c.provider === 'groq').configured, false);
+});
+await step('sin sesión: connections 401', async () => { const saved = jar; jar = {}; assert.equal((await call('/api/admin/connections')).status, 401); jar = saved; });
 await step('logout limpia cookies y la sesión deja de valer', async () => {
   await call('/api/admin/session', { method: 'DELETE' });
   assert.deepEqual(jar, {}); assert.equal((await call('/api/admin/opportunities')).status, 401);

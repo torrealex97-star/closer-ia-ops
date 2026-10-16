@@ -6,7 +6,7 @@ export function startMocks({ authPort, enginePort }) {
   const state = {
     users: new Map([['owner@test.dev', { id: 'u1', password: 'Correcta-12345' }]]),
     admins: [{ email: 'owner@test.dev', role: 'owner', invited_by: 'bootstrap', created_at: '2026-10-16T00:00:00Z' }],
-    tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
+    connections: new Map(), tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
   };
   const send = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
@@ -18,7 +18,7 @@ export function startMocks({ authPort, enginePort }) {
   state.issue = issue;
 
   const auth = http.createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://x'); const body = ['POST', 'PUT'].includes(req.method) ? await read(req) : {};
+    const url = new URL(req.url, 'http://x'); const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await read(req) : {};
     const bearer = (req.headers.authorization || '').replace('Bearer ', '');
     if (url.pathname === '/auth/v1/health') return send(res, 200, { ok: true });
     if (url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') {
@@ -67,6 +67,19 @@ export function startMocks({ authPort, enginePort }) {
       }
       if (req.method === 'DELETE') { state.admins = state.admins.filter(a => `eq.${a.email}` !== eq); return send(res, 204, {}); }
     }
+    if (url.pathname === '/rest/v1/integration_connections') {
+      const eq = (url.searchParams.get('provider') || '').replace('eq.', '');
+      if (req.method === 'GET') {
+        const rows = [...state.connections.values()].filter(r => !eq || r.provider === eq);
+        return send(res, 200, rows);
+      }
+      if (req.method === 'POST') { state.connections.set(body.provider, { ...body }); return send(res, 201, {}); }
+      if (req.method === 'PATCH') { Object.assign(state.connections.get(eq) ?? {}, body); return send(res, 204, {}); }
+      if (req.method === 'DELETE') { state.connections.delete(eq); return send(res, 204, {}); }
+    }
+    // Proveedores externos simulados: solo la clave «good-key» es válida.
+    const key = bearer || url.searchParams.get('api_key');
+    if (['/v2/users/me', '/account.json', '/openai/v1/models', '/v1/models'].includes(url.pathname)) { state.providerCalls = (state.providerCalls ?? 0) + 1; return send(res, key === 'good-key-1234' ? 200 : 401, {}); }
     send(res, 404, {});
   }).listen(authPort);
 

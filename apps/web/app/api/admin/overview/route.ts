@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticate, withCookies } from '../../../../lib/adminAuth';
 import { authHealthy, listAdmins } from '../../../../lib/supabaseAuth';
+import { listConnections, PROVIDERS } from '../../../../lib/integrations';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -26,12 +27,13 @@ export async function GET(request: NextRequest) {
   const engine = (process.env.CAREER_ENGINE_URL ?? '').replace(/\/$/, '');
   const env = (name: string) => Boolean(process.env[name]);
 
-  const [status, funnel, audit, authOk, admins] = await Promise.all([
+  const [status, funnel, audit, authOk, admins, saved] = await Promise.all([
     engine ? engineGet(engine, '/api/status').catch(() => null) : null,
     engine ? engineGet(engine, '/api/funnel').catch(() => null) : null,
     engine ? engineGet(engine, '/api/audit').catch(() => null) : null,
     timed(async () => ({ ok: await authHealthy(), detail: 'Supabase Auth (login y recuperación)' })),
     listAdmins(),
+    listConnections(),
   ]);
 
   const connections: Check[] = [
@@ -42,10 +44,14 @@ export async function GET(request: NextRequest) {
     { id: 'supabase-db', name: 'Supabase · lista de operadores', status: admins ? 'ok' : 'error', detail: admins ? `${admins.length} usuario(s) con acceso` : 'No se pudo leer (¿service role?)' },
     { id: 'admin-token', name: 'Token admin del motor', status: env('CAREER_ADMIN_TOKEN') ? 'ok' : 'not_configured', detail: env('CAREER_ADMIN_TOKEN') ? 'Presente en el servidor' : 'Falta CAREER_ADMIN_TOKEN' },
   ];
-  // Proveedores de pago: el recolector público no los usa por regla del proyecto (gasto solo con orden explícita).
-  const paid: Check[] = ['Apify', 'SerpApi', 'Groq', 'OpenAI'].map(name => ({
-    id: name.toLowerCase(), name, status: 'not_configured', detail: 'No conectado al motor cloud (solo disponible en la app local, opt-in)',
-  }));
+  // Proveedores externos: estado de la clave guardada y de su última prueba. El motor cloud público no los usa
+  // (gasto solo con orden explícita), así que «guardada» no implica que se esté consumiendo crédito.
+  const paid: Check[] = Object.entries(PROVIDERS).map(([id, spec]) => {
+    const row = saved?.find(r => r.provider === id);
+    if (!row) return { id, name: spec.name, status: 'not_configured', detail: 'Sin clave guardada (pestaña APIs)' };
+    return { id, name: spec.name, status: row.last_test_ok === false ? 'error' : 'ok',
+      detail: `Clave …${row.last4} guardada · ${row.last_test_ok == null ? 'sin probar' : row.last_test_detail ?? ''} · el motor cloud no la usa todavía` };
+  });
 
   const sources = Array.isArray(funnel?.sources) ? funnel.sources : [];
   return withCookies(Response.json({

@@ -1,12 +1,14 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, Check, KeyRound, LoaderCircle, LogOut, RefreshCcw, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Activity, Check, Database, KeyRound, LoaderCircle, LogOut, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import CloudAdminPanel from './CloudAdminPanel';
+import ApisTab from './ApisTab';
+import CatalogTab from './CatalogTab';
 
 // Cáscara del panel hospedado: acceso por email + contraseña (Supabase Auth, solo usuarios invitados),
 // recuperación por correo y pestañas Revisión / Fuentes y conexiones / Usuarios.
 type Me = { email: string; role: 'owner' | 'admin' };
-type Tab = 'review' | 'sources' | 'users';
+type Tab = 'review' | 'catalog' | 'sources' | 'apis' | 'users';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/admin/${path}`, { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -165,13 +167,15 @@ export default function AdminShell() {
   if (state === 'checking') return <section className="empty"><LoaderCircle size={20} className="spin" /> Comprobando sesión…</section>;
   if (state === 'unconfigured') return <section className="empty"><ShieldCheck size={32} strokeWidth={1.3} /><h3>Acceso al panel sin configurar en este despliegue.</h3><p>Faltan las variables de Supabase (URL, clave pública y service role) en el servidor.</p></section>;
   if (state === 'out' || !me) return <Login onLogin={m => { setMe(m); setState('in'); }} />;
-  const tabs: Array<[Tab, string, React.ReactNode]> = [['review', 'Revisión', <Check key="r" size={15} />], ['sources', 'Fuentes y conexiones', <Activity key="s" size={15} />], ['users', 'Usuarios', <Users key="u" size={15} />]];
+  const tabs: Array<[Tab, string, React.ReactNode]> = [['review', 'Revisión', <Check key="r" size={15} />], ['catalog', 'Probar ofertas', <Search key="c" size={15} />], ['sources', 'Fuentes', <Activity key="s" size={15} />], ['apis', 'APIs', <Database key="a" size={15} />], ['users', 'Usuarios', <Users key="u" size={15} />]];
   return <>
     <nav className="source-actions" aria-label="Secciones del panel" style={{ marginBottom: 12, justifyContent: 'space-between' }}>
       <span>{tabs.map(([id, label, icon]) => <button key={id} className={tab === id ? 'primary' : ''} aria-pressed={tab === id} onClick={() => setTab(id)}>{icon} {label}</button>)}</span>
       <span><span className="muted">{me.email} · {me.role === 'owner' ? 'Propietario' : 'Administrador'}</span> <button onClick={logout}><LogOut size={15} /> Salir</button></span>
     </nav>
     {tab === 'review' && <CloudAdminPanel onSessionLost={lost} />}
+    {tab === 'catalog' && <CatalogTab onSessionLost={lost} />}
+    {tab === 'apis' && <ApisTab owner={me.role === 'owner'} onSessionLost={lost} />}
     {tab === 'sources' && <SourcesTab onSessionLost={lost} />}
     {tab === 'users' && <UsersTab me={me} onSessionLost={lost} />}
   </>;
