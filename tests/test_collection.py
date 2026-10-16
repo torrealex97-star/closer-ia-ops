@@ -34,6 +34,8 @@ def test_daily_http_collection_then_search_never_contacts_vendor(api, monkeypatc
     client, state = api
     connection = prepare_connected(api)
     monkeypatch.setattr(collection, 'REGISTRY', {})
+    # Las empresas de la watchlist (ATS públicos) salen a internet: el test no depende de la red.
+    monkeypatch.setattr(collection, 'watchlist_connectors', lambda organization: {})
     first = client.post('/v1/collection/refresh').json()['latest']
     assert client.post('/v1/collection/refresh').json()['latest']['id'] == first['id']
     asyncio.run(collection.collect(first['id'], 'org-test'))

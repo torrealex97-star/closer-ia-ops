@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { draftFromDetail, sendable, type VersionPayload } from '../lib/reviewPayload';
 import { Check, ChevronRight, ExternalLink, Eye, LoaderCircle, RefreshCcw, Send, X } from 'lucide-react';
 
 // Panel de administración contra el ENGINE CLOUD (port fase 4). El navegador solo
@@ -17,16 +18,6 @@ const ROLES: Array<{ value: string; label: string }> = [
   { value: 'sdr', label: 'SDR / BDR' },
 ];
 const FILTERS = ['', 'draft', 'needs_review', 'approved', 'published', 'withdrawn'] as const;
-type NextStep = { action?: string; label?: string; enabled: boolean; disabled_reason?: string };
-// Payload de versión: puede llegar en forma de presentación (revisada) o raw-shape
-// del collector (title/company/url sin headline). La UI mapea sin inventar.
-type VersionPayload = {
-  headline?: string; title?: string; role?: string; short_summary?: string;
-  what_they_are_looking_for?: string[]; what_you_would_do?: string[]; why_it_may_be_interesting?: string[];
-  compensation_summary?: string; location_summary?: string; experience_summary?: string;
-  language_requirements?: string[]; application_type?: string; application_url?: string | null;
-  next_step?: NextStep; [k: string]: unknown;
-};
 type Item = { id: string; job_id: string; original_title: string | null; company: string | null; source_url: string | null; source: string; editorial_status: string; opportunity_status: string; connection_type: string; created_at: string; updated_at: string };
 // Veredicto espejo del POST /verify (fase 3): mismo shape que VerificationResult local.
 type Verification = { result: 'open' | 'closed' | 'unknown'; method: string; checked_at: string; valid_until: string | null; reason_code: string; opportunity_status: string; next_step_enabled: boolean; status_reason: string | null };
@@ -85,23 +76,8 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
     try {
       const d = await admin<Detail>(`opportunities/${item.id}`);
       setDetail(d);
-      const p = d.version_payload ?? {};
-      // Mapeo del payload real (raw-shape o presentación) al formulario de edición.
-      setDraft({
-        ...p,
-        headline: p.headline ?? p.title ?? '',
-        role: p.role ?? 'uncategorized',
-        short_summary: p.short_summary ?? '',
-        what_they_are_looking_for: p.what_they_are_looking_for ?? [],
-        what_you_would_do: p.what_you_would_do ?? [],
-        why_it_may_be_interesting: p.why_it_may_be_interesting ?? [],
-        compensation_summary: p.compensation_summary ?? '',
-        location_summary: p.location_summary ?? (d.job_snapshot.location ?? ''),
-        experience_summary: p.experience_summary ?? '',
-        language_requirements: p.language_requirements ?? [],
-        application_type: p.application_type ?? 'unknown',
-        application_url: p.application_url ?? d.job_snapshot.source_url ?? null,
-      });
+      // Mapeo del payload real (raw-shape del collector o presentación) al formulario de edición.
+      setDraft(draftFromDetail(d));
     } catch (err) { setError((err as Error).message); }
   }
 
@@ -111,7 +87,7 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
     try {
       const outcome = await admin<{ version: number }>(`opportunities/${detail.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ editorial_status: status, version_payload: draft, locale: 'es', reviewed_by: 'admin-web' }),
+        body: JSON.stringify({ editorial_status: status, version_payload: sendable(draft), locale: 'es', reviewed_by: 'admin-web' }),
       });
       setNotice(`Guardado: ${EDITORIAL[status]} · versión ${outcome.version} creada.`);
       setDetail(null);

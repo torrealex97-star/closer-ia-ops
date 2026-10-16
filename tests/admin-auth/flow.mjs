@@ -47,7 +47,7 @@ await step('cross-site bloqueado', async () => {
 });
 await step('overview: conexiones y fuentes reales del motor, sin valores de env', async () => {
   const r = await call('/api/admin/overview'); assert.equal(r.status, 200);
-  assert.equal(r.json.sources.length, 2); assert.equal(r.json.sources[1].warning, 'HTTP 401');
+  assert.equal(r.json.sources.length, 3); assert.equal(r.json.sources[1].warning, 'HTTP 401'); assert.equal(r.json.pool.by_role.closer, 7);
   assert.ok(r.json.connections.some(c => c.id === 'supabase-auth' && c.status === 'ok'));
   assert.ok(r.json.paid.every(p => p.status === 'not_configured'));
   assert.ok(!JSON.stringify(r.json).includes('engine-token') && !JSON.stringify(r.json).includes('service-key'));

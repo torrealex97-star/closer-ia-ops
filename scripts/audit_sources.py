@@ -131,9 +131,13 @@ def log_alert(payload, stream=None):
     message = 'JobToday slug audit: ' + ' | '.join(lines)
     print(message, flush=True, file=stream)
     # Notificación de escritorio: el operador la vea sin abrir logs ni la UI.
-    subprocess.run(['/usr/bin/osascript', '-e',
-                    f'display notification "{message}" with title "WDC slug audit" sound name "Sosumi"'],
-                   check=False, capture_output=True)
+    # Solo existe en macOS: en otros sistemas (CI, Linux) el aviso queda en el log, sin romper el audit.
+    try:
+        subprocess.run(['/usr/bin/osascript', '-e',
+                        f'display notification "{message}" with title "WDC slug audit" sound name "Sosumi"'],
+                       check=False, capture_output=True)
+    except OSError:
+        pass
 
 
 asyncio.run(main())

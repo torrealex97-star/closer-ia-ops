@@ -83,12 +83,45 @@ export function startMocks({ authPort, enginePort }) {
     send(res, 404, {});
   }).listen(authPort);
 
-  const engine = http.createServer((req, res) => {
-    if (req.url.startsWith('/api/status')) return send(res, 200, { catalog_active: 12, raw_items: 300, latest_run: { day: '2026-10-16', status: 'completed', completed_at: '2026-10-16T08:00:00Z', sources: [] } });
-    if (req.url.startsWith('/api/funnel')) return send(res, 200, { sources: [{ code: 'jobtoday', name: 'JobToday España', revisadas: 16, catalogo: 10, elegible: 4, seleccionada: 1, run_status: 'completed' }, { code: 'ats-ashby-pennylane', name: 'Pennylane', revisadas: null, catalogo: 0, elegible: 0, seleccionada: 0, run_status: 'failed', fuente: 'HTTP 401' }] });
-    if (req.url.startsWith('/api/audit')) return send(res, 200, { day: '2026-10-16', slugs: [{ source: 'jobtoday', slug: 'closer-de-ventas', status: 'ok', http_status: 200, canonical_url: null }] });
-    if (req.url.startsWith('/v1/admin/opportunities')) return req.headers['x-admin-token'] === 'engine-token' ? send(res, 200, { items: [{ id: 'opp-1', job_id: 'job-1', original_title: 'Closer de ventas B2B (remoto)', company: 'Acme Servicios', source_url: 'https://example.com/a', source: 'jobtoday', editorial_status: 'draft', opportunity_status: 'verifying', connection_type: 'external_application', created_at: '2026-10-15T08:00:00Z', updated_at: '2026-10-15T08:00:00Z' }, { id: 'opp-2', job_id: 'job-2', original_title: 'Setter inbound — España', company: 'Beta Growth', source_url: 'https://example.com/b', source: 'freehire-latam', editorial_status: 'approved', opportunity_status: 'active', connection_type: 'external_application', created_at: '2026-10-14T08:00:00Z', updated_at: '2026-10-14T08:00:00Z' }], total: 2, counts: { draft: 1, approved: 1 } }) : send(res, 401, { detail: 'no' });
-    send(res, 404, {});
+  // Motor cloud simulado: mismas reglas de payload que versionPayloadError del Worker (campos permitidos).
+  const ALLOWED = ['headline', 'role', 'short_summary', 'what_they_are_looking_for', 'what_you_would_do', 'why_it_may_be_interesting', 'compensation_summary', 'location_summary', 'experience_summary', 'language_requirements', 'application_type', 'application_url', 'next_step'];
+  state.patches = []; state.verifies = [];
+  state.opps = [
+    { id: 'opp-1', job_id: 'job-1', original_title: 'Closer de ventas B2B (remoto)', company: 'Acme Servicios', source_url: 'https://example.com/a', source: 'jobtoday', editorial_status: 'draft', opportunity_status: 'verifying', connection_type: 'external_application', created_at: '2026-10-15T08:00:00Z', updated_at: '2026-10-15T08:00:00Z', location: 'Madrid, España' },
+    { id: 'opp-2', job_id: 'job-2', original_title: 'Setter y Closer de ventas', company: 'Beta Growth', source_url: 'https://example.com/b', source: 'freehire-latam', editorial_status: 'draft', opportunity_status: 'verifying', connection_type: 'external_application', created_at: '2026-10-14T08:00:00Z', updated_at: '2026-10-14T08:00:00Z', location: 'Austin, Texas' },
+    { id: 'opp-3', job_id: 'job-3', original_title: 'Desarrollador Backend', company: 'Gamma', source_url: 'https://example.com/c', source: 'himalayas', editorial_status: 'draft', opportunity_status: 'verifying', connection_type: 'external_application', created_at: '2026-10-13T08:00:00Z', updated_at: '2026-10-13T08:00:00Z', location: 'Remoto' },
+  ];
+  const engine = http.createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://x'); const body = ['POST', 'PATCH'].includes(req.method) ? await read(req) : {};
+    if (url.pathname === '/api/status') return send(res, 200, { catalog_active: 12, raw_items: 300, latest_run: { day: '2026-10-16', status: 'completed', completed_at: '2026-10-16T08:00:00Z', sources: [] } });
+    if (url.pathname === '/api/funnel') return send(res, 200, { totales: { elegible: 9 }, sources: [{ code: 'jobtoday', name: 'JobToday España', revisadas: 16, catalogo: 10, elegible: 4, seleccionada: 1, run_status: 'completed', roles: { closer: 3, account_executive: 1 } }, { code: 'ats-ashby-pennylane', name: 'Pennylane', revisadas: null, catalogo: 0, elegible: 0, seleccionada: 0, run_status: 'failed', fuente: 'HTTP 401', roles: {} }, { code: 'jobtoday-closers', name: 'JobToday Closers', revisadas: 5, catalogo: 5, elegible: 5, seleccionada: 0, run_status: 'completed', roles: { closer: 4 } }] });
+    if (url.pathname === '/api/audit') return send(res, 200, { day: '2026-10-16', slugs: [{ source: 'jobtoday', slug: 'closer-de-ventas', status: 'ok', http_status: 200, canonical_url: null }] });
+    if (url.pathname === '/v1/opportunities/search' && req.method === 'POST') {
+      const mk = n => Array.from({ length: n }, (_, i) => ({ id: 'v' + i, role_label: 'Closer', original_title: 'Closer ' + i, company: 'C' + i, compensation: 'No publicada', location: 'Madrid', modality: 'Remoto', source_name: 'jobtoday.com', source_url: 'https://x.test/' + i, published_at: null }));
+      const items = body.role === 'closer' ? mk(7) : mk(12); return send(res, 200, { items, total: items.length, selection_total: 0 });
+    }
+    if (!url.pathname.startsWith('/v1/admin/opportunities')) return send(res, 404, {});
+    if (req.headers['x-admin-token'] !== 'engine-token') return send(res, 401, { detail: 'no' });
+    const m = url.pathname.match(/^\/v1\/admin\/opportunities\/([^/]+)(\/verify)?$/);
+    if (!m) {
+      const status = url.searchParams.get('status');
+      const items = state.opps.filter(o => !status || o.editorial_status === status).map(({ location, ...o }) => o);
+      const counts = {}; for (const o of state.opps) counts[o.editorial_status] = (counts[o.editorial_status] ?? 0) + 1;
+      return send(res, 200, { items, total: items.length, counts });
+    }
+    const opp = state.opps.find(o => o.id === m[1]); if (!opp) return send(res, 404, { detail: 'Oportunidad no encontrada' });
+    if (m[2] && req.method === 'POST') { state.verifies.push(opp.id); return send(res, 200, { result: 'open', reason_code: 'content_matches', checked_at: new Date().toISOString(), valid_until: null, method: 'GET', opportunity_status: 'active', next_step_enabled: true, status_reason: null }); }
+    if (req.method === 'PATCH') {
+      const unknown = Object.keys(body.version_payload ?? {}).filter(k => !ALLOWED.includes(k));
+      if (unknown.length) return send(res, 422, { detail: 'Campos no permitidos en version_payload: ' + unknown.sort().join(', ') });
+      state.patches.push({ id: opp.id, status: body.editorial_status, payload: body.version_payload }); opp.editorial_status = body.editorial_status;
+      return send(res, 200, { id: opp.id, version: 2, editorial_status: body.editorial_status });
+    }
+    return send(res, 200, { ...opp, version: 1,
+      // Payload tal como lo escribe el collector (raw-shape): trae campos que el PATCH NO admite.
+      version_payload: { title: opp.original_title, company: opp.company, location: opp.location, url: opp.source_url, salary: null, posted_at: null, application_type: 'unknown', next_step: { enabled: false } },
+      job_snapshot: { title: opp.original_title, company: opp.company, location: opp.location, salary: null, posted_at: null, source_url: opp.source_url, source: opp.source },
+      vigencia: { expires_at: null, activa: true }, verificacion: { last_verified_at: null, verified_until: null, status_reason: null } });
   }).listen(enginePort);
   return { state, close: () => { auth.close(); engine.close(); } };
 }

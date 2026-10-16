@@ -1,0 +1,749 @@
+[
+ {
+  "code": "himalayas",
+  "name": "Himalayas",
+  "category": "Internacional",
+  "website": "https://himalayas.app",
+  "acquisition_method": "Búsqueda API",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Palabras clave",
+   "País",
+   "Orden reciente"
+  ]
+ },
+ {
+  "code": "weworkremotely",
+  "name": "We Work Remotely",
+  "category": "Internacional",
+  "website": "https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss",
+  "acquisition_method": "RSS de ventas y marketing",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Categoría ventas y marketing"
+  ]
+ },
+ {
+  "code": "jobicy",
+  "name": "Jobicy",
+  "category": "Internacional",
+  "website": "https://weworkremotely.com",
+  "acquisition_method": "API pública por industria",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Industria ventas (slug seller)"
+  ]
+ },
+ {
+  "code": "remotive",
+  "name": "Remotive",
+  "category": "Internacional",
+  "website": "https://remotive.com/api/remote-jobs",
+  "acquisition_method": "API por categoría",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Categoría ventas"
+  ]
+ },
+ {
+  "code": "remoteok",
+  "name": "Remote OK",
+  "category": "Internacional",
+  "website": "https://remoteok.com/api",
+  "acquisition_method": "Feed público",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "arbeitnow",
+  "name": "Arbeitnow",
+  "category": "Internacional",
+  "website": "https://www.arbeitnow.com/api/job-board-api",
+  "acquisition_method": "Feed público",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "workingnomads",
+  "name": "Working Nomads",
+  "category": "Internacional",
+  "website": "https://www.workingnomads.com/api/exposed_jobs/",
+  "acquisition_method": "API pública",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "virtualvocations",
+  "name": "Virtual Vocations",
+  "category": "Internacional",
+  "website": "https://www.virtualvocations.com/rss",
+  "acquisition_method": "RSS general",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "remotejobs",
+  "name": "Remote.jobs",
+  "category": "Internacional",
+  "website": "https://remote.jobs/feed/",
+  "acquisition_method": "RSS general",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "remotefirstjobs",
+  "name": "Remote First Jobs",
+  "category": "Internacional",
+  "website": "https://remotefirstjobs.com/rss/jobs/sales.rss",
+  "acquisition_method": "RSS de ventas",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jobspresso",
+  "name": "Jobspresso",
+  "category": "Internacional",
+  "website": "https://www.jobspresso.co/?feed=job_feed",
+  "acquisition_method": "RSS general",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "remotojob",
+  "name": "RemotoJOB",
+  "category": "Internacional",
+  "website": "https://remotojob.com/feed/",
+  "acquisition_method": "RSS general",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jobtoday",
+  "name": "JobToday España",
+  "category": "España",
+  "website": "https://jobtoday.com/es/trabajos-closer-de-ventas",
+  "acquisition_method": "Listado embebido (NEXT_DATA)",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Ruta por keyword (closer)"
+  ]
+ },
+ {
+  "code": "jobtoday-telemarketing",
+  "name": "JobToday Telemarketing",
+  "category": "España",
+  "website": "https://jobtoday.com/es/trabajos-telemarketing",
+  "acquisition_method": "Listado embebido (NEXT_DATA)",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Ruta por keyword (telemarketing)"
+  ]
+ },
+ {
+  "code": "jobtoday-remoto",
+  "name": "JobToday Comercial remoto",
+  "category": "España",
+  "website": "https://jobtoday.com/es/trabajos-ventas-remoto",
+  "acquisition_method": "Listado embebido (NEXT_DATA)",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Ruta por keyword (ventas-remoto)"
+  ]
+ },
+ {
+  "code": "jobtoday-ventas",
+  "name": "JobToday Ventas",
+  "category": "España",
+  "website": "https://jobtoday.com/es/trabajos-ventas",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jobtoday-comercial",
+  "name": "JobToday Comercial",
+  "category": "España",
+  "website": "https://jobtoday.com/es/trabajos-comercial",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "getonbrd-public",
+  "name": "Get on Board",
+  "category": "LATAM",
+  "website": "https://www.getonbrd.com",
+  "acquisition_method": "API por categoría",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": [
+   "Categoría ventas"
+  ]
+ },
+ {
+  "code": "freehire",
+  "name": "FreeHire",
+  "category": "Internacional",
+  "website": "https://freehire.me",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "none",
+  "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-ashby-pennylane",
+  "name": "Pennylane · Ashby",
+  "category": "Empresas",
+  "website": "https://api.ashbyhq.com/posting-api/job-board/pennylane",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-greenhouse-cabify",
+  "name": "Cabify · Greenhouse",
+  "category": "Empresas",
+  "website": "https://boards-api.greenhouse.io/v1/boards/cabify/jobs",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-greenhouse-stripe",
+  "name": "Stripe · Greenhouse",
+  "category": "Empresas",
+  "website": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-greenhouse-typeform",
+  "name": "Typeform · Greenhouse",
+  "category": "Empresas",
+  "website": "https://boards-api.greenhouse.io/v1/boards/typeform/jobs",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-greenhouse-wallapop",
+  "name": "Wallapop · Greenhouse",
+  "category": "Empresas",
+  "website": "https://boards-api.greenhouse.io/v1/boards/wallapop/jobs",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-recruitee-livestorm",
+  "name": "Livestorm · Recruitee",
+  "category": "Empresas",
+  "website": "https://livestorm.recruitee.com/api/offers/",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-teamtailor-monestcapital",
+  "name": "Monestcapital · Teamtailor",
+  "category": "Empresas",
+  "website": "https://careers.monestcapital.com/jobs.rss",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-teamtailor-producthackers",
+  "name": "Producthackers · Teamtailor",
+  "category": "Empresas",
+  "website": "https://producthackers.teamtailor.com/jobs.rss",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jooble",
+  "name": "Jooble",
+  "category": "España",
+  "website": "https://es.jooble.org",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Búsqueda española aportada por WDC. Validar descripción, duplicados y scraper.",
+  "upstream_filters": []
+ },
+ {
+  "code": "simplyhired",
+  "name": "SimplyHired",
+  "category": "España",
+  "website": "https://www.simplyhired.es",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Búsqueda de closer y ventas aportada por WDC. Validar cobertura del proveedor.",
+  "upstream_filters": []
+ },
+ {
+  "code": "infojobs",
+  "name": "InfoJobs",
+  "category": "España",
+  "website": "https://www.infojobs.net",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Portal español. Seleccionar teletrabajo o híbrido en el proveedor.",
+  "upstream_filters": []
+ },
+ {
+  "code": "computrabajo",
+  "name": "Computrabajo",
+  "category": "LATAM",
+  "website": "https://www.computrabajo.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Portales por país. Activar descripción completa y modalidad.",
+  "upstream_filters": []
+ },
+ {
+  "code": "workana",
+  "name": "Workana",
+  "category": "LATAM",
+  "website": "https://www.workana.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Proyectos freelance; revisar si presupuesto es por proyecto u hora.",
+  "upstream_filters": []
+ },
+ {
+  "code": "getonbrd",
+  "name": "Get on Board",
+  "category": "LATAM",
+  "website": "https://www.getonbrd.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Empleo digital LATAM. Comprobar cobertura comercial del scraper.",
+  "upstream_filters": []
+ },
+ {
+  "code": "linkedin",
+  "name": "LinkedIn Jobs",
+  "category": "España · LATAM · Europa",
+  "website": "https://www.linkedin.com/jobs",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Ofertas públicas; búsquedas por términos, región y modalidad.",
+  "upstream_filters": []
+ },
+ {
+  "code": "indeed",
+  "name": "Indeed",
+  "category": "España · LATAM · Europa",
+  "website": "https://www.indeed.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Elegir dominio regional y proveedor con descripción completa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "infoempleo",
+  "name": "Infoempleo",
+  "category": "España",
+  "website": "https://www.infoempleo.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Páginas públicas: necesita validar extracción y paginación.",
+  "upstream_filters": []
+ },
+ {
+  "code": "trabajos",
+  "name": "Trabajos.com",
+  "category": "España",
+  "website": "https://www.trabajos.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Portal generalista: configurar búsquedas de comercial remoto.",
+  "upstream_filters": []
+ },
+ {
+  "code": "torre",
+  "name": "Torre",
+  "category": "LATAM",
+  "website": "https://torre.ai",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Empleo y talento: validar páginas y campos de cada búsqueda.",
+  "upstream_filters": []
+ },
+ {
+  "code": "weremoto",
+  "name": "WeRemoto",
+  "category": "LATAM",
+  "website": "https://www.weremoto.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Bolsa remota hispana; extracción de páginas públicas por validar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "remotoco",
+  "name": "Remoto.co",
+  "category": "LATAM",
+  "website": "https://www.remoto.co",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Trabajo remoto LATAM; configurar enlaces concretos y validar vigencia.",
+  "upstream_filters": []
+ },
+ {
+  "code": "laborum",
+  "name": "Laborum / Bumeran",
+  "category": "LATAM",
+  "website": "https://www.bumeran.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Portales regionales; se requiere proveedor compatible con el país.",
+  "upstream_filters": []
+ },
+ {
+  "code": "elempleo",
+  "name": "El Empleo",
+  "category": "LATAM",
+  "website": "https://www.elempleo.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Ventas regionales; exigir evidencia de remoto o híbrido.",
+  "upstream_filters": []
+ },
+ {
+  "code": "upwork",
+  "name": "Upwork",
+  "category": "Freelance",
+  "website": "https://www.upwork.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Proyectos de closer y setter; filtrar Spanish y requisitos del cliente.",
+  "upstream_filters": []
+ },
+ {
+  "code": "freelancer",
+  "name": "Freelancer",
+  "category": "Freelance",
+  "website": "https://www.freelancer.es",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "API oficial disponible; importar su salida mediante dataset o adaptar proveedor.",
+  "upstream_filters": []
+ },
+ {
+  "code": "malt",
+  "name": "Malt",
+  "category": "Freelance",
+  "website": "https://www.malt.es",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Muchas misiones requieren cuenta; solo contenido accesible autorizado.",
+  "upstream_filters": []
+ },
+ {
+  "code": "eures",
+  "name": "EURES",
+  "category": "Europa",
+  "website": "https://eures.europa.eu",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Movilidad europea; español y trabajo a distancia deben constar en la oferta.",
+  "upstream_filters": []
+ },
+ {
+  "code": "europe-language",
+  "name": "Europe Language Jobs",
+  "category": "Europa",
+  "website": "https://www.europelanguagejobs.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Búsquedas Spanish. Comprobar modalidad y residencia exigida.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jobsqd",
+  "name": "Jobsqd",
+  "category": "Europa",
+  "website": "https://www.jobsqd.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Empleo por idioma; abundan puestos presenciales, filtrar modalidad.",
+  "upstream_filters": []
+ },
+ {
+  "code": "facebook",
+  "name": "Facebook · grupos y páginas",
+  "category": "Comunidades",
+  "website": "https://www.facebook.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Añadir URLs concretas. Grupos privados requieren acceso autorizado y proveedor compatible.",
+  "upstream_filters": []
+ },
+ {
+  "code": "linkedin-posts",
+  "name": "LinkedIn · publicaciones",
+  "category": "Comunidades",
+  "website": "https://www.linkedin.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Mapear texto y enlace del post; admitir solo contratación explícita.",
+  "upstream_filters": []
+ },
+ {
+  "code": "skool",
+  "name": "Skool",
+  "category": "Comunidades",
+  "website": "https://www.skool.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Comunidades concretas; el acceso de miembro no se presupone público.",
+  "upstream_filters": []
+ },
+ {
+  "code": "telegram",
+  "name": "Telegram · canales públicos",
+  "category": "Comunidades",
+  "website": "https://telegram.org",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Canales públicos de empleo; mapear texto, fecha y permalink.",
+  "upstream_filters": []
+ },
+ {
+  "code": "reddit",
+  "name": "Reddit",
+  "category": "Comunidades",
+  "website": "https://www.reddit.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Comunidades de trabajo remoto; evitar autopromoción y candidatos buscando empleo.",
+  "upstream_filters": []
+ },
+ {
+  "code": "company",
+  "name": "Empresas · páginas de empleo / ATS",
+  "category": "Empresas",
+  "website": "https://apify.com/store",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Añadir webs de empresas, agencias, academias y sus bolsas ATS.",
+  "upstream_filters": []
+ },
+ {
+  "code": "custom",
+  "name": "Otra web o comunidad",
+  "category": "Personalizada",
+  "website": "https://apify.com/store",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Cualquier proveedor que entregue registros estructurados. Viabilidad y acceso se validan por sitio.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jobgether",
+  "name": "Jobgether",
+  "category": "Internacional",
+  "website": "https://jobgether.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Remoto con filtro por país; HTML tras Cloudflare. Proveedor por validar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "tecnoempleo",
+  "name": "Tecnoempleo",
+  "category": "España",
+  "website": "https://www.tecnoempleo.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "IT España; útil para SDR y AE de SaaS. Sin RSS localizado; HTML por validar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "talent",
+  "name": "Talent.com",
+  "category": "España · LATAM",
+  "website": "https://www.talent.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Agregador con penetración ES/LATAM; feed partner sin verificar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "milanuncios",
+  "name": "Milanuncios Empleo",
+  "category": "España",
+  "website": "https://www.milanuncios.com/empleo/",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Volumen de comercial autónomo; HTML con anti-bot por validar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "primer-empleo",
+  "name": "Primer Empleo",
+  "category": "España",
+  "website": "https://www.primerempleo.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Perfiles junior; HTML por validar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "jobfluent",
+  "name": "Jobfluent",
+  "category": "España",
+  "website": "https://www.jobfluent.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Startups, sobre todo Barcelona; HTML por validar.",
+  "upstream_filters": []
+ },
+ {
+  "code": "welcomejungle",
+  "name": "Welcome to the Jungle ES",
+  "category": "España",
+  "website": "https://www.welcometothejungle.com/es",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Backend Algolia; requiere adaptador específico de su API interna.",
+  "upstream_filters": []
+ },
+ {
+  "code": "closers-avenue",
+  "name": "ClosersAvenue",
+  "category": "España",
+  "website": "https://closersavenue.com",
+  "acquisition_method": "Sin listado público",
+  "validation_status": "Sin listado público extraíble",
+  "requires": "input",
+  "note": "Nicho closer comisión-pura España. Su bolsa interna devuelve 500 (2026-09-23): sin listado público extraíble; requiere Actor opt-in o acceso autorizado.",
+  "upstream_filters": []
+ },
+ {
+  "code": "google",
+  "name": "Google dorks · SerpApi",
+  "category": "España · Europa",
+  "website": "https://www.google.com/search?q=site%3Alinkedin.com%2Fjobs%2Fview+%22closer+de+ventas%22",
+  "acquisition_method": "SerpApi · motor google_jobs (pendiente de conectar)",
+  "validation_status": "Requiere API key · presets listos",
+  "requires": "input",
+  "note": "Motor google_jobs de SerpApi (pendiente de conectar): cada dork del vocabulario WDC busca ofertas ya indexadas de LinkedIn/portales con los filtros exactos (site:, comillas, España). Requiere API key de SerpApi; el coste por búsqueda se controla con el presupuesto diario de ADR-009.",
+  "upstream_filters": [
+   "Dork completo (site:, comillas, ubicación)",
+   "País (gl) e idioma (hl)"
+  ]
+ },
+ {
+  "code": "remotolist",
+  "name": "RemotoList",
+  "category": "España · LATAM",
+  "website": "https://remotolist.com",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Comunidad remota hispana con categoría de ventas; sin feed público localizado.",
+  "upstream_filters": []
+ },
+ {
+  "code": "domestika",
+  "name": "Domestika Empleo",
+  "category": "España",
+  "website": "https://www.domestika.org",
+  "acquisition_method": "Adaptador específico pendiente",
+  "validation_status": "Sin proveedor verificado",
+  "requires": "input",
+  "note": "Marginal para ventas; HTML por validar.",
+  "upstream_filters": []
+ }
+]

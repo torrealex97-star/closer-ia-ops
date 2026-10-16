@@ -14,8 +14,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       (origin && origin !== `http://${host}`))) {
     return Response.json({ detail: 'Origen no permitido' }, { status: 403 });
   }
+  // En producción solo https del mismo host; en una máquina de desarrollo (loopback) también http.
+  const loopback = /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host);
   if (engine && (request.headers.get('sec-fetch-site') === 'cross-site' ||
-      (origin && origin !== `https://${host}`))) {
+      (origin && origin !== `https://${host}` && !(loopback && origin === `http://${host}`)))) {
     return Response.json({ detail: 'Origen no permitido' }, { status: 403 });
   }
   const { path } = await context.params;

@@ -1,14 +1,17 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, BriefcaseBusiness, ChevronRight, FileCheck2, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Activity, BriefcaseBusiness, ChevronRight, FileCheck2, LayoutDashboard, ListChecks, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import CloudAdminPanel from './CloudAdminPanel';
 import ApisTab from './ApisTab';
 import CatalogTab from './CatalogTab';
+import QuickReview from './QuickReview';
+import SummaryTab from './SummaryTab';
+import sourceCatalog from '../lib/sourceCatalog.json';
 
 // Panel hospedado: mismo marco que el panel local (barra lateral, cabecera, título en serif), con acceso por
 // email + contraseña de Supabase Auth (solo usuarios invitados) y las secciones de gestión de la app.
 export type Me = { email: string; role: 'owner' | 'admin' };
-type Tab = 'review' | 'catalog' | 'sources' | 'apis' | 'users';
+type Tab = 'summary' | 'quick' | 'review' | 'catalog' | 'sources' | 'apis' | 'users';
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/admin/${path}`, { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -63,6 +66,49 @@ const CONN: Record<string, string> = { ok: 'Conectado', error: 'Con fallo', not_
 const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida' };
 const statusClass = (s: string | null) => s === 'ok' || s === 'completed' ? 'status ok' : s === 'error' || s === 'failed' ? 'status bad' : 'status';
 
+type CatalogEntry = { code: string; name: string; category: string | null; website: string | null; acquisition_method: string | null; validation_status: string | null; requires: string | null; note: string | null };
+const CATALOG = sourceCatalog as CatalogEntry[];
+type CloudSource = Overview['sources'][number];
+type Filter = 'all' | 'cloud' | 'failed' | 'local';
+
+// Catálogo completo (todas las fuentes que conoce la app) cruzado con el estado real del motor cloud.
+function SourceCatalog({ sources }: { sources: CloudSource[] }) {
+  const [filter, setFilter] = useState<Filter>('all');
+  const [category, setCategory] = useState('');
+  const [text, setText] = useState('');
+  const cloud = new Map(sources.map(s => [s.code, s]));
+  const known = new Set(CATALOG.map(c => c.code));
+  const rows = [
+    ...CATALOG.map(c => ({ ...c, cloud: cloud.get(c.code) ?? null })),
+    ...sources.filter(s => !known.has(s.code)).map(s => ({ code: s.code, name: s.name, category: 'Motor cloud', website: null, acquisition_method: 'Recogida del motor cloud', validation_status: null, requires: 'none', note: null, cloud: s })),
+  ];
+  const failed = (r: (typeof rows)[number]) => r.cloud?.run_status === 'failed';
+  const categories = [...new Set(rows.map(r => r.category ?? 'Otras'))].sort();
+  const q = text.trim().toLowerCase();
+  const shown = rows.filter(r => (filter === 'all' || (filter === 'cloud' && r.cloud) || (filter === 'failed' && failed(r)) || (filter === 'local' && !r.cloud))
+    && (!category || (r.category ?? 'Otras') === category) && (!q || `${r.name} ${r.code} ${r.note ?? ''}`.toLowerCase().includes(q)));
+  const inCloud = rows.filter(r => r.cloud).length;
+  const cell = (r: (typeof rows)[number]) => r.cloud
+    ? <span className={statusClass(r.cloud.run_status)}>{r.cloud.run_status ? RUN[r.cloud.run_status] ?? r.cloud.run_status : 'Sin recogida'}</span>
+    : <span className="status">{r.requires === 'input' ? 'Requiere configurar' : 'Fuera del cloud'}</span>;
+  return <>
+    <h2 className="section-title">Fuentes de datos</h2>
+    <div className="stat-strip"><span><strong>{rows.length}</strong>fuentes catalogadas</span><span><strong>{inCloud}</strong>recogidas por el motor cloud</span><span><strong>{rows.filter(failed).length}</strong>con fallo</span><span><strong>{rows.length - inCloud}</strong>fuera del cloud (app local o con configuración)</span></div>
+    <div className="search-panel admin-toolbar">
+      <label className="grow" htmlFor="src-q">Buscar<input id="src-q" placeholder="Nombre o código" value={text} onChange={e => setText(e.target.value)} /></label>
+      <label htmlFor="src-filter">Mostrar<select id="src-filter" value={filter} onChange={e => setFilter(e.target.value as Filter)}><option value="all">Todas</option><option value="cloud">En el motor cloud</option><option value="failed">Con fallo</option><option value="local">Fuera del cloud</option></select></label>
+      <label htmlFor="src-cat">Categoría<select id="src-cat" value={category} onChange={e => setCategory(e.target.value)}><option value="">Todas</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></label>
+    </div>
+    {!shown.length ? <div className="empty"><h3>Ninguna fuente con estos filtros.</h3></div> : <div className="table-wrap"><table className="data-table">
+      <thead><tr><th>Fuente</th><th>Categoría</th><th>Método</th><th>Estado</th><th className="num">Leídas</th><th className="num">Catálogo</th><th className="num">Elegibles</th></tr></thead>
+      <tbody>{shown.map(r => <tr key={r.code}>
+        <td className="primary-cell"><strong>{r.website ? <a href={r.website} target="_blank" rel="noopener noreferrer">{r.name}</a> : r.name}</strong><span>{r.code}</span>
+          {r.cloud?.warning && <span style={{ color: 'var(--warning)' }}>{r.cloud.warning}</span>}{!r.cloud && r.note && <span>{r.note}</span>}</td>
+        <td>{r.category ?? '—'}</td><td>{r.acquisition_method ?? '—'}{r.validation_status && <span className="sub">{r.validation_status}</span>}</td>
+        <td>{cell(r)}</td><td className="num">{r.cloud?.fetched ?? '—'}</td><td className="num">{r.cloud?.catalog ?? '—'}</td><td className="num">{r.cloud?.eligible ?? '—'}</td></tr>)}</tbody></table></div>}
+  </>;
+}
+
 function SourcesTab({ onSessionLost }: { onSessionLost: () => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState('');
@@ -86,13 +132,7 @@ function SourcesTab({ onSessionLost }: { onSessionLost: () => void }) {
       <div className="card-grid">{[...data.connections, ...data.paid].map(c => <article className="source-card" key={c.id}>
         <div className="card-head"><h3>{c.name}</h3><span className={statusClass(c.status)}>{CONN[c.status]}</span></div>
         <p className="card-meta">{c.detail}{c.ms ? ` · ${c.ms} ms` : ''}</p></article>)}</div>
-      <h2 className="section-title">Fuentes de datos</h2>
-      {!data.sources.length ? <div className="empty"><h3>El motor no devolvió fuentes.</h3></div> : <div className="table-wrap"><table className="data-table">
-        <thead><tr><th>Fuente</th><th>Última recogida</th><th className="num">Leídas</th><th className="num">Catálogo</th><th className="num">Elegibles</th><th className="num">Seleccionadas</th></tr></thead>
-        <tbody>{data.sources.map(s => <tr key={s.code}>
-          <td className="primary-cell"><strong>{s.name}</strong><span>{s.code}</span>{s.warning && <span style={{ color: 'var(--warning)' }}>{s.warning}</span>}</td>
-          <td><span className={statusClass(s.run_status)}>{s.run_status ? RUN[s.run_status] ?? s.run_status : 'Sin recogida'}</span></td>
-          <td className="num">{s.fetched ?? '—'}</td><td className="num">{s.catalog}</td><td className="num">{s.eligible}</td><td className="num">{s.selected}</td></tr>)}</tbody></table></div>}
+      <SourceCatalog sources={data.sources} />
       <h2 className="section-title">Auditoría de enlaces JobToday{data.audit ? ` · ${data.audit.day}` : ''}</h2>
       {!data.audit ? <p className="muted">Sin auditoría disponible hoy.</p> : <div className="table-wrap"><table className="data-table">
         <thead><tr><th>Fuente</th><th>Enlace</th><th>Estado</th><th className="num">HTTP</th></tr></thead>
@@ -151,7 +191,9 @@ function UsersTab({ me, onSessionLost }: { me: Me; onSessionLost: () => void }) 
 }
 
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; eyebrow: string; title: string; lead: string }> = [
-  { id: 'review', label: 'Revisión', icon: <FileCheck2 size={18} />, eyebrow: 'DE LA OFERTA BRUTA A LA OPORTUNIDAD', title: 'Revisar antes de ofrecer.', lead: 'Aprobar o publicar es siempre una decisión humana. Cada guardado crea una versión nueva e inmutable.' },
+  { id: 'summary', label: 'Resumen', icon: <LayoutDashboard size={18} />, eyebrow: 'TU OBJETIVO', title: 'Cómo vamos.', lead: 'Cuántas ofertas de closer en España ven ya las alumnas y qué toca hacer para llegar a 20.' },
+  { id: 'quick', label: 'Revisión rápida', icon: <ListChecks size={18} />, eyebrow: 'MUCHAS OFERTAS, POCOS CLICS', title: 'Revisa en bloque.', lead: 'Filtra por perfil, verifica la vigencia y aprueba varias a la vez. Todo se puede deshacer.' },
+  { id: 'review', label: 'Revisión una a una', icon: <FileCheck2 size={18} />, eyebrow: 'DE LA OFERTA BRUTA A LA OPORTUNIDAD', title: 'Revisar antes de ofrecer.', lead: 'Aprobar o publicar es siempre una decisión humana. Cada guardado crea una versión nueva e inmutable.' },
   { id: 'catalog', label: 'Probar ofertas', icon: <Search size={18} />, eyebrow: 'LO QUE RECOGE EL MOTOR', title: 'Prueba las ofertas.', lead: 'Mira todo el catálogo o lo que vería una alumna ahora mismo con los mismos filtros.' },
   { id: 'sources', label: 'Fuentes', icon: <Activity size={18} />, eyebrow: 'TU MESA DE TRABAJO', title: 'Fuentes de datos.', lead: 'Estado real de cada fuente y de las conexiones del sistema.' },
   { id: 'apis', label: 'APIs', icon: <Plug size={18} />, eyebrow: 'CLAVES Y PROVEEDORES', title: 'APIs y conexiones.', lead: 'Guarda las claves de los proveedores y comprueba que funcionan.' },
@@ -161,7 +203,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; eyebrow: stri
 export default function AdminShell() {
   const [state, setState] = useState<'checking' | 'out' | 'in' | 'unconfigured'>('checking');
   const [me, setMe] = useState<Me | null>(null);
-  const [tab, setTab] = useState<Tab>('review');
+  const [tab, setTab] = useState<Tab>('summary');
   useEffect(() => {
     fetch('/api/admin/session').then(r => r.json()).then((s: { configured?: boolean; authenticated?: boolean; email?: string; role?: Me['role'] }) => {
       if (s.authenticated && s.email && s.role) { setMe({ email: s.email, role: s.role }); setState('in'); } else setState(s.configured ? 'out' : 'unconfigured');
@@ -188,6 +230,8 @@ export default function AdminShell() {
         <a className="local-badge" href="/" target="_blank" rel="noopener noreferrer"><BriefcaseBusiness size={14} /> Ver la app de alumnas</a></header>
       <main>
         <div className="page-heading"><div><span className="eyebrow">{current.eyebrow}</span><h1>{current.title}</h1><p>{current.lead}</p></div></div>
+        {tab === 'summary' && <SummaryTab go={setTab} onSessionLost={lost} />}
+        {tab === 'quick' && <QuickReview onSessionLost={lost} />}
         {tab === 'review' && <CloudAdminPanel onSessionLost={lost} />}
         {tab === 'catalog' && <CatalogTab onSessionLost={lost} />}
         {tab === 'sources' && <SourcesTab onSessionLost={lost} />}
