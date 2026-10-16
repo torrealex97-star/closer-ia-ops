@@ -1,12 +1,14 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, ExternalLink, LoaderCircle, RefreshCcw, ShieldCheck, Undo2, Download } from 'lucide-react';
+import { Check, ExternalLink, FileDown, LoaderCircle, Pause, Play, RefreshCcw, ShieldCheck, Undo2, Download } from 'lucide-react';
+import { download, toCsv } from '../lib/csv';
 import { ROLE_LABELS, roleFromTitle, spainSignal, type RoleFamily } from '../lib/vocabulary';
 
 // Fuentes externas: APIs oficiales con clave (InfoJobs, Adzuna, Jooble) y recolectores programados (JobSpy en GitHub).
 // Llegan como borradores; una alumna solo ve lo que apruebas aquí y que además cumple las reglas básicas de la vista.
 type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null };
-type Data = { offers: Offer[]; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }> };
+type Data = { offers: Offer[]; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[] };
+const KNOWN = [['infojobs', 'InfoJobs', 'API oficial'], ['adzuna', 'Adzuna', 'API oficial'], ['jooble', 'Jooble', 'API oficial'], ['indeed', 'Indeed', 'JobSpy'], ['linkedin', 'LinkedIn', 'JobSpy'], ['google', 'Google Jobs', 'JobSpy']] as const;
 const STATUS: Record<string, string> = { draft: 'Borrador', needs_review: 'A revisar', approved: 'Aprobada', published: 'Publicada', withdrawn: 'Retirada' };
 const VERDICT: Record<string, string> = { open: 'Activa', closed: 'Cerrada', unknown: 'No verificable' };
 const fmt = (v: string | null) => v ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '—';
@@ -70,6 +72,17 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       }
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
+  async function toggle(source: string, enabled: boolean) {
+    setWorking(`toggle-${source}`); setError(''); setNotice('');
+    try { await call({ method: 'PATCH', body: JSON.stringify({ source, enabled }) }); setNotice(`${source}: ${enabled ? 'reanudada' : 'pausada. No se recoge ni se muestra a las alumnas hasta que la reanudes'}.`); load(); }
+    catch (err) { lost(err as Error); } finally { setWorking(''); }
+  }
+  function exportCsv() {
+    download(`ofertas-externas-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows, [
+      { header: 'Título', value: r => r.title }, { header: 'Empresa', value: r => r.company }, { header: 'Ubicación', value: r => r.location }, { header: 'Salario', value: r => r.salary },
+      { header: 'Fuente', value: r => r.source }, { header: 'Estado', value: r => STATUS[r.editorial_status] ?? r.editorial_status }, { header: 'Publicada', value: r => r.posted_at }, { header: 'Enlace', value: r => r.url },
+    ]));
+  }
   async function collect() {
     setWorking('collect'); setError(''); setNotice('');
     try {
@@ -82,10 +95,16 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. LinkedIn, Indeed y Google Jobs llegan desde el workflow de GitHub con JobSpy. Todo entra como borrador; las alumnas solo ven lo que apruebes. Estas ofertas enlazan siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
-    <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
-      <div className="stat-strip" style={{ margin: 0 }}>{(data?.sources ?? []).map(s => <span key={s.source}><strong>{s.live}</strong>{s.source}{s.approved ? ` (${s.approved} aprobadas)` : ''}</span>)}{data && !data.sources.length && <span>Sin ofertas externas todavía</span>}</div>
+    <div className="admin-toolbar" style={{ justifyContent: 'flex-end' }}>
       {owner && <button disabled={working !== ''} onClick={() => void collect()}>{working === 'collect' ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />} Recoger APIs ahora</button>}
     </div>
+    <div className="table-wrap" style={{ marginBottom: 20 }}><table className="data-table">
+      <thead><tr><th>Fuente</th><th>Vía</th><th>Estado</th><th className="num">Activas</th><th className="num">Aprobadas</th><th>Última vez</th><th /></tr></thead>
+      <tbody>{KNOWN.map(([code, name, via]) => { const st = data?.sources.find(x => x.source === code); const off = data?.paused.includes(code); return <tr key={code}>
+        <td className="primary-cell"><strong>{name}</strong><span>{code}</span></td><td>{via}</td>
+        <td><span className={off ? 'status bad' : st ? 'status ok' : 'status'}>{off ? 'Pausada' : st ? 'Activa' : 'Sin datos aún'}</span></td>
+        <td className="num">{st?.live ?? 0}</td><td className="num">{st?.approved ?? 0}</td><td>{fmt(st?.last_seen ?? null)}</td>
+        <td style={{ textAlign: 'right' }}>{owner && <button disabled={working !== ''} onClick={() => void toggle(code, !!off)} aria-label={`${off ? 'Reanudar' : 'Pausar'} ${name}`}>{off ? <Play size={14} /> : <Pause size={14} />} {off ? 'Reanudar' : 'Pausar'}</button>}</td></tr>; })}</tbody></table></div>
     {!!data?.runs.length && <p className="card-meta">Última entrada: {data.runs[0].source} vía {data.runs[0].via}, {data.runs[0].accepted} de {data.runs[0].received} guardadas · {fmt(data.runs[0].created_at)}</p>}
     <div className="search-panel admin-toolbar">
       <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => setStatus(e.target.value)}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
@@ -103,6 +122,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       <button className="primary" disabled={!chosen.length || working !== ''} onClick={() => void act('approved')}><Check size={15} /> Aprobar {chosen.length || ''}</button>
       <button disabled={!chosen.length || working !== ''} onClick={() => void act('draft')}><Undo2 size={15} /> Volver a borrador</button>
       <button disabled={!chosen.length || working !== ''} onClick={() => void act('withdrawn')}>Retirar</button>
+      <button disabled={!rows.length} onClick={exportCsv}><FileDown size={15} /> Exportar CSV</button>
     </div>
     {busy ? <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p> : !rows.length ? <div className="empty"><h3>No hay ofertas externas con estos filtros.</h3><p className="card-meta">Guarda una clave en APIs, lanza una recogida o quita «Solo con señal clara de España».</p></div> : <div className="table-wrap"><table className="data-table">
       <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Seleccionar todas las visibles" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} /></th><th>Oferta</th><th>Perfil</th><th>Ubicación</th><th>Fuente</th><th>Vigencia</th><th /></tr></thead>

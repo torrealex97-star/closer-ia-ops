@@ -127,7 +127,7 @@ async function sourceGreenhouse(source) {
 }
 
 async function sourceAshby(source) {
-  const data = JSON.parse(await fetchText(`https://api.ashbyhq.com/posting-api/board/${source.slug}`));
+  const data = JSON.parse(await fetchText(`https://api.ashbyhq.com/posting-api/job-board/${source.slug}`));
   return (data.jobs || []).slice(0, MAX_ITEMS_PER_SOURCE).map(j => ({ external_id: String(j.id || j.jobUrl), payload: {
     title: j.title, company: source.name.split(' · ')[0], location: pick(j, 'location', 'secondaryAddressesText'),
     url: j.jobUrl, posted_at: j.publishedAt ? new Date(j.publishedAt).toISOString() : null, raw: j,

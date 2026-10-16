@@ -18,3 +18,8 @@ Los runners de GitHub a veces son bloqueados por LinkedIn/Indeed: un fallo apare
 
 ## 3. Variables de entorno (Vercel, producción)
 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` o `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (integración de Supabase), `CAREER_ENGINE_URL`, `CAREER_ADMIN_TOKEN`, `CRON_SECRET` (autoriza el cron), `INGEST_TOKEN` (autoriza el recolector de GitHub), opcional `ADMIN_SECRETS_KEY`.
+
+## 4. Control diario
+- **Pausar/reanudar** una fuente: Panel → Fuentes externas → tabla de fuentes (solo propietario). Pausada = no se recoge, no se acepta y no se muestra.
+- **Vigencia**: cada día el cron revisa las aprobadas y retira las cerradas en origen. LinkedIn/Indeed suelen bloquear la comprobación («no verificable»): esas se mantienen.
+- **Exportar**: botón «Exportar CSV» en Probar ofertas y en Fuentes externas.

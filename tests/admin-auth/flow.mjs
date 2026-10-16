@@ -202,6 +202,41 @@ await step('vista de alumna: suma solo externas aprobadas que cumplen perfil, Es
   assert.ok((await search({ market: 'EU' })).json.items.every(i => !i.id.startsWith('ext-')));
   assert.ok((await search({ starred_only: true })).json.items.every(i => !i.id.startsWith('ext-')));
 });
+await step('pausar una fuente: se rechaza su ingesta, se salta su recogida y desaparece de la vista de alumna', async () => {
+  const tok = { authorization: 'Bearer ingest-token-0123456789abcdef0123' };
+  const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });
+  assert.equal((await call('/api/admin/external', { method: 'PATCH', body: { source: 'indeed', enabled: false } })).status, 403); jar = saved; // solo propietario
+  assert.equal((await call('/api/admin/external', { method: 'PATCH', body: { source: 'MAL SOURCE', enabled: false } })).status, 422);
+  assert.equal((await call('/api/admin/external', { method: 'PATCH', body: { source: 'indeed', enabled: 'no' } })).status, 422);
+  assert.equal((await call('/api/admin/external', { method: 'PATCH', body: { source: 'indeed', enabled: false } })).status, 200);
+  assert.deepEqual((await call('/api/admin/external')).json.paused, ['indeed']);
+  const before = state.external.size;
+  const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: tok, body: { source: 'indeed', candidates: [{ external_id: 'p1', title: 'Closer', url: 'https://es.indeed.com/p1' }] } });
+  assert.equal(r.json.paused, true); assert.equal(r.json.accepted, 0); assert.equal(state.external.size, before);
+  const search = () => call('/api/backend/opportunities/search', { method: 'POST', cookies: false, body: { role: null, market: 'ES', days: 10, include_bilingual: false, starred_only: false, include_extra_roles: true } });
+  assert.ok(!(await search()).json.items.some(i => i.source_url.includes('a1')), 'pausada: oculta');
+  await call('/api/admin/connections', { method: 'PUT', body: { provider: 'jooble', secret: 'good-key-1234' } });
+  assert.equal((await call('/api/admin/external', { method: 'PATCH', body: { source: 'jooble', enabled: false } })).status, 200);
+  const c = await call('/api/admin/external', { method: 'POST', body: { action: 'collect' } });
+  assert.deepEqual(c.json.outcomes.find(o => o.provider === 'jooble'), { provider: 'jooble', ok: false, error: 'Fuente pausada' });
+  for (const s of ['indeed', 'jooble']) assert.equal((await call('/api/admin/external', { method: 'PATCH', body: { source: s, enabled: true } })).status, 200);
+  assert.deepEqual((await call('/api/admin/external')).json.paused, []);
+  assert.ok((await search()).json.items.some(i => i.source_url.includes('a1')), 'reanudada: visible otra vez');
+});
+await step('vigencia automática (cron): verifica las aprobadas viejas y retira solo las cerradas', async () => {
+  const mk = (id, url) => { const o = { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url, editorial_status: 'approved', verified_at: null, verified_result: null, posted_at: null, expires_at: new Date(Date.now() + 5 * 864e5).toISOString() }; state.external.set('v|' + id, o); return o; };
+  const live = mk('live', 'http://127.0.0.1:8792/page/ok'), dead = mk('dead', 'http://127.0.0.1:8792/page/gone');
+  const fresh = mk('fresh', 'http://127.0.0.1:8792/page/gone'); fresh.verified_at = new Date().toISOString(); // comprobada hace poco: no se toca
+  const r = await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
+  assert.equal(r.status, 200); assert.ok(r.json.vigencia.checked >= 2);
+  assert.equal(live.editorial_status, 'approved'); assert.equal(dead.editorial_status, 'withdrawn'); assert.equal(dead.reviewed_by, 'auto-vigencia'); assert.equal(fresh.editorial_status, 'approved');
+});
+await step('seguridad: cabeceras en todas las respuestas', async () => {
+  const res = await fetch(BASE + '/admin');
+  assert.equal(res.headers.get('x-frame-options'), 'DENY'); assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(res.headers.get('referrer-policy'), 'strict-origin-when-cross-origin'); assert.match(res.headers.get('permissions-policy'), /camera=\(\)/);
+  assert.equal(res.headers.get('x-powered-by'), null);
+});
 await step('logout limpia cookies y la sesión deja de valer', async () => {
   await call('/api/admin/session', { method: 'DELETE' });
   assert.deepEqual(jar, {}); assert.equal((await call('/api/admin/opportunities')).status, 401);

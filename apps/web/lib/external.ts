@@ -34,7 +34,28 @@ export function sanitize(input: unknown): Candidate | null {
   return { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary: clip(c.salary, 200), description, posted_at, raw };
 }
 
-export async function ingest(source: string, via: string, candidates: unknown[], note?: string): Promise<{ received: number; accepted: number; rejected: number }> {
+export async function pausedSources(): Promise<Set<string>> {
+  const response = await serviceRest(`source_settings?org_id=eq.${ORG}&enabled=eq.false&select=source`);
+  const rows = response.ok ? await response.json().catch(() => []) : [];
+  return new Set(Array.isArray(rows) ? rows.map((r: { source: string }) => r.source) : []);
+}
+
+export async function setSourceEnabled(source: string, enabled: boolean, by: string): Promise<boolean> {
+  if (!SOURCE_RE.test(source)) return false;
+  const response = await serviceRest('source_settings?on_conflict=org_id,source', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ org_id: ORG, source, enabled, updated_by: by, updated_at: new Date().toISOString() }),
+  });
+  return response.ok;
+}
+
+export async function ingest(source: string, via: string, candidates: unknown[], note?: string): Promise<{ received: number; accepted: number; rejected: number; paused?: boolean }> {
+  // Una fuente pausada no entra: se registra el intento para que se vea en el panel.
+  if ((await pausedSources()).has(source)) {
+    const received = Math.min(candidates.length, MAX_CANDIDATES);
+    await serviceRest('external_ingest_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, source, via, received, accepted: 0, rejected: received, note: 'Fuente pausada: no se guardó nada' }) });
+    return { received, accepted: 0, rejected: received, paused: true };
+  }
   const clean = candidates.slice(0, MAX_CANDIDATES).map(sanitize).filter((c): c is Candidate => c !== null);
   // Mismo anuncio dos veces en el lote: se queda el último.
   const unique = [...new Map(clean.map(c => [c.external_id, c])).values()];
@@ -116,4 +137,22 @@ async function listOffersById(id: string): Promise<ExternalOffer | null> {
   const response = await serviceRest(`external_offers?org_id=eq.${ORG}&id=eq.${id}&select=${COLS}&limit=1`);
   const rows = response.ok ? await response.json().catch(() => []) : [];
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
+// Vigencia automática: verifica las ofertas aprobadas que llevan más de 48 h sin comprobarse y retira las que el
+// origen da por cerradas (404/410). Solo cierra; nunca aprueba nada. Se llama desde el cron diario.
+export async function refreshVigencia(max = 20): Promise<{ checked: number; withdrawn: number }> {
+  const stale = encodeURIComponent(new Date(Date.now() - 48 * 3600 * 1000).toISOString());
+  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&editorial_status=in.(approved,published)&or=(verified_at.is.null,verified_at.lt.${stale})&select=id&order=verified_at.asc.nullsfirst&limit=${max}`);
+  const rows = response.ok ? await response.json().catch(() => []) as Array<{ id: string }> : [];
+  const queue = Array.isArray(rows) ? rows.map(r => r.id) : [];
+  const closed: string[] = []; let checked = 0;
+  await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
+    for (let id = queue.shift(); id; id = queue.shift()) {
+      const verdict = await verifyOffer(id);
+      if (verdict) { checked++; if (verdict.result === 'closed') closed.push(id); }
+    }
+  }));
+  if (closed.length) await setStatus(closed, 'withdrawn', 'auto-vigencia');
+  return { checked, withdrawn: closed.length };
 }

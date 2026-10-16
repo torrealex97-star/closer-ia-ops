@@ -1,5 +1,5 @@
 import { getSecret, type Provider } from './integrations';
-import { ingest, type Candidate } from './external';
+import { ingest, pausedSources, type Candidate } from './external';
 
 // Recolectores de APIs oficiales con clave (InfoJobs, Adzuna, Jooble). Permiso explícito del proveedor:
 // es la vía de menor riesgo. Volumen bajo: pocas consultas por pasada, una página cada una.
@@ -46,6 +46,7 @@ export type CollectOutcome = { provider: ApiProvider; ok: boolean; received?: nu
 
 // Recoge un proveedor con la clave guardada: una consulta tras otra, y un fallo de una no tumba las demás.
 export async function collectProvider(provider: ApiProvider, via: string): Promise<CollectOutcome> {
+  if ((await pausedSources()).has(provider)) return { provider, ok: false, error: 'Fuente pausada' };
   const secret = await getSecret(provider as Provider);
   if (!secret) return { provider, ok: false, error: 'Sin clave guardada' };
   try {

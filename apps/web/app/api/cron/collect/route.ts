@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { collectAll } from '../../../../lib/collectors';
+import { refreshVigencia } from '../../../../lib/external';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,5 +13,7 @@ export async function GET(request: NextRequest) {
   const given = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
   const a = Buffer.from(given), b = Buffer.from(expected);
   if (expected.length < 16 || a.length !== b.length || !timingSafeEqual(a, b)) return Response.json({ detail: 'No autorizado.' }, { status: 401 });
-  return Response.json({ outcomes: await collectAll('cron') });
+  const outcomes = await collectAll('cron');
+  const vigencia = await refreshVigencia().catch(() => ({ checked: 0, withdrawn: 0 }));
+  return Response.json({ outcomes, vigencia });
 }

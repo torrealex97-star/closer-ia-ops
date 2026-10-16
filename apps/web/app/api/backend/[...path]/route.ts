@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { externalForStudent } from '../../../../lib/externalSurface';
+import { fold } from '../../../../lib/vocabulary';
 
 export const dynamic = 'force-dynamic';
 const allowed = new Set(['127.0.0.1:3100', 'localhost:3100']);
@@ -55,8 +56,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
         const body = JSON.parse(requestBody) as { role?: string | null; market?: string; days?: number; include_bilingual?: boolean; starred_only?: boolean };
         const mine = await upstream.clone().json() as { items: Array<{ source_url: string }>; total: number };
         const extra = await externalForStudent({ role: body.role ?? null, market: body.market ?? 'any', days: Number(body.days) || 10, include_bilingual: Boolean(body.include_bilingual), starred_only: Boolean(body.starred_only) }).catch(() => []);
+        // Sin duplicados: mismo enlace o misma empresa + título (el mismo anuncio llega por varias fuentes).
+        const key = (i: { company?: string; original_title?: string }) => `${fold(i.company)}|${fold(i.original_title)}`;
         const seen = new Set(mine.items.map(i => i.source_url));
-        const items = [...mine.items, ...extra.filter(e => !seen.has(e.source_url))];
+        const seenKeys = new Set((mine.items as Array<{ company?: string; original_title?: string }>).map(key));
+        const items = [...mine.items, ...extra.filter(e => !seen.has(e.source_url) && !seenKeys.has(key(e)) && (seenKeys.add(key(e)), seen.add(e.source_url), true))];
         return Response.json({ ...mine, items, total: items.length }, { headers });
       } catch { /* si algo falla, se devuelve la respuesta del motor tal cual */ }
     }

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
-import { listOffers, recentRuns, setStatus, statsBySource, verifyOffer } from '../../../../lib/external';
+import { listOffers, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer } from '../../../../lib/external';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,7 +12,7 @@ async function gate(request: NextRequest, ownerOnly = false) {
   if (originBlocked(request)) return { error: Response.json({ detail: 'Origen no permitido' }, { status: 403 }) };
   const auth = await authenticate(request);
   if (!auth.ok) return { error: Response.json({ detail: auth.detail }, { status: auth.status }) };
-  if (ownerOnly && auth.admin.role !== 'owner') return { error: Response.json({ detail: 'Solo el propietario puede lanzar una recogida.' }, { status: 403 }) };
+  if (ownerOnly && auth.admin.role !== 'owner') return { error: Response.json({ detail: 'Solo el propietario puede lanzar una recogida o pausar fuentes.' }, { status: 403 }) };
   return { auth };
 }
 const reply = (auth: { setCookies: string[] }, body: unknown, status = 200) => withCookies(Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } }), auth.setCookies);
@@ -21,19 +21,24 @@ export async function GET(request: NextRequest) {
   const { auth, error } = await gate(request);
   if (error) return error;
   const p = request.nextUrl.searchParams;
-  const [offers, sources, runs] = await Promise.all([
-    listOffers({ status: p.get('status') || undefined, source: p.get('source') || undefined, limit: 200, onlyLive: true }), statsBySource(), recentRuns(),
+  const [offers, sources, runs, paused] = await Promise.all([
+    listOffers({ status: p.get('status') || undefined, source: p.get('source') || undefined, limit: 200, onlyLive: true }), statsBySource(), recentRuns(), pausedSources(),
   ]);
   if (!offers) return Response.json({ detail: 'No se pudo leer las fuentes externas.' }, { status: 503 });
   const counts: Record<string, number> = {};
   for (const s of await listOffers({ limit: 500, onlyLive: true }) ?? []) counts[s.editorial_status] = (counts[s.editorial_status] ?? 0) + 1;
-  return reply(auth!, { offers, counts, sources: sources ?? [], runs: runs ?? [] });
+  return reply(auth!, { offers, counts, sources: sources ?? [], runs: runs ?? [], paused: [...paused] });
 }
 
 export async function PATCH(request: NextRequest) {
-  const { auth, error } = await gate(request);
+  const body = await request.json().catch(() => ({})) as { ids?: unknown; editorial_status?: unknown; source?: unknown; enabled?: unknown };
+  const toggle = typeof body.source === 'string';
+  const { auth, error } = await gate(request, toggle);
   if (error) return error;
-  const body = await request.json().catch(() => ({})) as { ids?: unknown; editorial_status?: unknown };
+  if (toggle) {
+    if (typeof body.enabled !== 'boolean' || !await setSourceEnabled(body.source as string, body.enabled, auth!.admin.email)) return Response.json({ detail: 'Fuente o valor no válidos.' }, { status: 422 });
+    return reply(auth!, { ok: true, source: body.source, enabled: body.enabled });
+  }
   const ids = Array.isArray(body.ids) ? body.ids.filter((i): i is string => typeof i === 'string') : [];
   const changed = typeof body.editorial_status === 'string' ? await setStatus(ids, body.editorial_status, auth!.admin.email) : null;
   if (changed === null) return Response.json({ detail: 'Ids o estado no válidos (máximo 200 por vez).' }, { status: 422 });

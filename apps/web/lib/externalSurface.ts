@@ -1,4 +1,4 @@
-import { listOffers, type ExternalOffer } from './external';
+import { listOffers, pausedSources, type ExternalOffer } from './external';
 import { fold, roleFromTitle, ROLE_LABELS, spainSignal, type RoleFamily } from './vocabulary';
 
 // Ofertas externas aprobadas, con el contrato Opportunity de la vista de alumna. Nada se inventa: lo que la
@@ -22,7 +22,8 @@ export function toOpportunity(o: ExternalOffer, role: RoleFamily) {
 
 export async function externalForStudent(q: Query) {
   if (q.starred_only || !['any', 'ES'].includes(q.market)) return [];
-  const rows = await listOffers({ limit: 300, onlyLive: true }) ?? [];
+  const [all, paused] = await Promise.all([listOffers({ limit: 300, onlyLive: true }), pausedSources()]);
+  const rows = (all ?? []).filter(o => !paused.has(o.source));
   const cutoff = Date.now() - q.days * 86400000;
   const out = [];
   for (const o of rows) {

@@ -6,7 +6,7 @@ export function startMocks({ authPort, enginePort }) {
   const state = {
     users: new Map([['owner@test.dev', { id: 'u1', password: 'Correcta-12345' }]]),
     admins: [{ email: 'owner@test.dev', role: 'owner', invited_by: 'bootstrap', created_at: '2026-10-16T00:00:00Z' }],
-    connections: new Map(), external: new Map(), ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
+    connections: new Map(), external: new Map(), sourceSettings: new Map(), ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
   };
   const send = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
@@ -86,6 +86,10 @@ export function startMocks({ authPort, enginePort }) {
       }
       return send(res, 200, n);
     }
+    if (url.pathname === '/rest/v1/source_settings') {
+      if (req.method === 'POST') { state.sourceSettings.set(body.source, body); return send(res, 201, {}); }
+      return send(res, 200, [...state.sourceSettings.values()].filter(r => r.enabled === false).map(r => ({ source: r.source })));
+    }
     if (url.pathname === '/rest/v1/external_ingest_runs') {
       if (req.method === 'POST') { state.ingestRuns.unshift({ ...body, created_at: new Date().toISOString() }); return send(res, 201, {}); }
       return send(res, 200, state.ingestRuns);
@@ -94,7 +98,9 @@ export function startMocks({ authPort, enginePort }) {
       const q = Object.fromEntries(url.searchParams); const ids = q.id?.startsWith('in.(') ? q.id.slice(4, -1).split(',') : q.id?.startsWith('eq.') ? [q.id.slice(3)] : null;
       let rows = [...state.external.values()];
       if (ids) rows = rows.filter(r => ids.includes(r.id));
-      if (q.editorial_status) rows = rows.filter(r => `eq.${r.editorial_status}` === q.editorial_status);
+      if (q.editorial_status?.startsWith('in.(')) rows = rows.filter(r => q.editorial_status.slice(4, -1).split(',').includes(r.editorial_status));
+      else if (q.editorial_status) rows = rows.filter(r => `eq.${r.editorial_status}` === q.editorial_status);
+      if (q.or?.includes('verified_at.is.null')) { const lt = q.or.match(/verified_at\.lt\.([^,)]+)/)?.[1]; rows = rows.filter(r => !r.verified_at || (lt && r.verified_at < lt)); }
       if (q.source) rows = rows.filter(r => `eq.${r.source}` === q.source);
       if (q.expires_at?.startsWith('gt.')) rows = rows.filter(r => r.expires_at > decodeURIComponent(q.expires_at.slice(3)));
       if (req.method === 'PATCH') { for (const r of rows) Object.assign(r, body); return send(res, 200, rows); }

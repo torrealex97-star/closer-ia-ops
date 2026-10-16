@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ExternalLink, LoaderCircle, RefreshCcw } from 'lucide-react';
+import { ExternalLink, FileDown, LoaderCircle, RefreshCcw } from 'lucide-react';
+import { download, toCsv } from '../lib/csv';
 
 // «Probar ofertas»: todo el catálogo recogido (admin) y, aparte, lo que ve hoy una alumna
 // (solo ofertas aprobadas/publicadas) con los mismos filtros que la vista pública.
@@ -42,6 +43,11 @@ export default function CatalogTab({ onSessionLost }: { onSessionLost: () => voi
   const q = text.trim().toLowerCase();
   const shown = items.filter(i => !q || `${i.original_title} ${i.company}`.toLowerCase().includes(q));
   const shownStudent = student.filter(i => !q || `${i.original_title} ${i.company}`.toLowerCase().includes(q));
+  function exportCsv() {
+    const day = new Date().toISOString().slice(0, 10);
+    if (mode === 'admin') download(`catalogo-${day}.csv`, toCsv(shown, [{ header: 'Título', value: r => r.original_title }, { header: 'Empresa', value: r => r.company }, { header: 'Fuente', value: r => r.source }, { header: 'Estado', value: r => EDITORIAL[r.editorial_status] ?? r.editorial_status }, { header: 'Vigencia', value: r => ACTIVITY[r.opportunity_status] ?? r.opportunity_status }, { header: 'Recogida', value: r => r.created_at }, { header: 'Enlace', value: r => r.source_url }]));
+    else download(`vista-alumna-${day}.csv`, toCsv(shownStudent, [{ header: 'Título', value: r => r.original_title }, { header: 'Empresa', value: r => r.company }, { header: 'Perfil', value: r => r.role_label }, { header: 'Compensación', value: r => r.compensation }, { header: 'Ubicación', value: r => r.location }, { header: 'Modalidad', value: r => r.modality }, { header: 'Publicada', value: r => r.published_at }, { header: 'Enlace', value: r => r.source_url }]));
+  }
   return <section aria-label="Probar ofertas">
     <div className="admin-toolbar" role="group" aria-label="Vista">
       <button className={mode === 'admin' ? 'primary' : ''} aria-pressed={mode === 'admin'} onClick={() => setMode('admin')}>Catálogo completo</button>
@@ -58,6 +64,7 @@ export default function CatalogTab({ onSessionLost }: { onSessionLost: () => voi
         <label htmlFor="catalog-days">Publicada<select id="catalog-days" value={days} onChange={e => setDays(Number(e.target.value))}><option value={1}>Últimas 24 h</option><option value={3}>Últimos 3 días</option><option value={7}>Últimos 7 días</option><option value={10}>Últimos 10 días</option></select></label>
       </>}
       <button disabled={busy} onClick={load}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
+      <button disabled={busy || !(mode === 'admin' ? shown.length : shownStudent.length)} onClick={exportCsv}><FileDown size={15} /> Exportar CSV</button>
     </div>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     <p className="card-meta" style={{ marginTop: 0, marginBottom: 16 }}>{mode === 'admin'

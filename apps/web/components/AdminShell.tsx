@@ -62,7 +62,7 @@ type Overview = {
   audit: { day: string; slugs: Array<{ source: string; slug: string; status: string; http_status: number | null; canonical_url: string | null }> } | null;
   connections: Array<{ id: string; name: string; status: 'ok' | 'error' | 'not_configured'; detail: string; ms?: number }>;
   paid: Array<{ id: string; name: string; status: 'ok' | 'error' | 'not_configured'; detail: string; ms?: number }>;
-  external?: { pending: number; sources: ExtSource[] };
+  external?: { pending: number; sources: ExtSource[]; paused?: string[] };
 };
 const CONN: Record<string, string> = { ok: 'Conectado', error: 'Con fallo', not_configured: 'Sin configurar' };
 const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida' };
@@ -75,7 +75,7 @@ type CloudSource = Overview['sources'][number];
 type Filter = 'all' | 'cloud' | 'failed' | 'local';
 
 // Catálogo completo (todas las fuentes que conoce la app) cruzado con el estado real del motor cloud.
-function SourceCatalog({ sources, external = [] }: { sources: CloudSource[]; external?: ExtSource[] }) {
+function SourceCatalog({ sources, external = [], paused = [] }: { sources: CloudSource[]; external?: ExtSource[]; paused?: string[] }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [category, setCategory] = useState('');
   const [text, setText] = useState('');
@@ -93,7 +93,7 @@ function SourceCatalog({ sources, external = [] }: { sources: CloudSource[]; ext
   const shown = rows.filter(r => (filter === 'all' || (filter === 'cloud' && (r.cloud || r.ext)) || (filter === 'failed' && failed(r)) || (filter === 'local' && !r.cloud && !r.ext))
     && (!category || (r.category ?? 'Otras') === category) && (!q || `${r.name} ${r.code} ${r.note ?? ''}`.toLowerCase().includes(q)));
   const inCloud = rows.filter(r => r.cloud || r.ext).length;
-  const cell = (r: (typeof rows)[number]) => r.ext && !r.cloud ? <span className="status ok">Externa · {r.ext.live} activas</span> : r.cloud
+  const cell = (r: (typeof rows)[number]) => paused.includes(r.code) ? <span className="status bad">Pausada</span> : r.ext && !r.cloud ? <span className="status ok">Externa · {r.ext.live} activas</span> : r.cloud
     ? <span className={statusClass(r.cloud.run_status)}>{r.cloud.run_status ? RUN[r.cloud.run_status] ?? r.cloud.run_status : 'Sin recogida'}</span>
     : <span className="status">{r.requires === 'input' ? 'Requiere configurar' : 'Fuera del cloud'}</span>;
   return <>
@@ -137,7 +137,7 @@ function SourcesTab({ onSessionLost }: { onSessionLost: () => void }) {
       <div className="card-grid">{[...data.connections, ...data.paid].map(c => <article className="source-card" key={c.id}>
         <div className="card-head"><h3>{c.name}</h3><span className={statusClass(c.status)}>{CONN[c.status]}</span></div>
         <p className="card-meta">{c.detail}{c.ms ? ` · ${c.ms} ms` : ''}</p></article>)}</div>
-      <SourceCatalog sources={data.sources} external={data.external?.sources} />
+      <SourceCatalog sources={data.sources} external={data.external?.sources} paused={data.external?.paused} />
       <h2 className="section-title">Auditoría de enlaces JobToday{data.audit ? ` · ${data.audit.day}` : ''}</h2>
       {!data.audit ? <p className="muted">Sin auditoría disponible hoy.</p> : <div className="table-wrap"><table className="data-table">
         <thead><tr><th>Fuente</th><th>Enlace</th><th>Estado</th><th className="num">HTTP</th></tr></thead>

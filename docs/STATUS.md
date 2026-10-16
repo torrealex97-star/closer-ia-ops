@@ -1,5 +1,16 @@
 # Estado
 
+## Control de fuentes externas, vigencia automática, CSV y cabeceras de seguridad (sesión 38) — 2026-10-16
+
+- **Pausar y reanudar fuentes externas** (solo propietario; tabla `public.source_settings`, migración `source_settings`): una fuente pausada no se recoge (cron y botón), su `/api/ingest` devuelve `paused` y no guarda nada (queda registrado), y sus ofertas dejan de verse para las alumnas hasta reanudarla. Tabla de las 6 fuentes (InfoJobs, Adzuna, Jooble, Indeed, LinkedIn, Google Jobs) con estado y botón en Fuentes externas; el catálogo de Fuentes muestra «Pausada».
+- **Vigencia automática** (cron diario): verifica las ofertas externas aprobadas sin comprobar en 48 h (máx. 20 por pasada, concurrencia 4) y **retira** las que el origen da por cerradas (404/410, `reviewed_by = auto-vigencia`). Solo cierra; nunca aprueba.
+- **Exportar CSV** en Probar ofertas (catálogo y vista de alumna) y en Fuentes externas; las celdas que empiezan por `= + - @` se neutralizan contra inyección de fórmulas (`tests/admin-auth/csv.mjs`).
+- **Sin duplicados** en la vista de alumna: se descarta una externa si el motor ya ofrece el mismo enlace o la misma empresa + título.
+- **Seguridad**: cabeceras `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `COOP` en todo el sitio (`next.config.ts`), probadas en el flujo.
+- **Worker**: el endpoint de Ashby/Pennylane queda corregido en el código (`/posting-api/job-board/`); **sigue sin desplegarse** ni verificarse contra Ashby (el Worker se despliega por Sites).
+- **Verificación**: `tests/admin-auth/run.sh` **27/27 + parity + csv + 6/6 de interfaz**; Playwright con la pila local completa **15/15** (el refactor del proxy no rompe el modo local); `pytest` jobspy/catálogo/audit 12/12; typecheck, build y ruff OK.
+- **Lo que sigue dependiendo del operador**: claves de InfoJobs/Adzuna/Jooble, `INGEST_TOKEN` y secretos de GitHub (ver [EXTERNAL_SOURCES.md](EXTERNAL_SOURCES.md)), y el despliegue del Worker (activar/pausar las 17 fuentes del motor, Pennylane, más fuentes públicas). Clasificaciones IA e historial del panel local siguen sin portar: el motor cloud no usa proveedores de pago sin orden explícita.
+
 ## Fuentes externas: InfoJobs, Adzuna, Jooble y JobSpy (Indeed, LinkedIn, Google Jobs) — 2026-10-16 (sesión 37)
 
 - **Decisión del operador** ([ADR-011](decisions/ADR-011-external-sources-tos.md)): asume el riesgo de términos de uso del scraping y pide usar todas las vías. Se construye opt-in, con volumen bajo, sin datos de contacto y con revisión humana obligatoria. Puesta en marcha paso a paso en [EXTERNAL_SOURCES.md](EXTERNAL_SOURCES.md).
