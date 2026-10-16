@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Prueba del acceso al panel: arranca la app (next start) con Supabase y motor simulados y lanza flow.mjs.
+# Requiere `npm run build` previo. Uso: bash tests/admin-auth/run.sh
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+export PORT=3199
+SUPABASE_URL=http://127.0.0.1:8791 SUPABASE_PUBLISHABLE_KEY=anon-key SUPABASE_SERVICE_ROLE_KEY=service-key \
+CAREER_ENGINE_URL=http://127.0.0.1:8792 CAREER_ADMIN_TOKEN=engine-token ADMIN_PUBLIC_URL=https://app.test.dev \
+  npx --no-install next start apps/web --hostname 127.0.0.1 --port "$PORT" > /tmp/admin-auth-next.log 2>&1 &
+NEXT_PID=$!
+trap 'kill $NEXT_PID 2>/dev/null || true' EXIT
+for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.5; done
+BASE="http://127.0.0.1:$PORT" node tests/admin-auth/flow.mjs

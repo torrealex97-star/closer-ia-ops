@@ -43,12 +43,7 @@ async function admin<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-export default function CloudAdminPanel() {
-  const [authState, setAuthState] = useState<'checking' | 'out' | 'in' | 'unconfigured'>('checking');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loggingIn, setLoggingIn] = useState(false);
-
+export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () => void }) {
   const [items, setItems] = useState<Item[]>([]);
   const [counts, setCounts] = useState<Counts>({});
   const [total, setTotal] = useState(0);
@@ -62,35 +57,16 @@ export default function CloudAdminPanel() {
   const [verification, setVerification] = useState<Verification | null>(null);
   const [verifying, setVerifying] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/admin/session').then(r => r.json()).then((s: { configured?: boolean; authenticated?: boolean }) => {
-      setAuthState(s.authenticated ? 'in' : s.configured ? 'out' : 'unconfigured');
-    }).catch(() => setAuthState('out'));
-  }, []);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(t); }, [notice]);
-
-  function login(e: React.FormEvent) {
-    e.preventDefault();
-    setLoggingIn(true); setLoginError('');
-    fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
-      .then(r => { if (!r.ok) throw new Error('Contraseña incorrecta.'); return r.json(); })
-      .then(() => { setAuthState('in'); setPassword(''); })
-      .catch(err => setLoginError((err as Error).message))
-      .finally(() => setLoggingIn(false));
-  }
-
-  function logout() {
-    fetch('/api/admin/session', { method: 'DELETE' }).finally(() => { setAuthState('out'); setDetail(null); });
-  }
 
   function refresh(status: (typeof FILTERS)[number] = filter) {
     setBusy(true);
     admin<{ items: Item[]; total: number; counts: Counts }>(`opportunities?limit=50${status ? `&status=${status}` : ''}`)
       .then(d => { setItems(d.items); setTotal(d.total); setCounts(d.counts ?? {}); setError(''); })
-      .catch(err => { if ((err as Error).message.includes('Sesión')) setAuthState('out'); setError((err as Error).message); })
+      .catch(err => { if ((err as Error).message.includes('Sesión')) onSessionLost(); setError((err as Error).message); })
       .finally(() => setBusy(false));
   }
-  useEffect(() => { if (authState === 'in') refresh(filter); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [filter, authState]);
+  useEffect(() => { refresh(filter); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [filter]);
 
   // Fase 3: verificación REAL de vigencia contra el engine (un GET acotado con
   // corroboración de contenido). El veredicto llega con su vigencia y razón.
@@ -144,20 +120,6 @@ export default function CloudAdminPanel() {
     finally { setSaving(false); }
   }
 
-  if (authState === 'checking') return <section className="empty"><LoaderCircle size={20} className="spin" /> Comprobando sesión…</section>;
-  if (authState === 'unconfigured') return <section className="empty"><Eye size={32} strokeWidth={1.3} /><h3>Panel de administración no configurado en este despliegue.</h3><p>Falta la variable de sesión del operador (ADMIN_UI_PASSWORD) en el servidor. Configúralo antes de usar el panel.</p></section>;
-  if (authState === 'out') return <section className="empty" style={{ maxWidth: 420, margin: '8vh auto' }}>
-    <form onSubmit={login}>
-      <h3>Panel de administración</h3>
-      <p className="muted">Acceso del operador al catálogo del engine cloud. La credencial va en una cookie HttpOnly; el token del engine nunca llega al navegador.</p>
-      <label style={{ display: 'block', marginTop: 12 }}>Contraseña
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoFocus autoComplete="current-password" style={{ width: '100%', marginTop: 4 }} /></label>
-      {loginError && <div className="alert error" role="alert" style={{ marginTop: 8 }}>{loginError}</div>}
-      <button className="primary" disabled={!password || loggingIn} style={{ marginTop: 12, width: '100%' }}>
-        {loggingIn ? <LoaderCircle size={15} className="spin" /> : <ChevronRight size={15} />} Entrar</button>
-    </form>
-  </section>;
-
   return <section aria-label="Revisión editorial del catálogo cloud">
     {error && <div className="alert error" role="alert">{error}</div>}
     {notice && <div className="toast" role="status"><Check size={16} />{notice}</div>}
@@ -170,7 +132,6 @@ export default function CloudAdminPanel() {
           {FILTERS.map(f => <option key={f} value={f}>{f ? EDITORIAL[f] : 'Todos los estados'}</option>)}
         </select></label>
         <button disabled={busy} onClick={() => refresh()}><RefreshCcw size={15} /> Actualizar</button>
-        <button onClick={logout}><X size={15} /> Salir</button>
       </div>
     </div>
     {busy && <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p>}

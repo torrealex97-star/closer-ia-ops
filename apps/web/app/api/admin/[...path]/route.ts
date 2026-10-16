@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { ADMIN_COOKIE, sessionIsValid, sessionUnavailable } from '../../../../lib/adminSession';
+import { authenticate, originBlocked, withCookies } from '../../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,20 +9,12 @@ export const runtime = 'nodejs';
 //   del operador vive en /api/backend contra el backend local y aquí no hay nada.
 // - CAREER_ADMIN_TOKEN: el token X-Admin-Token del engine. Solo en el servidor.
 // La sesión del operador (cookie HttpOnly) es la única credencial que toca el navegador.
-const originBlocked = (request: NextRequest) => {
-  const host = request.headers.get('host') ?? '';
-  const origin = request.headers.get('origin');
-  if (request.headers.get('sec-fetch-site') === 'cross-site') return true;
-  return Boolean(origin) && origin !== `https://${host}` && origin !== `http://${host}`;
-};
-
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const engine = process.env.CAREER_ENGINE_URL;
   if (!engine) return Response.json({ detail: 'El panel del operador en modo local vive en /admin con el backend local.' }, { status: 404 });
   if (originBlocked(request)) return Response.json({ detail: 'Origen no permitido' }, { status: 403 });
-  if (sessionUnavailable()) return Response.json({ detail: 'El panel de administración no está configurado en este despliegue.' }, { status: 503 });
-  const session = request.cookies.get(ADMIN_COOKIE)?.value;
-  if (!sessionIsValid(session)) return Response.json({ detail: 'Sesión de operador no iniciada.' }, { status: 401 });
+  const auth = await authenticate(request);
+  if (!auth.ok) return Response.json({ detail: auth.detail }, { status: auth.status });
   const token = process.env.CAREER_ADMIN_TOKEN;
   if (!token) return Response.json({ detail: 'El token del engine no está configurado en este despliegue.' }, { status: 503 });
   const { path } = await context.params;
@@ -38,7 +30,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     const contentType = upstream.headers.get('content-type');
     if (contentType) headers.set('content-type', contentType);
-    return new Response(upstream.body, { status: upstream.status, headers });
+    return withCookies(new Response(upstream.body, { status: upstream.status, headers }), auth.setCookies);
   } catch {
     return Response.json({ detail: 'El engine cloud no responde.' }, { status: 503 });
   }
