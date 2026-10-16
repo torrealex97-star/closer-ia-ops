@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
-import { listOffers, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer } from '../../../../lib/external';
+import { approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,17 +17,21 @@ async function gate(request: NextRequest, ownerOnly = false) {
 }
 const reply = (auth: { setCookies: string[] }, body: unknown, status = 200) => withCookies(Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } }), auth.setCookies);
 
+const num = (v: string | null, d: number) => { const n = Number(v); return Number.isFinite(n) && v !== null && v !== '' ? n : d; };
+function queryOf(p: URLSearchParams): PageQuery {
+  return { status: p.get('status') || undefined, source: p.get('source') || undefined, role: p.get('role') || undefined, spain: p.get('spain') === '1', minScore: num(p.get('min_score'), 0), q: p.get('q') || undefined, sort: p.get('sort') === 'recent' ? 'recent' : 'score' };
+}
+
 export async function GET(request: NextRequest) {
   const { auth, error } = await gate(request);
   if (error) return error;
   const p = request.nextUrl.searchParams;
-  const [offers, sources, runs, paused] = await Promise.all([
-    listOffers({ status: p.get('status') || undefined, source: p.get('source') || undefined, limit: 200, onlyLive: true }), statsBySource(), recentRuns(), pausedSources(),
+  const pageSize = Math.min(Math.max(num(p.get('page_size'), 50), 10), 100), page = Math.max(num(p.get('page'), 1), 1);
+  const [list, counts, sources, runs, paused] = await Promise.all([
+    listOffersPage({ ...queryOf(p), limit: pageSize, offset: (page - 1) * pageSize }), countsByStatus(), statsBySource(), recentRuns(), pausedSources(),
   ]);
-  if (!offers) return Response.json({ detail: 'No se pudo leer las fuentes externas.' }, { status: 503 });
-  const counts: Record<string, number> = {};
-  for (const s of await listOffers({ limit: 500, onlyLive: true }) ?? []) counts[s.editorial_status] = (counts[s.editorial_status] ?? 0) + 1;
-  return reply(auth!, { offers, counts, sources: sources ?? [], runs: runs ?? [], paused: [...paused] });
+  if (!list) return Response.json({ detail: 'No se pudo leer las fuentes externas.' }, { status: 503 });
+  return reply(auth!, { offers: list.rows, total: list.total, page, page_size: pageSize, counts: counts ?? {}, sources: sources ?? [], runs: runs ?? [], paused: [...paused] });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -46,7 +50,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => ({})) as { action?: unknown; provider?: unknown; ids?: unknown };
+  const body = await request.json().catch(() => ({})) as { action?: unknown; provider?: unknown; ids?: unknown; n?: unknown; filters?: Record<string, string> };
   const { auth, error } = await gate(request, body.action === 'collect');
   if (error) return error;
   if (body.action === 'collect') {
@@ -58,6 +62,14 @@ export async function POST(request: NextRequest) {
     const results = [];
     for (const id of ids) { const r = await verifyOffer(id); if (r) results.push(r); }
     return reply(auth!, { results });
+  }
+  if (body.action === 'approve_top') {
+    const n = Number(body.n);
+    if (!Number.isFinite(n) || n < 1) return Response.json({ detail: 'Indica cuántas aprobar (1-500).' }, { status: 422 });
+    const params = new URLSearchParams(Object.entries(body.filters ?? {}).filter(([, v]) => typeof v === 'string') as Array<[string, string]>);
+    const result = await approveTop({ ...queryOf(params), n }, auth!.admin.email);
+    if (!result) return Response.json({ detail: 'No se pudo aprobar.' }, { status: 503 });
+    return reply(auth!, result);
   }
   return Response.json({ detail: 'Acción no válida.' }, { status: 422 });
 }

@@ -6,9 +6,9 @@ export function startMocks({ authPort, enginePort }) {
   const state = {
     users: new Map([['owner@test.dev', { id: 'u1', password: 'Correcta-12345' }]]),
     admins: [{ email: 'owner@test.dev', role: 'owner', invited_by: 'bootstrap', created_at: '2026-10-16T00:00:00Z' }],
-    connections: new Map(), external: new Map(), sourceSettings: new Map(), ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
+    connections: new Map(), external: new Map(), sourceSettings: new Map(), apifyActors: [], apifyRuns: [], apifyCalls: [], apifyItems: [], apifyStatus: 'SUCCEEDED', ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
   };
-  const send = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+  const send = (res, code, body, extra = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...extra }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
   const issue = email => {
     const at = 'at-' + Math.random().toString(36).slice(2), rt = 'rt-' + Math.random().toString(36).slice(2);
@@ -81,7 +81,9 @@ export function startMocks({ authPort, enginePort }) {
       let n = 0;
       for (const r of body.p_rows) {
         const key = `${body.p_source}|${r.external_id}`; const old = state.external.get(key);
-        state.external.set(key, old ? { ...old, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined)), last_seen_at: new Date().toISOString() } : { id: crypto.randomUUID(), source: body.p_source, editorial_status: 'draft', verified_result: null, verified_at: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 10 * 864e5).toISOString(), raw: {}, ...r });
+        const dup = !old && r.fingerprint ? [...state.external.values()].find(o => o.fingerprint === r.fingerprint && o.source !== body.p_source) : null;
+        if (dup) { dup.also_seen = [...new Set([...(dup.also_seen ?? []), body.p_source])]; dup.last_seen_at = new Date().toISOString(); n++; continue; }
+        state.external.set(key, old ? { ...old, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined)), last_seen_at: new Date().toISOString() } : { id: crypto.randomUUID(), source: body.p_source, editorial_status: 'draft', verified_result: null, verified_at: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 10 * 864e5).toISOString(), raw: {}, also_seen: [], score: 0, ...r });
         n++;
       }
       return send(res, 200, n);
@@ -100,11 +102,18 @@ export function startMocks({ authPort, enginePort }) {
       if (ids) rows = rows.filter(r => ids.includes(r.id));
       if (q.editorial_status?.startsWith('in.(')) rows = rows.filter(r => q.editorial_status.slice(4, -1).split(',').includes(r.editorial_status));
       else if (q.editorial_status) rows = rows.filter(r => `eq.${r.editorial_status}` === q.editorial_status);
-      if (q.or?.includes('verified_at.is.null')) { const lt = q.or.match(/verified_at\.lt\.([^,)]+)/)?.[1]; rows = rows.filter(r => !r.verified_at || (lt && r.verified_at < lt)); }
       if (q.source) rows = rows.filter(r => `eq.${r.source}` === q.source);
+      if (q.role === 'is.null') rows = rows.filter(r => !r.role); else if (q.role?.startsWith('eq.')) rows = rows.filter(r => r.role === q.role.slice(3));
+      if (q.spain === 'is.true') rows = rows.filter(r => r.spain === true);
+      if (q.score?.startsWith('gte.')) rows = rows.filter(r => (r.score ?? 0) >= Number(q.score.slice(4)));
       if (q.expires_at?.startsWith('gt.')) rows = rows.filter(r => r.expires_at > decodeURIComponent(q.expires_at.slice(3)));
+      if (q.or?.includes('verified_at.is.null')) { const lt = q.or.match(/verified_at\.lt\.([^,)]+)/)?.[1]; rows = rows.filter(r => !r.verified_at || (lt && r.verified_at < lt)); }
+      else if (q.or?.includes('ilike')) { const term = decodeURIComponent(q.or.match(/title\.ilike\.\*([^*]*)\*/)?.[1] ?? '').toLowerCase(); rows = rows.filter(r => `${r.title} ${r.company ?? ''}`.toLowerCase().includes(term)); }
       if (req.method === 'PATCH') { for (const r of rows) Object.assign(r, body); return send(res, 200, rows); }
-      return send(res, 200, rows.slice(0, Number(q.limit) || 200));
+      if (q.order?.startsWith('score.desc')) rows.sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || String(b.posted_at ?? '').localeCompare(String(a.posted_at ?? '')));
+      else rows.sort((a, b) => String(b.posted_at ?? '').localeCompare(String(a.posted_at ?? '')));
+      const offset = Number(q.offset) || 0, limit = Number(q.limit) || 200, slice = rows.slice(offset, offset + limit);
+      return send(res, 200, slice, /count=exact/.test(req.headers.prefer ?? '') ? { 'content-range': `${slice.length ? offset : '*'}-${offset + slice.length - 1}/${rows.length}` } : {});
     }
     // APIs oficiales simuladas: InfoJobs (Basic), Adzuna (app_id/app_key) y Jooble (clave en la ruta).
     if (url.pathname === '/api/9/offer') {
@@ -117,6 +126,36 @@ export function startMocks({ authPort, enginePort }) {
     }
     if (url.pathname === '/api/good-key-1234' && req.method === 'POST') {
       return send(res, 200, { jobs: [{ id: 77, title: 'Setter de ventas', company: 'Gamma', location: 'Valencia', link: 'https://es.jooble.org/desc/77', snippet: 'Llama a leads para agendar citas de ventas con el equipo.', updated: '2026-10-13T08:00:00Z' }] });
+    }
+    // Tablas de actores y ejecuciones de Apify (PostgREST simulado).
+    if (url.pathname === '/rest/v1/apify_actors') {
+      const q = Object.fromEntries(url.searchParams); const id = q.id?.replace('eq.', '');
+      if (req.method === 'POST') { state.apifyActors.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), ...body }); return send(res, 201, {}); }
+      if (req.method === 'PATCH') { Object.assign(state.apifyActors.find(a => a.id === id) ?? {}, body); return send(res, 204, {}); }
+      if (req.method === 'DELETE') { state.apifyActors = state.apifyActors.filter(a => a.id !== id); state.apifyRuns = state.apifyRuns.filter(r => r.actor_id !== id); return send(res, 204, {}); }
+      return send(res, 200, state.apifyActors);
+    }
+    if (url.pathname === '/rest/v1/apify_runs') {
+      const q = Object.fromEntries(url.searchParams); const rid = q.run_id?.replace('eq.', '');
+      if (req.method === 'POST') { state.apifyRuns.unshift({ id: crypto.randomUUID(), started_at: new Date().toISOString(), finished_at: null, items_total: null, harvested: 0, cost_usd: null, error: null, ...body }); return send(res, 201, {}); }
+      if (req.method === 'PATCH') { Object.assign(state.apifyRuns.find(r => r.run_id === rid) ?? {}, body); return send(res, 204, {}); }
+      let rows = [...state.apifyRuns]; if (q.started_at?.startsWith('gte.')) rows = rows.filter(r => r.started_at >= decodeURIComponent(q.started_at.slice(4)));
+      return send(res, 200, rows.slice(0, Number(q.limit) || 100));
+    }
+    // API de Apify simulada: solo la clave «good-key-1234» es válida.
+    const apifyMatch = url.pathname.match(/^\/v2\/(acts\/([^/]+)\/(builds\/default|runs)|actor-runs\/([^/]+)|datasets\/([^/]+)\/items)$/);
+    if (apifyMatch) {
+      if (bearer !== 'good-key-1234') return send(res, 401, {});
+      if (apifyMatch[3] === 'builds/default') {
+        const strict = apifyMatch[2].includes('strict');
+        return send(res, 200, { data: { inputSchema: JSON.stringify({ properties: strict ? { mandatoryField: { type: 'string' }, search_term: { type: 'string' } } : { search_term: { type: 'string' }, location: { type: 'string' }, results_wanted: { type: 'integer' }, hours_old: { type: 'integer' }, country_indeed: { type: 'string' }, site_name: { type: 'array', items: { type: 'string' } }, proxyConfiguration: { type: 'object' } }, required: strict ? ['mandatoryField'] : ['search_term'] }) } });
+      }
+      if (apifyMatch[3] === 'runs' && req.method === 'POST') {
+        const n = state.apifyCalls.length + 1; state.apifyCalls.push({ actor: apifyMatch[2], query: Object.fromEntries(url.searchParams), input: body, auth: bearer });
+        return send(res, 201, { data: { id: 'RUN' + n + 'abcdef', defaultDatasetId: 'DS' + n, status: 'RUNNING' } });
+      }
+      if (apifyMatch[4]) return send(res, 200, { data: { status: state.apifyStatus, defaultDatasetId: 'DS1', usageTotalUsd: 0.07 } });
+      if (apifyMatch[5]) { const o = Number(url.searchParams.get('offset')) || 0, l = Number(url.searchParams.get('limit')) || 100; return send(res, 200, state.apifyItems.slice(o, o + l)); }
     }
     // Proveedores externos simulados: solo la clave «good-key» es válida.
     const key = bearer || url.searchParams.get('api_key');

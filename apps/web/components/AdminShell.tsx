@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, BriefcaseBusiness, Globe2, ChevronRight, FileCheck2, LayoutDashboard, ListChecks, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Activity, BriefcaseBusiness, CloudCog, Globe2, ChevronRight, FileCheck2, LayoutDashboard, ListChecks, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import CloudAdminPanel from './CloudAdminPanel';
+import ApifyTab from './ApifyTab';
 import ApisTab from './ApisTab';
 import CatalogTab from './CatalogTab';
 import ExternalTab from './ExternalTab';
@@ -12,7 +13,7 @@ import sourceCatalog from '../lib/sourceCatalog.json';
 // Panel hospedado: mismo marco que el panel local (barra lateral, cabecera, título en serif), con acceso por
 // email + contraseña de Supabase Auth (solo usuarios invitados) y las secciones de gestión de la app.
 export type Me = { email: string; role: 'owner' | 'admin' };
-type Tab = 'summary' | 'quick' | 'external' | 'review' | 'catalog' | 'sources' | 'apis' | 'users';
+type Tab = 'summary' | 'quick' | 'external' | 'apify' | 'review' | 'catalog' | 'sources' | 'apis' | 'users';
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/admin/${path}`, { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -199,6 +200,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; eyebrow: stri
   { id: 'summary', label: 'Resumen', icon: <LayoutDashboard size={18} />, eyebrow: 'TU OBJETIVO', title: 'Cómo vamos.', lead: 'Cuántas ofertas de closer en España ven ya las alumnas y qué toca hacer para llegar a 20.' },
   { id: 'quick', label: 'Revisión rápida', icon: <ListChecks size={18} />, eyebrow: 'MUCHAS OFERTAS, POCOS CLICS', title: 'Revisa en bloque.', lead: 'Filtra por perfil, verifica la vigencia y aprueba varias a la vez. Todo se puede deshacer.' },
   { id: 'external', label: 'Fuentes externas', icon: <Globe2 size={18} />, eyebrow: 'APIS OFICIALES Y JOBSPY', title: 'Más ofertas de España.', lead: 'InfoJobs, Adzuna, Jooble, LinkedIn, Indeed y Google Jobs entran como borradores. Tú decides cuáles ve una alumna.' },
+  { id: 'apify', label: 'Apify', icon: <CloudCog size={18} />, eyebrow: 'SCRAPING A ESCALA SIN PROXIES PROPIOS', title: 'Miles de ofertas.', lead: 'Lanza scrapers en la infraestructura de Apify, con tope de gasto, y recoge los resultados como borradores puntuados.' },
   { id: 'review', label: 'Revisión una a una', icon: <FileCheck2 size={18} />, eyebrow: 'DE LA OFERTA BRUTA A LA OPORTUNIDAD', title: 'Revisar antes de ofrecer.', lead: 'Aprobar o publicar es siempre una decisión humana. Cada guardado crea una versión nueva e inmutable.' },
   { id: 'catalog', label: 'Probar ofertas', icon: <Search size={18} />, eyebrow: 'LO QUE RECOGE EL MOTOR', title: 'Prueba las ofertas.', lead: 'Mira todo el catálogo o lo que vería una alumna ahora mismo con los mismos filtros.' },
   { id: 'sources', label: 'Fuentes', icon: <Activity size={18} />, eyebrow: 'TU MESA DE TRABAJO', title: 'Fuentes de datos.', lead: 'Estado real de cada fuente y de las conexiones del sistema.' },
@@ -239,6 +241,7 @@ export default function AdminShell() {
         {tab === 'summary' && <SummaryTab go={setTab} onSessionLost={lost} />}
         {tab === 'quick' && <QuickReview onSessionLost={lost} />}
         {tab === 'external' && <ExternalTab owner={me.role === 'owner'} onSessionLost={lost} />}
+        {tab === 'apify' && <ApifyTab owner={me.role === 'owner'} onSessionLost={lost} goApis={() => setTab('apis')} />}
         {tab === 'review' && <CloudAdminPanel onSessionLost={lost} />}
         {tab === 'catalog' && <CatalogTab onSessionLost={lost} />}
         {tab === 'sources' && <SourcesTab onSessionLost={lost} />}

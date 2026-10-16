@@ -221,6 +221,132 @@ await step('vista de alumna: suma solo externas aprobadas que cumplen perfil, Es
   assert.ok((await search({ market: 'EU' })).json.items.every(i => !i.id.startsWith('ext-')));
   assert.ok((await search({ starred_only: true })).json.items.every(i => !i.id.startsWith('ext-')));
 });
+await step('escala: puntuación, filtros en servidor, paginación, deduplicado entre fuentes y «aprobar las mejores»', async () => {
+  const tok = { authorization: 'Bearer ingest-token-0123456789abcdef0123' };
+  const fresh = new Date().toISOString();
+  const candidates = Array.from({ length: 130 }, (_, i) => ({
+    external_id: `g${i}`, title: i % 10 === 0 ? 'Setter de ventas' : `Closer de ventas ${i}`, company: `Empresa ${i}`, location: i % 2 ? 'Austin, Texas' : 'Madrid, España', url: `https://www.glassdoor.es/job/${i}`, posted_at: fresh,
+    description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa. ' + (i % 3 === 0 ? 'Ofrecemos 30.000 € brutos/año más comisiones. ' : '') + 'x'.repeat(i % 7 === 0 ? 400 : 0),
+  }));
+  const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: tok, body: { source: 'glassdoor', via: 'jobspy', candidates } });
+  assert.equal(r.json.accepted, 130);
+  const rows = [...state.external.values()].filter(o => o.source === 'glassdoor');
+  assert.equal(rows.length, 130); assert.ok(rows.every(o => Number.isInteger(o.score) && o.score >= 0 && o.score <= 100));
+  assert.equal(rows.find(o => o.external_id === 'g2').role, 'closer'); assert.equal(rows.find(o => o.external_id === 'g10').role, 'setter');
+  assert.equal(rows.find(o => o.external_id === 'g2').spain, true); assert.equal(rows.find(o => o.external_id === 'g3').spain, false);
+  assert.ok(rows.find(o => o.external_id === 'g6').score > rows.find(o => o.external_id === 'g2').score, 'con sueldo publicado puntúa más');
+  assert.ok(rows.find(o => o.external_id === 'g2').score > rows.find(o => o.external_id === 'g3').score, 'España puntúa más que fuera');
+  // listado en servidor
+  const list = (qs) => call('/api/admin/external?' + qs);
+  const all = await list('status=draft&source=glassdoor&spain=1&role=closer&page_size=50'); assert.equal(all.status, 200);
+  assert.equal(all.json.total, 52); // 65 en España − 13 setters (i%10==0 y par)
+  assert.equal(all.json.offers.length, 50); assert.equal(all.json.page, 1);
+  const scores = all.json.offers.map(o => o.score); assert.deepEqual(scores, [...scores].sort((a, b) => b - a), 'orden por puntuación');
+  assert.equal((await list('status=draft&source=glassdoor&spain=1&role=closer&page_size=50&page=2')).json.offers.length, 2);
+  assert.equal((await list('status=draft&source=glassdoor&role=setter')).json.total, 13);
+  assert.equal((await list('status=draft&source=glassdoor&spain=1&q=Empresa%2012')).json.total, 6); // 12, 120, 122, 124, 126, 128 (búsqueda parcial, como ilike)
+  assert.ok((await list('status=draft&source=glassdoor&min_score=60')).json.offers.every(o => o.score >= 60));
+  assert.ok((await list('status=draft&source=glassdoor&sort=recent')).json.offers.length > 0);
+  assert.ok(all.json.counts.draft >= 130);
+  // el mismo anuncio llegando por otra fuente no se duplica
+  const before = state.external.size;
+  const dup = await call('/api/ingest', { method: 'POST', cookies: false, headers: tok, body: { source: 'google', candidates: [{ external_id: 'dup-4', title: 'Closer de ventas 4 (H/M)', company: 'EMPRESA 4 S.L.', location: 'Madrid', url: 'https://www.google.com/jobs/4', description: 'Buscamos' }] } });
+  assert.equal(dup.json.accepted, 1); assert.equal(state.external.size, before);
+  assert.deepEqual(rows.find(o => o.external_id === 'g4').also_seen, ['google']);
+  // aprobar las 5 mejores con filtros
+  const top5 = [...all.json.offers].slice(0, 5).map(o => o.id);
+  const bad = await call('/api/admin/external', { method: 'POST', body: { action: 'approve_top', n: 0 } }); assert.equal(bad.status, 422);
+  const ap = await call('/api/admin/external', { method: 'POST', body: { action: 'approve_top', n: 5, filters: { status: 'draft', source: 'glassdoor', spain: '1', role: 'closer' } } });
+  assert.deepEqual([ap.json.matched, ap.json.approved], [52, 5]);
+  const approved = rows.filter(o => o.editorial_status === 'approved').map(o => o.id).sort();
+  assert.deepEqual(approved, [...top5].sort(), 'se aprueban justo las 5 de mayor puntuación');
+  assert.equal((await list('status=draft&source=glassdoor&spain=1&role=closer')).json.total, 47);
+  // las aprobadas llegan a la vista de alumna ordenadas, las borradores no
+  const seen = (await call('/api/backend/opportunities/search', { method: 'POST', cookies: false, body: { role: 'closer', market: 'ES', days: 10, include_bilingual: false, starred_only: false, include_extra_roles: true } })).json.items.filter(i => i.source_url.includes('glassdoor.es'));
+  assert.equal(seen.length, 5);
+});
+await step('Apify: clave, actores, validaciones y permisos (solo el propietario configura y lanza)', async () => {
+  assert.equal((await call('/api/admin/apify', { cookies: false })).status, 401);
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'apify', secret: 'good-key-1234' } })).status, 200);
+  let g = await call('/api/admin/apify'); assert.equal(g.status, 200); assert.equal(g.json.has_key, true); assert.equal(g.json.budget.limit, 5); assert.equal(g.json.presets[0].actor, 'aakash19/jobspy');
+  const save = (b) => call('/api/admin/apify', { method: 'POST', body: { action: 'save', ...b } });
+  assert.equal((await save({ label: 'x', actor: 'sin-barra', source: 'apify-x' })).status, 422);
+  assert.equal((await save({ label: 'x', actor: 'a/b', source: 'MAL' })).status, 422);
+  assert.equal((await save({ label: 'x', actor: 'a/b', source: 'apify-x', input_template: '{no json' })).status, 422);
+  assert.equal((await save({ label: 'x', actor: 'a/b', source: 'apify-x', input_template: '[1]' })).status, 422);
+  assert.equal((await save({ label: 'JobSpy', actor: 'aakash19/jobspy', source: 'apify-jobspy', max_items: 650, memory_mb: 1024, timeout_s: 900 })).status, 201);
+  assert.equal((await save({ label: 'Con plantilla', actor: 'owner/templated', source: 'apify-tpl', max_items: 100, input_template: '{"keywords":"{{query}}","where":"{{location}}","limit":"{{max_items}}","nested":{"c":"{{country}}"},"text":"en {{location}}"}' })).status, 201);
+  assert.equal((await save({ label: 'Estricto', actor: 'owner/strict', source: 'apify-strict' })).status, 201);
+  const actors = (await call('/api/admin/apify')).json.actors; assert.equal(actors.length, 3);
+  const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });
+  assert.equal((await call('/api/admin/apify')).status, 200); // ver: cualquiera
+  assert.equal((await save({ label: 'y', actor: 'a/b', source: 'apify-y' })).status, 403);
+  assert.equal((await call('/api/admin/apify', { method: 'POST', body: { action: 'start', id: actors[0].id } })).status, 403);
+  assert.equal((await call('/api/admin/apify', { method: 'POST', body: { action: 'schema', actor: 'a/b' } })).status, 403);
+  assert.equal((await call('/api/admin/apify', { method: 'POST', body: { action: 'harvest' } })).status, 200); // recoger: cualquiera
+  jar = saved;
+  const schema = await call('/api/admin/apify', { method: 'POST', body: { action: 'schema', actor: 'aakash19/jobspy' } });
+  assert.deepEqual(schema.json.fields.find(f => f.name === 'search_term'), { name: 'search_term', type: 'string', required: true });
+});
+await step('Apify: lanzar adapta la entrada al esquema, aplica límites, webhook y presupuesto', async () => {
+  const [jobspy, tpl, strict] = (await call('/api/admin/apify')).json.actors;
+  const start = (a) => call('/api/admin/apify', { method: 'POST', body: { action: 'start', id: a.id } });
+  const r = await start(jobspy); assert.equal(r.status, 202);
+  const c = state.apifyCalls.at(-1);
+  assert.equal(c.actor, 'aakash19~jobspy'); assert.equal(c.auth, 'good-key-1234');
+  assert.match(c.input.search_term, /"closer de ventas" OR "closer high ticket"/); assert.equal(c.input.location, 'España'); assert.equal(c.input.country_indeed, 'Spain');
+  assert.equal(c.input.results_wanted, 650); assert.equal(c.input.hours_old, 240); assert.deepEqual(c.input.site_name, ['indeed', 'linkedin', 'glassdoor', 'google']); assert.deepEqual(c.input.proxyConfiguration, { useApifyProxy: true });
+  assert.deepEqual([c.query.memory, c.query.timeout, c.query.maxItems], ['1024', '900', '650']);
+  const hook = JSON.parse(Buffer.from(c.query.webhooks, 'base64').toString()); assert.ok(hook[0].eventTypes.includes('ACTOR.RUN.SUCCEEDED')); assert.match(hook[0].requestUrl, /^https:\/\/app\.test\.dev\/api\/apify\/webhook\?t=[0-9a-f]{64}$/);
+  assert.equal(state.apifyRuns[0].status, 'RUNNING'); assert.equal(state.apifyRuns[0].started_by, 'owner@test.dev');
+  assert.equal((await start(jobspy)).status, 409, 'una sola ejecución en curso por actor');
+  const t = await start(tpl); assert.equal(t.status, 202); const ti = state.apifyCalls.at(-1).input;
+  assert.equal(ti.limit, 100); assert.equal(typeof ti.limit, 'number'); assert.equal(ti.where, 'España'); assert.equal(ti.nested.c, 'Spain'); assert.equal(ti.text, 'en España'); assert.match(ti.keywords, /closer de ventas/);
+  const st = await start(strict); assert.equal(st.status, 409); assert.match(st.json.detail, /mandatoryField/);
+  // presupuesto: con 4,5 USD gastados y límite 5 no se lanza nada más
+  state.apifyRuns.unshift({ id: crypto.randomUUID(), actor_id: tpl.id, run_id: 'OLD1', status: 'SUCCEEDED', started_at: new Date().toISOString(), finished_at: new Date().toISOString(), harvested: 1, cost_usd: 4.5 });
+  state.apifyRuns.find(x => x.run_id === 'OLD1'); const calls = state.apifyCalls.length;
+  const over = await start({ id: tpl.id }); assert.equal(over.status, 409); assert.match(over.json.detail, /Presupuesto mensual agotado/); assert.equal(state.apifyCalls.length, calls);
+  state.apifyRuns = state.apifyRuns.filter(x => x.run_id !== 'OLD1');
+});
+await step('Apify: webhook con token; recogida por lotes reanudable; coste y duplicados', async () => {
+  const run = state.apifyRuns.find(r => r.run_id.startsWith('RUN1')); const token = JSON.parse(Buffer.from(state.apifyCalls[0].query.webhooks, 'base64').toString())[0].requestUrl.split('t=')[1];
+  const hookCall = (t, body) => call(`/api/apify/webhook?t=${t}`, { method: 'POST', cookies: false, body });
+  assert.equal((await hookCall('mal', { resource: { id: run.run_id } })).status, 401);
+  assert.equal((await hookCall(token, { resource: { id: 'noexiste1' } })).status, 404);
+  assert.equal((await hookCall(token, { resource: { id: '!!' } })).status, 422);
+  // En curso: no hay nada que recoger todavía
+  state.apifyStatus = 'RUNNING'; let h = await hookCall(token, { resource: { id: run.run_id } }); assert.equal(h.json.done, false); assert.equal(h.json.harvested, 0);
+  // 650 elementos con forma de JobSpy + 2 inválidos (sin enlace) y uno repetido por otra fuente
+  state.apifyItems = Array.from({ length: 650 }, (_, i) => ({ id: `ap-${i}`, site: 'indeed', job_url: `https://es.indeed.com/viewjob?jk=ap${i}`, title: i % 5 === 0 ? 'Setter de ventas' : `Closer de ventas ${i}`, company: `Compañía ${i}`, location: i % 2 ? 'Texas, USA' : 'Madrid, España', date_posted: new Date().toISOString().slice(0, 10), description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa', min_amount: i % 3 === 0 ? 24000 : null, max_amount: i % 3 === 0 ? 30000 : null, currency: 'EUR', interval: 'yearly', is_remote: i % 4 === 0, job_type: 'fulltime' }));
+  state.apifyItems.push({ id: 'bad1', title: 'Sin enlace' }, { id: 'bad2', job_url: 'javascript:alert(1)', title: 'Peligrosa' });
+  state.apifyStatus = 'SUCCEEDED';
+  const before = [...state.external.values()].filter(o => o.source === 'apify-jobspy').length; assert.equal(before, 0);
+  h = await hookCall(token, { resource: { id: run.run_id } }); assert.equal(h.status, 200); assert.equal(h.json.done, true); assert.equal(h.json.harvested, 652);
+  const got = [...state.external.values()].filter(o => o.source === 'apify-jobspy');
+  assert.equal(got.length, 650, 'las 2 inválidas se descartan y las demás se guardan en 3 lotes (300+300+52)');
+  assert.ok(got.every(o => o.score >= 0 && o.editorial_status === 'draft'));
+  const withSalary = got.find(o => o.external_id === 'ap-0'); assert.equal(withSalary.salary, '24000–30000 EUR / yearly'); assert.equal(withSalary.role, 'setter'); assert.equal(withSalary.spain, true);
+  assert.equal(got.find(o => o.external_id === 'ap-4').raw.is_remote, true);
+  const done = state.apifyRuns.find(r => r.run_id === run.run_id); assert.equal(done.cost_usd, 0.07); assert.ok(done.finished_at); assert.equal(done.harvested, 652); assert.equal(done.error, null);
+  const g = (await call('/api/admin/apify')).json; assert.equal(g.budget.spent, 0.07 + 1, 'coste real de la terminada + 1 USD reservado de la ejecución en curso');
+  // reanudable: si ya está terminada no se vuelve a recoger
+  const again = await call('/api/admin/apify', { method: 'POST', body: { action: 'harvest' } });
+  assert.equal(state.external.size, [...state.external.values()].length); assert.equal([...state.external.values()].filter(o => o.source === 'apify-jobspy').length, 650); void again;
+  // ejecución fallida: se anota y no recoge nada
+  const failed = state.apifyRuns.find(r => r.run_id.startsWith('RUN2')); state.apifyStatus = 'FAILED';
+  const f = await hookCall(token, { resource: { id: failed.run_id } }); assert.equal(f.json.done, true); assert.match(state.apifyRuns.find(r => r.run_id === failed.run_id).error, /FAILED/); state.apifyStatus = 'SUCCEEDED';
+});
+await step('Apify: el cron lanza solo los actores diarios (una vez al día) y respeta el presupuesto', async () => {
+  const [jobspy] = (await call('/api/admin/apify')).json.actors;
+  await call('/api/admin/apify', { method: 'POST', body: { action: 'save', id: jobspy.id, label: 'JobSpy', actor: 'aakash19/jobspy', source: 'apify-jobspy', max_items: 650, memory_mb: 1024, timeout_s: 900, schedule_daily: true } });
+  state.apifyRuns.find(r => r.actor_id === jobspy.id).started_at = new Date(Date.now() - 30 * 3600 * 1000).toISOString(); // última ejecución hace 30 h
+  for (const r of state.apifyRuns) if (r.actor_id !== jobspy.id) r.status = 'SUCCEEDED';
+  const calls = state.apifyCalls.length;
+  const cron = () => call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
+  let r = await cron(); assert.equal(r.status, 200); assert.equal(state.apifyCalls.length, calls + 1, 'lanzó el diario'); assert.deepEqual(r.json.apify.started, [{ actor: 'aakash19/jobspy', ok: true }]);
+  r = await cron(); assert.equal(state.apifyCalls.length, calls + 1, 'una sola vez al día'); assert.deepEqual(r.json.apify.started, []);
+});
 await step('pausar una fuente: se rechaza su ingesta, se salta su recogida y desaparece de la vista de alumna', async () => {
   const tok = { authorization: 'Bearer ingest-token-0123456789abcdef0123' };
   const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });

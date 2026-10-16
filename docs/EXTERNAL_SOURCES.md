@@ -32,3 +32,14 @@ Los runners de GitHub a veces son bloqueados por LinkedIn/Indeed: un fallo apare
 - LinkedIn limita ráfagas (429) y los runners de GitHub pueden ser bloqueados: el secreto opcional `JOBSPY_PROXIES` (proxies separados por coma) se pasa a JobSpy.
 - JobSpy solo extrae salario del texto para EE. UU.; aquí se rescata la frase literal en euros con periodo o bruto/neto (`lib/salary.ts`).
 - **Actor de Apify `aakash19/jobspy`** (envoltorio de pago de JobSpy, comunidad, 1 usuario mensual): no se ha integrado. Pros: proxies de Apify, sin bloqueo de IP de GitHub. Contras: coste por uso de plataforma, esquema de entrada no documentado en su ficha y un único mantenedor. Si se quiere, se conecta desde la app local (Fuentes → Apify guiado, que descubre el esquema de entrada) o se añade aquí como fuente de pago desactivada por defecto.
+
+## 6. Apify: scraping a escala sin proxies propios (de pago por uso)
+Los actores de Apify corren en la infraestructura de Apify, que ya incluye sus proxies: no hay que montar nada y no se bloquea tu IP. Es la vía para reunir miles de ofertas.
+1. **Clave**: Panel → APIs → Apify (token de Apify). Pon también un **límite de gasto en Apify** (Settings → Billing); la app añade su propio tope mensual (`APIFY_MONTHLY_BUDGET_USD`, 10 USD por defecto).
+2. **Actor**: Panel → Apify → «Añadir actor» (hay un preajuste con `aakash19/jobspy`). Sin plantilla de entrada, la app lee el esquema del actor y rellena búsqueda, ubicación (España), número de resultados, antigüedad (10 días), país y sitios. Si el actor exige campos que no conoce, pega una **plantilla** con marcadores `{{query}}`, `{{location}}`, `{{country}}`, `{{max_items}}`, `{{hours_old}}`, `{{sites}}`. Cualquier actor que devuelva ofertas sirve: el mapeo reconoce los nombres habituales de campos (título, empresa, ubicación, enlace, salario, descripción, fecha).
+3. **Límites por ejecución**: máximo de elementos, memoria y tiempo. **Lanzar ahora** (propietario) o «Lanzar cada día» (cron de las 06:00 UTC, una vez al día).
+4. **Resultados**: al terminar, Apify avisa por webhook (`/api/apify/webhook`, con token derivado de `CRON_SECRET`) y se recogen por lotes de 300; si no da tiempo, continúa con «Recoger resultados» o el cron. Entran como borradores puntuados en Fuentes externas; el coste real de cada ejecución se suma al gasto del mes.
+5. **Presupuesto**: no se lanza nada si el gasto del mes más 1 USD de reserva supera el tope.
+
+## 7. Filtrar miles de ofertas
+En Fuentes externas los filtros (estado, perfil, fuente, España, puntuación mínima, búsqueda, orden) y la paginación se hacen **en el servidor**. Cada oferta lleva una **puntuación 0-100** (perfil por título, España explícita, sueldo publicado, comisiones, frescura, calidad del texto) y una **huella** que une el mismo anuncio llegado por varias fuentes (se anota «también en …»). «Aprobar las N mejores» aprueba los borradores que cumplen los filtros por orden de puntuación; es reversible.

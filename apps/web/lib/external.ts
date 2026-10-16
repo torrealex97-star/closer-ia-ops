@@ -1,3 +1,4 @@
+import { enrich } from './offerScore';
 import { salaryFromText } from './salary';
 import { serviceRest } from './supabaseAuth';
 
@@ -5,9 +6,10 @@ import { serviceRest } from './supabaseAuth';
 // sin datos de contacto de personas, y no son visibles para una alumna hasta que un operador los aprueba.
 export const ORG = 'cloud-wdc';
 export type Candidate = { external_id: string; title: string; company?: string | null; location?: string | null; url: string; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown> };
-export type ExternalOffer = { raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null };
+export type ExternalOffer = { role?: string | null; spain?: boolean | null; score?: number; also_seen?: string[]; raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null };
 export const SOURCE_RE = /^[a-z0-9-]{2,40}$/;
-const MAX_CANDIDATES = 300;
+export const MAX_CANDIDATES = 300;
+const STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
 
 const clip = (v: unknown, max: number): string | null => {
   if (typeof v !== 'string' && typeof v !== 'number') return null;
@@ -64,7 +66,9 @@ export async function ingest(source: string, via: string, candidates: unknown[],
   const unique = [...new Map(clean.map(c => [c.external_id, c])).values()];
   let accepted = 0;
   if (unique.length) {
-    const response = await serviceRest('rpc/external_upsert', { method: 'POST', body: JSON.stringify({ p_org: ORG, p_source: source, p_rows: unique }) });
+    // Perfil, España, puntuación y huella (para ordenar y deduplicar entre fuentes) se calculan al entrar.
+    const rows = unique.map(c => ({ ...c, ...enrich(c) }));
+    const response = await serviceRest('rpc/external_upsert', { method: 'POST', body: JSON.stringify({ p_org: ORG, p_source: source, p_rows: rows }) });
     if (!response.ok) throw new Error('No se pudo guardar los candidatos.');
     accepted = Number(await response.json().catch(() => 0)) || 0;
   }
@@ -73,10 +77,11 @@ export async function ingest(source: string, via: string, candidates: unknown[],
   return { received, accepted, rejected: received - accepted };
 }
 
-const COLS = 'raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result';
-export async function listOffers(opts: { status?: string; source?: string; limit?: number; onlyLive?: boolean }): Promise<ExternalOffer[] | null> {
-  const q = [`org_id=eq.${ORG}`, `select=${COLS}`, 'order=posted_at.desc.nullslast,first_seen_at.desc', `limit=${Math.min(opts.limit ?? 200, 500)}`];
+const COLS = 'role,spain,score,also_seen,raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result';
+export async function listOffers(opts: { status?: string; statuses?: string[]; source?: string; limit?: number; onlyLive?: boolean; byScore?: boolean }): Promise<ExternalOffer[] | null> {
+  const q = [`org_id=eq.${ORG}`, `select=${COLS}`, opts.byScore ? 'order=score.desc,posted_at.desc.nullslast' : 'order=posted_at.desc.nullslast,first_seen_at.desc', `limit=${Math.min(opts.limit ?? 200, 1000)}`];
   if (opts.status) q.push(`editorial_status=eq.${encodeURIComponent(opts.status)}`);
+  if (opts.statuses?.length) q.push(`editorial_status=in.(${opts.statuses.filter(x => STATUSES.includes(x)).join(',')})`);
   if (opts.source) q.push(`source=eq.${encodeURIComponent(opts.source)}`);
   if (opts.onlyLive) q.push(`expires_at=gt.${encodeURIComponent(new Date().toISOString())}`);
   const response = await serviceRest(`external_offers?${q.join('&')}`);
@@ -105,7 +110,6 @@ export async function recentRuns(limit = 8): Promise<Array<{ source: string; via
   return Array.isArray(rows) ? rows : null;
 }
 
-const STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
 export async function setStatus(ids: string[], status: string, by: string): Promise<number | null> {
   if (!STATUSES.includes(status) || !ids.length || ids.length > 200 || ids.some(i => !/^[0-9a-f-]{36}$/.test(i))) return null;
   const response = await serviceRest(`external_offers?org_id=eq.${ORG}&id=in.(${ids.join(',')})`, {
@@ -158,4 +162,50 @@ export async function refreshVigencia(max = 20): Promise<{ checked: number; with
   }));
   if (closed.length) await setStatus(closed, 'withdrawn', 'auto-vigencia');
   return { checked, withdrawn: closed.length };
+}
+
+// ---- Escala: filtros, orden y paginación en el servidor (miles de ofertas) ----
+export type PageQuery = { status?: string; source?: string; role?: string; spain?: boolean; minScore?: number; q?: string; sort?: 'score' | 'recent'; limit?: number; offset?: number };
+
+function pageFilters(p: PageQuery): string[] {
+  const f = [`org_id=eq.${ORG}`, `expires_at=gt.${encodeURIComponent(new Date().toISOString())}`];
+  if (p.status && STATUSES.includes(p.status)) f.push(`editorial_status=eq.${p.status}`);
+  if (p.source && SOURCE_RE.test(p.source)) f.push(`source=eq.${p.source}`);
+  if (p.role === 'none') f.push('role=is.null'); else if (p.role && /^[a-z_]{2,30}$/.test(p.role)) f.push(`role=eq.${p.role}`);
+  if (p.spain) f.push('spain=is.true');
+  if (p.minScore && p.minScore > 0) f.push(`score=gte.${Math.min(100, Math.floor(p.minScore))}`);
+  const q = (p.q ?? '').replace(/[^\p{L}\p{N} .-]/gu, ' ').trim().slice(0, 60);
+  if (q) f.push(`or=(title.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`);
+  return f;
+}
+
+export async function listOffersPage(p: PageQuery): Promise<{ rows: ExternalOffer[]; total: number } | null> {
+  const limit = Math.min(Math.max(p.limit ?? 50, 1), 200), offset = Math.max(p.offset ?? 0, 0);
+  const order = p.sort === 'recent' ? 'posted_at.desc.nullslast,first_seen_at.desc' : 'score.desc,posted_at.desc.nullslast';
+  const response = await serviceRest(`external_offers?${[...pageFilters(p), `select=${COLS}`, `order=${order}`, `limit=${limit}`, `offset=${offset}`].join('&')}`, { headers: { Prefer: 'count=exact' } });
+  if (!response.ok) return null;
+  const rows = await response.json().catch(() => null);
+  if (!Array.isArray(rows)) return null;
+  const total = Number((response.headers.get('content-range') ?? '').split('/')[1]);
+  return { rows, total: Number.isFinite(total) ? total : rows.length };
+}
+
+export async function countsByStatus(): Promise<Record<string, number> | null> {
+  const out: Record<string, number> = {};
+  const results = await Promise.all(STATUSES.map(async st => {
+    const r = await serviceRest(`external_offers?${[...pageFilters({ status: st }), 'select=id', 'limit=1'].join('&')}`, { headers: { Prefer: 'count=exact' } });
+    return [st, r.ok ? Number((r.headers.get('content-range') ?? '').split('/')[1]) || 0 : null] as const;
+  }));
+  for (const [st, n] of results) { if (n === null) return null; if (n) out[st] = n; }
+  return out;
+}
+
+// «Aprobar las N mejores»: toma los borradores que cumplen los filtros, por puntuación, y los aprueba. Reversible.
+export async function approveTop(p: PageQuery & { n: number }, by: string): Promise<{ matched: number; approved: number } | null> {
+  const n = Math.min(Math.max(Math.floor(p.n), 1), 500);
+  const page = await listOffersPage({ ...p, status: 'draft', sort: 'score', limit: n, offset: 0 });
+  if (!page) return null;
+  const ids = page.rows.map(r => r.id);
+  const changed = ids.length ? await setStatus(ids, 'approved', by) : 0;
+  return changed === null ? null : { matched: page.total, approved: changed };
 }

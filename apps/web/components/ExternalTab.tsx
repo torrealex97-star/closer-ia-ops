@@ -1,17 +1,19 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, ExternalLink, FileDown, LoaderCircle, Pause, Play, RefreshCcw, ShieldCheck, Undo2, Download } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, LoaderCircle, Pause, Play, RefreshCcw, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
 import { download, toCsv } from '../lib/csv';
-import { ROLE_LABELS, roleFromTitle, spainSignal, type RoleFamily } from '../lib/vocabulary';
+import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 
-// Fuentes externas: APIs oficiales con clave (InfoJobs, Adzuna, Jooble) y recolectores programados (JobSpy en GitHub).
-// Llegan como borradores; una alumna solo ve lo que apruebas aquí y que además cumple las reglas básicas de la vista.
-type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null };
-type Data = { offers: Offer[]; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[] };
-const KNOWN = [['infojobs', 'InfoJobs', 'API oficial'], ['adzuna', 'Adzuna', 'API oficial'], ['jooble', 'Jooble', 'API oficial'], ['indeed', 'Indeed', 'JobSpy'], ['linkedin', 'LinkedIn', 'JobSpy'], ['glassdoor', 'Glassdoor', 'JobSpy'], ['google', 'Google Jobs', 'JobSpy']] as const;
+// Fuentes externas a escala: miles de ofertas filtradas, ordenadas por puntuación y paginadas en el servidor.
+// Llegan como borradores; una alumna solo ve lo que apruebes y que además cumple las reglas básicas de la vista.
+type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[] };
+type Data = { offers: Offer[]; total: number; page: number; page_size: number; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[] };
 const STATUS: Record<string, string> = { draft: 'Borrador', needs_review: 'A revisar', approved: 'Aprobada', published: 'Publicada', withdrawn: 'Retirada' };
+const PLURAL: Record<string, string> = { draft: 'borradores', needs_review: 'a revisar', approved: 'aprobadas', published: 'publicadas', withdrawn: 'retiradas' };
 const VERDICT: Record<string, string> = { open: 'Activa', closed: 'Cerrada', unknown: 'No verificable' };
+const KNOWN = [['infojobs', 'InfoJobs', 'API oficial'], ['adzuna', 'Adzuna', 'API oficial'], ['jooble', 'Jooble', 'API oficial'], ['indeed', 'Indeed', 'JobSpy'], ['linkedin', 'LinkedIn', 'JobSpy'], ['glassdoor', 'Glassdoor', 'JobSpy'], ['google', 'Google Jobs', 'JobSpy']] as const;
 const fmt = (v: string | null) => v ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '—';
+const tone = (n: number) => n >= 70 ? 'status ok' : n >= 45 ? 'status' : 'status bad';
 
 async function call<T>(init?: RequestInit, query = ''): Promise<T> {
   const response = await fetch(`/api/admin/external${query}`, { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -26,31 +28,39 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   const [role, setRole] = useState<'' | RoleFamily | 'none'>('closer');
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
+  const [query, setQuery] = useState('');
   const [onlySpain, setOnlySpain] = useState(true);
+  const [minScore, setMinScore] = useState(0);
+  const [sort, setSort] = useState<'score' | 'recent'>('score');
+  const [page, setPage] = useState(1);
+  const [topN, setTopN] = useState(25);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [verdicts, setVerdicts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(true);
   const [working, setWorking] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lost = useCallback((err: Error) => { if (err.message.includes('Sesión')) onSessionLost(); setError(err.message); }, [onSessionLost]);
+
+  const filters = useCallback(() => {
+    const p = new URLSearchParams({ status, sort });
+    if (role) p.set('role', role); if (source) p.set('source', source); if (onlySpain) p.set('spain', '1'); if (minScore) p.set('min_score', String(minScore)); if (query) p.set('q', query);
+    return p;
+  }, [status, sort, role, source, onlySpain, minScore, query]);
   const load = useCallback(() => {
     setBusy(true);
-    call<Data>(undefined, `?status=${status}`).then(d => { setData(d); setError(''); setPicked(new Set()); }).catch(lost).finally(() => setBusy(false));
-  }, [status, lost]);
+    const p = filters(); p.set('page', String(page));
+    call<Data>(undefined, `?${p}`).then(d => { setData(d); setError(''); setPicked(new Set()); }).catch(lost).finally(() => setBusy(false));
+  }, [filters, page, lost]);
   useEffect(load, [load]);
+  useEffect(() => { clearTimeout(timer.current); timer.current = setTimeout(() => { setQuery(text.trim()); setPage(1); }, 350); return () => clearTimeout(timer.current); }, [text]);
+  const change = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
 
-  const q = text.trim().toLowerCase();
-  const rows = useMemo(() => (data?.offers ?? []).filter(o => {
-    const r = roleFromTitle(o.title);
-    if (role === 'none' ? r !== null : role && r !== role) return false;
-    if (source && o.source !== source) return false;
-    if (q && !`${o.title} ${o.company}`.toLowerCase().includes(q)) return false;
-    if (onlySpain && spainSignal(o.title, o.location) !== true) return false;
-    return true;
-  }), [data, role, source, q, onlySpain]);
+  const rows = data?.offers ?? [];
   const chosen = rows.filter(r => picked.has(r.id));
   const allPicked = rows.length > 0 && rows.every(r => picked.has(r.id));
+  const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
 
   async function act(kind: 'verify' | 'approved' | 'draft' | 'withdrawn') {
     if (!chosen.length) return;
@@ -64,24 +74,25 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
           const r = await call<{ results: Array<{ id: string; result: string; reason: string }> }>({ method: 'POST', body: JSON.stringify({ action: 'verify', ids: ids.slice(i, i + 25) }) });
           for (const x of r.results) verdict[x.id] = `${VERDICT[x.result]} · ${x.reason}`;
         }
-        setVerdicts(old => ({ ...old, ...verdict }));
-        setNotice(`Verificadas ${Object.keys(verdict).length} de ${ids.length}.`);
+        setVerdicts(old => ({ ...old, ...verdict })); setNotice(`Verificadas ${Object.keys(verdict).length} de ${ids.length}.`);
       } else {
         const r = await call<{ changed: number }>({ method: 'PATCH', body: JSON.stringify({ ids, editorial_status: kind }) });
         setNotice(`${r.changed} oferta(s) → ${STATUS[kind]}.`); load();
       }
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
-  async function toggle(source: string, enabled: boolean) {
-    setWorking(`toggle-${source}`); setError(''); setNotice('');
-    try { await call({ method: 'PATCH', body: JSON.stringify({ source, enabled }) }); setNotice(`${source}: ${enabled ? 'reanudada' : 'pausada. No se recoge ni se muestra a las alumnas hasta que la reanudes'}.`); load(); }
+  async function approveBest() {
+    const f = Object.fromEntries(filters());
+    const label = `${topN} mejores borradores${role ? ` de ${role === 'none' ? 'sin perfil' : ROLE_LABELS[role as RoleFamily]}` : ''}${onlySpain ? ' en España' : ''}${minScore ? ` con puntuación ≥ ${minScore}` : ''}`;
+    if (!window.confirm(`¿Aprobar las ${label}? (${data?.total ?? 0} cumplen los filtros). Las alumnas verán las que además pasen las reglas de la vista. Puedes deshacerlo.`)) return;
+    setWorking('best'); setError(''); setNotice('');
+    try { const r = await call<{ matched: number; approved: number }>({ method: 'POST', body: JSON.stringify({ action: 'approve_top', n: topN, filters: f }) }); setNotice(`Aprobadas ${r.approved} de ${r.matched} que cumplían los filtros.`); load(); }
     catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
-  function exportCsv() {
-    download(`ofertas-externas-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows, [
-      { header: 'Título', value: r => r.title }, { header: 'Empresa', value: r => r.company }, { header: 'Ubicación', value: r => r.location }, { header: 'Salario', value: r => r.salary },
-      { header: 'Fuente', value: r => r.source }, { header: 'Estado', value: r => STATUS[r.editorial_status] ?? r.editorial_status }, { header: 'Publicada', value: r => r.posted_at }, { header: 'Enlace', value: r => r.url },
-    ]));
+  async function toggle(src: string, enabled: boolean) {
+    setWorking(`toggle-${src}`); setError(''); setNotice('');
+    try { await call({ method: 'PATCH', body: JSON.stringify({ source: src, enabled }) }); setNotice(`${src}: ${enabled ? 'reanudada' : 'pausada. No se recoge ni se muestra a las alumnas hasta que la reanudes'}.`); load(); }
+    catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
   async function collect() {
     setWorking('collect'); setError(''); setNotice('');
@@ -90,12 +101,27 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       setNotice(r.outcomes.map(o => `${o.provider}: ${o.ok ? `${o.accepted} guardadas` : o.error}`).join(' · ')); load();
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
+  const csvColumns = [
+    { header: 'Puntuación', value: (r: Offer) => r.score }, { header: 'Título', value: (r: Offer) => r.title }, { header: 'Empresa', value: (r: Offer) => r.company }, { header: 'Ubicación', value: (r: Offer) => r.location },
+    { header: 'Salario', value: (r: Offer) => r.salary }, { header: 'Fuente', value: (r: Offer) => [r.source, ...(r.also_seen ?? [])].join(' + ') }, { header: 'Estado', value: (r: Offer) => STATUS[r.editorial_status] ?? r.editorial_status },
+    { header: 'Publicada', value: (r: Offer) => r.posted_at }, { header: 'Enlace', value: (r: Offer) => r.url },
+  ];
+  async function exportAll() {
+    setWorking('csv'); setError('');
+    try {
+      const all: Offer[] = [];
+      for (let pg = 1; pg <= 20; pg++) { const p = filters(); p.set('page', String(pg)); p.set('page_size', '100'); const d = await call<Data>(undefined, `?${p}`); all.push(...d.offers); if (all.length >= d.total) break; }
+      download(`ofertas-externas-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(all, csvColumns)); setNotice(`Exportadas ${all.length} ofertas (máximo 2.000 por archivo).`);
+    } catch (err) { lost(err as Error); } finally { setWorking(''); }
+  }
 
+  const counts = data?.counts ?? {};
   return <section aria-label="Fuentes externas">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. LinkedIn, Indeed, Glassdoor y Google Jobs llegan desde el workflow de GitHub con JobSpy. Todo entra como borrador; las alumnas solo ven lo que apruebes. Estas ofertas enlazan siempre al anuncio original.</p>
+    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. LinkedIn, Indeed, Glassdoor y Google Jobs llegan desde el workflow de GitHub con JobSpy, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
-    <div className="admin-toolbar" style={{ justifyContent: 'flex-end' }}>
+    <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
+      <div className="stat-strip" style={{ margin: 0 }}>{Object.entries(PLURAL).map(([k, l]) => <span key={k}><strong>{counts[k] ?? 0}</strong>{l}</span>)}</div>
       {owner && <button disabled={working !== ''} onClick={() => void collect()}>{working === 'collect' ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />} Recoger APIs ahora</button>}
     </div>
     <div className="table-wrap" style={{ marginBottom: 20 }}><table className="data-table">
@@ -107,31 +133,47 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
         <td style={{ textAlign: 'right' }}>{owner && <button disabled={working !== ''} onClick={() => void toggle(code, !!off)} aria-label={`${off ? 'Reanudar' : 'Pausar'} ${name}`}>{off ? <Play size={14} /> : <Pause size={14} />} {off ? 'Reanudar' : 'Pausar'}</button>}</td></tr>; })}</tbody></table></div>
     {!!data?.runs.length && <p className="card-meta">Última entrada: {data.runs[0].source} vía {data.runs[0].via}, {data.runs[0].accepted} de {data.runs[0].received} guardadas · {fmt(data.runs[0].created_at)}</p>}
     <div className="search-panel admin-toolbar">
-      <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => setStatus(e.target.value)}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-      <label htmlFor="ex-role">Perfil (por el título)<select id="ex-role" value={role} onChange={e => setRole(e.target.value as typeof role)}><option value="">Todos</option>{Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}<option value="none">Sin perfil claro</option></select></label>
-      <label htmlFor="ex-source">Fuente<select id="ex-source" value={source} onChange={e => setSource(e.target.value)}><option value="">Todas</option>{(data?.sources ?? []).map(s => <option key={s.source} value={s.source}>{s.source}</option>)}</select></label>
+      <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => change(setStatus)(e.target.value)}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label htmlFor="ex-role">Perfil (por el título)<select id="ex-role" value={role} onChange={e => change(setRole)(e.target.value as typeof role)}><option value="">Todos</option>{Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}<option value="none">Sin perfil claro</option></select></label>
+      <label htmlFor="ex-source">Fuente<select id="ex-source" value={source} onChange={e => change(setSource)(e.target.value)}><option value="">Todas</option>{(data?.sources ?? []).map(s => <option key={s.source} value={s.source}>{s.source}</option>)}</select></label>
+      <label htmlFor="ex-min">Puntuación mínima<select id="ex-min" value={minScore} onChange={e => change(setMinScore)(Number(e.target.value))}><option value={0}>Cualquiera</option><option value={45}>≥ 45 (decente)</option><option value={60}>≥ 60 (buena)</option><option value={75}>≥ 75 (muy buena)</option></select></label>
+      <label htmlFor="ex-sort">Orden<select id="ex-sort" value={sort} onChange={e => change(setSort)(e.target.value as typeof sort)}><option value="score">Mejor puntuación</option><option value="recent">Más recientes</option></select></label>
       <label className="grow" htmlFor="ex-q">Buscar<input id="ex-q" placeholder="Título o empresa" value={text} onChange={e => setText(e.target.value)} /></label>
       <button disabled={busy} onClick={load}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
     </div>
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
-      <div className="stat-strip" style={{ margin: 0 }}><span><strong>{rows.length}</strong>en pantalla</span><span><strong>{chosen.length}</strong>seleccionadas</span></div>
-      <label className="check-label" style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" checked={onlySpain} onChange={e => setOnlySpain(e.target.checked)} /> Solo con señal clara de España</label>
+      <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data?.total ?? '…'}</strong>cumplen los filtros</span><span><strong>{chosen.length}</strong>seleccionadas en esta página</span></div>
+      <label className="check-label" style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" checked={onlySpain} onChange={e => change(setOnlySpain)(e.target.checked)} /> Solo con señal clara de España</label>
     </div>
+    {status === 'draft' && <div className="search-panel admin-toolbar" style={{ alignItems: 'center' }}>
+      <Sparkles size={18} aria-hidden="true" />
+      <label htmlFor="ex-topn" style={{ flexDirection: 'row', alignItems: 'center', flex: '0 0 auto' }}>Aprobar las <input id="ex-topn" type="number" min={1} max={500} value={topN} onChange={e => setTopN(Math.max(1, Math.min(500, Number(e.target.value) || 1)))} style={{ width: 84 }} /> mejores</label>
+      <span className="card-meta" style={{ flex: '1 1 260px', margin: 0 }}>Toma los borradores que cumplen los filtros de arriba, empezando por la mayor puntuación. Es reversible.</span>
+      <button className="primary" disabled={!data?.total || working !== ''} onClick={() => void approveBest()}>{working === 'best' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />} Aprobar las mejores</button>
+    </div>}
     <div className="admin-toolbar">
       <button disabled={!chosen.length || working !== ''} onClick={() => void act('verify')}>{working === 'verify' ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />} Verificar vigencia</button>
       <button className="primary" disabled={!chosen.length || working !== ''} onClick={() => void act('approved')}><Check size={15} /> Aprobar {chosen.length || ''}</button>
       <button disabled={!chosen.length || working !== ''} onClick={() => void act('draft')}><Undo2 size={15} /> Volver a borrador</button>
       <button disabled={!chosen.length || working !== ''} onClick={() => void act('withdrawn')}>Retirar</button>
-      <button disabled={!rows.length} onClick={exportCsv}><FileDown size={15} /> Exportar CSV</button>
+      <button disabled={!data?.total || working !== ''} onClick={() => void exportAll()}>{working === 'csv' ? <LoaderCircle size={15} className="spin" /> : <FileDown size={15} />} Exportar CSV</button>
     </div>
-    {busy ? <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p> : !rows.length ? <div className="empty"><h3>No hay ofertas externas con estos filtros.</h3><p className="card-meta">Guarda una clave en APIs, lanza una recogida o quita «Solo con señal clara de España».</p></div> : <div className="table-wrap"><table className="data-table">
-      <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Seleccionar todas las visibles" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} /></th><th>Oferta</th><th>Perfil</th><th>Ubicación</th><th>Fuente</th><th>Vigencia</th><th /></tr></thead>
-      <tbody>{rows.map(r => { const f = roleFromTitle(r.title); const sp = spainSignal(r.title, r.location); return <tr key={r.id}>
-        <td><input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={picked.has(r.id)} onChange={() => setPicked(old => { const n = new Set(old); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} /></td>
-        <td className="primary-cell"><strong>{r.title}</strong><span>{r.company ?? 'Empresa no indicada'}{r.salary ? ` · ${r.salary}` : ''}</span></td>
-        <td>{f ? <span className="status ok">{ROLE_LABELS[f]}</span> : <span className="status">Sin perfil claro</span>}</td>
-        <td>{r.location ?? 'No indicada'}{sp !== null && <span className={sp ? 'status ok' : 'status bad'} style={{ marginLeft: 6 }}>{sp ? 'España' : 'Fuera'}</span>}</td>
-        <td>{r.source}</td><td>{verdicts[r.id] ?? (r.verified_result ? VERDICT[r.verified_result] : <span className="muted">—</span>)}</td>
-        <td style={{ textAlign: 'right' }}><a href={r.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir el anuncio original de ${r.title}`}><ExternalLink size={14} /></a></td></tr>; })}</tbody></table></div>}
+    {busy && !data ? <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p> : !rows.length ? <div className="empty"><h3>No hay ofertas externas con estos filtros.</h3><p className="card-meta">Guarda una clave en APIs, lanza una recogida o relaja los filtros.</p></div> : <>
+      <div className="table-wrap"><table className="data-table">
+        <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Seleccionar todas las visibles" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} /></th><th className="num">Punt.</th><th>Oferta</th><th>Perfil</th><th>Ubicación</th><th>Fuente</th><th>Vigencia</th><th /></tr></thead>
+        <tbody>{rows.map(r => <tr key={r.id}>
+          <td><input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={picked.has(r.id)} onChange={() => setPicked(old => { const n = new Set(old); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} /></td>
+          <td className="num"><span className={tone(r.score)}>{r.score}</span></td>
+          <td className="primary-cell"><strong>{r.title}</strong><span>{r.company ?? 'Empresa no indicada'}{r.salary ? ` · ${r.salary}` : ''}</span></td>
+          <td>{r.role ? <span className="status ok">{ROLE_LABELS[r.role as RoleFamily] ?? r.role}</span> : <span className="status">Sin perfil claro</span>}</td>
+          <td>{r.location ?? 'No indicada'}{r.spain !== null && <span className={r.spain ? 'status ok' : 'status bad'} style={{ marginLeft: 6 }}>{r.spain ? 'España' : 'Fuera'}</span>}</td>
+          <td>{r.source}{r.also_seen?.length ? <span className="sub">también en {r.also_seen.join(', ')}</span> : null}</td>
+          <td>{verdicts[r.id] ?? (r.verified_result ? VERDICT[r.verified_result] : <span className="muted">—</span>)}</td>
+          <td style={{ textAlign: 'right' }}><a href={r.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir el anuncio original de ${r.title}`}><ExternalLink size={14} /></a></td></tr>)}</tbody></table></div>
+      <div className="admin-toolbar" style={{ justifyContent: 'center', marginTop: 16 }}>
+        <button disabled={page <= 1 || busy} onClick={() => setPage(p => p - 1)} aria-label="Página anterior"><ChevronLeft size={15} /></button>
+        <span className="card-meta" style={{ margin: 0 }}>Página {page} de {pages}</span>
+        <button disabled={page >= pages || busy} onClick={() => setPage(p => p + 1)} aria-label="Página siguiente"><ChevronRight size={15} /></button>
+      </div></>}
   </section>;
 }

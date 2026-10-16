@@ -14,3 +14,7 @@ El motor cloud solo recoge fuentes públicas verificadas y no alcanza el volumen
 ## Consecuencias
 - Un segundo catálogo (Postgres) convive con el motor D1; la vista de alumna los fusiona en el proxy. A futuro puede unificarse al migrar el motor.
 - Las fuentes externas dependen de claves y secretos que solo el operador puede crear (InfoJobs/Adzuna/Jooble, `INGEST_TOKEN`, secretos de GitHub).
+
+## Adenda 2026-10-16: Apify y escala
+- El operador no tiene ni va a crear infraestructura de proxies. Para el volumen (miles de ofertas) se añade la ejecución de **actores de Apify** (su infraestructura y proxies), de pago por uso: desactivados por defecto, con tope mensual propio, límites por ejecución, una ejecución a la vez por actor y webhook firmado con HMAC. El actor `aakash19/jobspy` es un envoltorio de comunidad: se muestra como preajuste con la advertencia de comprobar su ficha.
+- Ranking y huella al entrar (`lib/offerScore.ts`, columnas `score`, `role`, `spain`, `fingerprint`) para filtrar y deduplicar en el servidor; la aprobación sigue siendo humana (en bloque, por filtros).

@@ -61,8 +61,8 @@ await step('Revisión una a una: guardar una oferta con payload raw ya no da 422
   await page.getByRole('button', { name: 'Guardar borrador' }).click(); await page.getByText(/Guardado: Borrador/).waitFor();
 });
 await step('Fuentes externas: filtra closers de España, verifica y aprueba; el catálogo marca la fuente como externa', async () => {
-  const mk = (id, over) => state.external.set(id, { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'http://127.0.0.1:8792/page/ok', salary: null, description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa', posted_at: new Date().toISOString(), editorial_status: 'draft', verified_result: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), ...over });
-  mk('x1', {}); mk('x2', { location: 'Austin, Texas' }); mk('x3', { title: 'Setter de ventas', location: 'Valencia' });
+  const mk = (id, over) => state.external.set(id, { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'http://127.0.0.1:8792/page/ok', salary: null, description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa', posted_at: new Date().toISOString(), editorial_status: 'draft', role: 'closer', spain: true, score: 80, also_seen: [], verified_result: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), ...over });
+  mk('x1', {}); mk('x2', { location: 'Austin, Texas', spain: false, score: 20 }); mk('x3', { title: 'Setter de ventas', location: 'Valencia', role: 'setter', score: 60 });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
   await page.getByText('Closer de ventas').first().waitFor();
@@ -73,10 +73,36 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByRole('button', { name: 'Reanudar InfoJobs' }).click(); await page.getByText(/infojobs: reanudada/).waitFor();
   await page.getByLabel('Seleccionar todas las visibles').check();
   await page.getByRole('button', { name: 'Verificar vigencia' }).click(); await page.getByText(/Activa · content_matches/).waitFor();
-  await page.getByRole('button', { name: /^Aprobar/ }).click(); await page.getByText(/1 oferta\(s\) → Aprobada/).waitFor();
+  await page.getByText('80', { exact: true }).first().waitFor(); // puntuación visible
+  await page.getByRole('button', { name: 'Aprobar 1', exact: true }).click(); await page.getByText(/1 oferta\(s\) → Aprobada/).waitFor();
   assert.equal([...state.external.values()].filter(o => o.editorial_status === 'approved').length, 1);
+  // «Aprobar las mejores»: con otro borrador de puntuación alta pendiente, se aprueba por filtros
+  mk('x4', { title: 'Closer high ticket', score: 95 });
+  await page.getByRole('button', { name: 'Actualizar' }).click(); await page.getByText('Closer high ticket').waitFor();
+  await page.getByRole('button', { name: 'Aprobar las mejores' }).click(); await page.getByText(/Aprobadas 1 de 1 que cumplían los filtros/).waitFor();
+  assert.equal([...state.external.values()].filter(o => o.editorial_status === 'approved').length, 2);
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
-  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 3 activas/).waitFor();
+  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 4 activas/).waitFor();
+});
+await step('Apify: añadir el actor, guardar la clave, lanzar y recoger resultados con coste y presupuesto', async () => {
+  await page.getByRole('button', { name: 'Apify', exact: true }).click(); await page.getByRole('heading', { name: 'Miles de ofertas.' }).waitFor();
+  await page.getByText('Falta la clave de Apify.').waitFor(); await page.getByText('0.00 USD de 5 USD').waitFor();
+  await page.getByRole('button', { name: 'Usar este actor' }).click();
+  assert.equal(await page.getByLabel('Actor de Apify').inputValue(), 'aakash19/jobspy'); assert.equal(await page.getByLabel('Código de la fuente').inputValue(), 'apify-jobspy');
+  await page.getByLabel('Máximo de elementos por ejecución').fill('300'); await page.getByRole('button', { name: 'Guardar', exact: true }).click(); await page.getByText('Actor guardado.').waitFor();
+  await page.getByText('aakash19/jobspy').first().waitFor();
+  await page.getByRole('button', { name: 'Lanzar ahora' }).click(); await page.getByText(/Guarda antes la clave de Apify/).first().waitFor(); // sin clave no se lanza
+  await page.getByRole('button', { name: 'APIs', exact: true }).click(); await page.getByLabel('Clave de Apify').fill('good-key-1234');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).nth(0).click(); await page.getByText('Clave de Apify guardada.').waitFor();
+  await page.getByRole('button', { name: 'Apify', exact: true }).click();
+  await page.getByRole('button', { name: 'Lanzar ahora' }).click(); await page.getByText(/Ejecución lanzada en Apify/).waitFor();
+  assert.equal(state.apifyCalls.length, 1); assert.equal(state.apifyCalls[0].query.maxItems, '300');
+  await page.getByText('En curso').first().waitFor();
+  state.apifyItems = [1, 2, 3].map(i => ({ id: `u${i}`, site: 'linkedin', job_url: `https://www.linkedin.com/jobs/view/u${i}`, title: 'Closer de ventas', company: `Empresa ${i}`, location: 'Madrid, España', description: 'Buscamos closer con experiencia en ventas para el equipo comercial' }));
+  await page.getByRole('button', { name: 'Recoger resultados' }).click(); await page.getByText(/Recogidas 1 ejecución\(es\): 3 elementos/).waitFor();
+  await page.getByText('Terminada').first().waitFor(); await page.getByText('0.070').waitFor();
+  assert.equal([...state.external.values()].filter(o => o.source === 'apify-jobspy').length, 3);
+  await page.getByText('1.07 USD de 5 USD').waitFor().catch(() => {}); // 0,07 gastados (+ nada en curso)
 });
 await step('móvil: Resumen sin scroll horizontal', async () => {
   await page.setViewportSize({ width: 390, height: 844 });

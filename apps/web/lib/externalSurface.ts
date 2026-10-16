@@ -1,3 +1,4 @@
+import { spanishWords } from './offerScore';
 import { listOffers, pausedSources, type ExternalOffer } from './external';
 import { fold, roleFromTitle, ROLE_LABELS, spainSignal, type RoleFamily } from './vocabulary';
 
@@ -5,7 +6,7 @@ import { fold, roleFromTitle, ROLE_LABELS, spainSignal, type RoleFamily } from '
 // fuente no dice sale como «no indicado». Mismas puertas básicas que el motor: perfil por título, España por
 // señal explícita, antigüedad y español (salvo que la alumna pida bilingüe).
 type Query = { role: string | null; market: string; days: number; include_bilingual: boolean; starred_only: boolean };
-const SPANISH = /\b(?:de|la|el|los|las|para|con|en|y|que|una|un|experiencia|ventas|empresa|buscamos|incorporar|comercial|trabajo|oferta|requisitos|funciones|salario|jornada)\b/g;
+
 const PORTUGUESE = /\b(?:vendas|voce|comissoes|portugues|brasil)\b/;
 
 // Lo que la fuente declara (JobSpy: is_remote, job_type). Si no lo dice, se queda «no indicado».
@@ -34,7 +35,8 @@ export function toOpportunity(o: ExternalOffer, role: RoleFamily) {
 
 export async function externalForStudent(q: Query) {
   if (q.starred_only || !['any', 'ES'].includes(q.market)) return [];
-  const [all, paused] = await Promise.all([listOffers({ limit: 300, onlyLive: true }), pausedSources()]);
+  // Solo aprobadas, ya ordenadas por puntuación en el servidor (con miles de borradores no se pierde ninguna aprobada).
+  const [all, paused] = await Promise.all([listOffers({ statuses: ['approved', 'published'], byScore: true, limit: 600, onlyLive: true }), pausedSources()]);
   const rows = (all ?? []).filter(o => !paused.has(o.source));
   const cutoff = Date.now() - q.days * 86400000;
   const out = [];
@@ -48,7 +50,7 @@ export async function externalForStudent(q: Query) {
     if (PORTUGUESE.test(text)) continue;
     // Con descripción, hacen falta 3 palabras españolas; sin ella (p. ej. LinkedIn sin detalle), basta una en el
     // título más ubicación en España explícita: el idioma se asume solo cuando el resto de señales cuadra.
-    const words = (text.match(SPANISH) ?? []).length;
+    const words = spanishWords(text);
     const enough = o.description ? words >= 3 : words >= 1 && spainSignal(o.title, o.location) === true;
     if (!q.include_bilingual && !enough) continue;
     out.push(toOpportunity(o, role));
