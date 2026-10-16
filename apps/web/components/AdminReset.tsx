@@ -32,16 +32,17 @@ export default function AdminReset() {
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   }
-  return <section className="empty" style={{ maxWidth: 420, margin: '8vh auto' }}>
-    {done ? <><h3>Contraseña guardada</h3><p className="muted">Ya puedes entrar al panel con tu email y la contraseña nueva.</p><a className="primary" href="/admin">Ir al panel</a></>
-      : problem ? <><h3>Enlace no válido</h3><p className="alert error" role="alert">{problem}</p><a href="/admin">Volver al acceso</a></>
-      : !token ? <><LoaderCircle className="spin" size={20} /> Comprobando enlace…</>
-      : <form onSubmit={submit}>
-        <h3>Crea tu contraseña</h3><p className="muted">Mínimo 10 caracteres.</p>
-        <label style={{ display: 'block', marginTop: 12 }}>Contraseña nueva<input type="password" minLength={10} required value={password} onChange={e => setPassword(e.target.value)} autoFocus autoComplete="new-password" style={{ width: '100%', marginTop: 4 }} /></label>
-        <label style={{ display: 'block', marginTop: 12 }}>Repite la contraseña<input type="password" minLength={10} required value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" style={{ width: '100%', marginTop: 4 }} /></label>
-        {error && <div className="alert error" role="alert" style={{ marginTop: 8 }}>{error}</div>}
-        <button className="primary" disabled={busy || !password} style={{ marginTop: 12, width: '100%' }}>{busy ? <LoaderCircle size={15} className="spin" /> : <KeyRound size={15} />} Guardar contraseña</button>
-      </form>}
-  </section>;
+  return <div className="auth-wrap"><div className="auth-card">
+    <a className="brand" href="/admin" aria-label="Closer IA OPs · panel"><span className="brand-mark">w.</span><span>Women Digital<br /><strong>Closer</strong></span></a>
+    {done ? <><div><span className="eyebrow">LISTO</span><h1>Contraseña guardada</h1><p>Ya puedes entrar al panel con tu email y la contraseña nueva.</p></div><a className="primary" href="/admin">Ir al panel</a></>
+      : problem ? <><div><span className="eyebrow">ENLACE NO VÁLIDO</span><h1>Pide un enlace nuevo</h1><p>{problem}</p></div><a className="primary" href="/admin">Volver al acceso</a></>
+      : !token ? <p className="muted"><LoaderCircle className="spin" size={18} /> Comprobando enlace…</p>
+      : <><div><span className="eyebrow">CREAR CONTRASEÑA</span><h1>Elige tu contraseña</h1><p>Mínimo 10 caracteres.</p></div>
+        <form onSubmit={submit}>
+          <label htmlFor="new-password">Contraseña nueva<input id="new-password" type="password" minLength={10} required value={password} onChange={e => setPassword(e.target.value)} autoFocus autoComplete="new-password" /></label>
+          <label htmlFor="confirm-password">Repite la contraseña<input id="confirm-password" type="password" minLength={10} required value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" /></label>
+          {error && <div className="alert error" role="alert"><span>{error}</span></div>}
+          <button className="primary" disabled={busy || !password}>{busy ? <LoaderCircle size={16} className="spin" /> : <KeyRound size={16} />} Guardar contraseña</button>
+        </form></>}
+  </div></div>;
 }

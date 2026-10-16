@@ -1,5 +1,11 @@
 # Estado
 
+## Rediseño del panel /admin hospedado (sesión 35) — 2026-10-16
+
+- **Problema**: las pestañas añadidas en las sesiones 33-34 se montaron sueltas, sin el marco del panel original, y los `input` globales (ancho 100 %) descuadraban formularios y filtros.
+- **Cambio**: [AdminShell.tsx](../apps/web/components/AdminShell.tsx) usa ahora el mismo marco que el panel local (barra lateral con marca, `workspace-label`, navegación con iconos, cabecera con migas, título en serif con eyebrow y entradilla) y el sistema de diseño existente (papel/terracota, DM Sans + Libre Caslon, tokens de `globals.css`). Acceso y creación de contraseña con tarjeta centrada y marca. Tablas legibles para fuentes, auditoría, catálogo y usuarios; tarjetas con estado en píldora para conexiones y APIs; filtros alineados en barra de herramientas. Solo se añadieron clases (`auth-*`, `card-*`, `data-table`, `status`, `admin-toolbar`); no se tocó ningún estilo del panel local ni de la vista de alumna.
+- **Verificación**: `tsc` y `next build` OK; `tests/admin-auth/run.sh` 18/18; revisión visual en navegador de login, Revisión, Probar ofertas, Fuentes, APIs y Usuarios a 1280 px y de APIs a 390 px (sin scroll horizontal). Un fallo visual detectado y corregido en la revisión (etiqueta «tú» ocupando toda la celda).
+
 ## Panel /admin hospedado: pestañas «Probar ofertas» y «APIs» (sesión 34) — 2026-10-16
 
 - **Objetivo del operador**: gestionar la app entera desde `app.womendigitalclosers.com/admin` (el panel completo antiguo solo vive en local: `Workspace`, backend FastAPI + SQLite en el Mac). Se porta por cortes que se pueden desplegar y verificar desde Vercel/Supabase.

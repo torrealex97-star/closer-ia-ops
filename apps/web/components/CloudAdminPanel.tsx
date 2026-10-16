@@ -121,17 +121,15 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
   }
 
   return <section aria-label="Revisión editorial del catálogo cloud">
-    {error && <div className="alert error" role="alert">{error}</div>}
+    {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="toast" role="status"><Check size={16} />{notice}</div>}
-    <div className="run-progress classification-summary">
-      <strong>Revisión editorial <span className="muted">· catálogo del engine cloud · {date(Object.values(counts).length ? undefined : null) || ''} {total} en pantalla</span></strong>
-      <span className="muted">Aprobar o publicar es siempre una decisión humana. Cada guardado crea una versión nueva e inmutable.</span>
-      <div className="source-actions">
-        {Object.entries(counts).map(([k, n]) => <span key={k} className="source-tag">{EDITORIAL[k] ?? k}: {n}</span>)}
-        <label className="result-search" style={{ maxWidth: 200 }}><select aria-label="Filtrar por estado editorial" value={filter} onChange={e => setFilter(e.target.value as typeof filter)}>
+    <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
+      <div className="stat-strip" style={{ margin: 0 }}>{Object.entries(counts).map(([k, n]) => <span key={k}><strong>{n}</strong>{EDITORIAL[k] ?? k}</span>)}</div>
+      <div className="admin-toolbar" style={{ margin: 0 }}>
+        <label htmlFor="review-filter" style={{ minWidth: 200 }}><select id="review-filter" aria-label="Filtrar por estado editorial" value={filter} onChange={e => setFilter(e.target.value as typeof filter)}>
           {FILTERS.map(f => <option key={f} value={f}>{f ? EDITORIAL[f] : 'Todos los estados'}</option>)}
         </select></label>
-        <button disabled={busy} onClick={() => refresh()}><RefreshCcw size={15} /> Actualizar</button>
+        <button disabled={busy} onClick={() => refresh()}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
       </div>
     </div>
     {busy && <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p>}

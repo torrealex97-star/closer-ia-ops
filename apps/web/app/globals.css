@@ -56,3 +56,49 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .student-shell .sidebar-note{padding-top:40px}
 @media(max-width:1100px){.opportunity-grid{grid-template-columns:1fr}.student-tag{display:none}}
 @media(max-width:700px){.opportunity-card{padding:20px}.opportunity-pay{padding:16px}.opportunity-footer{flex-wrap:wrap}.student-freshness{display:none}.student-shell .page-heading h1{font-size:36px}.student-preferences{gap:12px}.student-preferences .check-label{font-size:11px}.student-shell .topbar{min-height:56px}}
+
+/* Panel hospedado /admin: mismo papel, tipografía y ritmo que el panel local; solo añade acceso, tarjetas y tablas. */
+.auth-wrap{min-height:100vh;display:grid;place-items:center;padding:32px 16px}
+.auth-card{width:min(420px,100%);background:var(--sheet);border:1px solid var(--line);border-radius:var(--radius);padding:36px 32px;display:flex;flex-direction:column;gap:20px}
+.auth-card form{display:flex;flex-direction:column;gap:16px}
+.auth-card h1{font-size:34px;margin:6px 0 8px}
+.auth-card p{font-size:13px;color:var(--secondary)}
+.auth-card .alert{margin:0}
+.auth-note{background:var(--sage-soft);color:var(--sage);padding:12px 16px;border-radius:8px;font-size:12px}
+.link-button{border:0;background:transparent;color:var(--accent);min-height:32px;padding:4px;font-size:12px;text-decoration:underline;text-underline-offset:3px;align-self:center}
+.admin-toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:20px}
+.admin-toolbar label{min-width:150px;flex:1 1 150px}
+.admin-toolbar .grow{flex:2 1 240px}
+.admin-toolbar button{min-height:44px}
+.card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.card-head h3{font-size:15px;font-weight:600;color:var(--ink)}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--inset);color:var(--secondary);white-space:nowrap}
+.status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.status.ok{background:var(--sage-soft);color:var(--sage)}
+.status.bad{background:var(--warning-soft);color:var(--warning)}
+.card-meta{font-size:12px;color:var(--secondary);margin-top:10px;overflow-wrap:anywhere;line-height:1.6}
+.card-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.card-form input{flex:1 1 200px;width:auto}
+.stat-strip{display:flex;flex-wrap:wrap;gap:8px 28px;font-size:12px;color:var(--secondary);margin-bottom:20px}
+.stat-strip strong{color:var(--ink);font-weight:650;font-size:15px;margin-right:4px}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--sheet)}
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:650;padding:12px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.data-table td{padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+.data-table tr:last-child td{border-bottom:0}
+.data-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.data-table .primary-cell{min-width:240px}
+.data-table .primary-cell strong{display:block;font-size:13px;font-weight:600;line-height:1.4}
+.data-table .primary-cell span,.data-table .sub{display:block;color:var(--secondary);font-size:11px;margin-top:2px;overflow-wrap:anywhere}
+.data-table a{color:var(--accent);text-underline-offset:3px}
+.section-title{font-size:10px;letter-spacing:1.6px;font-weight:650;color:var(--muted);text-transform:uppercase;margin:36px 0 12px}
+.section-title:first-child{margin-top:0}
+.avatar-sm{width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:12px;font-weight:650;flex-shrink:0}
+.sidebar .local-user{align-items:flex-start;flex-wrap:wrap}
+.sidebar .local-user>div{min-width:0;flex:1}
+.sidebar .local-user strong,.sidebar .local-user small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .local-user button{width:100%;margin-top:10px;font-size:12px}
+@media(max-width:900px){.card-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.auth-card{padding:28px 20px}.admin-toolbar label{flex-basis:100%}.sidebar .local-user{display:flex;padding:12px 0 0;border-top:0}.sidebar .local-user button{width:auto;margin-top:0}}
+.data-table .primary-cell strong .source-tag{display:inline-block;margin:0 0 0 8px;font-size:10px;font-weight:600}
