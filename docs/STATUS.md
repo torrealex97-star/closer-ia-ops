@@ -1,5 +1,12 @@
 # Estado
 
+## Incremento 1.2: robustez de ingesta (sesión 43) — 2026-10-17
+
+- **Qué** ([external.ts](../apps/web/lib/external.ts)): (1) cada candidato descartado se cuenta con su motivo (`sin_id`, `sin_titulo`, `sin_url`, `url_no_http`, `no_objeto`) y queda en la nota de `external_ingest_runs`; (2) **URL canónica** (sin `utm_*`, `fbclid`, `gclid`, fragmento; parámetros ordenados) y unión del mismo anuncio por URL dentro del lote; (3) guardado en **lotes de 100** con 2 reintentos y espera exponencial (300/600 ms) ante 5xx/429/red; un 4xx no se reintenta; (4) si un lote falla, se guarda **fila a fila** para aislar la mala: lo guardado no se pierde ni se oculta, y las fallidas se anotan; (5) si todo falla, error (no éxito falso).
+- **No cambia**: contrato de `/api/ingest`, esquema de BD (sin migración), `external_upsert`, ni el comportamiento con datos válidos.
+- **Verificación**: `ingest.mjs` (motivos, URL canónica, notas, reintentos con esperas exactas, aislamiento de 1 fila mala entre 250, caída total, 400 sin reintento), `run.sh` 34/34 de flujo + 7/7 de interfaz, typecheck y build. Servicios simulados.
+- **Limitaciones**: (1) no se ha probado contra el PostgREST real ni con fallos reales de Supabase; (2) la URL canónica cambia el `url` guardado de ofertas nuevas (las ya existentes no se reescriben), así que el dedupe por URL del proxy de alumna puede tardar en converger; (3) sin límite de antigüedad de `posted_at` a propósito (no se descarta por fecha); (4) rama apilada sobre `feat/offer-metrics`.
+
 ## Incremento 0.2: métricas de oferta en el panel (sesión 42) — 2026-10-16
 
 - **Qué**: panel plegable «Métricas · últimos 14 días» en Fuentes externas ([metrics.ts](../apps/web/lib/metrics.ts), `GET /api/admin/metrics`, [MetricsPanel.tsx](../apps/web/components/MetricsPanel.tsx)): ofertas buenas por día y por fuente («buena» = puntuación ≥ 60 y España clara), aprobadas por fuente, gasto de Apify y **coste por oferta buena de Apify**, decisiones humanas frente a decisiones del revisor IA.
