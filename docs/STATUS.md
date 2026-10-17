@@ -1,5 +1,12 @@
 # Estado
 
+## Aprendizajes de Growth Ops y skills importadas (sesión 47) — 2026-10-17
+
+- **Solo documentación y skills; no se ejecutó ni se probó código de la app.** Se leyó en solo lectura el repo `growth-ops-app` del propietario y se destiló lo generalizable en [LEARNINGS_GROWTH_OPS.md](LEARNINGS_GROWTH_OPS.md): qué ya cumplimos, 13 reglas nuevas (con acción concreta aquí), vocabulario inspeccionado/probado/verificado, y 6 cambios propuestos a `AGENTS.md` **pendientes de tu OK** (no se ha tocado `AGENTS.md`).
+- **Skills importadas** a `.agents/skills/` con enlaces en `.claude/skills/` (supabase, supabase-postgres-best-practices, apify-ultimate-scraper, integration-testing, nextjs-app-router-patterns, browser-testing-with-devtools, sales-engineering, find-skills; ~430 KB). Sin datos de tenants, personas ni credenciales de Growth Ops (comprobado por búsqueda de patrones); no se usó su BD ni sus secretos.
+- **Hallazgo de riesgo (inspeccionado, no probado):** el cron diario suma presupuestos que pueden superar `maxDuration = 60` con claves reales → propuesto incremento 1.4.
+- **Advisors de Supabase** (BD real, hoy): sin críticos. Pendiente tuyo: activar *Leaked password protection*. FK sin índice en `apify_runs.actor_id` (despreciable).
+- **Verificación**: solo de documentación — enlaces simbólicos sin roto y búsqueda de secretos en lo importado. Ningún test de la app se ejecutó para este cambio.
 ## Incremento 3.1: ofertas recomendadas a cada alumna (matching explicable, solo lectura) (sesión 46) — 2026-10-17
 
 - **Qué** ([matching.ts](../apps/web/lib/matching.ts), `GET /api/student/matches`, sección «Ofertas para ti» en `/alumna`): recomienda hasta 20 ofertas **ya aprobadas por el equipo** según SU perfil. Parte de la misma puerta de la vista de alumna (`externalForStudent`: perfil por título, España, idioma, antigüedad ≤ 10 días) y puntúa: perfil elegido (+50, y si eligió perfiles, una oferta de otro perfil **no aparece**; sin perfiles elegidos +20), remoto o su ciudad (+15), retribución publicada (+10), publicada ≤ 3 días (+15) o ≤ 7 (+8). Cada punto lleva su motivo; lo que no se sabe (ciudad, ubicación, retribución, fecha) sale en «No sabemos», nunca se supone. Bilingüe solo si la alumna marca inglés.
