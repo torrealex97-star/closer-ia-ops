@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, LoaderCircle, LogOut, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/vocabulary';
+import { ApplicationForm, Applications } from './StudentApplications';
 
 // Portal de alumnas: acceso por invitación (email + contraseña de Supabase Auth) y perfil propio. Los vídeos NO se suben
 // aquí: cada alumna los guarda en su propio Drive y solo pega el enlace (por si algún formulario futuro lo pide).
@@ -44,7 +45,9 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 type Match = { opportunity: { id: string; original_title: string; company: string; location: string; modality: string; compensation: string; source_url: string }; score: number; reasons: string[]; unknowns: string[] };
 // Ofertas aprobadas por el equipo que encajan con su perfil. Solo recomienda: el envío lo hace ella en la web de la oferta.
-function Matches({ refreshKey }: { refreshKey: number }) {
+function Matches({ refreshKey, onPrepared, onLost }: { refreshKey: number; onPrepared: () => void; onLost: () => void }) {
+  const [msg, setMsg] = useState(''); const [busyId, setBusyId] = useState('');
+  async function prepare(id: string) { setBusyId(id); setMsg(''); try { const r = await api<{ created: boolean }>('applications', { method: 'POST', body: JSON.stringify({ offer_id: id }) }); setMsg(r.created ? 'Candidatura preparada: la tienes abajo, en «Mis candidaturas».' : 'Ya tenías esta candidatura preparada: está abajo.'); onPrepared(); } catch (e) { const err = e as Error & { status?: number }; if (err.status === 401 || err.status === 403) onLost(); setMsg(err.message); } finally { setBusyId(''); } }
   const [data, setData] = useState<{ ready: boolean; hint?: string; matches: Match[] } | null>(null);
   useEffect(() => { api<{ ready: boolean; hint?: string; matches: Match[] }>('matches').then(setData).catch(() => setData({ ready: false, hint: 'No se pudieron cargar tus ofertas ahora mismo.', matches: [] })); }, [refreshKey]);
   if (!data) return <p className="muted"><LoaderCircle size={14} className="spin" /> Buscando ofertas para ti…</p>;
@@ -55,7 +58,8 @@ function Matches({ refreshKey }: { refreshKey: number }) {
         <div className="card-meta">{m.opportunity.location} · {m.opportunity.modality} · {m.opportunity.compensation}</div>
         {!!m.reasons.length && <div className="card-meta">Por qué: {m.reasons.join(' · ')}</div>}
         {!!m.unknowns.length && <div className="card-meta muted">No sabemos: {m.unknowns.join(' · ')}</div>}
-        <a href={m.opportunity.source_url} target="_blank" rel="noopener noreferrer">Ver el anuncio original</a></li>)}</ol>}
+        <a href={m.opportunity.source_url} target="_blank" rel="noopener noreferrer">Ver el anuncio original</a> <button onClick={() => void prepare(m.opportunity.id)} disabled={busyId !== ''}>{busyId === m.opportunity.id ? <LoaderCircle size={14} className="spin" /> : null} Preparar candidatura</button></li>)}</ol>}
+    {msg && <div className="auth-note" role="status">{msg}</div>}
   </section>;
 }
 
@@ -63,6 +67,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
   const [p, setP] = useState<Profile>({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null });
   const [consent, setConsent] = useState(false);
   const [saves, setSaves] = useState(0);
+  const [apps, setApps] = useState(0);
   const [busy, setBusy] = useState(true); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const fail = useCallback((err: Error & { status?: number }) => { if (err.status === 401 || err.status === 403) onLost(); setError(err.message); }, [onLost]);
   useEffect(() => { api<{ profile: Profile | null }>('profile').then(d => { if (d.profile) { setP({ ...d.profile, full_name: d.profile.full_name ?? '', city: d.profile.city ?? '', availability: d.profile.availability ?? '', video_url: d.profile.video_url ?? '' }); setConsent(Boolean(d.profile.consent_at)); } }).catch(fail).finally(() => setBusy(false)); }, [fail]);
@@ -74,7 +79,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
   async function erase() {
     if (!window.confirm('¿Borrar tu perfil y el enlace a tu vídeo? No se puede deshacer.')) return;
     setBusy(true); setError(''); setNotice('');
-    try { await api('profile', { method: 'DELETE' }); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil se ha borrado.'); setSaves(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
+    try { await api('profile', { method: 'DELETE' }); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil, tu formulario y tus candidaturas se han borrado.'); setSaves(n => n + 1); setApps(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
   }
   return <div className="auth-wrap"><div className="auth-card" style={{ maxWidth: 640 }}><Brand />
     <div><span className="eyebrow">TU PERFIL</span><h1>Hola, {p.full_name || email}</h1><p>Esta información nos ayuda a elegir ofertas para ti. Puedes cambiarla o borrarla cuando quieras.</p></div>
@@ -91,7 +96,9 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
       {notice && <div className="auth-note" role="status">{notice}</div>}
       <button className="primary" disabled={busy || (!p.consent_at && !consent)}>{busy ? <LoaderCircle size={16} className="spin" /> : <Save size={16} />} Guardar perfil</button>
     </form>
-    <Matches refreshKey={saves} />
+    <ApplicationForm onLost={onLost} onSaved={() => setApps(n => n + 1)} />
+    <Matches refreshKey={saves} onPrepared={() => setApps(n => n + 1)} onLost={onLost} />
+    <Applications refreshKey={apps} onLost={onLost} />
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <a href="/">Ver oportunidades</a>
       <span><button type="button" onClick={() => void erase()} disabled={busy}><Trash2 size={14} /> Borrar mi perfil</button> <button type="button" onClick={onLogout}><LogOut size={14} /> Salir</button></span>
