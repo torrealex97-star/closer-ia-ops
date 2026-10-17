@@ -123,6 +123,9 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.getByLabel(/Enlace a tu vídeo/).fill('https://drive.google.com/file/d/abc/view');
   await alumna.getByLabel(/Acepto que Women Digital Closer/).check(); await alumna.getByRole('button', { name: 'Guardar perfil' }).click();
   await alumna.getByText('Perfil guardado.').waitFor();
+  state.external.set('ui|1', { id: '00000000-0000-4000-8000-000000000099', source: 'ui', external_id: '1', title: 'Closer de ventas remoto', company: 'Zeta', location: 'Madrid, España', url: 'https://jobs.example.com/ui1', salary: null, description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa en España.', posted_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), editorial_status: 'approved', role: 'closer', spain: true, score: 70, raw: { is_remote: true }, also_seen: [] });
+  await alumna.reload(); await alumna.getByTestId('matches').getByText('Closer de ventas remoto').waitFor({ timeout: 8000 });
+  assert.match(await alumna.getByTestId('matches').innerText(), /Remoto/); assert.match(await alumna.getByTestId('matches').innerText(), /No sabemos:/);
   await alumna.reload(); await alumna.getByText('TU PERFIL').waitFor(); await alumna.waitForFunction(() => document.querySelector('#sp-name')?.value === 'Lucía', null, { timeout: 8000 });
   assert.equal(await alumna.getByLabel(/Enlace a tu vídeo/).inputValue(), 'https://drive.google.com/file/d/abc/view');
   assert.equal(await alumna.getByLabel('Nombre').inputValue(), 'Lucía');

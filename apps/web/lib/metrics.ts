@@ -23,14 +23,14 @@ export function computeMetrics(offers: OfferRow[], runs: RunRow[], now: Date, wi
   const goodPerDay = Object.fromEntries(days.map(d => [d, 0])) as Record<string, number>;
   const by = new Map<string, Metrics['perSource'][number]>();
   for (const o of offers) {
-    const i = index.get(dayKey(o.first_seen_at)); if (i === undefined) continue;
+    const i = o.first_seen_at ? index.get(dayKey(o.first_seen_at)) : undefined; if (i === undefined) continue;
     const s = by.get(o.source) ?? { source: o.source, total: 0, good: 0, approved: 0, perDay: Array(windowDays).fill(0) };
     s.total++;
     if (isGood(o)) { s.good++; s.perDay[i]++; goodPerDay[days[i]]++; }
     if (o.editorial_status === 'approved' || o.editorial_status === 'published') s.approved++;
     by.set(o.source, s);
   }
-  const apifyGood = offers.filter(o => o.source.startsWith('apify') && isGood(o) && index.has(dayKey(o.first_seen_at))).length;
+  const apifyGood = offers.filter(o => o.source.startsWith('apify') && isGood(o) && (o.first_seen_at ? index.has(dayKey(o.first_seen_at)) : false)).length;
   const cost = runs.reduce((a, r) => a + (Number(r.cost_usd) || 0), 0);
   const since = now.getTime() - windowDays * 864e5;
   const decided = offers.filter(o => o.reviewed_at && Date.parse(o.reviewed_at) >= since);

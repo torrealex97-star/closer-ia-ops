@@ -1,5 +1,13 @@
 # Estado
 
+## Incremento 3.1: ofertas recomendadas a cada alumna (matching explicable, solo lectura) (sesión 46) — 2026-10-17
+
+- **Qué** ([matching.ts](../apps/web/lib/matching.ts), `GET /api/student/matches`, sección «Ofertas para ti» en `/alumna`): recomienda hasta 20 ofertas **ya aprobadas por el equipo** según SU perfil. Parte de la misma puerta de la vista de alumna (`externalForStudent`: perfil por título, España, idioma, antigüedad ≤ 10 días) y puntúa: perfil elegido (+50, y si eligió perfiles, una oferta de otro perfil **no aparece**; sin perfiles elegidos +20), remoto o su ciudad (+15), retribución publicada (+10), publicada ≤ 3 días (+15) o ≤ 7 (+8). Cada punto lleva su motivo; lo que no se sabe (ciudad, ubicación, retribución, fecha) sale en «No sabemos», nunca se supone. Bilingüe solo si la alumna marca inglés.
+- **Límites (reglas del repo)**: **no envía, no aplica, no guarda** nada ni contacta a nadie; solo lee. Sin perfil guardado + consentimiento + idioma no devuelve ofertas (y ni consulta el catálogo). Nunca borradores ni retiradas. `user_id` sale de la sesión. Si la fuente falla, lista vacía sin romper.
+- **Verificación**: `matching.mjs` (puntuación exacta por componente, sin tildes/mayúsculas, ausencias, tope 20, orden estable/determinista, puertas de entrada, tolerancia a fallos); `run.sh` **36/36** de flujo (aprobada de su perfil sí; borrador y otro perfil no; 401 sin sesión) + **8/8** de interfaz (la alumna guarda perfil y ve la oferta remota con «Por qué» y «No sabemos»), typecheck y build. Servicios simulados.
+- **Limitaciones**: (1) los pesos (50/15/10/15) son **heurísticos sin calibrar con datos reales**; (2) no hay feedback de la alumna (descartar/guardar) ni aprendizaje; (3) la disponibilidad y el idioma de la oferta no puntúan (la disponibilidad es texto libre; el idioma ya filtra); (4) el catálogo real está hoy vacío, así que con datos reales aún no se ha visto; (5) ciudad = coincidencia de texto con la ubicación de la oferta (no hay distancia ni zonas); (6) mientras el login esté sin activar para todas, solo lo ven alumnas invitadas; rama apilada sobre `feat/student-auth` (PR #5). Corrección menor: `computeMetrics` ignora filas sin `first_seen_at` en vez de fallar.
+- **Siguiente (3.2, con tu OK)**: candidatura **asistida**: la alumna revisa un borrador (mensaje/respuestas) y envía ella; nada se automatiza.
+
 ## Incremento 1.4: presupuesto de tiempo del cron y escrituras que no se ignoran (sesión 49) — 2026-10-17
 
 - **Problema (inspeccionado en el código)**: `/api/cron/collect` encadenaba APIs oficiales (3 × 7 consultas, 20 s cada una), vigencia (20 × 10 s), Apify (25 s) y revisor IA (30 s) con `maxDuration = 60`: con claves reales podía morir con 504 a mitad, sin guardar ni declarar nada.

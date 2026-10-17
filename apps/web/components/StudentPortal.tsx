@@ -42,21 +42,39 @@ function Login({ onLogin }: { onLogin: () => void }) {
   </div></div>;
 }
 
+type Match = { opportunity: { id: string; original_title: string; company: string; location: string; modality: string; compensation: string; source_url: string }; score: number; reasons: string[]; unknowns: string[] };
+// Ofertas aprobadas por el equipo que encajan con su perfil. Solo recomienda: el envío lo hace ella en la web de la oferta.
+function Matches({ refreshKey }: { refreshKey: number }) {
+  const [data, setData] = useState<{ ready: boolean; hint?: string; matches: Match[] } | null>(null);
+  useEffect(() => { api<{ ready: boolean; hint?: string; matches: Match[] }>('matches').then(setData).catch(() => setData({ ready: false, hint: 'No se pudieron cargar tus ofertas ahora mismo.', matches: [] })); }, [refreshKey]);
+  if (!data) return <p className="muted"><LoaderCircle size={14} className="spin" /> Buscando ofertas para ti…</p>;
+  return <section aria-label="Ofertas para ti" data-testid="matches"><span className="eyebrow">OFERTAS PARA TI</span>
+    {!data.ready ? <p className="card-meta">{data.hint}</p> : !data.matches.length ? <p className="card-meta">Hoy no hay ofertas aprobadas que encajen con tu perfil. Vuelve mañana o amplía tus perfiles de interés.</p>
+      : <ol style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 12 }}>{data.matches.map(m => <li key={m.opportunity.id} className="search-panel">
+        <strong>{m.opportunity.original_title}</strong> · {m.opportunity.company} <span className="status ok" style={{ marginLeft: 6 }}>{m.score}% encaje</span>
+        <div className="card-meta">{m.opportunity.location} · {m.opportunity.modality} · {m.opportunity.compensation}</div>
+        {!!m.reasons.length && <div className="card-meta">Por qué: {m.reasons.join(' · ')}</div>}
+        {!!m.unknowns.length && <div className="card-meta muted">No sabemos: {m.unknowns.join(' · ')}</div>}
+        <a href={m.opportunity.source_url} target="_blank" rel="noopener noreferrer">Ver el anuncio original</a></li>)}</ol>}
+  </section>;
+}
+
 function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () => void; onLost: () => void }) {
   const [p, setP] = useState<Profile>({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null });
   const [consent, setConsent] = useState(false);
+  const [saves, setSaves] = useState(0);
   const [busy, setBusy] = useState(true); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const fail = useCallback((err: Error & { status?: number }) => { if (err.status === 401 || err.status === 403) onLost(); setError(err.message); }, [onLost]);
   useEffect(() => { api<{ profile: Profile | null }>('profile').then(d => { if (d.profile) { setP({ ...d.profile, full_name: d.profile.full_name ?? '', city: d.profile.city ?? '', availability: d.profile.availability ?? '', video_url: d.profile.video_url ?? '' }); setConsent(Boolean(d.profile.consent_at)); } }).catch(fail).finally(() => setBusy(false)); }, [fail]);
   const toggle = (key: 'target_roles' | 'languages', v: string) => setP(old => ({ ...old, [key]: old[key].includes(v) ? old[key].filter(x => x !== v) : [...old[key], v] }));
   async function save(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try { await api('profile', { method: 'PUT', body: JSON.stringify({ ...p, consent }) }); setNotice('Perfil guardado.'); } catch (err) { fail(err as Error); } finally { setBusy(false); }
+    try { await api('profile', { method: 'PUT', body: JSON.stringify({ ...p, consent }) }); setNotice('Perfil guardado.'); setSaves(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
   }
   async function erase() {
     if (!window.confirm('¿Borrar tu perfil y el enlace a tu vídeo? No se puede deshacer.')) return;
     setBusy(true); setError(''); setNotice('');
-    try { await api('profile', { method: 'DELETE' }); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil se ha borrado.'); } catch (err) { fail(err as Error); } finally { setBusy(false); }
+    try { await api('profile', { method: 'DELETE' }); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil se ha borrado.'); setSaves(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
   }
   return <div className="auth-wrap"><div className="auth-card" style={{ maxWidth: 640 }}><Brand />
     <div><span className="eyebrow">TU PERFIL</span><h1>Hola, {p.full_name || email}</h1><p>Esta información nos ayuda a elegir ofertas para ti. Puedes cambiarla o borrarla cuando quieras.</p></div>
@@ -73,6 +91,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
       {notice && <div className="auth-note" role="status">{notice}</div>}
       <button className="primary" disabled={busy || (!p.consent_at && !consent)}>{busy ? <LoaderCircle size={16} className="spin" /> : <Save size={16} />} Guardar perfil</button>
     </form>
+    <Matches refreshKey={saves} />
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <a href="/">Ver oportunidades</a>
       <span><button type="button" onClick={() => void erase()} disabled={busy}><Trash2 size={14} /> Borrar mi perfil</button> <button type="button" onClick={onLogout}><LogOut size={14} /> Salir</button></span>

@@ -193,6 +193,16 @@ await step('alumnas: invitación, recuperación, login, perfil con consentimient
   assert.equal(put.status, 200); assert.equal(put.json.profile.full_name, 'Ana Pérez'); assert.deepEqual(put.json.profile.target_roles, ['closer']); assert.deepEqual(put.json.profile.languages, ['es']);
   assert.ok(put.json.profile.consent_at && !('user_id' in put.json.profile), 'user_id/org_id nunca vienen del cuerpo');
   assert.equal([...state.profiles.keys()].length, 1); assert.equal([...state.profiles.values()][0].org_id, 'cloud-wdc');
+  // Matching: solo aprobadas, de su perfil, explicado; sin sesión no hay acceso
+  assert.equal((await call('/api/student/matches', { cookies: false })).status, 401);
+  const mk = (id, status, title) => state.external.set(`m|${id}`, { id: `00000000-0000-4000-8000-0000000000${id}`, source: 'm', external_id: id, title, company: 'Acme', location: 'Sevilla, España', url: `https://jobs.example.com/${id}`, salary: '30.000 €/año', description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa en España.', posted_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), editorial_status: status, role: 'closer', spain: true, score: 80, raw: {}, also_seen: [] });
+  mk('11', 'approved', 'Closer de ventas Sevilla'); mk('12', 'draft', 'Closer de ventas borrador'); mk('13', 'approved', 'Setter de ventas Sevilla');
+  const recs = await call('/api/student/matches', own); assert.equal(recs.status, 200); assert.equal(recs.json.ready, true);
+  const titles = recs.json.matches.map(m => m.opportunity.original_title);
+  assert.ok(titles.includes('Closer de ventas Sevilla'), 'recomienda la aprobada de su perfil');
+  assert.ok(!titles.includes('Closer de ventas borrador'), 'nunca un borrador');
+  assert.ok(!titles.includes('Setter de ventas Sevilla'), 'ni otro perfil que no eligió');
+  const top = recs.json.matches.find(m => m.opportunity.original_title === 'Closer de ventas Sevilla'); assert.ok(top.reasons.some(r => /tu ciudad/.test(r)) && top.score >= 70);
   const bad = await call('/api/student/profile', { ...own, method: 'PUT', body: { full_name: 'Ana', video_url: 'http://insegura.test/v', consent: true } }); assert.equal(bad.json.profile.video_url, null, 'http se descarta');
   assert.equal((await call('/api/student/profile', { ...own, method: 'PUT', body: { video_url: 'https://10.0.0.1/x', consent: true } })).json.profile.video_url, null, 'IP literal se descarta');
   // Aislamiento entre superficies: la sesión de alumna no abre el panel ni al revés
