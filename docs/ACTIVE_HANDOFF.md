@@ -10,13 +10,14 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 
 | Rama | PR | Estado |
 | --- | --- | --- |
-| `feat/metrics-panel-design` (panel de métricas con `dashboard-design`) | #12 | validated |
-| `feat/student-application` (3.2 formulario base + candidaturas asistidas) | #13 | validated, depende de #12 |
+| `fix/review-hardening` (correcciones de la revisión de código) | #19 | validated |
+
+Todo lo anterior (PRs #1-#18) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
-- **Fusionado hoy** (PRs #1-#10, en orden, con CI de GitHub en verde antes de cada fusión): revisor IA shadow, métricas, ingesta robusta, niveles de fuentes + leads B2B + grants, presupuesto de tiempo del cron, login de alumnas + perfil + RLS, recomendaciones, aprendizajes/skills, relevo entre agentes, skills de diseño y gráficas. Detalle: `docs/handoff/archive/2026-10.md`.
-- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2; en la PR #13). Las 9 tablas previas siguen sin migraciones originales: hay un snapshot de referencia en `supabase/schema/` (hace falta `supabase db pull` para lo definitivo).
+- **Fusionado hoy** (PRs #1-#18, con CI de GitHub en verde antes de cada fusión): revisor IA shadow, métricas, ingesta robusta, niveles de fuentes + leads B2B + grants, presupuesto de tiempo del cron, login de alumnas + perfil + RLS, recomendaciones, candidaturas asistidas, interruptor `STUDENT_LOGIN_REQUIRED`, informe de acuerdo IA/humano, baseline de esquema, ADR-013 (voz), contraste `--muted`, skills y relevo entre agentes. Detalle: `docs/handoff/archive/2026-10.md`.
+- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2). Las 9 tablas previas siguen sin migraciones originales: hay un snapshot de referencia en `supabase/schema/` (hace falta `supabase db pull` para lo definitivo).
 - **Evidencia (inspeccionado / probado / verificado):**
   - *Verificado en GitHub:* el workflow `Quality` (jobs `verify` y `web-admin`) pasa en verde en las PRs #5-#10.
   - *Verificado en BD real:* RLS de alumnas (`tests/db/student_rls.sql`, 12/12 con rollback) y grants.
@@ -32,7 +33,8 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 5. **Revisor IA:** 5-7 días en shadow comparando con tus decisiones; el paso a `live` es tuyo.
 6. **Legal:** revisar el texto de consentimiento (`v1-borrador`) y la política de privacidad antes de abrir a alumnas.
 7. **Activar el login para las alumnas** (decisión tuya): ya existe el interruptor `STUDENT_LOGIN_REQUIRED=true` en Vercel (+ redeploy); apagado = `/` abierta. Antes: invitar a las alumnas y probar el correo real.
-8. **`--muted` (contraste):** decidir si se oscurece el gris del texto pequeño (imagen antes/después enviada). Recomendado: sí.
+8. **Revisor IA → live:** confirmar o ajustar la puerta propuesta (≥ 30 pares comparados y ≤ 5 % de falsas aprobaciones; informe en Fuentes externas).
+9. **Voz (futuro):** antes de construir roleplays/entrevistas, acuerdo de tratamiento o retención cero con el proveedor (o modelos autoalojados) y texto legal del consentimiento de audio (ADR-013).
 
 ## 4. Decisiones ya tomadas
 
@@ -45,8 +47,9 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 
 ## 5. Siguiente acción exacta
 
-1. Fusionar #12 y #13 (CI verde). Después, con OK: activar el login para alumnas (tarea 7) y, cuando haya datos reales, calibrar matching y revisar el revisor IA.
-2. Fase 4 (automatización) NO empieza sin autorización escrita: ver ADR-012.
+1. Fusionar #19 (CI verde). Después, candidatos para el siguiente incremento (agente): menú del panel en móvil y lista de Fuentes paginada en móvil; métricas sin ceros falsos (coste Apify ilegible, decisiones fuera de ventana); guarda SSRF con IP fijada contra DNS rebinding; spike acotado de voz (Pipecat) cuando el dueño lo autorice.
+2. Con datos reales: calibrar matching y revisar el revisor IA con el informe de acuerdo.
+3. Fase 4 (automatización) NO empieza sin autorización escrita: ver ADR-012.
 
 ## 6. No declarar PASS en
 
