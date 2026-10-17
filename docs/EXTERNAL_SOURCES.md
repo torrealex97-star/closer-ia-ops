@@ -43,3 +43,6 @@ Los actores de Apify corren en la infraestructura de Apify, que ya incluye sus p
 
 ## 7. Filtrar miles de ofertas
 En Fuentes externas los filtros (estado, perfil, fuente, España, puntuación mínima, búsqueda, orden) y la paginación se hacen **en el servidor**. Cada oferta lleva una **puntuación 0-100** (perfil por título, España explícita, sueldo publicado, comisiones, frescura, calidad del texto) y una **huella** que une el mismo anuncio llegado por varias fuentes (se anota «también en …»). «Aprobar las N mejores» aprueba los borradores que cumplen los filtros por orden de puntuación; es reversible.
+
+## 8. Revisor IA (shadow)
+Variables opcionales (Vercel): `AI_REVIEW_ENABLED` (`false` apaga), `AI_REVIEW_MODE` (`live` decide; por defecto shadow), `AI_REVIEW_MODEL`, `AI_REVIEW_MAX_CALLS` (15), `AI_REVIEW_MAX_APPROVALS` (25), `AUTO_PUBLISH` (`true` publica), `JEV_API_KEY`/`JEV_API_URL` (anotación opcional). Necesita la clave de Groq en Panel → APIs. En shadow no cambia ningún estado; mira la columna «Revisor IA» y el filtro «Cola humana» en Fuentes externas. Detalle en STATUS (sesión 41).

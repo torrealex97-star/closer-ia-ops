@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
+import { runAiReview, undoAiDecisions } from '../../../../lib/aiReview';
 import { approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ const reply = (auth: { setCookies: string[] }, body: unknown, status = 200) => w
 
 const num = (v: string | null, d: number) => { const n = Number(v); return Number.isFinite(n) && v !== null && v !== '' ? n : d; };
 function queryOf(p: URLSearchParams): PageQuery {
-  return { status: p.get('status') || undefined, source: p.get('source') || undefined, role: p.get('role') || undefined, spain: p.get('spain') === '1', minScore: num(p.get('min_score'), 0), q: p.get('q') || undefined, sort: p.get('sort') === 'recent' ? 'recent' : 'score' };
+  return { status: p.get('status') || undefined, source: p.get('source') || undefined, role: p.get('role') || undefined, spain: p.get('spain') === '1', minScore: num(p.get('min_score'), 0), ai: (['human', 'withdraw', 'approve', 'none'] as const).find(x => x === p.get('ai')), q: p.get('q') || undefined, sort: p.get('sort') === 'recent' ? 'recent' : 'score' };
 }
 
 export async function GET(request: NextRequest) {
@@ -51,12 +52,14 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({})) as { action?: unknown; provider?: unknown; ids?: unknown; n?: unknown; filters?: Record<string, string> };
-  const { auth, error } = await gate(request, body.action === 'collect');
+  const { auth, error } = await gate(request, body.action === 'collect' || body.action === 'ai_review' || body.action === 'ai_undo');
   if (error) return error;
   if (body.action === 'collect') {
     const only = typeof body.provider === 'string' && (API_PROVIDERS as readonly string[]).includes(body.provider) ? body.provider as ApiProvider : undefined;
     return reply(auth!, { outcomes: await collectAll('panel', only) });
   }
+  if (body.action === 'ai_review') return reply(auth!, await runAiReview());
+  if (body.action === 'ai_undo') return reply(auth!, { undone: await undoAiDecisions(auth!.admin.email) });
   if (body.action === 'verify') {
     const ids = Array.isArray(body.ids) ? body.ids.filter((i): i is string => typeof i === 'string').slice(0, 25) : [];
     const results = [];

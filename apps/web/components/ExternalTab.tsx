@@ -6,7 +6,9 @@ import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 
 // Fuentes externas a escala: miles de ofertas filtradas, ordenadas por puntuación y paginadas en el servidor.
 // Llegan como borradores; una alumna solo ve lo que apruebes y que además cumple las reglas básicas de la vista.
-type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[] };
+type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[]; ai_review?: AiReview | null };
+type AiReview = { verdict: string; confidence: number; reasons: string[]; red_flags: string[]; would_decide: string; gate: string; mode: string; applied: boolean; audit_sample?: boolean; link?: { result: string; reason: string }; jev?: { verdict: string | null; score: number | null; note: string | null } };
+const WOULD: Record<string, string> = { approve: 'Aprobaría', withdraw: 'Retiraría', human: 'Cola humana' };
 type Data = { offers: Offer[]; total: number; page: number; page_size: number; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[] };
 const STATUS: Record<string, string> = { draft: 'Borrador', needs_review: 'A revisar', approved: 'Aprobada', published: 'Publicada', withdrawn: 'Retirada' };
 const PLURAL: Record<string, string> = { draft: 'borradores', needs_review: 'a revisar', approved: 'aprobadas', published: 'publicadas', withdrawn: 'retiradas' };
@@ -31,6 +33,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   const [query, setQuery] = useState('');
   const [onlySpain, setOnlySpain] = useState(true);
   const [minScore, setMinScore] = useState(0);
+  const [ai, setAi] = useState('');
   const [sort, setSort] = useState<'score' | 'recent'>('score');
   const [page, setPage] = useState(1);
   const [topN, setTopN] = useState(25);
@@ -45,9 +48,9 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
 
   const filters = useCallback(() => {
     const p = new URLSearchParams({ status, sort });
-    if (role) p.set('role', role); if (source) p.set('source', source); if (onlySpain) p.set('spain', '1'); if (minScore) p.set('min_score', String(minScore)); if (query) p.set('q', query);
+    if (role) p.set('role', role); if (source) p.set('source', source); if (onlySpain) p.set('spain', '1'); if (minScore) p.set('min_score', String(minScore)); if (query) p.set('q', query); if (ai) p.set('ai', ai);
     return p;
-  }, [status, sort, role, source, onlySpain, minScore, query]);
+  }, [status, sort, role, source, onlySpain, minScore, query, ai]);
   const load = useCallback(() => {
     setBusy(true);
     const p = filters(); p.set('page', String(page));
@@ -137,6 +140,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       <label htmlFor="ex-role">Perfil (por el título)<select id="ex-role" value={role} onChange={e => change(setRole)(e.target.value as typeof role)}><option value="">Todos</option>{Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}<option value="none">Sin perfil claro</option></select></label>
       <label htmlFor="ex-source">Fuente<select id="ex-source" value={source} onChange={e => change(setSource)(e.target.value)}><option value="">Todas</option>{(data?.sources ?? []).map(s => <option key={s.source} value={s.source}>{s.source}</option>)}</select></label>
       <label htmlFor="ex-min">Puntuación mínima<select id="ex-min" value={minScore} onChange={e => change(setMinScore)(Number(e.target.value))}><option value={0}>Cualquiera</option><option value={45}>≥ 45 (decente)</option><option value={60}>≥ 60 (buena)</option><option value={75}>≥ 75 (muy buena)</option></select></label>
+      <label htmlFor="ex-ai">Revisor IA<select id="ex-ai" value={ai} onChange={e => change(setAi)(e.target.value)}><option value="">Todo</option><option value="human">Cola humana</option><option value="approve">Aprobaría</option><option value="withdraw">Retiraría</option><option value="none">Sin revisar</option></select></label>
       <label htmlFor="ex-sort">Orden<select id="ex-sort" value={sort} onChange={e => change(setSort)(e.target.value as typeof sort)}><option value="score">Mejor puntuación</option><option value="recent">Más recientes</option></select></label>
       <label className="grow" htmlFor="ex-q">Buscar<input id="ex-q" placeholder="Título o empresa" value={text} onChange={e => setText(e.target.value)} /></label>
       <button disabled={busy} onClick={load}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
@@ -160,7 +164,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     </div>
     {busy && !data ? <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p> : !rows.length ? <div className="empty"><h3>No hay ofertas externas con estos filtros.</h3><p className="card-meta">Guarda una clave en APIs, lanza una recogida o relaja los filtros.</p></div> : <>
       <div className="table-wrap"><table className="data-table">
-        <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Seleccionar todas las visibles" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} /></th><th className="num">Punt.</th><th>Oferta</th><th>Perfil</th><th>Ubicación</th><th>Fuente</th><th>Vigencia</th><th /></tr></thead>
+        <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Seleccionar todas las visibles" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} /></th><th className="num">Punt.</th><th>Oferta</th><th>Perfil</th><th>Ubicación</th><th>Fuente</th><th>Revisor IA</th><th>Vigencia</th><th /></tr></thead>
         <tbody>{rows.map(r => <tr key={r.id}>
           <td><input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={picked.has(r.id)} onChange={() => setPicked(old => { const n = new Set(old); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} /></td>
           <td className="num"><span className={tone(r.score)}>{r.score}</span></td>
@@ -168,6 +172,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
           <td>{r.role ? <span className="status ok">{ROLE_LABELS[r.role as RoleFamily] ?? r.role}</span> : <span className="status">Sin perfil claro</span>}</td>
           <td>{r.location ?? 'No indicada'}{r.spain !== null && <span className={r.spain ? 'status ok' : 'status bad'} style={{ marginLeft: 6 }}>{r.spain ? 'España' : 'Fuera'}</span>}</td>
           <td>{r.source}{r.also_seen?.length ? <span className="sub">también en {r.also_seen.join(', ')}</span> : null}</td>
+          <td>{r.ai_review ? <span title={[...(r.ai_review.reasons ?? []), r.ai_review.link ? `Enlace: ${r.ai_review.link.result} (${r.ai_review.link.reason})` : '', r.ai_review.jev ? `Jev: ${r.ai_review.jev.verdict ?? '—'} ${r.ai_review.jev.score ?? ''}` : ''].filter(Boolean).join(' · ')}><span className={r.ai_review.would_decide === 'approve' ? 'status ok' : r.ai_review.would_decide === 'withdraw' ? 'status bad' : 'status'}>{WOULD[r.ai_review.would_decide] ?? r.ai_review.would_decide}</span><span className="sub">{r.ai_review.verdict} {r.ai_review.confidence}% · {r.ai_review.mode === 'shadow' ? 'shadow' : r.ai_review.applied ? 'aplicado' : 'live'}{r.ai_review.audit_sample ? ' · auditoría' : ''}</span></span> : <span className="muted">—</span>}</td>
           <td>{verdicts[r.id] ?? (r.verified_result ? VERDICT[r.verified_result] : <span className="muted">—</span>)}</td>
           <td style={{ textAlign: 'right' }}><a href={r.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir el anuncio original de ${r.title}`}><ExternalLink size={14} /></a></td></tr>)}</tbody></table></div>
       <div className="admin-toolbar" style={{ justifyContent: 'center', marginTop: 16 }}>
