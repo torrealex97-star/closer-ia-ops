@@ -7,6 +7,7 @@ import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 // Fuentes externas a escala: miles de ofertas filtradas, ordenadas por puntuación y paginadas en el servidor.
 // Llegan como borradores; una alumna solo ve lo que apruebes y que además cumple las reglas básicas de la vista.
 import MetricsPanel from './MetricsPanel';
+import AiAgreement from './AiAgreement';
 type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[]; ai_review?: AiReview | null };
 type AiReview = { verdict: string; confidence: number; reasons: string[]; red_flags: string[]; would_decide: string; gate: string; mode: string; applied: boolean; audit_sample?: boolean; link?: { result: string; reason: string }; jev?: { verdict: string | null; score: number | null; note: string | null } };
 const WOULD: Record<string, string> = { approve: 'Aprobaría', withdraw: 'Retiraría', human: 'Cola humana' };
@@ -129,6 +130,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       {owner && <button disabled={working !== ''} onClick={() => void collect()}>{working === 'collect' ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />} Recoger APIs ahora</button>}
     </div>
     <MetricsPanel onSessionLost={onSessionLost} />
+    <AiAgreement onSessionLost={onSessionLost} />
     <div className="table-wrap" style={{ marginBottom: 20 }}><table className="data-table">
       <thead><tr><th>Fuente</th><th>Vía</th><th>Estado</th><th className="num">Activas</th><th className="num">Aprobadas</th><th>Última vez</th><th /></tr></thead>
       <tbody>{KNOWN.map(([code, name, via]) => { const st = data?.sources.find(x => x.source === code); const off = data?.paused.includes(code); return <tr key={code}>
