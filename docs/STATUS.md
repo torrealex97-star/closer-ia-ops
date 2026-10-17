@@ -15,6 +15,12 @@
 - Cambios: `studentLoginRequired()` y `authenticateStudent` acepta un lector de cookies (`lib/studentAuth.ts`), `app/page.tsx` (dinámica) y el proxy `app/api/backend/[...path]`.
 - **Verificación**: *probado* — `tests/admin-auth/gate.mjs` (parte de `run.sh`) arranca la app real con el flag y mocks de Supabase: redirección sin sesión, 401 con y sin cookie falsa, acceso con sesión de alumna, y flag apagado = abierto.
 - **Limitaciones**: no *verificado* con Supabase Auth real; la ruta `/` sigue pública mientras el flag esté apagado; las alumnas deben estar invitadas y con contraseña antes de activarlo.
+## Baseline de esquema de las 9 tablas sin versionar (sesión 54) — 2026-10-17
+
+- Añadido [supabase/schema/baseline_pre_2026-10-17.sql](../supabase/schema/baseline_pre_2026-10-17.sql): DDL de referencia de `admin_users`, `apify_actors`, `apify_runs`, `b2b_leads`, `external_ingest_runs`, `external_offers`, `integration_connections`, `source_settings`, `weekly_reports`, más sus índices, RLS, revocación de grants, las funciones `enforce_admin_allowlist`/`external_upsert` y el trigger de `auth.users`.
+- **Evidencia**: *inspeccionado* contra el catálogo real de Supabase (consultas de solo lectura). El archivo **no se ha ejecutado** en ninguna BD. No es una migración (vive fuera de `supabase/migrations/` a propósito) ni son las migraciones originales.
+- **Limitaciones**: reconstruido de `pg_catalog`; no incluye datos, comentarios ni el historial de cambios. `supabase db pull` del dueño lo sustituirá.
+- Retirado el claim cerrado `claude-muted-contrast`.
 
 ## Contraste del texto pequeño: `--muted` → `--secondary` (sesión 53) — 2026-10-17
 
