@@ -40,6 +40,7 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 - 3.2 candidaturas: **asistidas** ahora (ella revisa y envía); el diseño deja preparada la automatización futura (ver ADR-012) sin activarla.
 - Skills de marketing importadas (para cuando haga falta).
 - Candidaturas: formulario base con consentimiento de autorrelleno futuro aparte (ADR-012).
+- Futuro: roleplays de ventas por voz y simulaciones de entrevista con personalidades de IA; solo licencias MIT/Apache/BSD; base y privacidad en ADR-013 (nada implementado).
 - Fusión de PRs: el dueño autoriza fusionar las que estén listas (CI verde) en cada petición; no es permiso permanente.
 
 ## 5. Siguiente acción exacta

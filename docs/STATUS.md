@@ -17,6 +17,13 @@
   11. Visual: separación vertical excesiva en los grupos de casillas del perfil de la alumna.
 - **Sin corregir (declarado)**: métricas — el coste de Apify sigue mostrando 0 si falla la lectura y las decisiones solo cuentan ofertas vistas en la ventana de 14 días; el DNS puede cambiar entre la comprobación y la petición (DNS rebinding residual); el menú del panel en móvil ocupa la primera pantalla; la lista de Fuentes en móvil mide ~11.000 px.
 - **Verificación**: *probado* — `run.sh` completo (39/39 flujo, hardening 5/5, gate 5/5, UI 8/8, resto), tsc, build y `npm run design`. Nada *verificado* contra servicios reales.
+## ADR-013: base para roleplays de ventas por voz y entrevistas (sesión 57) — 2026-10-17
+
+- Solo documentación: [ADR-013](decisions/ADR-013-voice-roleplay-foundations.md) fija interfaces `VoiceProvider`/`LLMProvider` reemplazables, personalidades como configuración versionada, feedback con citas literales y reglas de privacidad del audio. No se instaló ni se escribió código de voz.
+- **Licencias — *inspeccionado*** (se leyó el fichero LICENSE en GitHub): Pipecat BSD-2-Clause, LiveKit Agents Apache-2.0, Kokoro (código) Apache-2.0, Whisper MIT, Chatterbox MIT, JobSpy MIT, JobSync MIT. **Descartadas:** Piper actual (GPL-3.0) y AIHawk (AGPL).
+- **Sin verificar:** licencia de los pesos de Kokoro y su calidad en español, el repo de «Close Call» y los otros proyectos de entrevistas (solo referencia). Nada de esto se ejecutó.
+- Verificación: `npm run handoff` y enlaces locales; no se ejecutaron tests de runtime porque no cambió código.
+- Retirado el claim cerrado `claude-schema-baseline`.
 
 ## Informe de acuerdo revisor IA vs. personas (sesión 56) — 2026-10-17
 
