@@ -1,5 +1,14 @@
 # Estado
 
+## Informe de acuerdo revisor IA vs. personas (sesión 56) — 2026-10-17
+
+- Nuevo bloque «Revisor IA vs. personas» en la pestaña de fuentes externas (`/api/admin/ai-agreement`, `lib/aiAgreement.ts`, `components/AiAgreement.tsx`): compara lo que la IA **habría** hecho (`ai_review.would_decide` en modo sombra) con lo que decidió después una persona. Muestra coinciden / falsas aprobaciones / falsas retiradas / pendientes / dudosas, con tabla y veredicto en texto.
+- **Puerta de salida propuesta** (informativa, no activa nada): ≥ 30 pares comparados y falsas aprobaciones ≤ 5 % de las aprobaciones de la IA. Es una propuesta mía, **pendiente de que el dueño la confirme o ajuste**; no sustituye el conjunto dorado etiquetado a mano.
+- Sin pares muestra «—» y «Aún no hay base: 0 de 30»; las decisiones aplicadas por la IA y `auto-vigencia` no cuentan como humanas.
+- **Verificación**: *probado* — `tests/admin-auth/agreement.mjs` (lógica, umbrales 1/30 vs 2/30), flow (401/200) y UI (bloque, veredicto, tabla de 5 filas); `run.sh` completo, tsc, build, `npm run design`. Con datos reales *no verificado* (aún no hay ofertas con anotación de la IA).
+- **Limitaciones**: lee hasta 5.000 ofertas anotadas; un humano que decide sin haber visto la propuesta de la IA igualmente cuenta (la sombra no se muestra en la cola); no distingue revisores.
+- Rama apilada sobre `feat/student-login-flag` (PR #16).
+
 ## Interruptor `STUDENT_LOGIN_REQUIRED` para proteger la vista de oportunidades (sesión 55) — 2026-10-17
 
 - Con `STUDENT_LOGIN_REQUIRED=true` (Vercel → Environment Variables + redeploy) `/` redirige a `/alumna` si no hay sesión de alumna válida y `POST /api/backend/opportunities/search` (modo hospedado) responde 401. **Por defecto está apagado**: nada cambia hasta que el dueño lo active, como se acordó.
