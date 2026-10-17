@@ -37,8 +37,8 @@ Reglas: eje en 0 para barras; ejes truncados solo si se indica; etiquetado direc
 | `accent` | 6,44 | 6,02 | Enlaces, énfasis |
 | `sage` | 5,12 | 4,78 | Estado correcto |
 | `warning` | 5,26 | 4,91 | Aviso |
-| **`muted`** | **3,40** | **3,18** | **NO cumple AA para texto**: solo decoración, iconos o texto ≥ 18 px/bold ≥ 14 px (3:1) |
-- **Hallazgo abierto:** `--muted` se usa en texto de 8-11 px (`workspace-label`, `source-caption`, `score small`, `footnote`…). No cumple AA. Propuesta: usar `--secondary` para todo texto < 14 px (decisión de diseño del dueño; no cambiado aún).
+| **`muted`** | **3,40** | **3,18** | **NO cumple AA para texto**: solo iconos/decoración (3:1). Prohibido en texto (lo vigila `npm run design`) |
+- **Resuelto (2026-10-17, decisión del dueño):** todo el texto gris pequeño usa `--secondary` (≥ 4,56:1 sobre cualquier fondo); `--muted` queda **solo para iconos** (`.icon-button`, ≥ 3:1). `npm run design` falla si `--muted` vuelve a usarse en texto.
 - `accent` y `sage` tienen contraste mutuo de solo **1,26**: no se distinguen por luminosidad (ni con daltonismo). **Nunca** diferenciar dos series solo por esos colores: añade etiqueta, forma o patrón.
 - El color nunca es la única codificación: los estados llevan texto (`Activa`, `Pausada`, `Cola humana`).
 - Marcas gráficas (barras, iconos) ≥ 3:1 contra su fondo (`accent` 6,44 y `sage` 5,12 cumplen).
@@ -58,7 +58,7 @@ Reglas: eje en 0 para barras; ejes truncados solo si se indica; etiquetado direc
 - Todo dato personal de alumnas queda fuera de gráficos e informes agregados con n pequeño.
 
 ## 6. Antes de dar un dashboard por terminado
-1. `node scripts/check-design.mjs` (sin hex fuera de `:root`).
+1. `npm run design` (sin hex fuera de `:root` y sin `--muted` en texto).
 2. Typecheck y build; prueba de interfaz que abra el panel y compruebe su contenido real (no solo que compile: un gráfico puede no montarse por datos condicionales).
 3. Comprobación visual a 1280 px y 390 px; revisar estados vacío/error/parcial con datos simulados.
 4. Contraste de cualquier color nuevo contra `paper`, `sheet` e `inset` (≥ 4,5 texto, ≥ 3 marcas).

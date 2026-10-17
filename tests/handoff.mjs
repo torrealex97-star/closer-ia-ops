@@ -1,3 +1,4 @@
+assert.deepEqual(check([claim('c1', { agent: 'a1', touches: 'docs/STATUS.md' }), claim('c2', { agent: 'a2', touches: 'docs/STATUS.md' })]), [], 'STATUS.md es de solo añadir: no genera solape');
 // Tablero de relevo: node tests/handoff.mjs
 import assert from 'node:assert/strict';
 import { parseClaim, check, board, load } from '../scripts/handoff.mjs';

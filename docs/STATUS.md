@@ -1,5 +1,12 @@
 # Estado
 
+## Contraste del texto pequeño: `--muted` → `--secondary` (sesión 53) — 2026-10-17
+
+- **Decisión del dueño**: aplicar el cambio recomendado. Los 13 usos de `color:var(--muted)` en texto de 8-11 px (`workspace-label`, `source-caption`, `score small`, `footnote`, cabeceras de tabla `.data-table th`, `.section-title`, `.muted`…) pasan a `var(--secondary)`: contraste **4,88:1** sobre `paper`, **5,10** sobre `sheet`, **4,56** sobre `inset` (antes 3,40 / 3,55 / 3,18; mínimo AA 4,5). `--muted` queda **solo** en `.icon-button` (iconos, ≥ 3:1). Cambio visual mínimo: mismo gris, algo más oscuro; la jerarquía sigue marcada por tamaño, mayúsculas y peso. No se tocó ningún otro color del tema.
+- **Guardia**: `npm run design` (y el job `web-admin` de CI) ahora también falla si `--muted` vuelve a aparecer en texto, en `globals.css` o en componentes (con prueba en `tests/design.mjs`). La skill `dashboard-design` actualizada.
+- **Verificación**: *probado* — `tests/design.mjs`, `npm run design`, y en navegador el color computado de las cabeceras de tabla es `rgb(116, 107, 107)` (= `--secondary`); `run.sh` completo, typecheck y build. Los contrastes son los calculados a partir de los tokens (texto sobre fondo plano); no se midió con captura ni con herramientas externas.
+- **Limitaciones**: no se revisó caso por caso cada pantalla a mano (solo las pruebas de interfaz existentes); texto sobre fondos `*-soft` ya cumplía y no se cambió.
+
 ## Panel de métricas rediseñado con `dashboard-design` (sesión 51) — 2026-10-17
 
 - **Qué** ([MetricsPanel.tsx](../apps/web/components/MetricsPanel.tsx)): título con la conclusión («Últimos 14 días: N ofertas buenas»), gráfico de barras SVG con **base en 0**, valor máximo en el eje, fechas inicial/final y el día más alto etiquetado; color por token (`--accent`, comprobado en el navegador: `rgb(141,70,61)`); **alternativa en tabla** (por día, por nivel con % de buenas y por fuente) y `role="img"` con resumen en `aria-label`; **estados**: cargando, **error con «Reintentar»** (antes se quedaba en un texto), **vacío** (sin ofertas nuevas, explicando que no prueba que las fuentes funcionen) y sin-dato como **«—» con su causa** (coste de Apify: «sin ejecuciones» / «aún sin ofertas buenas»). Sin gráficos de tarta, sin librería nueva, texto secundario con `--secondary` (no `--muted`). Estilo nuevo en `globals.css` solo para cabeceras de fila (sin mayúsculas), con tokens.

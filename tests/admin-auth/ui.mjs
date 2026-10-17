@@ -66,6 +66,8 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
   await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Últimos 14 días: \d+ ofertas buenas/);
+  // Contraste: el texto pequeño gris usa --secondary (≥ 4,5:1), no --muted (3,4:1)
+  assert.equal(await page.locator('.data-table th').first().evaluate(el => getComputedStyle(el).color), 'rgb(116, 107, 107)', 'cabeceras de tabla con --secondary');
   // Gráfico accesible: resumen en aria-label, color por token (computado = accent), eje en 0 y tabla alternativa con los 14 días
   const chart = page.getByTestId('metrics').getByRole('img'); assert.match(await chart.getAttribute('aria-label'), /Ofertas buenas por día del .* al .*: \d+ en total/);
   assert.equal(await page.getByTestId('metrics').locator('svg rect').first().evaluate(el => getComputedStyle(el).fill), 'rgb(141, 70, 61)', 'barras con el token --accent');
