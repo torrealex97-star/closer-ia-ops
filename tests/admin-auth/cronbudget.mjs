@@ -42,6 +42,7 @@ t += 30_000; assert.equal(b.remaining(), 10_000); assert.equal(b.deadline(18_000
 t += 20_000; assert.equal(b.expired(), true); assert.equal(b.remaining(), 0);
 b.cut('apis'); b.cut('apis'); b.cut('vigencia'); assert.deepEqual(b.truncated, ['apis', 'vigencia'], 'cortes sin duplicar');
 assert.equal(B.timeLeft(undefined), Infinity); assert.equal(B.callTimeout(20000, 1_005_000, () => 1_000_000), 5000); assert.equal(B.callTimeout(20000, undefined), 20000);
+assert.ok(Number.isInteger(B.callTimeout(20000, 1_014_000.6667, () => 1_000_000)), 'AbortSignal.timeout exige un entero (fallo real con deadline fraccionario)');
 assert.equal(B.totalFromEnv({}), 40_000); assert.equal(B.totalFromEnv({ CRON_BUDGET_MS: '25000' }), 25_000); assert.equal(B.totalFromEnv({ CRON_BUDGET_MS: '90000' }), 40_000, 'fuera de rango: valor seguro');
 assert.equal(B.totalFromEnv({ CRON_BUDGET_MS: 'x' }), 40_000);
 console.log('PASS  reloj: fin por paso y global, recortes, cortes sin duplicar y límites de la variable');
@@ -75,6 +76,7 @@ rest.on('request', (req, res) => {
     const id = (q.id ?? '').slice(3); return send(200, [{ id, title: 'Closer Acme', company: 'Acme', url: `http://127.0.0.1:${pages.address().port}/p`, source: 's', external_id: id }]);
   });
 });
+process.env.URL_GUARD_TEST_ALLOW = `127.0.0.1:${pages.address().port}`; // la página lenta es local: solo ese host:port exacto pasa la guarda SSRF
 pageCalls = 0;
 const quick = await E.refreshVigencia(12, Date.now() + 2500); // 4 en paralelo × 600 ms: caben 1-2 rondas
 assert.equal(quick.truncated, true); assert.ok(quick.checked >= 4 && quick.checked < 12, `comprobadas: ${quick.checked}`);

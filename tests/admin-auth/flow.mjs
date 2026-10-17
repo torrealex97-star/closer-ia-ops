@@ -327,7 +327,7 @@ await step('recogida de APIs oficiales: solo propietario; usa las claves guardad
   const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });
   assert.equal((await call('/api/admin/external', { method: 'POST', body: { action: 'collect' } })).status, 403); jar = saved;
   const r = await call('/api/admin/external', { method: 'POST', body: { action: 'collect' } }); assert.equal(r.status, 200);
-  assert.deepEqual(r.json.outcomes.map(o => [o.provider, o.ok]), [['infojobs', true], ['adzuna', true], ['jooble', true]]);
+  assert.deepEqual(r.json.outcomes.map(o => [o.provider, o.ok]), [['infojobs', true], ['adzuna', true], ['jooble', true]], JSON.stringify(r.json.outcomes));
   const bySource = Object.fromEntries([...state.external.values()].map(o => [o.source, o]));
   assert.equal(bySource.infojobs.title, 'Closer de ventas high ticket'); assert.equal(bySource.adzuna.location, 'Barcelona, España'); assert.equal(bySource.jooble.editorial_status, 'draft');
   assert.equal(state.ingestRuns.filter(x => x.via === 'panel').length, 3);

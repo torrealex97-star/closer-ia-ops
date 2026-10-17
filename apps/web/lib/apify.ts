@@ -77,11 +77,13 @@ export function fillTemplate(template: unknown, vars: Vars): unknown {
 export const varsFor = (actor: Pick<ActorRow, 'max_items'>): Vars => ({ query: QUERIES.map(q => `"${q}"`).join(' OR '), location: 'España', country: 'Spain', max_items: actor.max_items, hours_old: 240, sites: ['indeed', 'linkedin', 'glassdoor', 'google'] });
 
 // ---- presupuesto ----
-export async function monthSpent(): Promise<number> {
+// null = no se pudo leer el gasto. Quien lanza una ejecución de pago debe tratarlo como «no se sabe» y NO lanzar.
+export async function monthSpent(): Promise<number | null> {
   const since = new Date(); since.setUTCDate(1); since.setUTCHours(0, 0, 0, 0);
   const response = await serviceRest(`apify_runs?org_id=eq.${ORG}&started_at=gte.${encodeURIComponent(since.toISOString())}&select=cost_usd,status`);
-  const rows = response.ok ? await response.json().catch(() => []) as Array<{ cost_usd: number | null; status: string }> : [];
-  return (Array.isArray(rows) ? rows : []).reduce((sum, r) => sum + (r.cost_usd != null ? Number(r.cost_usd) : r.status === 'RUNNING' ? RESERVE_USD : 0), 0);
+  const rows = response.ok ? await response.json().catch(() => null) as Array<{ cost_usd: number | null; status: string }> | null : null;
+  if (!Array.isArray(rows)) return null;
+  return rows.reduce((sum, r) => sum + (r.cost_usd != null ? Number(r.cost_usd) : r.status === 'RUNNING' ? RESERVE_USD : 0), 0);
 }
 
 export async function listActors(): Promise<ActorRow[] | null> {
@@ -95,6 +97,7 @@ export type StartResult = { ok: true; run_id: string } | { ok: false; error: str
 export async function startRun(actor: ActorRow, by: string, publicBase: string): Promise<StartResult> {
   const token = await apifyToken(); if (!token) return { ok: false, error: 'Guarda antes la clave de Apify en la pestaña APIs.' };
   const [spent, runs] = await Promise.all([monthSpent(), listRuns(30)]);
+  if (spent === null) return { ok: false, error: 'No se pudo leer el gasto del mes en Apify; por seguridad no se lanza la ejecución. Reintenta en un momento.' };
   if (spent + RESERVE_USD > MONTHLY_BUDGET_USD()) return { ok: false, error: `Presupuesto mensual agotado (${spent.toFixed(2)} de ${MONTHLY_BUDGET_USD()} USD).` };
   if (runs?.some(r => r.actor_id === actor.id && r.status === 'RUNNING' && Date.now() - Date.parse(r.started_at) < 2 * 3600 * 1000)) return { ok: false, error: 'Ya hay una ejecución en curso de este actor.' };
   const vars = varsFor(actor); let input: Record<string, unknown>;

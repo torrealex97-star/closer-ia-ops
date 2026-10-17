@@ -1,5 +1,23 @@
 # Estado
 
+## Revisión de código y visual: correcciones (sesión 58) — 2026-10-17
+
+- **Revisión**: skill `code-review` (nivel alto) sobre `apps/web/lib` y `app/api` + capturas Playwright de `/`, `/alumna`, `/admin` (Resumen, Fuentes, Alumnas) en escritorio y móvil (390 px). Visual: sin desbordes horizontales ni errores de consola; el portal de alumna y el panel se ven coherentes con `docs/DESIGN.md`.
+- **Corregido** (cada punto con prueba en `tests/admin-auth/hardening.mjs`, `gate.mjs` o `cronbudget.mjs`):
+  1. **Fallo real encontrado por las pruebas:** `callTimeout` devolvía milisegundos fraccionarios y `AbortSignal.timeout` los rechaza → con un `deadline` el proveedor podía fallar de forma intermitente. Ahora es entero.
+  2. Proxy con `STUDENT_LOGIN_REQUIRED`: descartaba las cookies renovadas (la alumna se desconectaba al caducar el token). Ahora las reenvía.
+  3. **SSRF** en `verifyOffer` (verificación manual y vigencia diaria): ahora pasa por la misma guarda que el revisor IA (`lib/urlGuard.ts`: IP literal, host interno, DNS a red privada). Una URL no permitida da `unknown` sin petición.
+  4. `refreshVigencia` ya no cuenta como retirada una escritura fallida: lo declara (`failed`) y libera la marca de verificación para reintentar.
+  5. Gasto de Apify: si no se puede leer, es «no se sabe» (`null`) y NO se lanza ninguna ejecución de pago (antes contaba 0 y lanzaba). El panel muestra «—» con la causa.
+  6. Fuentes pausadas: si no se puede leer el ajuste, falla cerrado (no se muestra nada a alumnas, `ingest` no guarda, la recogida lo declara) en vez de abierto.
+  7. `collectProvider`: un error de red al comprobar pausa/clave ya no tumba a los demás proveedores.
+  8. Acciones del panel «recoger», «verificar» e «IA» usan el reloj compartido (corte declarado `truncated`) en lugar de ir sin límite con `maxDuration = 60`.
+  9. Revisor IA: la comprobación del enlace respeta el `deadline` del cron y la anotación Jev se salta si no queda margen.
+  10. `publicBaseUrl` ya no usa la cabecera `Host` en producción (queda `ADMIN_PUBLIC_URL` o el dominio fijo).
+  11. Visual: separación vertical excesiva en los grupos de casillas del perfil de la alumna.
+- **Sin corregir (declarado)**: métricas — el coste de Apify sigue mostrando 0 si falla la lectura y las decisiones solo cuentan ofertas vistas en la ventana de 14 días; el DNS puede cambiar entre la comprobación y la petición (DNS rebinding residual); el menú del panel en móvil ocupa la primera pantalla; la lista de Fuentes en móvil mide ~11.000 px.
+- **Verificación**: *probado* — `run.sh` completo (39/39 flujo, hardening 5/5, gate 5/5, UI 8/8, resto), tsc, build y `npm run design`. Nada *verificado* contra servicios reales.
+
 ## Informe de acuerdo revisor IA vs. personas (sesión 56) — 2026-10-17
 
 - Nuevo bloque «Revisor IA vs. personas» en la pestaña de fuentes externas (`/api/admin/ai-agreement`, `lib/aiAgreement.ts`, `components/AiAgreement.tsx`): compara lo que la IA **habría** hecho (`ai_review.would_decide` en modo sombra) con lo que decidió después una persona. Muestra coinciden / falsas aprobaciones / falsas retiradas / pendientes / dudosas, con tabla y veredicto en texto.

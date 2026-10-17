@@ -1,6 +1,7 @@
 import { enrich } from './offerScore';
 import { callTimeout, timeLeft } from './cronBudget';
 import { salaryFromText } from './salary';
+import { assertPublicUrl } from './urlGuard';
 import { serviceRest } from './supabaseAuth';
 
 // Fuentes externas (APIs con clave y recolectores programados). Los candidatos llegan tal cual los da la fuente,
@@ -82,6 +83,13 @@ export async function saveCandidates(source: string, rows: Array<Record<string, 
   return { accepted, failed };
 }
 
+// Estricta: null = no se pudo leer. Quien decide qué ve una alumna o qué se guarda trata «no se sabe» como pausada (falla cerrado).
+export async function pausedSourcesStrict(): Promise<Set<string> | null> {
+  const response = await serviceRest(`source_settings?org_id=eq.${ORG}&enabled=eq.false&select=source`).catch(() => null);
+  const rows = response?.ok ? await response.json().catch(() => null) : null;
+  return Array.isArray(rows) ? new Set(rows.map((r: { source: string }) => r.source)) : null;
+}
+
 export async function pausedSources(): Promise<Set<string>> {
   const response = await serviceRest(`source_settings?org_id=eq.${ORG}&enabled=eq.false&select=source`);
   const rows = response.ok ? await response.json().catch(() => []) : [];
@@ -99,7 +107,8 @@ export async function setSourceEnabled(source: string, enabled: boolean, by: str
 
 export async function ingest(source: string, via: string, candidates: unknown[], note?: string): Promise<{ received: number; accepted: number; rejected: number; paused?: boolean }> {
   // Una fuente pausada no entra: se registra el intento para que se vea en el panel.
-  if ((await pausedSources()).has(source)) {
+  const paused = await pausedSourcesStrict();
+  if (!paused || paused.has(source)) {
     const received = Math.min(candidates.length, MAX_CANDIDATES);
     await serviceRest('external_ingest_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, source, via, received, accepted: 0, rejected: received, note: 'Fuente pausada: no se guardó nada' }) });
     return { received, accepted: 0, rejected: received, paused: true };
@@ -174,8 +183,10 @@ export async function verifyOffer(id: string, timeoutMs = 10000): Promise<{ id: 
   const found = await listOffersById(id);
   if (!found) return null;
   let result: 'open' | 'closed' | 'unknown' = 'unknown'; let reason = 'network_unreachable';
+  const target = await assertPublicUrl(found.url);
   try {
-    const response = await fetch(found.url, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
+    if (!target.ok) throw new Error(target.reason);
+    const response = await fetch(target.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
     if (response.status === 404 || response.status === 410) { result = 'closed'; reason = 'job_not_found'; }
     else if (response.status === 403 || response.status === 429) reason = 'source_blocked';
     else if (response.status >= 300 && response.status < 400) reason = 'redirect_without_verification';
@@ -185,7 +196,7 @@ export async function verifyOffer(id: string, timeoutMs = 10000): Promise<{ id: 
       const hit = (fold(found.title).length >= 5 && body.includes(fold(found.title))) || (fold(found.company).length >= 3 && body.includes(fold(found.company)));
       if (hit) { result = 'open'; reason = 'content_matches'; } else reason = 'content_not_corroborated';
     } else reason = `http_${response.status}`;
-  } catch { /* red caída: unknown */ }
+  } catch { if (!target.ok) reason = `url_no_permitida_${target.reason}`; /* red caída o URL no permitida: unknown */ }
   await serviceRest(`external_offers?org_id=eq.${ORG}&id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ verified_at: new Date().toISOString(), verified_result: result }) });
   return { id, result, reason };
 }
@@ -198,7 +209,7 @@ async function listOffersById(id: string): Promise<ExternalOffer | null> {
 
 // Vigencia automática: verifica las ofertas aprobadas que llevan más de 48 h sin comprobarse y retira las que el
 // origen da por cerradas (404/410). Solo cierra; nunca aprueba nada. Se llama desde el cron diario.
-export async function refreshVigencia(max = 20, deadline?: number): Promise<{ checked: number; withdrawn: number; truncated?: boolean }> {
+export async function refreshVigencia(max = 20, deadline?: number): Promise<{ checked: number; withdrawn: number; failed?: number; truncated?: boolean }> {
   const stale = encodeURIComponent(new Date(Date.now() - 48 * 3600 * 1000).toISOString());
   const response = await serviceRest(`external_offers?org_id=eq.${ORG}&editorial_status=in.(approved,published)&or=(verified_at.is.null,verified_at.lt.${stale})&select=id&order=verified_at.asc.nullsfirst&limit=${max}`);
   const rows = response.ok ? await response.json().catch(() => []) as Array<{ id: string }> : [];
@@ -212,8 +223,16 @@ export async function refreshVigencia(max = 20, deadline?: number): Promise<{ ch
       if (verdict) { checked++; if (verdict.result === 'closed') closed.push(id); }
     }
   }));
-  if (closed.length) await setStatus(closed, 'withdrawn', 'auto-vigencia');
-  return { checked, withdrawn: closed.length, ...(truncated ? { truncated } : {}) };
+  let withdrawn = 0, failed = 0;
+  if (closed.length) {
+    const done = await setStatus(closed, 'withdrawn', 'auto-vigencia');
+    if (done === null) {
+      // Escritura fallida: no se cuenta como hecha y se libera la marca de verificación para reintentar en la próxima ejecución.
+      failed = closed.length;
+      await serviceRest(`external_offers?org_id=eq.${ORG}&id=in.(${closed.join(',')})`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ verified_at: null, verified_result: null }) }).catch(() => undefined);
+    } else withdrawn = done;
+  }
+  return { checked, withdrawn, ...(failed ? { failed } : {}), ...(truncated ? { truncated } : {}) };
 }
 
 // ---- Escala: filtros, orden y paginación en el servidor (miles de ofertas) ----

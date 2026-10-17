@@ -32,6 +32,12 @@ try {
     assert.equal((await fetch(BASE + '/', { redirect: 'manual', headers: { cookie } })).status, 200);
     assert.notEqual((await search(cookie)).status, 401);
   });
+  await step('flag activo: sesión caducada (solo refresh) se renueva y los tokens nuevos llegan al navegador', async () => {
+    const login = await fetch(BASE + '/api/student/session', { method: 'POST', headers: { 'content-type': 'application/json', origin: BASE }, body: JSON.stringify({ email: 'ana@alumna.dev', password: 'Contraseña-alumna-1' }) });
+    const refresh = login.headers.getSetCookie().map(c => c.split(';')[0]).find(c => c.startsWith('wdc_student_rt='));
+    const r = await search(refresh); assert.notEqual(r.status, 401);
+    assert.ok(r.headers.getSetCookie().some(c => c.startsWith('wdc_student_at=') && /HttpOnly/.test(c)), 'el proxy debe reenviar la cookie renovada');
+  });
   await stop();
   child = run(''); await up();
   await step('flag apagado (por defecto): `/` y la búsqueda siguen abiertas', async () => {

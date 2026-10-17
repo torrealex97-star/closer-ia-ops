@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   if (error) return error;
   const [actors, runs, spent, token] = await Promise.all([listActors(), listRuns(), monthSpent(), apifyToken()]);
   if (!actors || !runs) return Response.json({ detail: 'No se pudo leer los actores.' }, { status: 503 });
-  return reply(auth!, { actors, runs, presets: PRESETS, budget: { spent: Number(spent.toFixed(4)), limit: MONTHLY_BUDGET_USD() }, has_key: Boolean(token) });
+  return reply(auth!, { actors, runs, presets: PRESETS, budget: { spent: spent === null ? null : Number(spent.toFixed(4)), limit: MONTHLY_BUDGET_USD() }, has_key: Boolean(token) });
 }
 
 export async function POST(request: NextRequest) {
