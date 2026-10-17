@@ -105,6 +105,32 @@ await step('Apify: añadir el actor, guardar la clave, lanzar y recoger resultad
   assert.equal([...state.external.values()].filter(o => o.source === 'apify-jobspy').length, 3);
   await page.getByText('1.07 USD de 5 USD').waitFor().catch(() => {}); // 0,07 gastados (+ nada en curso)
 });
+await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su perfil con consentimiento y el enlace de su vídeo', async () => {
+  await page.getByRole('button', { name: 'Alumnas' }).click(); await page.getByRole('heading', { name: 'Alumnas con acceso.' }).waitFor();
+  await page.getByLabel('Invitar a una alumna').fill('lucia@alumna.dev'); await page.getByRole('button', { name: 'Enviar invitación' }).click();
+  await page.getByText('Invitación enviada a lucia@alumna.dev.').waitFor(); await page.getByText('lucia@alumna.dev').first().waitFor();
+  const alumna = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage(); // otro navegador: sin la sesión del panel
+  const token = state.recoverTokens.get('lucia@alumna.dev'); assert.ok(token);
+  if (process.env.UI_DEBUG) alumna.on('response', r => { if (r.url().includes('/api/')) console.log('NET', r.status(), r.url()); });
+  await alumna.goto(`${BASE}/alumna/reset#access_token=${token}&type=recovery`);
+  await alumna.getByLabel('Contraseña nueva').fill('Contraseña-lucia-1'); await alumna.getByLabel('Repite la contraseña').fill('Contraseña-lucia-1');
+  await alumna.getByRole('button', { name: 'Guardar contraseña' }).click(); await alumna.getByRole('heading', { name: 'Contraseña guardada' }).waitFor({ timeout: 8000 }).catch(async e => { throw new Error(`${e.message.split('\n')[0]} · pantalla: ${(await alumna.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300)}`); });
+  await alumna.goto(BASE + '/alumna'); await alumna.getByLabel('Email').fill('lucia@alumna.dev'); await alumna.getByLabel('Contraseña').fill('Contraseña-lucia-1');
+  await alumna.getByRole('button', { name: 'Entrar' }).click(); await alumna.getByText('TU PERFIL').waitFor();
+  assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil');
+  assert.equal(await alumna.getByRole('button', { name: 'Guardar perfil' }).isDisabled(), true, 'sin consentimiento no se puede guardar');
+  await alumna.getByLabel('Nombre').fill('Lucía'); await alumna.getByRole('checkbox', { name: /closer/i }).first().check();
+  await alumna.getByLabel(/Enlace a tu vídeo/).fill('https://drive.google.com/file/d/abc/view');
+  await alumna.getByLabel(/Acepto que Women Digital Closer/).check(); await alumna.getByRole('button', { name: 'Guardar perfil' }).click();
+  await alumna.getByText('Perfil guardado.').waitFor();
+  state.external.set('ui|1', { id: '00000000-0000-4000-8000-000000000099', source: 'ui', external_id: '1', title: 'Closer de ventas remoto', company: 'Zeta', location: 'Madrid, España', url: 'https://jobs.example.com/ui1', salary: null, description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa en España.', posted_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), editorial_status: 'approved', role: 'closer', spain: true, score: 70, raw: { is_remote: true }, also_seen: [] });
+  await alumna.reload(); await alumna.getByTestId('matches').getByText('Closer de ventas remoto').waitFor({ timeout: 8000 });
+  assert.match(await alumna.getByTestId('matches').innerText(), /Remoto/); assert.match(await alumna.getByTestId('matches').innerText(), /No sabemos:/);
+  await alumna.reload(); await alumna.getByText('TU PERFIL').waitFor(); await alumna.waitForFunction(() => document.querySelector('#sp-name')?.value === 'Lucía', null, { timeout: 8000 });
+  assert.equal(await alumna.getByLabel(/Enlace a tu vídeo/).inputValue(), 'https://drive.google.com/file/d/abc/view');
+  assert.equal(await alumna.getByLabel('Nombre').inputValue(), 'Lucía');
+  await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
+});
 await step('móvil: Resumen sin scroll horizontal', async () => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Resumen' }).click(); await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();

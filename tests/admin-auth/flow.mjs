@@ -13,7 +13,7 @@ async function call(path, { method = 'GET', body, cookies = true, headers = {} }
   return { status: res.status, json: await res.json().catch(() => ({})), raw: res };
 }
 const results = [];
-const step = async (name, fn) => { try { await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message]); } };
+const step = async (name, fn) => { try { await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, `${e.message} @ ${(String(e.stack).match(/flow\.mjs:\d+/) ?? [''])[0]}`]); } };
 
 await step('sin sesión: proxy admin 401, overview 401, users 401', async () => {
   for (const p of ['/api/admin/opportunities', '/api/admin/overview', '/api/admin/users']) assert.equal((await call(p)).status, 401, p);
@@ -164,6 +164,67 @@ await step('ingest: repetir una oferta no pisa su estado editorial', async () =>
   const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [{ external_id: 'a1', title: 'Closer de ventas (actualizada)', url: 'https://es.indeed.com/viewjob?jk=a1' }] } });
   assert.equal(r.status, 200); assert.equal(offer.editorial_status, 'approved');
 });
+await step('alumnas: invitación, recuperación, login, perfil con consentimiento, aislamiento, pausa, supresión y baja', async () => {
+  const E = 'ana@alumna.dev', studentCookie = () => `wdc_student_at=${jar.wdc_student_at}`;
+  // Sin sesión
+  for (const [path, method] of [['/api/student/profile', 'GET'], ['/api/admin/students', 'GET']]) assert.equal((await call(path, { method, cookies: false })).status, 401);
+  assert.equal((await call('/api/student/session', { method: 'POST', cookies: false, body: { email: E, password: 'x'.repeat(12) } })).status, 401);
+  // Invitar (admin): origen ajeno bloqueado, alta, duplicado, correo no válido
+  assert.equal((await call('/api/admin/students', { method: 'POST', body: { email: E }, headers: { origin: 'https://evil.test' } })).status, 403);
+  const inv = await call('/api/admin/students', { method: 'POST', body: { email: E } }); assert.equal(inv.status, 201); assert.equal(inv.json.email_sent, true);
+  assert.equal((await call('/api/admin/students', { method: 'POST', body: { email: E } })).status, 409);
+  assert.equal((await call('/api/admin/students', { method: 'POST', body: { email: 'no-es-correo' } })).status, 422);
+  // Una persona NO invitada no puede recuperar ni entrar (misma respuesta: no revela quién está)
+  const rec = await call('/api/student/auth/recover', { method: 'POST', cookies: false, body: { email: 'intrusa@x.dev' } }); assert.equal(rec.status, 200); assert.ok(!state.recoverTokens.has('intrusa@x.dev'));
+  // Crear contraseña con el enlace del correo y entrar
+  assert.equal((await call('/api/student/auth/recover', { method: 'POST', cookies: false, body: { email: E } })).status, 200);
+  const t = state.recoverTokens.get(E);
+  assert.equal((await call('/api/student/auth/reset', { method: 'POST', cookies: false, body: { access_token: t, password: 'corta' } })).status, 422);
+  assert.equal((await call('/api/student/auth/reset', { method: 'POST', cookies: false, body: { access_token: t, password: 'Contraseña-alumna-1' } })).status, 200);
+  const login = await call('/api/student/session', { method: 'POST', cookies: false, body: { email: E, password: 'Contraseña-alumna-1' } }); assert.equal(login.status, 200);
+  assert.ok(login.raw.headers.getSetCookie().every(c => /HttpOnly/.test(c) && c.startsWith('wdc_student_')), 'cookies propias y HttpOnly');
+  // Primera entrada enlaza el usuario y activa la ficha
+  assert.equal(state.students.find(x => x.email === E).status, 'active'); assert.ok(state.students.find(x => x.email === E).user_id);
+  // Perfil: exige consentimiento; saneado; el vídeo es un enlace https
+  const own = { cookies: false, headers: { cookie: studentCookie() } };
+  assert.equal((await call('/api/student/profile', own)).json.profile, null);
+  assert.equal((await call('/api/student/profile', { ...own, method: 'PUT', body: { full_name: 'Ana', consent: false } })).status, 422);
+  const put = await call('/api/student/profile', { ...own, method: 'PUT', body: { full_name: ' Ana <b>Pérez</b> ', city: 'Sevilla', target_roles: ['closer', 'hacker'], languages: ['es', 'xx'], video_url: 'https://drive.google.com/file/d/1/view', consent: true, user_id: 'robado', org_id: 'otra' } });
+  assert.equal(put.status, 200); assert.equal(put.json.profile.full_name, 'Ana Pérez'); assert.deepEqual(put.json.profile.target_roles, ['closer']); assert.deepEqual(put.json.profile.languages, ['es']);
+  assert.ok(put.json.profile.consent_at && !('user_id' in put.json.profile), 'user_id/org_id nunca vienen del cuerpo');
+  assert.equal([...state.profiles.keys()].length, 1); assert.equal([...state.profiles.values()][0].org_id, 'cloud-wdc');
+  // Matching: solo aprobadas, de su perfil, explicado; sin sesión no hay acceso
+  assert.equal((await call('/api/student/matches', { cookies: false })).status, 401);
+  const mk = (id, status, title) => state.external.set(`m|${id}`, { id: `00000000-0000-4000-8000-0000000000${id}`, source: 'm', external_id: id, title, company: 'Acme', location: 'Sevilla, España', url: `https://jobs.example.com/${id}`, salary: '30.000 €/año', description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa en España.', posted_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), editorial_status: status, role: 'closer', spain: true, score: 80, raw: {}, also_seen: [] });
+  mk('11', 'approved', 'Closer de ventas Sevilla'); mk('12', 'draft', 'Closer de ventas borrador'); mk('13', 'approved', 'Setter de ventas Sevilla');
+  const recs = await call('/api/student/matches', own); assert.equal(recs.status, 200); assert.equal(recs.json.ready, true);
+  const titles = recs.json.matches.map(m => m.opportunity.original_title);
+  assert.ok(titles.includes('Closer de ventas Sevilla'), 'recomienda la aprobada de su perfil');
+  assert.ok(!titles.includes('Closer de ventas borrador'), 'nunca un borrador');
+  assert.ok(!titles.includes('Setter de ventas Sevilla'), 'ni otro perfil que no eligió');
+  const top = recs.json.matches.find(m => m.opportunity.original_title === 'Closer de ventas Sevilla'); assert.ok(top.reasons.some(r => /tu ciudad/.test(r)) && top.score >= 70);
+  const bad = await call('/api/student/profile', { ...own, method: 'PUT', body: { full_name: 'Ana', video_url: 'http://insegura.test/v', consent: true } }); assert.equal(bad.json.profile.video_url, null, 'http se descarta');
+  assert.equal((await call('/api/student/profile', { ...own, method: 'PUT', body: { video_url: 'https://10.0.0.1/x', consent: true } })).json.profile.video_url, null, 'IP literal se descarta');
+  // Aislamiento entre superficies: la sesión de alumna no abre el panel ni al revés
+  assert.equal((await call('/api/admin/students', { cookies: false, headers: { cookie: studentCookie() } })).status, 401);
+  assert.equal((await call('/api/admin/external', { cookies: false, headers: { cookie: studentCookie() } })).status, 401);
+  assert.equal((await call('/api/student/profile', { cookies: false, headers: { cookie: `wdc_admin_at=${jar.wdc_admin_at}` } })).status, 401);
+  // Pausar corta el acceso (con su token aún vivo) y reactivar lo devuelve; la lista la ve el panel
+  const id = (await call('/api/admin/students')).json.students.find(x => x.email === E).id;
+  assert.equal((await call('/api/admin/students', { method: 'PATCH', body: { id, status: 'paused' } })).status, 200);
+  assert.equal((await call('/api/student/profile', own)).status, 403);
+  assert.equal((await call('/api/student/session', { method: 'POST', cookies: false, body: { email: E, password: 'Contraseña-alumna-1' } })).status, 403);
+  assert.equal((await call('/api/admin/students', { method: 'PATCH', body: { id, status: 'inventado' } })).status, 422);
+  assert.equal((await call('/api/admin/students', { method: 'PATCH', body: { id, status: 'active' } })).status, 200);
+  assert.equal((await call('/api/student/profile', own)).status, 200);
+  // Supresión de perfil (RGPD) y baja
+  assert.equal((await call('/api/student/profile', { ...own, method: 'DELETE' })).status, 200); assert.equal((await call('/api/student/profile', own)).json.profile, null);
+  assert.equal((await call('/api/admin/students', { method: 'DELETE' })).status, 503, 'sin id no borra nada');
+  assert.equal((await call(`/api/admin/students?id=${id}`, { method: 'DELETE' })).status, 200);
+  assert.ok(!state.students.some(x => x.email === E) && !state.users.has(E), 'baja borra ficha y usuario de Auth');
+  const out = await call('/api/student/session', { method: 'DELETE', headers: { origin: 'https://evil.test' } }); assert.equal(out.status, 403);
+  delete jar.wdc_student_at; delete jar.wdc_student_rt; // el navegador de la alumna no es el del operador
+});
 await step('leads B2B (panel): exige sesión y origen, importa, lista y cambia estado sin pisar el trabajo humano', async () => {
   assert.equal((await call('/api/admin/b2b', { cookies: false })).status, 401);
   assert.equal((await call('/api/admin/b2b', { method: 'POST', body: { leads: [{ advertiser: 'Acme' }] }, headers: { origin: 'https://evil.test' } })).status, 403);
@@ -211,6 +272,8 @@ await step('cron: exige CRON_SECRET', async () => {
   assert.equal((await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer incorrecto-0123456789' } })).status, 401);
   const r = await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
   assert.equal(r.status, 200); assert.equal(r.json.outcomes.length, 3);
+  // Presupuesto de tiempo: la respuesta declara los cortes y lo gastado, muy por debajo de maxDuration (60 s)
+  assert.ok(Array.isArray(r.json.truncated)); assert.ok(r.json.spent_ms >= 0 && r.json.spent_ms < 40000);
 });
 await step('vista de alumna: suma solo externas aprobadas que cumplen perfil, España y español', async () => {
   const ext = Object.fromEntries([...state.external.values()].map(o => [o.external_id, o]));
@@ -325,6 +388,15 @@ await step('Apify: lanzar adapta la entrada al esquema, aplica límites, webhook
   state.apifyRuns.find(x => x.run_id === 'OLD1'); const calls = state.apifyCalls.length;
   const over = await start({ id: tpl.id }); assert.equal(over.status, 409); assert.match(over.json.detail, /Presupuesto mensual agotado/); assert.equal(state.apifyCalls.length, calls);
   state.apifyRuns = state.apifyRuns.filter(x => x.run_id !== 'OLD1');
+});
+await step('Apify: una ejecución lanzada que no se puede registrar se DECLARA con su id (no es un éxito falso)', async () => {
+  const [jobspy] = (await call('/api/admin/apify')).json.actors;
+  const keep = state.apifyRuns; state.apifyRuns = []; state.failRunPost = true;
+  try {
+    const r = await call('/api/admin/apify', { method: 'POST', body: { action: 'start', id: jobspy.id } });
+    assert.equal(r.status, 409); assert.match(r.json.detail, /no se pudo registrar/); assert.match(r.json.detail, /RUN\w+/, 'incluye el id de la ejecución de Apify');
+    assert.equal(state.apifyRuns.length, 0, 'nada a medias en la base');
+  } finally { state.failRunPost = false; state.apifyRuns = keep; }
 });
 await step('Apify: webhook con token; recogida por lotes reanudable; coste y duplicados', async () => {
   const run = state.apifyRuns.find(r => r.run_id.startsWith('RUN1')); const token = JSON.parse(Buffer.from(state.apifyCalls[0].query.webhooks, 'base64').toString())[0].requestUrl.split('t=')[1];

@@ -4,7 +4,8 @@ import { KeyRound, LoaderCircle } from 'lucide-react';
 
 // Destino del enlace del correo de Supabase: el token llega en el # de la URL (nunca en una
 // petición al servidor hasta que se envía la contraseña nueva).
-export default function AdminReset() {
+export default function AdminReset({ scope = 'admin' }: { scope?: 'admin' | 'student' }) {
+  const home = scope === 'student' ? '/alumna' : '/admin', who = scope === 'student' ? 'al portal' : 'al panel';
   const [token, setToken] = useState<string | null>(null);
   const [problem, setProblem] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +18,7 @@ export default function AdminReset() {
     const at = params.get('access_token');
     if (at) setToken(at);
     else setProblem(params.get('error_description')?.includes('expired') || params.get('error_code') === 'otp_expired'
-      ? 'El enlace ha caducado. Pide uno nuevo desde el acceso al panel.' : 'Este enlace no es válido. Pide uno nuevo desde el acceso al panel.');
+      ? 'El enlace ha caducado. Pide uno nuevo desde el acceso.' : 'Este enlace no es válido. Pide uno nuevo desde el acceso.');
     history.replaceState(null, '', window.location.pathname); // el token no se queda en la barra de direcciones
   }, []);
   async function submit(e: React.FormEvent) {
@@ -25,7 +26,7 @@ export default function AdminReset() {
     if (password !== confirm) { setError('Las contraseñas no coinciden.'); return; }
     setBusy(true);
     try {
-      const r = await fetch('/api/admin/auth/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: token, password }) });
+      const r = await fetch(`/api/${scope}/auth/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: token, password }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail ?? 'No se pudo guardar la contraseña.');
       setDone(true);
@@ -33,9 +34,9 @@ export default function AdminReset() {
     finally { setBusy(false); }
   }
   return <div className="auth-wrap"><div className="auth-card">
-    <a className="brand" href="/admin" aria-label="Closer IA OPs · panel"><span className="brand-mark">w.</span><span>Women Digital<br /><strong>Closer</strong></span></a>
-    {done ? <><div><span className="eyebrow">LISTO</span><h1>Contraseña guardada</h1><p>Ya puedes entrar al panel con tu email y la contraseña nueva.</p></div><a className="primary" href="/admin">Ir al panel</a></>
-      : problem ? <><div><span className="eyebrow">ENLACE NO VÁLIDO</span><h1>Pide un enlace nuevo</h1><p>{problem}</p></div><a className="primary" href="/admin">Volver al acceso</a></>
+    <a className="brand" href={home} aria-label="Closer IA OPs"><span className="brand-mark">w.</span><span>Women Digital<br /><strong>Closer</strong></span></a>
+    {done ? <><div><span className="eyebrow">LISTO</span><h1>Contraseña guardada</h1><p>Ya puedes entrar {who} con tu email y la contraseña nueva.</p></div><a className="primary" href={home}>Ir {who}</a></>
+      : problem ? <><div><span className="eyebrow">ENLACE NO VÁLIDO</span><h1>Pide un enlace nuevo</h1><p>{problem}</p></div><a className="primary" href={home}>Volver al acceso</a></>
       : !token ? <p className="muted"><LoaderCircle className="spin" size={18} /> Comprobando enlace…</p>
       : <><div><span className="eyebrow">CREAR CONTRASEÑA</span><h1>Elige tu contraseña</h1><p>Mínimo 10 caracteres.</p></div>
         <form onSubmit={submit}>
