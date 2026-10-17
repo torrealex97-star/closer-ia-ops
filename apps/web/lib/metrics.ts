@@ -1,5 +1,6 @@
 import { ORG } from './external';
 import { serviceRest } from './supabaseAuth';
+import { tierOf, type Tier } from './sourceTiers';
 
 // Métricas de oferta (incremento 0.2). Todo se calcula de datos reales; lo que no se mide se declara `null`
 // (p. ej. minutos de revisión: la app no registra el tiempo, solo cuántas decisiones tomó una persona).
@@ -8,6 +9,7 @@ export type OfferRow = { source: string; score: number | null; spain: boolean | 
 export type RunRow = { cost_usd: number | string | null; started_at: string; status?: string };
 export type Metrics = {
   days: string[]; goodPerDay: Record<string, number>; perSource: Array<{ source: string; total: number; good: number; approved: number; perDay: number[] }>;
+  perTier: Array<{ tier: Tier; total: number; good: number }>;
   apify: { cost_usd: number; runs: number; good_offers: number; cost_per_good: number | null };
   review: { human_decisions: number; ai_decisions: number; minutes: null };
 };
@@ -33,7 +35,8 @@ export function computeMetrics(offers: OfferRow[], runs: RunRow[], now: Date, wi
   const since = now.getTime() - windowDays * 864e5;
   const decided = offers.filter(o => o.reviewed_at && Date.parse(o.reviewed_at) >= since);
   return {
-    days, goodPerDay, perSource: [...by.values()].sort((a, b) => b.good - a.good || a.source.localeCompare(b.source)),
+    days, goodPerDay, perTier: (['official', 'scrape', 'paid', 'other'] as Tier[]).map(t => { const l = [...by.values()].filter(x => tierOf(x.source) === t); return { tier: t, total: l.reduce((a, x) => a + x.total, 0), good: l.reduce((a, x) => a + x.good, 0) }; }).filter(t => t.total),
+    perSource: [...by.values()].sort((a, b) => b.good - a.good || a.source.localeCompare(b.source)),
     apify: { cost_usd: Math.round(cost * 100) / 100, runs: runs.length, good_offers: apifyGood, cost_per_good: apifyGood ? Math.round((cost / apifyGood) * 1000) / 1000 : null },
     review: { human_decisions: decided.filter(o => o.reviewed_by !== 'ai-review' && o.reviewed_by !== 'auto-vigencia').length, ai_decisions: decided.filter(o => o.reviewed_by === 'ai-review').length, minutes: null },
   };

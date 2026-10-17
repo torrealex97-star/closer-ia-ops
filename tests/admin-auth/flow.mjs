@@ -164,10 +164,22 @@ await step('ingest: repetir una oferta no pisa su estado editorial', async () =>
   const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [{ external_id: 'a1', title: 'Closer de ventas (actualizada)', url: 'https://es.indeed.com/viewjob?jk=a1' }] } });
   assert.equal(r.status, 200); assert.equal(offer.editorial_status, 'approved');
 });
+await step('leads B2B (panel): exige sesión y origen, importa, lista y cambia estado sin pisar el trabajo humano', async () => {
+  assert.equal((await call('/api/admin/b2b', { cookies: false })).status, 401);
+  assert.equal((await call('/api/admin/b2b', { method: 'POST', body: { leads: [{ advertiser: 'Acme' }] }, headers: { origin: 'https://evil.test' } })).status, 403);
+  const imp = await call('/api/admin/b2b', { method: 'POST', body: { leads: [{ advertiser: 'Acme Clinics', market: 'ES', weeks_active: 8 }, { nada: 1 }] } });
+  assert.equal(imp.status, 200); assert.deepEqual([imp.json.accepted, imp.json.rejected], [1, 1]);
+  const list = await call('/api/admin/b2b'); assert.equal(list.json.leads.length, 1);
+  const id = list.json.leads[0].id;
+  assert.equal((await call('/api/admin/b2b', { method: 'PATCH', body: { ids: [id], status: 'contactado' } })).json.changed, 1);
+  assert.equal((await call('/api/admin/b2b', { method: 'PATCH', body: { ids: [id], status: 'inventado' } })).status, 422);
+  await call('/api/admin/b2b', { method: 'POST', body: { leads: [{ advertiser: 'Acme Clinics', market: 'ES', weeks_active: 9 }] } });
+  assert.equal((await call('/api/admin/b2b')).json.leads[0].status, 'contactado');
+});
 await step('métricas (panel): exige sesión y devuelve 14 días con coste y decisiones', async () => {
   assert.equal((await call('/api/admin/metrics', { cookies: false })).status, 401);
   const r = await call('/api/admin/metrics'); assert.equal(r.status, 200);
-  assert.equal(r.json.days.length, 14); assert.ok(Array.isArray(r.json.perSource) && r.json.review.minutes === null && 'cost_per_good' in r.json.apify);
+  assert.equal(r.json.days.length, 14); assert.ok(Array.isArray(r.json.perTier) && Array.isArray(r.json.perSource) && r.json.review.minutes === null && 'cost_per_good' in r.json.apify);
 });
 await step('externas (panel): lista con contadores, aprobación en bloque y verificación de vigencia', async () => {
   assert.equal((await call('/api/admin/external', { cookies: false })).status, 401);
