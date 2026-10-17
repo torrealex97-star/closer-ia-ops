@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 // Base de datos simulada mínima (external_offers + integration_connections vacío: se inyecta el LLM).
-const rows = new Map();
+const rows = new Map(); const fault = {};
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x'); let body = '';
   req.on('data', c => body += c); req.on('end', () => {
@@ -13,7 +13,13 @@ const server = http.createServer((req, res) => {
     let list = [...rows.values()];
     if (req.method === 'PATCH') {
       const ids = q.id?.startsWith('in.(') ? q.id.slice(4, -1).split(',') : [q.id.slice(3)];
-      const patch = JSON.parse(body); const hit = list.filter(r => ids.includes(r.id)); hit.forEach(r => Object.assign(r, patch)); return send(200, hit);
+      const patch = JSON.parse(body);
+      if (fault.failAnnotate && 'ai_review' in patch && !('editorial_status' in patch)) return send(500, {});
+      if (fault.raceOnApply && 'editorial_status' in patch) for (const id of ids) rows.get(id).editorial_status = 'needs_review'; // una persona la movió entretanto
+      let hit = list.filter(r => ids.includes(r.id));
+      if (q.ai_review === 'is.null') hit = hit.filter(r => !r.ai_review);
+      if (q.editorial_status?.startsWith('eq.')) hit = hit.filter(r => `eq.${r.editorial_status}` === q.editorial_status);
+      hit.forEach(r => Object.assign(r, patch)); return send(200, hit);
     }
     if (q.ai_review === 'is.null') list = list.filter(r => !r.ai_review);
     if (q.editorial_status?.startsWith('in.(')) list = list.filter(r => q.editorial_status.slice(4, -1).split(',').includes(r.editorial_status));
@@ -120,4 +126,24 @@ assert.equal(undone, live.applied); assert.ok([...rows.values()].every(r => r.ed
 seed(); await ai.runAiReview({ ...base, env: { AI_REVIEW_MODE: 'live', AUTO_PUBLISH: 'true' } });
 assert.ok([...rows.values()].some(r => r.editorial_status === 'published'));
 console.log('PASS  ejecución: shadow no cambia estados; live con tope, auditoría y deshacer; AUTO_PUBLISH');
+
+// 6) Escrituras que no se ignoran: anotación fallida, carrera con una persona y presupuesto de tiempo.
+seed(); fault.failAnnotate = true;
+const fa = await ai.runAiReview({ ...base, env: { AI_REVIEW_MODE: 'live' } });
+assert.equal(fa.reviewed, 0, 'si no se pudo anotar, no cuenta como revisada'); assert.equal(fa.failed_writes, 6); assert.equal(fa.applied, 0);
+assert.ok([...rows.values()].every(r => r.editorial_status === 'draft' && !r.ai_review), 'y no se cambia ningún estado');
+fault.failAnnotate = false;
+seed(); fault.raceOnApply = true;
+const race = await ai.runAiReview({ ...base, env: { AI_REVIEW_MODE: 'live' } });
+assert.equal(race.applied, 0, 'si una persona movió la oferta, la IA no la pisa'); assert.ok(race.failed_writes >= 1);
+assert.ok([...rows.values()].every(r => r.editorial_status !== 'approved' && r.editorial_status !== 'withdrawn'), 'ninguna aprobada/retirada por la IA');
+assert.ok([...rows.values()].every(r => r.ai_review && r.ai_review.applied === false), 'queda anotada como no aplicada');
+fault.raceOnApply = false;
+seed();
+const tight = await ai.runAiReview({ ...base, env: {}, deadline: Date.now() + 5000 });
+assert.equal(tight.truncated, true); assert.equal(tight.reviewed, 0, 'con menos de ~20 s no empieza ninguna oferta');
+seed();
+const roomy = await ai.runAiReview({ ...base, env: {}, deadline: Date.now() + 60000 });
+assert.equal(roomy.truncated, undefined); assert.equal(roomy.reviewed, 6);
+console.log('PASS  escrituras: anotación fallida no cuenta, guarda de estado frente a personas, corte por presupuesto');
 server.close();
