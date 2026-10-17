@@ -30,6 +30,8 @@ assert.match(check([parseClaim('nada', 'roto')])[0], /roto: sin cabecera/);
 const b = board([claim('c2', { date: '2026-10-18', pr: 7 }), claim('c1', { date: '2026-10-17' })]);
 assert.ok(b.indexOf('2026-10-17') < b.indexOf('2026-10-18') && b.includes('#7'));
 
+assert.deepEqual(load('/ruta/que/no/existe'), [], 'sin carpeta de fichas = sin trabajos vivos, no un error');
+
 // Las fichas reales del repositorio deben pasar su propia comprobación
 const real = load(new URL('../docs/handoff/claims/', import.meta.url).pathname);
 assert.deepEqual(check(real), [], 'fichas reales sin solapes ni errores');

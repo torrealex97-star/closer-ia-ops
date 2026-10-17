@@ -3,7 +3,7 @@
 // mismo fichero ni chocan en el merge). `list` imprime el tablero; `check` falla si una ficha está mal formada, si dos
 // trabajos vivos tocan lo mismo sin declarar dependencia, o si un agente tiene dos trabajos `in_progress` a la vez.
 // (Varios `validated` del mismo agente esperando revisión del dueño sí se permiten: la cola de revisión no es trabajo en curso.)
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,6 +50,7 @@ export function board(claims) {
 }
 
 export function load(dir) {
+  if (!existsSync(dir)) return []; // sin trabajos vivos la carpeta puede no existir (git no guarda carpetas vacías)
   return readdirSync(dir).filter(f => f.endsWith('.md') && f !== 'README.md').sort().map(f => parseClaim(readFileSync(join(dir, f), 'utf8'), f.replace(/\.md$/, '')));
 }
 
