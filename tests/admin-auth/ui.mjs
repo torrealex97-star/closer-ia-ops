@@ -71,6 +71,8 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   // Gráfico accesible: resumen en aria-label, color por token (computado = accent), eje en 0 y tabla alternativa con los 14 días
   const chart = page.getByTestId('metrics').getByRole('img'); assert.match(await chart.getAttribute('aria-label'), /Ofertas buenas por día del .* al .*: \d+ en total/);
   assert.equal(await page.getByTestId('metrics').locator('svg rect').first().evaluate(el => getComputedStyle(el).fill), 'rgb(141, 70, 61)', 'barras con el token --accent');
+  await page.getByTestId('ai-agreement').waitFor(); await page.getByTestId('ai-agreement').locator('summary').click(); assert.match(await page.getByTestId('agreement-verdict').innerText(), /Aún no hay base: 0 de 30 pares/);
+  assert.equal(await page.getByTestId('agreement-table').locator('tbody tr').count(), 5);
   await page.getByTestId('metrics').getByText('Ver tabla por día').click(); assert.equal(await page.getByTestId('metrics-days').locator('tbody tr').count(), 14);
   assert.ok(await page.getByTestId('metrics-tiers').isVisible());
   // Error ≠ vacío: si falla la carga se dice y se puede reintentar; después vuelve el panel

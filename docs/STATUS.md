@@ -8,6 +8,21 @@
 - Verificación: `npm run handoff` y enlaces locales; no se ejecutaron tests de runtime porque no cambió código.
 - Retirado el claim cerrado `claude-schema-baseline`.
 
+## Informe de acuerdo revisor IA vs. personas (sesión 56) — 2026-10-17
+
+- Nuevo bloque «Revisor IA vs. personas» en la pestaña de fuentes externas (`/api/admin/ai-agreement`, `lib/aiAgreement.ts`, `components/AiAgreement.tsx`): compara lo que la IA **habría** hecho (`ai_review.would_decide` en modo sombra) con lo que decidió después una persona. Muestra coinciden / falsas aprobaciones / falsas retiradas / pendientes / dudosas, con tabla y veredicto en texto.
+- **Puerta de salida propuesta** (informativa, no activa nada): ≥ 30 pares comparados y falsas aprobaciones ≤ 5 % de las aprobaciones de la IA. Es una propuesta mía, **pendiente de que el dueño la confirme o ajuste**; no sustituye el conjunto dorado etiquetado a mano.
+- Sin pares muestra «—» y «Aún no hay base: 0 de 30»; las decisiones aplicadas por la IA y `auto-vigencia` no cuentan como humanas.
+- **Verificación**: *probado* — `tests/admin-auth/agreement.mjs` (lógica, umbrales 1/30 vs 2/30), flow (401/200) y UI (bloque, veredicto, tabla de 5 filas); `run.sh` completo, tsc, build, `npm run design`. Con datos reales *no verificado* (aún no hay ofertas con anotación de la IA).
+- **Limitaciones**: lee hasta 5.000 ofertas anotadas; un humano que decide sin haber visto la propuesta de la IA igualmente cuenta (la sombra no se muestra en la cola); no distingue revisores.
+- Rama apilada sobre `feat/student-login-flag` (PR #16).
+
+## Interruptor `STUDENT_LOGIN_REQUIRED` para proteger la vista de oportunidades (sesión 55) — 2026-10-17
+
+- Con `STUDENT_LOGIN_REQUIRED=true` (Vercel → Environment Variables + redeploy) `/` redirige a `/alumna` si no hay sesión de alumna válida y `POST /api/backend/opportunities/search` (modo hospedado) responde 401. **Por defecto está apagado**: nada cambia hasta que el dueño lo active, como se acordó.
+- Cambios: `studentLoginRequired()` y `authenticateStudent` acepta un lector de cookies (`lib/studentAuth.ts`), `app/page.tsx` (dinámica) y el proxy `app/api/backend/[...path]`.
+- **Verificación**: *probado* — `tests/admin-auth/gate.mjs` (parte de `run.sh`) arranca la app real con el flag y mocks de Supabase: redirección sin sesión, 401 con y sin cookie falsa, acceso con sesión de alumna, y flag apagado = abierto.
+- **Limitaciones**: no *verificado* con Supabase Auth real; la ruta `/` sigue pública mientras el flag esté apagado; las alumnas deben estar invitadas y con contraseña antes de activarlo.
 ## Baseline de esquema de las 9 tablas sin versionar (sesión 54) — 2026-10-17
 
 - Añadido [supabase/schema/baseline_pre_2026-10-17.sql](../supabase/schema/baseline_pre_2026-10-17.sql): DDL de referencia de `admin_users`, `apify_actors`, `apify_runs`, `b2b_leads`, `external_ingest_runs`, `external_offers`, `integration_connections`, `source_settings`, `weekly_reports`, más sus índices, RLS, revocación de grants, las funciones `enforce_admin_allowlist`/`external_upsert` y el trigger de `auth.users`.

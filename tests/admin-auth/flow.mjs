@@ -302,6 +302,11 @@ await step('métricas (panel): exige sesión y devuelve 14 días con coste y dec
   const r = await call('/api/admin/metrics'); assert.equal(r.status, 200);
   assert.equal(r.json.days.length, 14); assert.ok(Array.isArray(r.json.perTier) && Array.isArray(r.json.perSource) && r.json.review.minutes === null && 'cost_per_good' in r.json.apify);
 });
+await step('acuerdo IA/humano (panel): exige sesión y devuelve pares con veredicto', async () => {
+  assert.equal((await call('/api/admin/ai-agreement', { cookies: false })).status, 401);
+  const r = await call('/api/admin/ai-agreement'); assert.equal(r.status, 200);
+  assert.ok(['insufficient', 'not_ready', 'ready'].includes(r.json.verdict) && r.json.min_pairs === 30 && typeof r.json.pairs === 'number');
+});
 await step('externas (panel): lista con contadores, aprobación en bloque y verificación de vigencia', async () => {
   assert.equal((await call('/api/admin/external', { cookies: false })).status, 401);
   const list = await call('/api/admin/external?status=draft'); assert.equal(list.status, 200);
