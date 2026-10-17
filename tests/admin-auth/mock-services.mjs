@@ -157,6 +157,7 @@ export function startMocks({ authPort, enginePort }) {
     }
     if (url.pathname === '/rest/v1/apify_runs') {
       const q = Object.fromEntries(url.searchParams); const rid = q.run_id?.replace('eq.', '');
+      if (req.method === 'POST' && state.failRunPost) return send(res, 500, {});
       if (req.method === 'POST') { state.apifyRuns.unshift({ id: crypto.randomUUID(), started_at: new Date().toISOString(), finished_at: null, items_total: null, harvested: 0, cost_usd: null, error: null, ...body }); return send(res, 201, {}); }
       if (req.method === 'PATCH') { Object.assign(state.apifyRuns.find(r => r.run_id === rid) ?? {}, body); return send(res, 204, {}); }
       let rows = [...state.apifyRuns]; if (q.started_at?.startsWith('gte.')) rows = rows.filter(r => r.started_at >= decodeURIComponent(q.started_at.slice(4)));

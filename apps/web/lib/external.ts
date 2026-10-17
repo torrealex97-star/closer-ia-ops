@@ -1,4 +1,5 @@
 import { enrich } from './offerScore';
+import { callTimeout, timeLeft } from './cronBudget';
 import { salaryFromText } from './salary';
 import { serviceRest } from './supabaseAuth';
 
@@ -169,12 +170,12 @@ export async function setStatus(ids: string[], status: string, by: string): Prom
 }
 
 // Comprobación de vigencia: un GET acotado; solo «open» si responde 200 y el contenido nombra el título o la empresa.
-export async function verifyOffer(id: string): Promise<{ id: string; result: 'open' | 'closed' | 'unknown'; reason: string } | null> {
+export async function verifyOffer(id: string, timeoutMs = 10000): Promise<{ id: string; result: 'open' | 'closed' | 'unknown'; reason: string } | null> {
   const found = await listOffersById(id);
   if (!found) return null;
   let result: 'open' | 'closed' | 'unknown' = 'unknown'; let reason = 'network_unreachable';
   try {
-    const response = await fetch(found.url, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
+    const response = await fetch(found.url, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
     if (response.status === 404 || response.status === 410) { result = 'closed'; reason = 'job_not_found'; }
     else if (response.status === 403 || response.status === 429) reason = 'source_blocked';
     else if (response.status >= 300 && response.status < 400) reason = 'redirect_without_verification';
@@ -197,20 +198,22 @@ async function listOffersById(id: string): Promise<ExternalOffer | null> {
 
 // Vigencia automática: verifica las ofertas aprobadas que llevan más de 48 h sin comprobarse y retira las que el
 // origen da por cerradas (404/410). Solo cierra; nunca aprueba nada. Se llama desde el cron diario.
-export async function refreshVigencia(max = 20): Promise<{ checked: number; withdrawn: number }> {
+export async function refreshVigencia(max = 20, deadline?: number): Promise<{ checked: number; withdrawn: number; truncated?: boolean }> {
   const stale = encodeURIComponent(new Date(Date.now() - 48 * 3600 * 1000).toISOString());
   const response = await serviceRest(`external_offers?org_id=eq.${ORG}&editorial_status=in.(approved,published)&or=(verified_at.is.null,verified_at.lt.${stale})&select=id&order=verified_at.asc.nullsfirst&limit=${max}`);
   const rows = response.ok ? await response.json().catch(() => []) as Array<{ id: string }> : [];
   const queue = Array.isArray(rows) ? rows.map(r => r.id) : [];
-  const closed: string[] = []; let checked = 0;
+  const closed: string[] = []; let checked = 0, truncated = false;
   await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
     for (let id = queue.shift(); id; id = queue.shift()) {
-      const verdict = await verifyOffer(id);
+      // El reloj gobierna cada comprobación: sin tiempo no se empieza otra. Las más antiguas van primero, así que mañana se continúa.
+      if (timeLeft(deadline) < 1500) { truncated = true; return; }
+      const verdict = await verifyOffer(id, callTimeout(10000, deadline));
       if (verdict) { checked++; if (verdict.result === 'closed') closed.push(id); }
     }
   }));
   if (closed.length) await setStatus(closed, 'withdrawn', 'auto-vigencia');
-  return { checked, withdrawn: closed.length };
+  return { checked, withdrawn: closed.length, ...(truncated ? { truncated } : {}) };
 }
 
 // ---- Escala: filtros, orden y paginación en el servidor (miles de ofertas) ----
