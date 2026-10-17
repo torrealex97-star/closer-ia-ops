@@ -1,5 +1,13 @@
 # Estado
 
+## ADR-013: base para roleplays de ventas por voz y entrevistas (sesión 57) — 2026-10-17
+
+- Solo documentación: [ADR-013](decisions/ADR-013-voice-roleplay-foundations.md) fija interfaces `VoiceProvider`/`LLMProvider` reemplazables, personalidades como configuración versionada, feedback con citas literales y reglas de privacidad del audio. No se instaló ni se escribió código de voz.
+- **Licencias — *inspeccionado*** (se leyó el fichero LICENSE en GitHub): Pipecat BSD-2-Clause, LiveKit Agents Apache-2.0, Kokoro (código) Apache-2.0, Whisper MIT, Chatterbox MIT, JobSpy MIT, JobSync MIT. **Descartadas:** Piper actual (GPL-3.0) y AIHawk (AGPL).
+- **Sin verificar:** licencia de los pesos de Kokoro y su calidad en español, el repo de «Close Call» y los otros proyectos de entrevistas (solo referencia). Nada de esto se ejecutó.
+- Verificación: `npm run handoff` y enlaces locales; no se ejecutaron tests de runtime porque no cambió código.
+- Retirado el claim cerrado `claude-schema-baseline`.
+
 ## Baseline de esquema de las 9 tablas sin versionar (sesión 54) — 2026-10-17
 
 - Añadido [supabase/schema/baseline_pre_2026-10-17.sql](../supabase/schema/baseline_pre_2026-10-17.sql): DDL de referencia de `admin_users`, `apify_actors`, `apify_runs`, `b2b_leads`, `external_ingest_runs`, `external_offers`, `integration_connections`, `source_settings`, `weekly_reports`, más sus índices, RLS, revocación de grants, las funciones `enforce_admin_allowlist`/`external_upsert` y el trigger de `auth.users`.
