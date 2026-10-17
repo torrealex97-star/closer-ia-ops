@@ -96,6 +96,12 @@ export function startMocks({ authPort, enginePort }) {
       if (req.method === 'POST') { state.ingestRuns.unshift({ ...body, created_at: new Date().toISOString() }); return send(res, 201, {}); }
       return send(res, 200, state.ingestRuns);
     }
+    if (url.pathname === '/rest/v1/b2b_leads') {
+      state.leads ??= new Map();
+      if (req.method === 'POST') { for (const r of body) { const k = `${r.advertiser}|${r.market}`; state.leads.set(k, { id: state.leads.get(k)?.id ?? crypto.randomUUID(), status: 'nuevo', notes: null, first_seen_at: new Date().toISOString(), ...state.leads.get(k), ...r }); } return send(res, 201, {}); }
+      if (req.method === 'PATCH') { const ids = url.searchParams.get('id').slice(4, -1).split(','); const hit = [...state.leads.values()].filter(l => ids.includes(l.id)); hit.forEach(l => Object.assign(l, body)); return send(res, 200, hit); }
+      return send(res, 200, [...state.leads.values()]);
+    }
     if (url.pathname === '/rest/v1/external_offers') {
       const q = Object.fromEntries(url.searchParams); const ids = q.id?.startsWith('in.(') ? q.id.slice(4, -1).split(',') : q.id?.startsWith('eq.') ? [q.id.slice(3)] : null;
       let rows = [...state.external.values()];

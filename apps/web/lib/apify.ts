@@ -167,9 +167,9 @@ export async function harvestPending(budgetMs = 40000): Promise<Array<{ run_id: 
 }
 
 // Cron diario: lanza los actores marcados como diarios (si hace más de 20 h de la última ejecución y hay presupuesto) y recoge lo pendiente.
-export async function dailyApify(publicBase: string) {
+export async function dailyApify(publicBase: string, opts: { start?: boolean } = {}) {
   const [actors, runs] = await Promise.all([listActors(), listRuns(60)]); const started: Array<{ actor: string; ok: boolean; error?: string }> = [];
-  for (const a of (actors ?? []).filter(x => x.schedule_daily)) {
+  for (const a of opts.start === false ? [] : (actors ?? []).filter(x => x.schedule_daily)) {
     if (runs?.some(r => r.actor_id === a.id && Date.now() - Date.parse(r.started_at) < 20 * 3600 * 1000)) continue;
     const r = await startRun(a, 'cron', publicBase); started.push({ actor: a.actor, ok: r.ok, error: r.ok ? undefined : r.error });
   }
