@@ -30,7 +30,12 @@ async function authorize(user: { id: string; email: string }): Promise<Student |
   return { user_id: user.id, email: user.email };
 }
 
-export async function authenticateStudent(request: NextRequest): Promise<StudentAuth> {
+// Interruptor del dueño: con STUDENT_LOGIN_REQUIRED=true la vista de oportunidades (`/` y su búsqueda) exige sesión de alumna.
+// Por defecto está apagado (la vista sigue abierta hasta que se decida activar el login).
+export const studentLoginRequired = () => /^(1|true|yes|on)$/i.test((process.env.STUDENT_LOGIN_REQUIRED ?? '').trim());
+
+type CookieReader = { cookies: { get(name: string): { value: string } | undefined } };
+export async function authenticateStudent(request: NextRequest | CookieReader): Promise<StudentAuth> {
   if (!studentSessionAvailable()) return { ok: false, status: 503, detail: 'El acceso de alumnas no está configurado en este despliegue.' };
   const access = request.cookies.get(STUDENT_ACCESS)?.value;
   if (access) {

@@ -1,5 +1,12 @@
 # Estado
 
+## Interruptor `STUDENT_LOGIN_REQUIRED` para proteger la vista de oportunidades (sesión 55) — 2026-10-17
+
+- Con `STUDENT_LOGIN_REQUIRED=true` (Vercel → Environment Variables + redeploy) `/` redirige a `/alumna` si no hay sesión de alumna válida y `POST /api/backend/opportunities/search` (modo hospedado) responde 401. **Por defecto está apagado**: nada cambia hasta que el dueño lo active, como se acordó.
+- Cambios: `studentLoginRequired()` y `authenticateStudent` acepta un lector de cookies (`lib/studentAuth.ts`), `app/page.tsx` (dinámica) y el proxy `app/api/backend/[...path]`.
+- **Verificación**: *probado* — `tests/admin-auth/gate.mjs` (parte de `run.sh`) arranca la app real con el flag y mocks de Supabase: redirección sin sesión, 401 con y sin cookie falsa, acceso con sesión de alumna, y flag apagado = abierto.
+- **Limitaciones**: no *verificado* con Supabase Auth real; la ruta `/` sigue pública mientras el flag esté apagado; las alumnas deben estar invitadas y con contraseña antes de activarlo.
+
 ## Contraste del texto pequeño: `--muted` → `--secondary` (sesión 53) — 2026-10-17
 
 - **Decisión del dueño**: aplicar el cambio recomendado. Los 13 usos de `color:var(--muted)` en texto de 8-11 px (`workspace-label`, `source-caption`, `score small`, `footnote`, cabeceras de tabla `.data-table th`, `.section-title`, `.muted`…) pasan a `var(--secondary)`: contraste **4,88:1** sobre `paper`, **5,10** sobre `sheet`, **4,56** sobre `inset` (antes 3,40 / 3,55 / 3,18; mínimo AA 4,5). `--muted` queda **solo** en `.icon-button` (iconos, ≥ 3:1). Cambio visual mínimo: mismo gris, algo más oscuro; la jerarquía sigue marcada por tamaño, mayúsculas y peso. No se tocó ningún otro color del tema.
