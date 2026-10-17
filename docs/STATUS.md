@@ -1,5 +1,11 @@
 # Estado
 
+## Interruptor `STUDENT_LOGIN_REQUIRED` para proteger la vista de oportunidades (sesión 55) — 2026-10-17
+
+- Con `STUDENT_LOGIN_REQUIRED=true` (Vercel → Environment Variables + redeploy) `/` redirige a `/alumna` si no hay sesión de alumna válida y `POST /api/backend/opportunities/search` (modo hospedado) responde 401. **Por defecto está apagado**: nada cambia hasta que el dueño lo active, como se acordó.
+- Cambios: `studentLoginRequired()` y `authenticateStudent` acepta un lector de cookies (`lib/studentAuth.ts`), `app/page.tsx` (dinámica) y el proxy `app/api/backend/[...path]`.
+- **Verificación**: *probado* — `tests/admin-auth/gate.mjs` (parte de `run.sh`) arranca la app real con el flag y mocks de Supabase: redirección sin sesión, 401 con y sin cookie falsa, acceso con sesión de alumna, y flag apagado = abierto.
+- **Limitaciones**: no *verificado* con Supabase Auth real; la ruta `/` sigue pública mientras el flag esté apagado; las alumnas deben estar invitadas y con contraseña antes de activarlo.
 ## Baseline de esquema de las 9 tablas sin versionar (sesión 54) — 2026-10-17
 
 - Añadido [supabase/schema/baseline_pre_2026-10-17.sql](../supabase/schema/baseline_pre_2026-10-17.sql): DDL de referencia de `admin_users`, `apify_actors`, `apify_runs`, `b2b_leads`, `external_ingest_runs`, `external_offers`, `integration_connections`, `source_settings`, `weekly_reports`, más sus índices, RLS, revocación de grants, las funciones `enforce_admin_allowlist`/`external_upsert` y el trigger de `auth.users`.

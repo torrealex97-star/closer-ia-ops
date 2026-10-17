@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { externalForStudent } from '../../../../lib/externalSurface';
 import { fold } from '../../../../lib/vocabulary';
+import { authenticateStudent, studentLoginRequired } from '../../../../lib/studentAuth';
 
 export const dynamic = 'force-dynamic';
 const allowed = new Set(['127.0.0.1:3100', 'localhost:3100']);
@@ -23,6 +24,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return Response.json({ detail: 'Origen no permitido' }, { status: 403 });
   }
   const { path } = await context.params;
+  // Login de alumnas activado: la búsqueda hospedada tampoco responde sin sesión (no basta con ocultar la página).
+  if (engine && studentLoginRequired() && path.join('/') === 'opportunities/search') {
+    const auth = await authenticateStudent(request);
+    if (!auth.ok) return Response.json({ detail: 'Inicia sesión como alumna.' }, { status: auth.status });
+  }
   if (local && !process.env.CAREER_LOCAL_TOKEN) return Response.json({ detail: 'Inicia la aplicación con npm run dev desde la raíz.' }, { status: 503 });
   if (path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) return new Response(null, { status: 400 });
   if (engine) {
