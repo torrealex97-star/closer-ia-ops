@@ -1,5 +1,13 @@
 # Estado
 
+## Aprendizajes de Growth Ops y skills importadas (sesión 47) — 2026-10-17
+
+- **Solo documentación y skills; no se ejecutó ni se probó código de la app.** Se leyó en solo lectura el repo `growth-ops-app` del propietario y se destiló lo generalizable en [LEARNINGS_GROWTH_OPS.md](LEARNINGS_GROWTH_OPS.md): qué ya cumplimos, 13 reglas nuevas (con acción concreta aquí), vocabulario inspeccionado/probado/verificado, y 6 cambios propuestos a `AGENTS.md` **pendientes de tu OK** (no se ha tocado `AGENTS.md`).
+- **Skills importadas** a `.agents/skills/` con enlaces en `.claude/skills/` (supabase, supabase-postgres-best-practices, apify-ultimate-scraper, integration-testing, nextjs-app-router-patterns, browser-testing-with-devtools, sales-engineering, find-skills; ~430 KB). Sin datos de tenants, personas ni credenciales de Growth Ops (comprobado por búsqueda de patrones); no se usó su BD ni sus secretos.
+- **Hallazgo de riesgo (inspeccionado, no probado):** el cron diario suma presupuestos que pueden superar `maxDuration = 60` con claves reales → propuesto incremento 1.4.
+- **Advisors de Supabase** (BD real, hoy): sin críticos. Pendiente tuyo: activar *Leaked password protection*. FK sin índice en `apify_runs.actor_id` (despreciable).
+- **Verificación**: solo de documentación — enlaces simbólicos sin roto y búsqueda de secretos en lo importado. Ningún test de la app se ejecutó para este cambio.
+
 ## Incremento 1.3: niveles de fuentes y leads B2B + cierre de grants (sesión 44) — 2026-10-17
 
 - **Seguridad (decisión 1A del operador)**: migración `revoke_public_grants_b2b_weekly` **aplicada en Supabase** (SQL en [supabase/migrations](../supabase/migrations/20261017_revoke_public_grants_b2b_weekly.sql)): `b2b_leads` y `weekly_reports` ya no tienen privilegios para `anon`/`authenticated`. Comprobado en `information_schema.role_table_grants`: quedan solo `postgres` y `service_role` (la app usa la service role). Aditiva y reversible con `grant`.
