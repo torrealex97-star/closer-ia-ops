@@ -6,7 +6,7 @@
 
 ## 1. Tablero (trabajos vivos)
 
-Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`); no hay otros agentes con ficha. En curso: `feat/cron-budget` (1.4).
+Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`); no hay otros agentes con ficha. Nada `in_progress` ahora mismo.
 
 | Rama | PR | Estado | Depende de |
 | --- | --- | --- | --- |
@@ -14,6 +14,7 @@ Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`)
 | `feat/student-matching` (3.1 recomendaciones) | #6 | validated, espera revisión | #5 |
 | `docs/growth-ops-learnings` | #7 | validated, espera revisión | — |
 | `docs/agents-handoff` (este relevo + reglas aprobadas en AGENTS.md) | #8 | validated, espera revisión | #7 |
+| `feat/cron-budget` (1.4 presupuesto de tiempo del cron) | #9 | validated, espera revisión | — (desde `main`) |
 
 **Orden de fusión:** #5 → #6 (cambiar la base de #6 a `main` tras fusionar #5) · #7 → #8 (igual). Merge commit, no squash, para conservar la pila.
 
@@ -29,7 +30,7 @@ Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`)
 
 ## 3. Tareas del dueño (lo que solo tú puedes hacer)
 
-1. **Revisar y fusionar** #5 → #6 y #7 → #8 (yo no fusiono).
+1. **Revisar y fusionar** #9 (independiente), #5 → #6 y #7 → #8 (yo no fusiono). Tras #9, el cron declara `truncated`/`spent_ms`: vigílalo en los logs de Vercel la primera semana.
 2. **Supabase → Authentication → URL Configuration:** permitir `https://app.womendigitalclosers.com/alumna/reset`. Activar *Leaked password protection*. Configurar SMTP propio.
 3. **Incremento 0.1 (Apify):** Panel → Apify, `max_items=10`, y pasar ofertas, coste real, campos del actor y errores. Comparar con `harvestapi/linkedin-job-search` si se quiere LinkedIn barato.
 4. **Pegar el tarball `closer-offers-engine`** y ejecutar `supabase db pull` (migraciones previas).
@@ -46,8 +47,7 @@ Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`)
 
 ## 5. Siguiente acción exacta
 
-1. **1.4 Presupuesto de tiempo del cron y escrituras que no se ignoran** (aprobado). Rama `feat/cron-budget` desde `main`. Ver su ficha cuando exista.
-2. Después, con OK: 3.2 candidatura **asistida** (la alumna revisa y envía; claim atómico; nada automático).
+1. *(1.4 hecha: PR #9.)* Con tu OK: 3.2 candidatura **asistida** (la alumna revisa y envía; claim atómico; nada automático).
 
 ## 6. No declarar PASS en
 
