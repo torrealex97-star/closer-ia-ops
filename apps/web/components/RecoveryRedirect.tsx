@@ -6,9 +6,9 @@ import { useEffect } from 'react';
 export default function RecoveryRedirect() {
   useEffect(() => {
     const { hash, pathname } = window.location;
-    if (pathname !== '/admin/reset' && /access_token=/.test(hash) && /type=recovery/.test(hash)) {
-      window.location.replace(`/admin/reset${hash}`);
-    }
+    if (pathname === '/admin/reset' || pathname === '/alumna/reset' || !/access_token=/.test(hash) || !/type=recovery/.test(hash)) return;
+    // Desde el portal de alumnas va a su pantalla; desde cualquier otro sitio, a la del panel (como antes).
+    window.location.replace(`${pathname.startsWith('/alumna') ? '/alumna/reset' : '/admin/reset'}${hash}`);
   }, []);
   return null;
 }
