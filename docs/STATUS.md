@@ -1,5 +1,12 @@
 # Estado
 
+## Baseline de esquema de las 9 tablas sin versionar (sesión 54) — 2026-10-17
+
+- Añadido [supabase/schema/baseline_pre_2026-10-17.sql](../supabase/schema/baseline_pre_2026-10-17.sql): DDL de referencia de `admin_users`, `apify_actors`, `apify_runs`, `b2b_leads`, `external_ingest_runs`, `external_offers`, `integration_connections`, `source_settings`, `weekly_reports`, más sus índices, RLS, revocación de grants, las funciones `enforce_admin_allowlist`/`external_upsert` y el trigger de `auth.users`.
+- **Evidencia**: *inspeccionado* contra el catálogo real de Supabase (consultas de solo lectura). El archivo **no se ha ejecutado** en ninguna BD. No es una migración (vive fuera de `supabase/migrations/` a propósito) ni son las migraciones originales.
+- **Limitaciones**: reconstruido de `pg_catalog`; no incluye datos, comentarios ni el historial de cambios. `supabase db pull` del dueño lo sustituirá.
+- Retirado el claim cerrado `claude-muted-contrast`.
+
 ## Contraste del texto pequeño: `--muted` → `--secondary` (sesión 53) — 2026-10-17
 
 - **Decisión del dueño**: aplicar el cambio recomendado. Los 13 usos de `color:var(--muted)` en texto de 8-11 px (`workspace-label`, `source-caption`, `score small`, `footnote`, cabeceras de tabla `.data-table th`, `.section-title`, `.muted`…) pasan a `var(--secondary)`: contraste **4,88:1** sobre `paper`, **5,10** sobre `sheet`, **4,56** sobre `inset` (antes 3,40 / 3,55 / 3,18; mínimo AA 4,5). `--muted` queda **solo** en `.icon-button` (iconos, ≥ 3:1). Cambio visual mínimo: mismo gris, algo más oscuro; la jerarquía sigue marcada por tamaño, mayúsculas y peso. No se tocó ningún otro color del tema.
