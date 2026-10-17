@@ -46,9 +46,9 @@ export function startMocks({ authPort, enginePort }) {
     }
     if (url.pathname === '/auth/v1/logout') { state.tokens.delete(bearer); return send(res, 204, {}); }
     if (url.pathname === '/auth/v1/admin/users' && req.method === 'POST') {
-      if (!state.admins.some(a => a.email === body.email)) return send(res, 500, { msg: 'signup_disabled' }); // espejo del trigger de BD
+      if (!state.admins.some(a => a.email === body.email) && !(state.students ?? []).some(x => x.email === body.email && x.status !== 'paused')) return send(res, 500, { msg: 'signup_disabled' }); // espejo del trigger de BD
       if (state.users.has(body.email)) return send(res, 422, { msg: 'exists' });
-      state.users.set(body.email, { id: 'u' + (state.users.size + 1), password: null }); return send(res, 200, { id: 'new', email: body.email });
+      state.users.set(body.email, { id: crypto.randomUUID(), password: null }); return send(res, 200, { id: 'new', email: body.email });
     }
     if (url.pathname === '/auth/v1/admin/users' && req.method === 'GET') {
       return send(res, 200, { users: [...state.users].map(([email, u]) => ({ id: u.id, email })) });
@@ -95,6 +95,20 @@ export function startMocks({ authPort, enginePort }) {
     if (url.pathname === '/rest/v1/external_ingest_runs') {
       if (req.method === 'POST') { state.ingestRuns.unshift({ ...body, created_at: new Date().toISOString() }); return send(res, 201, {}); }
       return send(res, 200, state.ingestRuns);
+    }
+    if (url.pathname === '/rest/v1/students') {
+      state.students ??= []; const q = Object.fromEntries(url.searchParams); const eqv = k => q[k]?.startsWith('eq.') ? decodeURIComponent(q[k].slice(3)) : null;
+      let rows = state.students.filter(r => (!eqv('email') || r.email === eqv('email')) && (!eqv('id') || r.id === eqv('id')) && (q.status !== 'neq.paused' || r.status !== 'paused'));
+      if (req.method === 'POST') { if (state.students.some(r => r.email === body.email)) return send(res, 409, {}); state.students.unshift({ id: crypto.randomUUID(), user_id: null, status: 'invited', created_at: new Date().toISOString(), ...body }); return send(res, 201, {}); }
+      if (req.method === 'PATCH') { rows.forEach(r => Object.assign(r, body)); return send(res, 200, rows); }
+      if (req.method === 'DELETE') { state.students = state.students.filter(r => !rows.includes(r)); return send(res, 204, {}); }
+      return send(res, 200, rows);
+    }
+    if (url.pathname === '/rest/v1/student_profiles') {
+      state.profiles ??= new Map(); const q = Object.fromEntries(url.searchParams); const uid = q.user_id?.slice(3);
+      if (req.method === 'POST') { const row = { ...state.profiles.get(body.user_id), ...body }; state.profiles.set(body.user_id, row); return send(res, 201, [row]); }
+      if (req.method === 'DELETE') { state.profiles.delete(uid); return send(res, 204, {}); }
+      return send(res, 200, state.profiles.has(uid) ? [state.profiles.get(uid)] : []);
     }
     if (url.pathname === '/rest/v1/b2b_leads') {
       state.leads ??= new Map();
