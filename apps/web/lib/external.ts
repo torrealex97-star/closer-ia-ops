@@ -24,11 +24,27 @@ export const scrub = (text: string) => text
   .replace(/\s+/g, ' ').trim();
 const RAW_KEYS = ['site', 'job_type', 'is_remote', 'job_level', 'listing_type', 'provider', 'category'];
 
-export function sanitize(input: unknown): Candidate | null {
-  if (!input || typeof input !== 'object') return null;
+// URL canónica: sin fragmento ni parámetros de seguimiento (utm_*, fbclid, gclid...), para no duplicar el mismo anuncio.
+const TRACKING = /^(utm_.*|fbclid|gclid|msclkid|mc_[a-z]+|trk|trackingid|refid|ref|source)$/i;
+export function normalizeUrl(raw: string): string {
+  try {
+    const u = new URL(raw); u.hash = '';
+    for (const k of [...u.searchParams.keys()]) if (TRACKING.test(k)) u.searchParams.delete(k);
+    u.searchParams.sort();
+    return u.href.length <= 1000 ? u.href : raw;
+  } catch { return raw; }
+}
+
+export type Rejection = 'no_objeto' | 'sin_id' | 'sin_titulo' | 'sin_url' | 'url_no_http';
+export function classify(input: unknown): { candidate: Candidate } | { reason: Rejection } {
+  if (!input || typeof input !== 'object') return { reason: 'no_objeto' };
   const c = input as Record<string, unknown>;
-  const external_id = clip(c.external_id, 200), title = clip(c.title, 200), url = clip(c.url, 1000);
-  if (!external_id || !title || !url || !/^https?:\/\/[^\s]+$/i.test(url)) return null;
+  const external_id = clip(c.external_id, 200), title = clip(c.title, 200), url0 = clip(c.url, 1000);
+  if (!external_id) return { reason: 'sin_id' };
+  if (!title) return { reason: 'sin_titulo' };
+  if (!url0) return { reason: 'sin_url' };
+  if (!/^https?:\/\/[^\s]+$/i.test(url0)) return { reason: 'url_no_http' };
+  const url = normalizeUrl(url0);
   let posted_at: string | null = null;
   if (typeof c.posted_at === 'string' && c.posted_at) { const t = Date.parse(c.posted_at); if (Number.isFinite(t)) posted_at = new Date(t).toISOString(); }
   const description = typeof c.description === 'string' ? scrub(c.description).slice(0, 6000) || null : null;
@@ -36,7 +52,33 @@ export function sanitize(input: unknown): Candidate | null {
   const raw = Object.fromEntries(Object.entries(rawIn).filter(([k, v]) => RAW_KEYS.includes(k) && ['string', 'number', 'boolean'].includes(typeof v)));
   // Sin salario estructurado, se rescata la frase literal del texto (solo con importe en € y periodo o bruto/neto).
   const salary = clip(c.salary, 200) ?? (typeof c.description === 'string' ? salaryFromText(c.description) : null);
-  return { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary, description, posted_at, raw };
+  return { candidate: { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary, description, posted_at, raw } };
+}
+export const sanitize = (input: unknown): Candidate | null => { const r = classify(input); return 'candidate' in r ? r.candidate : null; };
+
+// Guardado resistente: lotes de 100, 2 reintentos con espera ante 5xx/red y, si un lote sigue fallando, fila a fila para
+// aislar la oferta mala. Nunca se pierde un lote entero por una fila ni se oculta lo que sí se guardó.
+const CHUNK = 100;
+async function upsertRows(source: string, rows: Array<Record<string, unknown>>, sleep: (ms: number) => Promise<void>): Promise<number> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await serviceRest('rpc/external_upsert', { method: 'POST', body: JSON.stringify({ p_org: ORG, p_source: source, p_rows: rows }) });
+      if (response.ok) return Number(await response.json().catch(() => 0)) || 0;
+      if (response.status < 500 && response.status !== 429) break; // error de datos: reintentar no ayuda
+    } catch { /* red: se reintenta */ }
+    if (attempt < 2) await sleep(300 * 2 ** attempt);
+  }
+  return -1;
+}
+export async function saveCandidates(source: string, rows: Array<Record<string, unknown>>, sleep: (ms: number) => Promise<void> = ms => new Promise(r => setTimeout(r, ms))): Promise<{ accepted: number; failed: number }> {
+  let accepted = 0, failed = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const n = await upsertRows(source, chunk, sleep);
+    if (n >= 0) { accepted += n; continue; }
+    for (const row of chunk) { const one = await upsertRows(source, [row], sleep); if (one >= 0) accepted += one; else failed++; }
+  }
+  return { accepted, failed };
 }
 
 export async function pausedSources(): Promise<Set<string>> {
@@ -61,19 +103,26 @@ export async function ingest(source: string, via: string, candidates: unknown[],
     await serviceRest('external_ingest_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, source, via, received, accepted: 0, rejected: received, note: 'Fuente pausada: no se guardó nada' }) });
     return { received, accepted: 0, rejected: received, paused: true };
   }
-  const clean = candidates.slice(0, MAX_CANDIDATES).map(sanitize).filter((c): c is Candidate => c !== null);
-  // Mismo anuncio dos veces en el lote: se queda el último.
-  const unique = [...new Map(clean.map(c => [c.external_id, c])).values()];
-  let accepted = 0;
+  const reasons: Record<string, number> = {};
+  const clean: Candidate[] = [];
+  for (const input of candidates.slice(0, MAX_CANDIDATES)) {
+    const r = classify(input);
+    if ('candidate' in r) clean.push(r.candidate); else reasons[r.reason] = (reasons[r.reason] ?? 0) + 1;
+  }
+  // Mismo anuncio dos veces en el lote (por id o por URL canónica): se queda el último.
+  const byUrl = new Map(clean.map(c => [c.url, c]));
+  const unique = [...new Map([...byUrl.values()].map(c => [c.external_id, c])).values()];
+  let accepted = 0, failed = 0;
   if (unique.length) {
     // Perfil, España, puntuación y huella (para ordenar y deduplicar entre fuentes) se calculan al entrar.
     const rows = unique.map(c => ({ ...c, ...enrich(c) }));
-    const response = await serviceRest('rpc/external_upsert', { method: 'POST', body: JSON.stringify({ p_org: ORG, p_source: source, p_rows: rows }) });
-    if (!response.ok) throw new Error('No se pudo guardar los candidatos.');
-    accepted = Number(await response.json().catch(() => 0)) || 0;
+    ({ accepted, failed } = await saveCandidates(source, rows));
+    if (failed === rows.length) throw new Error('No se pudo guardar los candidatos.');
   }
   const received = Math.min(candidates.length, MAX_CANDIDATES);
-  await serviceRest('external_ingest_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, source, via, received, accepted, rejected: received - accepted, note: note ?? null }) });
+  const discarded = Object.entries(reasons).map(([k, v]) => `${k}:${v}`).join(' ');
+  const notes = [note, discarded && `descartadas ${discarded}`, failed && `${failed} fila(s) no se pudieron guardar`].filter(Boolean).join(' · ') || null;
+  await serviceRest('external_ingest_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, source, via, received, accepted, rejected: received - accepted, note: notes }) });
   return { received, accepted, rejected: received - accepted };
 }
 
