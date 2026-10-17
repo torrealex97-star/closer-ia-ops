@@ -1,5 +1,12 @@
 # Estado
 
+## Panel de métricas rediseñado con `dashboard-design` (sesión 51) — 2026-10-17
+
+- **Qué** ([MetricsPanel.tsx](../apps/web/components/MetricsPanel.tsx)): título con la conclusión («Últimos 14 días: N ofertas buenas»), gráfico de barras SVG con **base en 0**, valor máximo en el eje, fechas inicial/final y el día más alto etiquetado; color por token (`--accent`, comprobado en el navegador: `rgb(141,70,61)`); **alternativa en tabla** (por día, por nivel con % de buenas y por fuente) y `role="img"` con resumen en `aria-label`; **estados**: cargando, **error con «Reintentar»** (antes se quedaba en un texto), **vacío** (sin ofertas nuevas, explicando que no prueba que las fuentes funcionen) y sin-dato como **«—» con su causa** (coste de Apify: «sin ejecuciones» / «aún sin ofertas buenas»). Sin gráficos de tarta, sin librería nueva, texto secundario con `--secondary` (no `--muted`). Estilo nuevo en `globals.css` solo para cabeceras de fila (sin mayúsculas), con tokens.
+- **Sin cambios** de API, de datos ni de la paleta. `--muted` sigue pendiente de decisión del dueño.
+- **Verificación**: `run.sh` 37/37 de flujo + 8/8 de interfaz (nuevos: resumen accesible del gráfico, fill computado = token, tabla de 14 días, error → reintentar → vuelve, sin scroll horizontal a 390 px), typecheck, build, `npm run design`; captura revisada a mano. *Probado* con datos simulados; el panel con datos reales aún no se ha visto (catálogo vacío).
+- **Limitaciones**: con un solo día con datos el gráfico muestra una barra aislada (es lo real); no hay selector de periodo (fijo 14 días); el gráfico no es interactivo (solo `title` por barra).
+
 ## Skills de diseño y gráficas para todos los dashboards (sesión 50) — 2026-10-17
 
 - **Importadas** (de Growth Ops, lectura): `data-visualization-pro` (teoría de gráficas, sin cambios) y `design-taste-frontend` (landings/superficie de alumna; su sección específica de ese proyecto —acento azul, shadcn— **se reescribió** para esta marca). **No importada**: `data-visualization` (Python/matplotlib; no aplica) ni la dirección visual de Growth Ops (dashboards oscuros con Recharts): aquí manda `docs/DESIGN.md` (papel y tinta).
