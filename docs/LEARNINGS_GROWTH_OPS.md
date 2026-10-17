@@ -62,8 +62,11 @@ Copiadas a `.agents/skills/` con enlaces simbólicos en `.claude/skills/` (patr�
 | `browser-testing-with-devtools` | Verificación real en navegador |
 | `sales-engineering` | Método comercial high-ticket (llamada, objeciones, KPIs): **material de formación para las alumnas closers**, no para el código |
 | `find-skills` | Descubrir skills nuevas |
+| `data-visualization-pro` | Teoría de gráficas: qué gráfico elegir, percepción, color, rendimiento (agnóstica de librería) |
+| `design-taste-frontend` | Diseño anti-genérico para landings y superficie de alumna; **adaptada** (sección 12 reescrita para esta marca) |
+| `dashboard-design` | **Propia de este repo:** reglas de dashboards/gráficas con los tokens reales, contrastes calculados y verificación (`npm run design`) |
 
-**No importadas (a propósito):** `marketing-and-copywriting`, `data-visualization(-pro)`, `oauth-implementation`, `apify-actor-development/actorization/generate-output-schema/integration-development` (construir actores propios; hoy no se hace). Se pueden traer cuando haya necesidad.
+**No importadas (a propósito):** `marketing-and-copywriting` (decisión del dueño), `data-visualization` (versión Python/matplotlib; aquí no aplica), `oauth-implementation`, `apify-actor-development/actorization/generate-output-schema/integration-development` (construir actores propios; hoy no se hace). Se pueden traer cuando haya necesidad.
 
 ## 6. Cambios propuestos a `AGENTS.md` (esperan tu OK; no se han tocado)
 

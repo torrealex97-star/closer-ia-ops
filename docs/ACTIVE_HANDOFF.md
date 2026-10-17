@@ -14,6 +14,7 @@ Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`)
 | `feat/student-matching` (3.1 recomendaciones) | #6 | validated, espera revisión | #5 |
 | `docs/growth-ops-learnings` | #7 | validated, espera revisión | — |
 | `docs/agents-handoff` (este relevo + reglas aprobadas en AGENTS.md) | #8 | validated, espera revisión | #7 |
+| `docs/design-chart-skills` (skills de diseño y gráficas) | #10 | validated, espera revisión | #8 |
 | `feat/cron-budget` (1.4 presupuesto de tiempo del cron) | #9 | validated, espera revisión | — (desde `main`) |
 
 **Orden de fusión:** #5 → #6 (cambiar la base de #6 a `main` tras fusionar #5) · #7 → #8 (igual). Merge commit, no squash, para conservar la pila.
@@ -30,14 +31,15 @@ Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`)
 
 ## 3. Tareas del dueño (lo que solo tú puedes hacer)
 
-1. **Revisar y fusionar** #9 (independiente), #5 → #6 y #7 → #8 (yo no fusiono). Tras #9, el cron declara `truncated`/`spent_ms`: vigílalo en los logs de Vercel la primera semana.
+1. **Revisar y fusionar** #9 (independiente), #5 → #6 y #7 → #8 (yo no fusiono). Orden docs: #7 → #8 → #10. Tras #9, el cron declara `truncated`/`spent_ms`: vigílalo en los logs de Vercel la primera semana.
 2. **Supabase → Authentication → URL Configuration:** permitir `https://app.womendigitalclosers.com/alumna/reset`. Activar *Leaked password protection*. Configurar SMTP propio.
 3. **Incremento 0.1 (Apify):** Panel → Apify, `max_items=10`, y pasar ofertas, coste real, campos del actor y errores. Comparar con `harvestapi/linkedin-job-search` si se quiere LinkedIn barato.
 4. **Pegar el tarball `closer-offers-engine`** y ejecutar `supabase db pull` (migraciones previas).
 5. **Vercel:** `INGEST_TOKEN` (y en GitHub secrets), claves InfoJobs/Adzuna/Jooble en Panel → APIs; **redeploy tras cambiar variables**; pasar a **Pro** antes de abrir a alumnas.
 6. **Revisor IA:** dejar 5-7 días en shadow y comparar con tus decisiones; el paso a `live` es tuyo. Conjunto dorado (~30 ofertas etiquetadas) antes de decidir.
 7. **Legal:** revisar el texto de consentimiento (`v1-borrador`) y la política de privacidad antes de abrir a alumnas.
-8. **Activar el login para las alumnas** (decisión tuya, pendiente): hoy `/` sigue abierta sin login.
+8. **Decidir `--muted`** (contraste 3,4:1, no cumple AA en texto pequeño): ¿lo sustituyo por `--secondary` en texto < 14 px? Ver `dashboard-design`.
+9. **Activar el login para las alumnas** (decisión tuya, pendiente): hoy `/` sigue abierta sin login.
 
 ## 4. Decisiones pendientes
 

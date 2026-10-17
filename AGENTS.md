@@ -21,6 +21,11 @@ Architecture revision: docs/decisions/ADR-007-groq-opportunity-surfaces.md and d
 - Student data: never send student profile data to an LLM without a processing agreement and zero retention. Matching stays deterministic.
 - Evidence wording in STATUS and PRs: *inspected* (read), *tested* (executed in a controlled or simulated environment), *verified* (confirmed against the real service). Never claim a higher level than was reached.
 
+## Design and charts
+
+- Before creating or changing any dashboard, KPI, chart, table or empty state in `apps/web`, read `.agents/skills/dashboard-design/SKILL.md` (and `docs/DESIGN.md`); theory in `data-visualization-pro`. Student-facing pages (`/alumna`, opportunities view) use `design-taste-frontend` within `docs/DESIGN.md`. No hex colors outside the tokens in `globals.css` (`npm run design`).
+- A gap is not a zero: unknown / failed / unconfigured / empty are shown differently ("—" plus the cause). Color is never the only encoding. Every non-trivial chart has a text or table alternative.
+
 ## Working with several agents
 
 - Read `docs/ACTIVE_HANDOFF.md` and run `node scripts/handoff.mjs list` before starting. One claim file per live job in `docs/handoff/claims/`; do not touch what another claim lists in `touches`. `npm run handoff` must pass. Rules and template: `docs/handoff/README.md`.

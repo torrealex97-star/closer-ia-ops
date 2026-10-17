@@ -42,6 +42,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node tests/handoff.mjs && npm run handoff
+      - run: node tests/design.mjs && npm run design
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:web
