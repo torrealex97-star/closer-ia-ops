@@ -10,13 +10,13 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 
 | Rama | PR | Estado |
 | --- | --- | --- |
-| `docs/housekeeping` (limpieza + skill de marketing) | — | validated |
-| *(siguientes)* `feat/metrics-panel-design` → `feat/student-application` (3.2) | — | por empezar, en ese orden |
+| `feat/metrics-panel-design` (panel de métricas con `dashboard-design`) | #12 | validated |
+| `feat/student-application` (3.2 formulario base + candidaturas asistidas) | #13 | validated, depende de #12 |
 
 ## 2. Estado de `main`
 
 - **Fusionado hoy** (PRs #1-#10, en orden, con CI de GitHub en verde antes de cada fusión): revisor IA shadow, métricas, ingesta robusta, niveles de fuentes + leads B2B + grants, presupuesto de tiempo del cron, login de alumnas + perfil + RLS, recomendaciones, aprendizajes/skills, relevo entre agentes, skills de diseño y gráficas. Detalle: `docs/handoff/archive/2026-10.md`.
-- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. Aplicada y **pendiente de versionar con la 3.2**: `student_application_profile` (tablas `student_application_profiles` y `student_applications`, aditiva). Las 9 migraciones previas siguen sin versionar (hace falta `supabase db pull`).
+- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2; en la PR #13). Las 9 migraciones previas siguen sin versionar (hace falta `supabase db pull`).
 - **Evidencia (inspeccionado / probado / verificado):**
   - *Verificado en GitHub:* el workflow `Quality` (jobs `verify` y `web-admin`) pasa en verde en las PRs #5-#10.
   - *Verificado en BD real:* RLS de alumnas (`tests/db/student_rls.sql`, 12/12 con rollback) y grants.
@@ -39,12 +39,13 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 - Los vídeos NO se guardan: cada alumna guarda el suyo en su Drive y solo se guarda el enlace.
 - 3.2 candidaturas: **asistidas** ahora (ella revisa y envía); el diseño deja preparada la automatización futura (ver ADR-012) sin activarla.
 - Skills de marketing importadas (para cuando haga falta).
+- Candidaturas: formulario base con consentimiento de autorrelleno futuro aparte (ADR-012).
 - Fusión de PRs: el dueño autoriza fusionar las que estén listas (CI verde) en cada petición; no es permiso permanente.
 
 ## 5. Siguiente acción exacta
 
-1. `feat/metrics-panel-design`: aplicar `dashboard-design` al panel de métricas (único gráfico real).
-2. `feat/student-application` (3.2): formulario base + candidatura asistida (migración ya aplicada).
+1. Fusionar #12 y #13 (CI verde). Después, con OK: activar el login para alumnas (tarea 7) y, cuando haya datos reales, calibrar matching y revisar el revisor IA.
+2. Fase 4 (automatización) NO empieza sin autorización escrita: ver ADR-012.
 
 ## 6. No declarar PASS en
 
