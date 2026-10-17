@@ -1,19 +1,20 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, BriefcaseBusiness, CloudCog, Globe2, ChevronRight, FileCheck2, LayoutDashboard, ListChecks, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Activity, BriefcaseBusiness, CloudCog, Globe2, ChevronRight, FileCheck2, LayoutDashboard, ListChecks, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users, GraduationCap } from 'lucide-react';
 import CloudAdminPanel from './CloudAdminPanel';
 import ApifyTab from './ApifyTab';
 import ApisTab from './ApisTab';
 import CatalogTab from './CatalogTab';
 import ExternalTab from './ExternalTab';
 import QuickReview from './QuickReview';
+import StudentsTab from './StudentsTab';
 import SummaryTab from './SummaryTab';
 import sourceCatalog from '../lib/sourceCatalog.json';
 
 // Panel hospedado: mismo marco que el panel local (barra lateral, cabecera, título en serif), con acceso por
 // email + contraseña de Supabase Auth (solo usuarios invitados) y las secciones de gestión de la app.
 export type Me = { email: string; role: 'owner' | 'admin' };
-type Tab = 'summary' | 'quick' | 'external' | 'apify' | 'review' | 'catalog' | 'sources' | 'apis' | 'users';
+type Tab = 'summary' | 'quick' | 'external' | 'apify' | 'review' | 'catalog' | 'sources' | 'apis' | 'students' | 'users';
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/admin/${path}`, { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -205,6 +206,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; eyebrow: stri
   { id: 'catalog', label: 'Probar ofertas', icon: <Search size={18} />, eyebrow: 'LO QUE RECOGE EL MOTOR', title: 'Prueba las ofertas.', lead: 'Mira todo el catálogo o lo que vería una alumna ahora mismo con los mismos filtros.' },
   { id: 'sources', label: 'Fuentes', icon: <Activity size={18} />, eyebrow: 'TU MESA DE TRABAJO', title: 'Fuentes de datos.', lead: 'Estado real de cada fuente y de las conexiones del sistema.' },
   { id: 'apis', label: 'APIs', icon: <Plug size={18} />, eyebrow: 'CLAVES Y PROVEEDORES', title: 'APIs y conexiones.', lead: 'Guarda las claves de los proveedores y comprueba que funcionan.' },
+  { id: 'students', label: 'Alumnas', icon: <GraduationCap size={18} />, eyebrow: 'QUIÉN ENTRA A SU ESPACIO', title: 'Alumnas con acceso.', lead: 'Invita, pausa o da de baja a las alumnas. Solo ellas ven su propio perfil.' },
   { id: 'users', label: 'Usuarios', icon: <Users size={18} />, eyebrow: 'QUIÉN ENTRA', title: 'Equipo con acceso.', lead: 'Solo las personas de esta lista pueden entrar al panel.' },
 ];
 
@@ -246,6 +248,7 @@ export default function AdminShell() {
         {tab === 'catalog' && <CatalogTab onSessionLost={lost} />}
         {tab === 'sources' && <SourcesTab onSessionLost={lost} />}
         {tab === 'apis' && <ApisTab owner={me.role === 'owner'} onSessionLost={lost} />}
+        {tab === 'students' && <StudentsTab owner={me.role === 'owner'} onSessionLost={lost} />}
         {tab === 'users' && <UsersTab me={me} onSessionLost={lost} />}
       </main>
     </div>

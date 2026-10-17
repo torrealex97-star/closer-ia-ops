@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { timeLeft, MIN_STEP_MS } from './cronBudget';
 import { ingest, MAX_CANDIDATES, ORG, type Candidate } from './external';
 import { getSecret } from './integrations';
 import { serviceRest } from './supabaseAuth';
@@ -111,8 +112,14 @@ export async function startRun(actor: ActorRow, by: string, publicBase: string):
   if (!response.ok) return { ok: false, error: response.status === 401 || response.status === 403 ? 'Apify rechazó la clave.' : `Apify respondió HTTP ${response.status}.` };
   const run = (await response.json().catch(() => ({}))).data as { id?: string; defaultDatasetId?: string } | undefined;
   if (!run?.id) return { ok: false, error: 'Apify no devolvió el identificador de la ejecución.' };
-  await serviceRest('apify_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, actor_id: actor.id, run_id: run.id, dataset_id: run.defaultDatasetId ?? null, status: 'RUNNING', started_by: by }) });
-  return { ok: true, run_id: run.id };
+  // La ejecución ya está lanzada (y se paga): si no se puede registrar, se reintenta y, si sigue fallando, se DECLARA con su id
+  // para recogerla a mano; nunca se devuelve éxito con una ejecución que la app no conoce (no se recogería ni contaría en el tope).
+  const row = JSON.stringify({ org_id: ORG, actor_id: actor.id, run_id: run.id, dataset_id: run.defaultDatasetId ?? null, status: 'RUNNING', started_by: by });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const saved = await serviceRest('apify_runs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: row }).catch(() => null);
+    if (saved?.ok) return { ok: true, run_id: run.id };
+  }
+  return { ok: false, error: `Apify lanzó la ejecución ${run.id} pero no se pudo registrar en la base de datos: no se recogerá sola. Anótala y revisa la conexión a Supabase.` };
 }
 
 // ---- elementos del dataset -> candidatos ----
@@ -138,7 +145,7 @@ export async function harvestRun(run: RunRow, actor: ActorRow, budgetMs = 40000)
   const token = await apifyToken(); if (!token) return { status: run.status, harvested: run.harvested, done: false, error: 'Sin clave de Apify.' };
   const info = await api(`/v2/actor-runs/${run.run_id}`, token); if (!info.ok) return { status: run.status, harvested: run.harvested, done: false, error: `HTTP ${info.status}` };
   const data = (await info.json().catch(() => ({}))).data as { status?: string; defaultDatasetId?: string; usageTotalUsd?: number } | undefined; const status = data?.status ?? run.status;
-  const patch = (body: Record<string, unknown>) => serviceRest(`apify_runs?run_id=eq.${encodeURIComponent(run.run_id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+  const patch = async (body: Record<string, unknown>) => (await serviceRest(`apify_runs?run_id=eq.${encodeURIComponent(run.run_id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) }).catch(() => null))?.ok === true;
   if (FAILED.has(status)) { await patch({ status, finished_at: new Date().toISOString(), cost_usd: data?.usageTotalUsd ?? null, error: `La ejecución terminó como ${status}.` }); return { status, harvested: run.harvested, done: true, error: status }; }
   if (!DONE.has(status)) return { status, harvested: run.harvested, done: false };
   const dataset = run.dataset_id ?? data?.defaultDatasetId; if (!dataset) { await patch({ status, error: 'Sin dataset.' }); return { status, harvested: run.harvested, done: true, error: 'Sin dataset' }; }
@@ -149,10 +156,12 @@ export async function harvestRun(run: RunRow, actor: ActorRow, budgetMs = 40000)
     const items = await page.json().catch(() => []) as Array<Record<string, unknown>>;
     if (!Array.isArray(items) || !items.length) { finished = true; break; }
     await ingest(actor.source, 'apify', items.map(mapItem).filter((c): c is Candidate => c !== null), `Apify ${actor.actor} · ${run.run_id}`);
-    offset += items.length; harvested += items.length; await patch({ harvested, items_total: harvested });
+    offset += items.length; harvested += items.length;
+    if (!await patch({ harvested, items_total: harvested })) return { status, harvested, done: false, error: 'No se pudo guardar el avance; se reanuda desde el último punto guardado (la entrada es idempotente).' };
     if (items.length < MAX_CANDIDATES) { finished = true; break; }
   }
-  if (finished) await patch({ status, harvested, items_total: harvested, finished_at: new Date().toISOString(), cost_usd: data?.usageTotalUsd ?? null, error: null });
+  // Cerrar la ejecución guarda su coste real (alimenta el tope mensual): si no se pudo guardar, NO se da por terminada y se reintenta.
+  if (finished && !await patch({ status, harvested, items_total: harvested, finished_at: new Date().toISOString(), cost_usd: data?.usageTotalUsd ?? null, error: null })) return { status, harvested, done: false, error: 'No se pudo guardar el cierre y el coste de la ejecución; se reintentará.' };
   return { status, harvested, done: finished };
 }
 
@@ -167,11 +176,13 @@ export async function harvestPending(budgetMs = 40000): Promise<Array<{ run_id: 
 }
 
 // Cron diario: lanza los actores marcados como diarios (si hace más de 20 h de la última ejecución y hay presupuesto) y recoge lo pendiente.
-export async function dailyApify(publicBase: string, opts: { start?: boolean } = {}) {
+export async function dailyApify(publicBase: string, opts: { start?: boolean; deadline?: number } = {}) {
   const [actors, runs] = await Promise.all([listActors(), listRuns(60)]); const started: Array<{ actor: string; ok: boolean; error?: string }> = [];
   for (const a of opts.start === false ? [] : (actors ?? []).filter(x => x.schedule_daily)) {
     if (runs?.some(r => r.actor_id === a.id && Date.now() - Date.parse(r.started_at) < 20 * 3600 * 1000)) continue;
+    if (timeLeft(opts.deadline) < MIN_STEP_MS * 2) { started.push({ actor: a.actor, ok: false, error: 'Sin tiempo en el presupuesto del cron: se lanzará en la próxima ejecución.' }); continue; }
     const r = await startRun(a, 'cron', publicBase); started.push({ actor: a.actor, ok: r.ok, error: r.ok ? undefined : r.error });
   }
-  return { started, harvested: await harvestPending(25000) };
+  const harvested = await harvestPending(Math.max(0, Math.min(25000, timeLeft(opts.deadline))));
+  return { started, harvested, ...(timeLeft(opts.deadline) < MIN_STEP_MS ? { truncated: true } : {}) };
 }

@@ -76,6 +76,8 @@ export async function authHealthy(): Promise<boolean> {
 const rest = (path: string, init: RequestInit = {}) =>
   call(`/rest/v1/${path}`, { key: serviceKey(), ...init });
 export const serviceRest = rest;
+// Llamada a la API de Auth (admin) con la service role. Solo servidor.
+export const serviceAuth = (path: string, init: RequestInit = {}) => call(path, { key: serviceKey(), ...init });
 
 export async function adminRole(email: string): Promise<AdminRole | null> {
   const response = await rest(`admin_users?email=eq.${encodeURIComponent(email)}&select=role&limit=1`);
@@ -91,7 +93,7 @@ export async function listAdmins(): Promise<AdminRow[] | null> {
   return Array.isArray(rows) ? rows : null;
 }
 
-async function findAuthUserId(email: string): Promise<string | null> {
+export async function findAuthUserId(email: string): Promise<string | null> {
   for (let page = 1; page <= 5; page++) {
     const response = await call(`/auth/v1/admin/users?page=${page}&per_page=200`, { key: serviceKey() });
     if (!response.ok) return null;
