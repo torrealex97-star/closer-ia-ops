@@ -6,7 +6,7 @@
 
 ## 1. Tablero (trabajos vivos)
 
-Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`); no hay otros agentes con ficha.
+Fuente: `node scripts/handoff.mjs list`. Hoy hay un solo agente (`claude-cloud`); no hay otros agentes con ficha. En curso: `feat/cron-budget` (1.4).
 
 | Rama | PR | Estado | Depende de |
 | --- | --- | --- | --- |
