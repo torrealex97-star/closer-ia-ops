@@ -211,6 +211,8 @@ await step('cron: exige CRON_SECRET', async () => {
   assert.equal((await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer incorrecto-0123456789' } })).status, 401);
   const r = await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
   assert.equal(r.status, 200); assert.equal(r.json.outcomes.length, 3);
+  // Presupuesto de tiempo: la respuesta declara los cortes y lo gastado, muy por debajo de maxDuration (60 s)
+  assert.ok(Array.isArray(r.json.truncated)); assert.ok(r.json.spent_ms >= 0 && r.json.spent_ms < 40000);
 });
 await step('vista de alumna: suma solo externas aprobadas que cumplen perfil, España y español', async () => {
   const ext = Object.fromEntries([...state.external.values()].map(o => [o.external_id, o]));
@@ -325,6 +327,15 @@ await step('Apify: lanzar adapta la entrada al esquema, aplica límites, webhook
   state.apifyRuns.find(x => x.run_id === 'OLD1'); const calls = state.apifyCalls.length;
   const over = await start({ id: tpl.id }); assert.equal(over.status, 409); assert.match(over.json.detail, /Presupuesto mensual agotado/); assert.equal(state.apifyCalls.length, calls);
   state.apifyRuns = state.apifyRuns.filter(x => x.run_id !== 'OLD1');
+});
+await step('Apify: una ejecución lanzada que no se puede registrar se DECLARA con su id (no es un éxito falso)', async () => {
+  const [jobspy] = (await call('/api/admin/apify')).json.actors;
+  const keep = state.apifyRuns; state.apifyRuns = []; state.failRunPost = true;
+  try {
+    const r = await call('/api/admin/apify', { method: 'POST', body: { action: 'start', id: jobspy.id } });
+    assert.equal(r.status, 409); assert.match(r.json.detail, /no se pudo registrar/); assert.match(r.json.detail, /RUN\w+/, 'incluye el id de la ejecución de Apify');
+    assert.equal(state.apifyRuns.length, 0, 'nada a medias en la base');
+  } finally { state.failRunPost = false; state.apifyRuns = keep; }
 });
 await step('Apify: webhook con token; recogida por lotes reanudable; coste y duplicados', async () => {
   const run = state.apifyRuns.find(r => r.run_id.startsWith('RUN1')); const token = JSON.parse(Buffer.from(state.apifyCalls[0].query.webhooks, 'base64').toString())[0].requestUrl.split('t=')[1];

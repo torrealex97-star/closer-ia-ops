@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { ORG, scrub, setStatus, type ExternalOffer } from './external';
+import { ORG, scrub, type ExternalOffer } from './external';
 import { getSecret } from './integrations';
 import { serviceRest } from './supabaseAuth';
 import { jevAnnotate } from './jev';
+import { timeLeft } from './cronBudget';
 
 // Revisor IA de ofertas (incremento 1.1). La IA PROPONE; las reglas deterministas DECIDEN.
 // Toda salida del modelo es no confiable: se sanea y valida antes de tocar la base de datos.
@@ -113,7 +114,7 @@ export async function checkLink(rawUrl: string, deps: LinkDeps = {}): Promise<Li
     try { if ((await resolve(check.url.hostname)).some(privateAddress)) return { result: 'skipped', reason: 'resuelve_a_red_interna' }; }
     catch { return { result: 'unknown', reason: 'dns' }; }
     try {
-      const response = await doFetch(check.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
+      const response = await doFetch(check.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
       if (response.status === 404 || response.status === 410) return { result: 'closed', reason: `http_${response.status}` };
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
@@ -144,7 +145,7 @@ export async function groqLlm(): Promise<Llm | null> {
   const base = process.env.GROQ_API_BASE ?? 'https://api.groq.com';
   return async prompt => {
     const response = await fetch(`${base}/openai/v1/chat/completions`, {
-      method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(20000),
+      method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(12000),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: config().model, temperature: 0, max_tokens: 400, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: prompt }] }),
     });
@@ -155,9 +156,18 @@ export async function groqLlm(): Promise<Llm | null> {
 }
 
 // ---- Ejecución ----
-export type ReviewSummary = { mode: 'shadow' | 'live'; reviewed: number; would_approve: number; would_withdraw: number; human: number; applied: number; skipped?: string };
+export type ReviewSummary = { mode: 'shadow' | 'live'; reviewed: number; would_approve: number; would_withdraw: number; human: number; applied: number; skipped?: string; truncated?: boolean; failed_writes?: number };
 type Row = ExternalOffer & { red_flags?: string[] | null };
-export type RunDeps = LinkDeps & { llm?: Llm | null; now?: () => Date; env?: NodeJS.ProcessEnv };
+export type RunDeps = LinkDeps & { llm?: Llm | null; now?: () => Date; env?: NodeJS.ProcessEnv; deadline?: number };
+// Peor caso de una oferta: modelo (12 s) + comprobación del enlace (6 s) + margen. Sin ese tiempo no se empieza otra.
+const PER_OFFER_MS = 20_000;
+
+// Escribe una fila y confirma que ESA fila cambió (return=representation): un fallo o una guarda que no coincide devuelve false.
+async function patchOne(id: string, guard: string, body: Record<string, unknown>): Promise<boolean> {
+  const r = await serviceRest(`external_offers?org_id=eq.${ORG}&id=eq.${id}&${guard}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) }).catch(() => null);
+  const rows = r?.ok ? await r.json().catch(() => null) : null;
+  return Array.isArray(rows) && rows.length === 1;
+}
 
 export async function runAiReview(deps: RunDeps = {}): Promise<ReviewSummary> {
   const cfg = config(deps.env);
@@ -168,45 +178,34 @@ export async function runAiReview(deps: RunDeps = {}): Promise<ReviewSummary> {
   const now = (deps.now ?? (() => new Date()))();
   const response = await serviceRest(`external_offers?org_id=eq.${ORG}&editorial_status=in.(draft,needs_review)&ai_review=is.null&expires_at=gt.${encodeURIComponent(now.toISOString())}&select=id,title,company,location,url,salary,description,score,red_flags,editorial_status&order=score.desc&limit=${cfg.maxCalls}`);
   const rows = response.ok ? await response.json().catch(() => []) as Row[] : [];
-  const out = { ...empty };
-  const toApprove: string[] = [], toWithdraw: string[] = [];
-  const started = Date.now(), budgetMs = Number(deps.env?.AI_REVIEW_BUDGET_MS) || 30000; // el cron tiene 60 s en total
+  const out = { ...empty }; let failed = 0, approvedSoFar = 0;
+  const deadline = deps.deadline ?? Date.now() + (Number(deps.env?.AI_REVIEW_BUDGET_MS) || 30000);
   for (const row of Array.isArray(rows) ? rows : []) {
-    if (Date.now() - started > budgetMs) break;
+    if (timeLeft(deadline) < PER_OFFER_MS) { out.truncated = true; break; }
     const raw = await llm(buildPrompt(row)).catch(() => null);
     if (raw === null) continue; // fallo del proveedor: sin anotar, se reintenta mañana
     const proposal = sanitizeProposal(raw);
     const link = await checkLink(row.url, deps);
-    const g = gate({ proposal, score: row.score ?? 0, offerRedFlags: row.red_flags ?? [], link, id: row.id, approvedSoFar: toApprove.length, maxApprovals: cfg.maxApprovals });
+    const g = gate({ proposal, score: row.score ?? 0, offerRedFlags: row.red_flags ?? [], link, id: row.id, approvedSoFar, maxApprovals: cfg.maxApprovals });
     const jev = await jevAnnotate(row).catch(() => null); // solo anota, nunca decide
     const review = {
       verdict: proposal.verdict, confidence: proposal.confidence, reasons: proposal.reasons, red_flags: proposal.red_flags, signals: proposal.signals,
       link, would_decide: g.decision, gate: g.why, audit_sample: g.audit_sample, mode: cfg.mode, applied: false, model: cfg.model,
       previous_status: row.editorial_status, reviewed_at: now.toISOString(), ...(jev ? { jev } : {}),
     };
-    await serviceRest(`external_offers?org_id=eq.${ORG}&id=eq.${row.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ai_review: review, ...(link.result !== 'skipped' && link.result !== 'unknown' ? { verified_at: now.toISOString(), verified_result: link.result } : {}) }) });
+    // 1) Anotar (solo si sigue sin revisar). Si no se pudo escribir, la oferta NO cuenta como revisada ni se le aplica nada: se reintenta mañana.
+    const verified = link.result !== 'skipped' && link.result !== 'unknown' ? { verified_at: now.toISOString(), verified_result: link.result } : {};
+    if (!await patchOne(row.id, 'ai_review=is.null', { ai_review: review, ...verified })) { failed++; continue; }
     out.reviewed++;
-    if (g.decision === 'approve') { out.would_approve++; toApprove.push(row.id); }
-    else if (g.decision === 'withdraw') { out.would_withdraw++; toWithdraw.push(row.id); }
-    else out.human++;
+    if (g.decision === 'approve') { out.would_approve++; approvedSoFar++; } else if (g.decision === 'withdraw') out.would_withdraw++; else out.human++;
+    // 2) Aplicar (solo live): una escritura atómica por oferta, con guarda de estado: si una persona la movió entretanto, no se pisa.
+    if (cfg.mode === 'live' && g.decision !== 'human') {
+      const target = g.decision === 'approve' ? cfg.target : 'withdrawn';
+      const done = await patchOne(row.id, `editorial_status=eq.${row.editorial_status}`, { editorial_status: target, reviewed_by: 'ai-review', reviewed_at: now.toISOString(), ai_review: { ...review, applied: true } });
+      if (done) out.applied++; else failed++;
+    }
   }
-  if (cfg.mode === 'live') {
-    // Cambios acotados (≤ tope) y marcados `ai-review`: se pueden deshacer con undoAiDecisions.
-    const a = toApprove.length ? await setStatus(toApprove, cfg.target, 'ai-review') : 0;
-    const w = toWithdraw.length ? await setStatus(toWithdraw, 'withdrawn', 'ai-review') : 0;
-    out.applied = (a ?? 0) + (w ?? 0);
-    await markApplied([...toApprove, ...toWithdraw]);
-  }
-  return out;
-}
-
-async function markApplied(ids: string[]) {
-  if (!ids.length) return;
-  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&id=in.(${ids.join(',')})&select=id,ai_review`);
-  const rows = response.ok ? await response.json().catch(() => []) as Array<{ id: string; ai_review: Record<string, unknown> | null }> : [];
-  for (const r of Array.isArray(rows) ? rows : []) {
-    await serviceRest(`external_offers?org_id=eq.${ORG}&id=eq.${r.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ai_review: { ...(r.ai_review ?? {}), applied: true } }) });
-  }
+  return { ...out, ...(failed ? { failed_writes: failed } : {}) };
 }
 
 // Deshacer: devuelve al estado previo las ofertas que decidió la IA (reviewed_by = ai-review) y siguen con ese estado.
