@@ -1,5 +1,12 @@
 # Estado
 
+## Incremento 0.2: métricas de oferta en el panel (sesión 42) — 2026-10-16
+
+- **Qué**: panel plegable «Métricas · últimos 14 días» en Fuentes externas ([metrics.ts](../apps/web/lib/metrics.ts), `GET /api/admin/metrics`, [MetricsPanel.tsx](../apps/web/components/MetricsPanel.tsx)): ofertas buenas por día y por fuente («buena» = puntuación ≥ 60 y España clara), aprobadas por fuente, gasto de Apify y **coste por oferta buena de Apify**, decisiones humanas frente a decisiones del revisor IA.
+- **Honestidad**: los **minutos de revisión no se miden** (la app no registra tiempo): se muestran las decisiones y se declara. Con 0 ofertas buenas el coste por oferta es «—», no 0. Solo lectura; sin migración.
+- **Verificación**: `metrics.mjs` (umbrales, ventana, coste, vacío), `run.sh` 34/34 de flujo (incluye 401 sin sesión) y 7/7 de interfaz, typecheck y build. Con servicios simulados; con la base vacía real solo se verá ceros hasta el primer lanzamiento del 0.1.
+- **Dependencia**: rama apilada sobre `feat/ai-review-shadow` (PR #1) por STATUS y `run.sh`.
+
 ## Incremento 1.1: revisor IA de ofertas en modo SHADOW (sesión 41) — 2026-10-16
 
 - **Qué hace** ([aiReview.ts](../apps/web/lib/aiReview.ts), [jev.ts](../apps/web/lib/jev.ts)): dentro del cron diario existente (sin crons nuevos) revisa borradores sin revisar por orden de puntuación. La IA (Groq, clave de la pestaña APIs, `AI_REVIEW_MODEL`, por defecto `llama-3.3-70b-versatile`) PROPONE `approve|reject|human` + confianza + razones; la **puerta determinista** DECIDE: aprobar solo con `approve`, confianza ≥ 85, puntuación ≥ 80, sin red flags, enlace no cerrado, bajo el tope `AI_REVIEW_MAX_APPROVALS` (25) y fuera de la muestra de auditoría (10 % por hash del id, siempre a persona). `reject` o enlace cerrado ⇒ `withdrawn`; el resto ⇒ cola humana.

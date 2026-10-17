@@ -164,6 +164,11 @@ await step('ingest: repetir una oferta no pisa su estado editorial', async () =>
   const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [{ external_id: 'a1', title: 'Closer de ventas (actualizada)', url: 'https://es.indeed.com/viewjob?jk=a1' }] } });
   assert.equal(r.status, 200); assert.equal(offer.editorial_status, 'approved');
 });
+await step('métricas (panel): exige sesión y devuelve 14 días con coste y decisiones', async () => {
+  assert.equal((await call('/api/admin/metrics', { cookies: false })).status, 401);
+  const r = await call('/api/admin/metrics'); assert.equal(r.status, 200);
+  assert.equal(r.json.days.length, 14); assert.ok(Array.isArray(r.json.perSource) && r.json.review.minutes === null && 'cost_per_good' in r.json.apify);
+});
 await step('externas (panel): lista con contadores, aprobación en bloque y verificación de vigencia', async () => {
   assert.equal((await call('/api/admin/external', { cookies: false })).status, 401);
   const list = await call('/api/admin/external?status=draft'); assert.equal(list.status, 200);
