@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { authenticateStudent } from '../../../../lib/studentAuth';
+import { eraseAppProfile } from '../../../../lib/applicationProfile';
+import { eraseApplications } from '../../../../lib/applications';
 import { eraseProfile, getProfile, saveProfile, sanitizeProfile, CONSENT_VERSION } from '../../../../lib/students';
 
 export const dynamic = 'force-dynamic';
@@ -32,5 +34,8 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const { auth, error } = await gate(request, true);
   if (error) return error;
-  return await eraseProfile(auth!.student.user_id) ? reply(auth!, { ok: true }) : Response.json({ detail: 'No se pudo borrar el perfil.' }, { status: 503 });
+  // Supresión completa de SUS datos: perfil, formulario base y candidaturas (borradores, mensajes, notas).
+  const uid = auth!.student.user_id;
+  const done = await Promise.all([eraseApplications(uid), eraseAppProfile(uid), eraseProfile(uid)]);
+  return done.every(Boolean) ? reply(auth!, { ok: true }) : Response.json({ detail: 'No se pudo borrar todo; vuelve a intentarlo.' }, { status: 503 });
 }

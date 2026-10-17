@@ -121,7 +121,8 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await page.getByRole('button', { name: 'Alumnas' }).click(); await page.getByRole('heading', { name: 'Alumnas con acceso.' }).waitFor();
   await page.getByLabel('Invitar a una alumna').fill('lucia@alumna.dev'); await page.getByRole('button', { name: 'Enviar invitación' }).click();
   await page.getByText('Invitación enviada a lucia@alumna.dev.').waitFor(); await page.getByText('lucia@alumna.dev').first().waitFor();
-  const alumna = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage(); // otro navegador: sin la sesión del panel
+  const alumnaCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] }); // otro navegador: sin la sesión del panel
+  const alumna = await alumnaCtx.newPage();
   const token = state.recoverTokens.get('lucia@alumna.dev'); assert.ok(token);
   if (process.env.UI_DEBUG) alumna.on('response', r => { if (r.url().includes('/api/')) console.log('NET', r.status(), r.url()); });
   await alumna.goto(`${BASE}/alumna/reset#access_token=${token}&type=recovery`);
@@ -141,6 +142,22 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.reload(); await alumna.getByText('TU PERFIL').waitFor(); await alumna.waitForFunction(() => document.querySelector('#sp-name')?.value === 'Lucía', null, { timeout: 8000 });
   assert.equal(await alumna.getByLabel(/Enlace a tu vídeo/).inputValue(), 'https://drive.google.com/file/d/abc/view');
   assert.equal(await alumna.getByLabel('Nombre').inputValue(), 'Lucía');
+  // Candidatura ASISTIDA: formulario base → preparar → revisar y copiar → abrir → «ya la he enviado». La app no envía nada.
+  await alumna.getByTestId('app-form').locator('summary').click();
+  await alumna.getByLabel('Email de contacto').fill('lucia@ejemplo.com'); await alumna.getByLabel('Teléfono').fill('600 11 22 33'); await alumna.getByLabel('Tu CV (enlace a tu Drive)').fill('https://drive.google.com/file/d/cv/view');
+  await alumna.getByLabel('Presentación breve (2-3 frases)').fill('Cierro llamadas high ticket.'); await alumna.getByLabel('Años de experiencia en ventas').fill('3');
+  await alumna.getByRole('button', { name: 'Guardar formulario' }).click(); await alumna.getByText('Formulario guardado.').waitFor();
+  assert.match(await alumna.getByTestId('app-form').locator('summary').innerText(), /completado al \d+ %/); assert.match(await alumna.getByTestId('app-missing').innerText(), /Te falta:/);
+  await alumna.getByTestId('matches').getByRole('button', { name: 'Preparar candidatura' }).first().click();
+  await alumna.getByTestId('application').first().waitFor(); const msg = alumna.locator('textarea[id^="msg-"]').first();
+  assert.match(await msg.inputValue(), /Me llamo Lucía y me interesa el puesto de Closer de ventas remoto/); assert.match(await msg.inputValue(), /Cierro llamadas high ticket\./);
+  await msg.fill('Mi mensaje revisado por mí.'); await alumna.getByRole('button', { name: 'Guardar mensaje' }).click(); await alumna.getByText('Mensaje guardado.').waitFor();
+  await alumna.getByRole('button', { name: 'Copiar mensaje' }).click(); await alumna.getByText('Mensaje copiado.').waitFor(); assert.equal(await alumna.evaluate(() => navigator.clipboard.readText()), 'Mi mensaje revisado por mí.');
+  await alumna.getByText('Datos para copiar en los formularios').click(); await alumna.getByRole('button', { name: 'Copiar Email' }).click(); assert.equal(await alumna.evaluate(() => navigator.clipboard.readText()), 'lucia@ejemplo.com');
+  const [tab] = await Promise.all([alumnaCtx.waitForEvent('page'), alumna.getByRole('link', { name: 'Abrir el anuncio' }).click()]); await tab.close();
+  await alumna.getByText('Anuncio abierto', { exact: false }).first().waitFor();
+  await alumna.getByRole('button', { name: 'Ya la he enviado' }).click(); await alumna.getByText('Enviada por ti', { exact: true }).waitFor(); if (process.env.SHOT2) await alumna.screenshot({ path: process.env.SHOT2, fullPage: true }); assert.equal(await alumna.getByRole('button', { name: 'Ya la he enviado' }).count(), 0);
+  assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con candidaturas');
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
 });
 await step('móvil: Resumen sin scroll horizontal', async () => {

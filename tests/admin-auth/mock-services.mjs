@@ -104,6 +104,23 @@ export function startMocks({ authPort, enginePort }) {
       if (req.method === 'DELETE') { state.students = state.students.filter(r => !rows.includes(r)); return send(res, 204, {}); }
       return send(res, 200, rows);
     }
+    if (url.pathname === '/rest/v1/student_application_profiles') {
+      state.appProfiles ??= new Map(); const q = Object.fromEntries(url.searchParams); const uid = q.user_id?.slice(3);
+      if (req.method === 'POST') { const row = { ...state.appProfiles.get(body.user_id), ...body }; state.appProfiles.set(body.user_id, row); return send(res, 201, [row]); }
+      if (req.method === 'DELETE') { state.appProfiles.delete(uid); return send(res, 204, {}); }
+      return send(res, 200, state.appProfiles.has(uid) ? [state.appProfiles.get(uid)] : []);
+    }
+    if (url.pathname === '/rest/v1/student_applications') {
+      state.applications ??= []; const q = Object.fromEntries(url.searchParams); const eqv = k => q[k]?.startsWith('eq.') ? q[k].slice(3) : null;
+      const mine = () => state.applications.filter(a => (!eqv('user_id') || a.user_id === eqv('user_id')) && (!eqv('id') || a.id === eqv('id')) && (!eqv('status') || a.status === eqv('status')));
+      if (req.method === 'POST') {
+        if (state.applications.some(a => a.user_id === body.user_id && a.offer_ref === body.offer_ref)) return send(res, 201, []);
+        const row = { id: crypto.randomUUID(), status: 'draft', notes: null, applied_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...body }; state.applications.push(row); return send(res, 201, [row]);
+      }
+      if (req.method === 'PATCH') { const hit = mine(); hit.forEach(a => Object.assign(a, body)); return send(res, 200, hit); }
+      if (req.method === 'DELETE') { const hit = mine(); state.applications = state.applications.filter(a => !hit.includes(a)); return send(res, 200, hit); }
+      return send(res, 200, mine().sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+    }
     if (url.pathname === '/rest/v1/student_profiles') {
       state.profiles ??= new Map(); const q = Object.fromEntries(url.searchParams); const uid = q.user_id?.slice(3);
       if (req.method === 'POST') { const row = { ...state.profiles.get(body.user_id), ...body }; state.profiles.set(body.user_id, row); return send(res, 201, [row]); }
