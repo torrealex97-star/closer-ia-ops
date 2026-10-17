@@ -102,3 +102,4 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:900px){.card-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.auth-card{padding:28px 20px}.admin-toolbar label{flex-basis:100%}.sidebar .local-user{display:flex;padding:12px 0 0;border-top:0}.sidebar .local-user button{width:auto;margin-top:0}}
 .data-table .primary-cell strong .source-tag{display:inline-block;margin:0 0 0 8px;font-size:10px;font-weight:600}
+.data-table tbody th[scope=row]{text-transform:none;letter-spacing:0;font-size:inherit;font-weight:400;color:var(--ink);text-align:left}

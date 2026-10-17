@@ -65,10 +65,22 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   mk('x1', {}); mk('x2', { location: 'Austin, Texas', spain: false, score: 20 }); mk('x3', { title: 'Setter de ventas', location: 'Valencia', role: 'setter', score: 60 });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
-  await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Métricas · últimos 14 días/);
+  await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Últimos 14 días: \d+ ofertas buenas/);
+  // Gráfico accesible: resumen en aria-label, color por token (computado = accent), eje en 0 y tabla alternativa con los 14 días
+  const chart = page.getByTestId('metrics').getByRole('img'); assert.match(await chart.getAttribute('aria-label'), /Ofertas buenas por día del .* al .*: \d+ en total/);
+  assert.equal(await page.getByTestId('metrics').locator('svg rect').first().evaluate(el => getComputedStyle(el).fill), 'rgb(141, 70, 61)', 'barras con el token --accent');
+  await page.getByTestId('metrics').getByText('Ver tabla por día').click(); assert.equal(await page.getByTestId('metrics-days').locator('tbody tr').count(), 14);
+  assert.ok(await page.getByTestId('metrics-tiers').isVisible());
+  // Error ≠ vacío: si falla la carga se dice y se puede reintentar; después vuelve el panel
+  await page.route('**/api/admin/metrics', r => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'No se pudieron calcular las métricas.' }) }));
+  await page.reload(); await page.getByRole('button', { name: 'Fuentes externas' }).click();
+  await page.getByTestId('metrics-error').waitFor(); assert.match(await page.getByTestId('metrics-error').innerText(), /No se pudieron calcular las métricas/);
+  await page.unroute('**/api/admin/metrics'); await page.getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('metrics').waitFor();
+  await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'métricas sin scroll horizontal en móvil'); await page.setViewportSize({ width: 1280, height: 900 });
+  if (process.env.SHOT) { await page.getByTestId('metrics').getByText('Ver tabla por día').click(); await page.getByTestId('metrics').screenshot({ path: process.env.SHOT }); }
   await page.getByText('Closer de ventas').first().waitFor();
   assert.equal(await page.locator('table').last().locator('tbody tr').count(), 1); // closer + España; el de Texas y el setter quedan fuera
-  assert.equal(await page.locator('table').nth(1).locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
+  assert.equal(await page.locator('table', { has: page.getByRole('columnheader', { name: 'Vía' }) }).locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
   await page.getByRole('button', { name: 'Pausar InfoJobs' }).click(); await page.getByText(/infojobs: pausada/).waitFor();
   await page.getByRole('button', { name: 'Reanudar InfoJobs' }).waitFor(); // espera a que la tabla recargue con el nuevo estado
   await page.getByRole('button', { name: 'Reanudar InfoJobs' }).click(); await page.getByText(/infojobs: reanudada/).waitFor();
