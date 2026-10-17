@@ -1,5 +1,12 @@
 # Estado
 
+## Relevo entre agentes y reglas aprendidas en AGENTS.md (sesión 48) — 2026-10-17
+
+- **Qué**: protocolo de relevo aprendido de Growth Ops pero **sin sus dos problemas** (su `ACTIVE_HANDOFF.md` creció a 395 KB/4.300 líneas y provocó colisiones al fusionar varias PRs sobre la misma ancla): [ACTIVE_HANDOFF.md](ACTIVE_HANDOFF.md) corto (estado, tareas del dueño, decisiones, siguiente acción), una **ficha por trabajo vivo** en `docs/handoff/claims/`, archivo mensual, [README](handoff/README.md) con reglas y plantilla, y `scripts/handoff.mjs` (`list` / `check`: ficha bien formada, sin solapes entre trabajos distintos, un `in_progress` por agente, pilas con `depends_on`). `AGENTS.md` ampliado con las 6 reglas aprobadas y la sección de varios agentes.
+- **Hueco real encontrado**: el workflow `Quality` **no ejecutaba** `tests/admin-auth/run.sh` (todas las pruebas del panel, ingesta, revisor, alumnas y matching solo se habían corrido a mano). Añadido el job `web-admin` (build + Playwright + `npm run test:web` + comprobación de relevo).
+- **Verificación**: `tests/handoff.mjs` (formato, solapes por prefijo de directorio, una rama en curso por agente, cadenas transitivas, fichas reales) y `npm run handoff` en local → *probado*. El job `web-admin` **no está verificado en CI** hasta que corra en GitHub (puede necesitar ajustes de entorno). Resto: solo documentación.
+- **Limitaciones**: hoy solo hay un agente; los carriles de otros agentes están por definir (decisión del dueño); `check` no sabe si una ficha caducó (hay que borrarla al fusionar, regla manual).
+
 ## Aprendizajes de Growth Ops y skills importadas (sesión 47) — 2026-10-17
 
 - **Solo documentación y skills; no se ejecutó ni se probó código de la app.** Se leyó en solo lectura el repo `growth-ops-app` del propietario y se destiló lo generalizable en [LEARNINGS_GROWTH_OPS.md](LEARNINGS_GROWTH_OPS.md): qué ya cumplimos, 13 reglas nuevas (con acción concreta aquí), vocabulario inspeccionado/probado/verificado, y 6 cambios propuestos a `AGENTS.md` **pendientes de tu OK** (no se ha tocado `AGENTS.md`).

@@ -31,3 +31,17 @@ jobs:
           cat /tmp/career-dev.log
           exit 1
       - run: npm run test:e2e
+  # Pruebas del panel y del portal de alumnas (tests/admin-auth): Supabase y motor simulados. Job aparte para no tocar el anterior.
+  web-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node tests/handoff.mjs && npm run handoff
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:web
