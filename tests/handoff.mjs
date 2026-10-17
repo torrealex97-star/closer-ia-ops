@@ -1,4 +1,3 @@
-assert.deepEqual(check([claim('c1', { agent: 'a1', touches: 'docs/STATUS.md' }), claim('c2', { agent: 'a2', touches: 'docs/STATUS.md' })]), [], 'STATUS.md es de solo añadir: no genera solape');
 // Tablero de relevo: node tests/handoff.mjs
 import assert from 'node:assert/strict';
 import { parseClaim, check, board, load } from '../scripts/handoff.mjs';
@@ -27,6 +26,7 @@ assert.deepEqual(check([claim('c1', { agent: 'a1', touches: 'a.ts' }), claim('c2
 assert.deepEqual(check([claim('c1', { agent: 'a1', touches: 'a.ts' }), claim('c2', { agent: 'a1', touches: 'b.ts', depends: 'c1' }), claim('c3', { agent: 'a1', touches: 'a.ts', depends: 'c2' })]), [], 'cadena transitiva');
 assert.match(check([claim('c1', { agent: 'a1', depends: 'fantasma' })])[0], /depends_on desconocido/);
 assert.match(check([parseClaim('nada', 'roto')])[0], /roto: sin cabecera/);
+assert.deepEqual(check([claim('c1', { agent: 'a1', touches: 'docs/STATUS.md' }), claim('c2', { agent: 'a2', touches: 'docs/STATUS.md' })]), [], 'STATUS.md es de solo añadir: no genera solape');
 // Tablero
 const b = board([claim('c2', { date: '2026-10-18', pr: 7 }), claim('c1', { date: '2026-10-17' })]);
 assert.ok(b.indexOf('2026-10-17') < b.indexOf('2026-10-18') && b.includes('#7'));
