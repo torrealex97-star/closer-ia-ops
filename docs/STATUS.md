@@ -1,5 +1,11 @@
 # Estado
 
+## Contraste del texto pequeño: `--muted` → `--secondary` (sesión 53) — 2026-10-17
+
+- **Decisión del dueño**: aplicar el cambio recomendado. Los 13 usos de `color:var(--muted)` en texto de 8-11 px (`workspace-label`, `source-caption`, `score small`, `footnote`, cabeceras de tabla `.data-table th`, `.section-title`, `.muted`…) pasan a `var(--secondary)`: contraste **4,88:1** sobre `paper`, **5,10** sobre `sheet`, **4,56** sobre `inset` (antes 3,40 / 3,55 / 3,18; mínimo AA 4,5). `--muted` queda **solo** en `.icon-button` (iconos, ≥ 3:1). Cambio visual mínimo: mismo gris, algo más oscuro; la jerarquía sigue marcada por tamaño, mayúsculas y peso. No se tocó ningún otro color del tema.
+- **Guardia**: `npm run design` (y el job `web-admin` de CI) ahora también falla si `--muted` vuelve a aparecer en texto, en `globals.css` o en componentes (con prueba en `tests/design.mjs`). La skill `dashboard-design` actualizada.
+- **Verificación**: *probado* — `tests/design.mjs`, `npm run design`, y en navegador el color computado de las cabeceras de tabla es `rgb(116, 107, 107)` (= `--secondary`); `run.sh` completo, typecheck y build. Los contrastes son los calculados a partir de los tokens (texto sobre fondo plano); no se midió con captura ni con herramientas externas.
+- **Limitaciones**: no se revisó caso por caso cada pantalla a mano (solo las pruebas de interfaz existentes); texto sobre fondos `*-soft` ya cumplía y no se cambió.
 ## Incremento 3.2: formulario base y candidaturas ASISTIDAS (sesión 52) — 2026-10-17
 
 - **Decisión del dueño**: hoy la candidatura es **asistida** (ella completa un primer formulario con todo, revisa y envía); en el futuro una IA podrá completarlo por ella. **Diseño** en [ADR-012](decisions/ADR-012-assisted-applications.md): el formulario base es la **fuente única** de datos; el consentimiento de autorrelleno futuro es **aparte, fechado, versionado y retirable** y **hoy no lo consume nada**; condiciones para automatizar (canales permitidos, aprobación por candidatura, topes, claim atómico, worker fuera de Vercel, evals, kill-switch) escritas pero **sin implementar**.

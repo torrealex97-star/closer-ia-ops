@@ -22,6 +22,8 @@ export function parseClaim(text, name) {
   return { name, agent: f.agent, status: f.status, branch: f.branch, pr: f.pr, date: f.date, touches: split(f.touches), dependsOn: split(f.depends_on), errors };
 }
 
+// Ficheros de solo-añadir que toda PR toca (el conflicto se resuelve al fusionar, no se evita con fichas).
+export const SHARED_APPEND_ONLY = new Set(['docs/STATUS.md']);
 const overlaps = (a, b) => a === b || a.startsWith(b.endsWith('/') ? b : `${b}/`) || b.startsWith(a.endsWith('/') ? a : `${a}/`);
 
 export function check(claims) {
@@ -38,7 +40,7 @@ export function check(claims) {
     const a = ok[i], b = ok[j];
     if (related(a, b)) continue;
     if (a.agent === b.agent && a.status === 'in_progress' && b.status === 'in_progress') problems.push(`${a.name} y ${b.name}: el agente ${a.agent} tiene dos trabajos in_progress sin cadena depends_on (un trabajo en curso por agente)`);
-    for (const x of a.touches) for (const y of b.touches) if (overlaps(x, y)) problems.push(`${a.name} y ${b.name}: ambos tocan ${x === y ? x : `${x} / ${y}`}`);
+    for (const x of a.touches) for (const y of b.touches) if (!SHARED_APPEND_ONLY.has(x) && !SHARED_APPEND_ONLY.has(y) && overlaps(x, y)) problems.push(`${a.name} y ${b.name}: ambos tocan ${x === y ? x : `${x} / ${y}`}`);
   }
   return problems;
 }

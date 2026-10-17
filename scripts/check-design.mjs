@@ -21,10 +21,18 @@ function* walk(dir) {
     if (statSync(p).isDirectory()) yield* walk(p); else if (/\.(tsx|ts|jsx|js)$/.test(f)) yield p;
   }
 }
+// --muted (contraste 3,4:1) NO cumple AA para texto: en CSS solo se permite en `.icon-button`; en componentes, nunca.
+export function findMutedText(css) {
+  const hits = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) if (/color:\s*var\(--muted\)/.test(m[2]) && !/\.icon-button\b/.test(m[1])) hits.push(m[1].trim());
+  return hits;
+}
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = new URL('../apps/web/', import.meta.url).pathname;
   const bad = [];
   for (const dir of ['components', 'app']) for (const file of walk(join(root, dir))) for (const h of findHex(readFileSync(file, 'utf8'))) bad.push(`${file.replace(root, '')}:${h.line} ${h.color}`);
+  for (const sel of findMutedText(readFileSync(join(root, 'app/globals.css'), 'utf8'))) bad.push(`app/globals.css: ${sel} usa --muted en texto (usa var(--secondary))`);
+  for (const dir of ['components', 'app']) for (const file of walk(join(root, dir))) if (/var\(--muted\)/.test(readFileSync(file, 'utf8'))) bad.push(`${file.replace(root, '')}: usa var(--muted) en texto`);
   if (bad.length) { console.error(`✗ Colores hex fuera de los tokens (usa var(--…) de globals.css):\n${bad.join('\n')}`); process.exit(1); }
   console.log('Diseño OK: ningún color hex fuera de los tokens.');
 }
