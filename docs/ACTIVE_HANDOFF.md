@@ -16,7 +16,7 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 ## 2. Estado de `main`
 
 - **Fusionado hoy** (PRs #1-#10, en orden, con CI de GitHub en verde antes de cada fusión): revisor IA shadow, métricas, ingesta robusta, niveles de fuentes + leads B2B + grants, presupuesto de tiempo del cron, login de alumnas + perfil + RLS, recomendaciones, aprendizajes/skills, relevo entre agentes, skills de diseño y gráficas. Detalle: `docs/handoff/archive/2026-10.md`.
-- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2; en la PR #13). Las 9 migraciones previas siguen sin versionar (hace falta `supabase db pull`).
+- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2; en la PR #13). Las 9 tablas previas siguen sin migraciones originales: hay un snapshot de referencia en `supabase/schema/` (hace falta `supabase db pull` para lo definitivo).
 - **Evidencia (inspeccionado / probado / verificado):**
   - *Verificado en GitHub:* el workflow `Quality` (jobs `verify` y `web-admin`) pasa en verde en las PRs #5-#10.
   - *Verificado en BD real:* RLS de alumnas (`tests/db/student_rls.sql`, 12/12 con rollback) y grants.
