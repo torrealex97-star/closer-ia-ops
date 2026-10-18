@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { collectAll } from '../../../../lib/collectors';
-import { dailyApify } from '../../../../lib/apify';
+import { dailyAuto as dailyApify } from '../../../../lib/apifyAuto';
 import { publicBaseUrl } from '../../../../lib/adminAuth';
 import { runAiReview, weeklyAiReport } from '../../../../lib/aiReview';
 import { loadMetrics } from '../../../../lib/metrics';
