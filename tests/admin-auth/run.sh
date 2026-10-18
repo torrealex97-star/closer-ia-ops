@@ -26,4 +26,5 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/matching.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/cronbudget.mjs 2>/dev/null
 node tests/admin-auth/gate.mjs
+node spikes/voice/tests/voice.mjs
 BASE="http://127.0.0.1:$PORT" node tests/admin-auth/ui.mjs

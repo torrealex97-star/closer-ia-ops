@@ -1,0 +1,18 @@
+{
+  "id": "cliente-esceptico",
+  "kind": "venta",
+  "title": "Cliente escéptico con el precio",
+  "system": "Eres un dueño de agencia con poco tiempo. Dudas del precio y quieres pruebas. Responde corto y en español.",
+  "opening": "Hola, tengo cinco minutos. ¿Qué me ofreces exactamente?",
+  "rules": [
+    { "when": "precio|cuesta|inversi[oó]n|tarifa", "say": "Eso me parece caro. ¿Qué resultado me garantizas?" },
+    { "when": "resultado|caso|cliente|ejemplo|roi|retorno", "say": "Vale, ¿tienes algún caso parecido al mío con números?" },
+    { "when": "agend|llamada|reuni[oó]n|siguiente paso|demo", "say": "Puede ser. Mándame un hueco el jueves y lo miro." }
+  ],
+  "fallback": ["No termino de verlo claro.", "¿Y qué diferencia tienes con otras opciones?"],
+  "rubric": [
+    { "id": "descubrimiento", "label": "Hace preguntas de descubrimiento", "evidence": "\\?" },
+    { "id": "valor", "label": "Conecta el precio con resultados o casos", "evidence": "resultado|caso|roi|retorno|cliente" },
+    { "id": "siguiente_paso", "label": "Propone un siguiente paso concreto", "evidence": "agend|llamada|reuni[oó]n|siguiente paso|demo" }
+  ]
+}
