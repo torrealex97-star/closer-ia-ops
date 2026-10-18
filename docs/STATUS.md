@@ -1,5 +1,10 @@
 # Estado
 
+## Cierre de #21 (sesión 61) — 2026-10-18
+
+- #21 (menú móvil, métricas sin ceros falsos, IP fijada) fusionada con CI verde en las dos ejecuciones. Se retira su ficha de relevo; no quedan trabajos vivos.
+- Sin cambios de código en esta entrega: solo documentación (`npm run handoff` y `tests/handoff.mjs` pasan; no se ejecutaron tests de runtime).
+
 ## Móvil, métricas sin ceros falsos e IP fijada contra DNS rebinding (sesión 60) — 2026-10-18
 
 - **Menú del panel en móvil:** una sola franja desplazable (antes cada botón ocupaba una fila y el menú llenaba la primera pantalla). **Fuentes por tandas** de 25 con «Mostrar N más» (en móvil la página pasó de ~11.100 px a ~5.700 px). Medido con capturas Playwright a 390 px; sin desbordes.
