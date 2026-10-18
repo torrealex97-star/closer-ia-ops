@@ -12,7 +12,7 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 | --- | --- | --- |
 | _(ninguno: no hay trabajos vivos)_ | — | — |
 
-Todo lo anterior (PRs #1-#19) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
+Todo lo anterior (PRs #1-#21) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
