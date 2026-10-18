@@ -1,16 +1,20 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { CloudDownload, LoaderCircle, Pencil, Play, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { CircleCheck, CircleDashed, CircleX, CloudDownload, LoaderCircle, Pencil, Play, Plus, RefreshCcw, Trash2, TriangleAlert } from 'lucide-react';
 
 // Apify: el scraping se ejecuta en la infraestructura de Apify (con sus proxies), no en la nuestra. De pago por uso:
 // nada se lanza solo salvo los actores marcados como diarios, con tope mensual y límites por ejecución.
 type Actor = { id: string; label: string; actor: string; source: string; input_template: Record<string, unknown> | null; max_items: number; memory_mb: number; timeout_s: number; schedule_daily: boolean };
 type Run = { id: string; actor_id: string; run_id: string; status: string; started_at: string; finished_at: string | null; items_total: number | null; harvested: number; cost_usd: number | null; error: string | null };
-type Data = { actors: Actor[]; runs: Run[]; presets: Array<{ label: string; actor: string; source: string }>; budget: { spent: number | null; limit: number }; has_key: boolean };
+type PortalView = { id: string; name: string; plain: string; caution?: string; daily: boolean; maxItems: number; state: 'off' | 'new' | 'running' | 'ok' | 'trying' | 'down'; headline: string; detail: string; recipes: Array<{ name: string; state: string; detail: string }> };
+const RUN_CAP = 2, TEST_CAP = 0.5; // topes duros que la app pide a Apify (mismos valores que lib/apify.ts)
+// Estado = texto + icono (nunca solo color).
+const STATE_META = { ok: { cls: 'status ok', Icon: CircleCheck }, running: { cls: 'status', Icon: LoaderCircle }, trying: { cls: 'status', Icon: TriangleAlert }, down: { cls: 'status bad', Icon: CircleX }, new: { cls: 'status', Icon: CircleDashed }, off: { cls: 'status', Icon: CircleDashed } } as const;
+type Data = { portals?: PortalView[]; actors: Actor[]; runs: Run[]; presets: Array<{ label: string; actor: string; source: string }>; budget: { spent: number | null; limit: number }; has_key: boolean };
 type Form = { id?: string; label: string; actor: string; source: string; input_template: string; max_items: number; memory_mb: number; timeout_s: number; schedule_daily: boolean };
 const blank: Form = { label: '', actor: '', source: '', input_template: '', max_items: 500, memory_mb: 1024, timeout_s: 900, schedule_daily: false };
 const fmt = (v: string | null) => v ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '—';
-const RUN: Record<string, string> = { RUNNING: 'En curso', SUCCEEDED: 'Terminada', FAILED: 'Fallida', 'TIMED-OUT': 'Tiempo agotado', ABORTED: 'Abortada' };
+const RUN: Record<string, string> = { RUNNING: 'Buscando…', SUCCEEDED: 'Terminada', FAILED: 'Falló', 'TIMED-OUT': 'Tardó demasiado', ABORTED: 'Cancelada' };
 
 async function call<T>(init?: RequestInit): Promise<T> {
   const response = await fetch('/api/admin/apify', { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -30,6 +34,9 @@ export default function ApifyTab({ owner, onSessionLost, goApis }: { owner: bool
   const lost = useCallback((err: Error) => { if (err.message.includes('Sesión')) onSessionLost(); setError(err.message); }, [onSessionLost]);
   const load = useCallback(() => { setBusy(true); call<Data>().then(d => { setData(d); setError(''); }).catch(lost).finally(() => setBusy(false)); }, [lost]);
   useEffect(load, [load]);
+  // Mientras haya una búsqueda en curso, se recogen y refrescan los resultados solos cada 30 s (y, si una falla, entra el repuesto).
+  const anyRunning = Boolean(data?.portals?.some(p => p.state === 'running'));
+  useEffect(() => { if (!anyRunning) return; const t = setInterval(() => { call<Record<string, unknown>>({ method: 'POST', body: JSON.stringify({ action: 'harvest' }) }).catch(() => undefined).finally(load); }, 30000); return () => clearInterval(t); }, [anyRunning, load]);
 
   async function run(kind: string, action: () => Promise<string>) {
     setWorking(kind); setError(''); setNotice('');
@@ -41,15 +48,51 @@ export default function ApifyTab({ owner, onSessionLost, goApis }: { owner: bool
   const pct = data && data.budget.spent !== null ? Math.min(100, Math.round((data.budget.spent / data.budget.limit) * 100)) : 0;
 
   return <section aria-label="Apify">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 780 }}>Los scrapers de Apify corren en su infraestructura, con sus proxies: no necesitas montar nada y no hay bloqueos por tu IP. Es de pago por uso, así que nada se lanza solo salvo lo que marques como diario, con un tope mensual y límites por ejecución. Lo recogido entra como borrador en Fuentes externas, con puntuación.</p>
+    <div className="search-panel" style={{ marginBottom: 20, maxWidth: 820 }}>
+      <h2 className="section-title" style={{ marginTop: 0 }}>Cómo funciona, en 3 líneas</h2>
+      <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 6 }}>
+        <li>Esta pestaña busca <strong>ofertas de trabajo</strong> en portales como Indeed o InfoJobs, usando un servicio externo de pago por uso llamado <strong>Apify</strong>.</li>
+        <li>Tú solo eliges <strong>en qué portales buscar</strong> y pulsas el botón. No necesitas saber cómo funciona por dentro.</li>
+        <li>Si un buscador falla, la app <strong>prueba otro sola</strong> hasta que uno funcione. Lo que encuentra entra como borrador: <strong>nada se publica sin que lo apruebes</strong>.</li>
+      </ol>
+    </div>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
-    {data && !data.has_key && <div className="alert"><span>Falta la clave de Apify.</span><button onClick={goApis}>Guardarla en APIs</button></div>}
+    {data && !data.has_key && <div className="search-panel" style={{ marginBottom: 20, borderColor: 'var(--warning)' }} role="alert">
+      <h3 style={{ marginTop: 0 }}>Antes de empezar: falta conectar tu cuenta de Apify</h3>
+      <ol style={{ margin: '0 0 12px', paddingLeft: 20, display: 'grid', gap: 4 }}>
+        <li>Crea una cuenta gratis en <a href="https://console.apify.com" target="_blank" rel="noopener noreferrer">console.apify.com</a>.</li>
+        <li>Dentro, ve a <strong>Settings → API &amp; Integrations</strong> y copia tu «Personal API token».</li>
+        <li>Pégalo en la pestaña <strong>APIs</strong> de este panel (se guarda cifrado).</li>
+      </ol>
+      <button onClick={goApis}>Ir a pegar la clave</button></div>}
     {data && <article className="source-card" style={{ marginBottom: 20 }}>
       <div className="card-head"><div><span className="eyebrow">GASTO DEL MES EN APIFY</span><h3 style={{ marginTop: 4 }}>{data.budget.spent === null ? '—' : data.budget.spent.toFixed(2)} USD de {data.budget.limit} USD</h3>{data.budget.spent === null && <p className="card-meta" role="alert">No se pudo leer el gasto del mes: no se lanzará ninguna ejecución hasta poder comprobarlo.</p>}</div><span className={data.budget.spent === null ? 'status' : pct >= 90 ? 'status bad' : 'status'}>{data.budget.spent === null ? '—' : `${pct} %`}</span></div>
       <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Gasto del mes" style={{ height: 8, borderRadius: 99, background: 'var(--inset)', marginTop: 14, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: pct >= 90 ? 'var(--warning)' : 'var(--accent)' }} /></div>
       <p className="card-meta">Se suma el coste real de cada ejecución terminada y se reserva 1 USD por cada una en curso. Al llegar al tope no se lanza ninguna más. Es un límite de esta app: ponlo también en Apify (Settings → Billing → límite de gasto).</p>
     </article>}
+    {data?.portals && <>
+      <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}><h2 className="section-title" style={{ margin: 0 }}>Portales de empleo</h2>
+        <button disabled={working !== '' || busy} onClick={() => void run('refresh', async () => { await post({ action: 'harvest' }); return 'Resultados actualizados.'; })}>{working === 'refresh' ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar resultados</button></div>
+      <p className="card-meta" style={{ marginTop: 0 }}>Cada tarjeta es un portal. «Probar con 10 ofertas» es lo más seguro para empezar: cuesta céntimos y comprueba que todo funciona.</p>
+      <div className="card-grid" style={{ marginBottom: 28 }}>{data.portals.map(p => {
+        const meta = STATE_META[p.state];
+        return <article className="source-card" key={p.id} data-testid={`portal-${p.id}`}>
+          <div className="card-head"><h3>{p.name}</h3><span className={meta.cls}><meta.Icon size={13} aria-hidden="true" className={p.state === 'running' ? 'spin' : undefined} /> {p.headline}</span></div>
+          <p className="card-meta">{p.plain}</p>
+          {p.caution && <p className="inline-hint">{p.caution}</p>}
+          <p style={{ margin: '8px 0' }}>{p.detail}</p>
+          {owner ? <div className="admin-toolbar" style={{ margin: '8px 0' }}>
+            <button disabled={working !== '' || !data.has_key} onClick={() => { if (window.confirm(`Prueba pequeña en ${p.name}: máximo 10 ofertas y un tope de ${TEST_CAP} USD. ¿Lanzarla?`)) void run(`test-${p.id}`, async () => (await post({ action: 'search_now', portal: p.id, test: true }) as { message: string }).message); }}>{working === `test-${p.id}` ? <LoaderCircle size={14} className="spin" /> : <Play size={14} />} Probar con 10 ofertas</button>
+            <button className="primary" disabled={working !== '' || !data.has_key} onClick={() => { if (window.confirm(`Buscar ofertas en ${p.name}. Gasta crédito de Apify: tope de ${RUN_CAP} USD por búsqueda (hasta ${p.maxItems} ofertas) y${data.budget.spent === null ? ' no se pudo leer lo gastado este mes' : ` este mes llevas ${data.budget.spent.toFixed(2)} de ${data.budget.limit} USD`}. ¿Seguir?`)) void run(`go-${p.id}`, async () => (await post({ action: 'search_now', portal: p.id }) as { message: string }).message); }}>{working === `go-${p.id}` ? <LoaderCircle size={14} className="spin" /> : <CloudDownload size={14} />} Buscar ahora</button>
+            <label className="check-label" style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" checked={p.daily} disabled={working !== ''} onChange={e => { const on = e.target.checked; /* se lee ya: React restaura el valor controlado antes de que termine la petición */ void run(`daily-${p.id}`, async () => { await post({ action: 'portal_daily', portal: p.id, on }); return on ? `Búsqueda diaria activada en ${p.name}.` : `Búsqueda diaria desactivada en ${p.name}.`; }); }} /> Buscar cada día</label></div>
+            : <p className="card-meta">Solo el propietario puede lanzar búsquedas. Búsqueda diaria: <strong>{p.daily ? 'activada' : 'desactivada'}</strong>.</p>}
+          <details><summary>Buscadores de repuesto ({p.recipes.length})</summary>
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, display: 'grid', gap: 4 }}>{p.recipes.map(r => <li key={r.name}><strong>{r.name}</strong>: {r.detail}</li>)}</ul>
+            <p className="card-meta">Se usan por orden. Si uno falla o no encuentra ofertas, se pasa al siguiente automáticamente.</p></details>
+        </article>; })}</div></>}
+    <details className="search-panel" style={{ marginBottom: 24 }} data-testid="apify-advanced"><summary><strong>Opciones avanzadas</strong>&nbsp;<span className="card-meta" style={{ margin: 0 }}>(solo si sabes lo que haces: añadir un buscador a mano)</span></summary>
+    <div style={{ marginTop: 16 }}>
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <h2 className="section-title" style={{ margin: 0 }}>Actores</h2>
       <div className="admin-toolbar" style={{ margin: 0 }}>
@@ -86,7 +129,8 @@ export default function ApifyTab({ owner, onSessionLost, goApis }: { owner: bool
         <button type="button" disabled={!form.actor || working !== ''} onClick={() => void run('schema', async () => { const r = await post({ action: 'schema', actor: form.actor }) as { fields: Array<{ name: string; type: string; required: boolean }> }; setFields(r.fields); return `El actor tiene ${r.fields.length} campos de entrada.`; })}>Ver campos del actor</button>
         <button type="button" onClick={() => setForm(null)}>Cancelar</button></div>
     </form>}
-    <h2 className="section-title">Ejecuciones</h2>
+    </div></details>
+    <h2 className="section-title">Últimas búsquedas</h2>
     {!data?.runs.length ? <p className="muted">Aún no se ha lanzado ninguna.</p> : <div className="table-wrap"><table className="data-table">
       <thead><tr><th>Inicio</th><th>Actor</th><th>Estado</th><th className="num">Recogidos</th><th className="num">Coste (USD)</th><th>Detalle</th></tr></thead>
       <tbody>{data.runs.map(r => <tr key={r.id}><td>{fmt(r.started_at)}</td><td>{actorName(r.actor_id)}</td>

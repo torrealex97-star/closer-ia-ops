@@ -501,6 +501,50 @@ await step('Apify: el cron lanza solo los actores diarios (una vez al día) y re
   let r = await cron(); assert.equal(r.status, 200); assert.equal(state.apifyCalls.length, calls + 1, 'lanzó el diario'); assert.deepEqual(r.json.apify.started, [{ actor: 'aakash19/jobspy', ok: true }]);
   r = await cron(); assert.equal(state.apifyCalls.length, calls + 1, 'una sola vez al día'); assert.deepEqual(r.json.apify.started, []);
 });
+await step('Apify sencillo: portales con buscadores de repuesto (arranque fallido, ejecución fallida y sin ofertas), lenguaje llano y tope de gasto', async () => {
+  const post = (body) => call('/api/admin/apify', { method: 'POST', body });
+  const settle = () => { for (const r of state.apifyRuns) if (r.status === 'RUNNING') Object.assign(r, { status: 'SUCCEEDED', finished_at: new Date().toISOString(), harvested: 3, cost_usd: 0.07 }); };
+  settle();
+  // vista: portales en lenguaje llano, sin nombres técnicos obligatorios
+  const view = (await call('/api/admin/apify')).json.portals;
+  assert.deepEqual(view.map(p => p.id), ['indeed', 'infojobs', 'linkedin', 'multi']);
+  const ind0 = view.find(p => p.id === 'indeed'); assert.equal(ind0.state, 'off'); assert.match(ind0.headline, /Sin probar/); assert.equal(ind0.daily, false); assert.equal(ind0.recipes.length, 4);
+  assert.equal((await post({ action: 'search_now', portal: 'no-existe' })).status, 422);
+  const adm = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });
+  assert.equal((await post({ action: 'search_now', portal: 'indeed' })).status, 403, 'solo el propietario gasta crédito'); jar = adm;
+  // 1) el primer buscador no arranca → se usa el segundo, y el fallo queda anotado
+  state.apifyFailActors = new Set(['boncross~indeed-jobs']);
+  let calls = state.apifyCalls.length;
+  let r = await post({ action: 'search_now', portal: 'indeed', test: true }); assert.equal(r.status, 202, JSON.stringify(r.json));
+  assert.equal(r.json.fallback, true); assert.equal(r.json.recipe, 'Buscador de Indeed B'); assert.match(r.json.message, /Prueba lanzada en Indeed/);
+  const c = state.apifyCalls.at(-1); assert.equal(c.actor, 'chuckling_hemp~indeed-jobs-scraper'); assert.equal(state.apifyCalls.length, calls + 1);
+  assert.equal(c.query.maxItems, '10', 'la prueba pide solo 10 elementos'); assert.equal(c.query.maxTotalChargeUsd, '0.5', 'tope duro de gasto por prueba'); assert.equal(c.input.search_term, 'closer de ventas');
+  const failedStart = state.apifyRuns.find(x => x.status === 'FAILED' && /noarranco/.test(x.run_id)); assert.ok(failedStart && failedStart.error, 'el intento fallido queda en el historial');
+  assert.equal((await post({ action: 'search_now', portal: 'indeed' })).status, 409, 'ya hay una búsqueda en curso'); assert.match((await post({ action: 'search_now', portal: 'indeed' })).json.detail, /en curso/);
+  // 2) esa ejecución termina FALLIDA → al recoger, se lanza sola el siguiente buscador
+  state.apifyStatus = 'FAILED'; calls = state.apifyCalls.length;
+  const h = await post({ action: 'harvest' }); assert.equal(h.status, 200); assert.ok(h.json.results.some(x => x.recovery?.ok === true), JSON.stringify(h.json));
+  assert.equal(state.apifyCalls.length, calls + 1); assert.equal(state.apifyCalls.at(-1).actor, 'ayeeyee~indeed-job-scraper', 'saltó el que falló (B) y el que ya no arrancaba (A)');
+  // 3) termina SIN ofertas → vuelve a probar con el siguiente (JobSpy, último recurso)
+  state.apifyStatus = 'SUCCEEDED'; state.apifyItems = []; calls = state.apifyCalls.length;
+  const h2 = await post({ action: 'harvest' }); assert.ok(h2.json.results.some(x => x.recovery?.ok === true), JSON.stringify(h2.json)); assert.equal(state.apifyCalls.at(-1).actor, 'aakash19~jobspy');
+  // 4) todos fallan → mensaje llano, sin éxito falso, y la vista dice «ningún buscador funciona»
+  settle(); state.apifyFailActors = new Set(['boncross~indeed-jobs', 'chuckling_hemp~indeed-jobs-scraper', 'ayeeyee~indeed-job-scraper', 'aakash19~jobspy']);
+  r = await post({ action: 'search_now', portal: 'indeed' }); assert.equal(r.status, 409); assert.match(r.json.detail, /Ningún buscador/); assert.ok(r.json.attempts.length >= 3);
+  assert.ok(!/HTTP|esquema|actor/i.test(r.json.attempts.map(a => a.error).join(' ')), 'errores en lenguaje llano');
+  const down = (await call('/api/admin/apify')).json.portals.find(p => p.id === 'indeed'); assert.equal(down.state, 'down'); assert.match(down.headline, /ningún buscador funciona/i);
+  // 5) búsqueda diaria: el interruptor activa todos los buscadores del portal; el cron hace UNA búsqueda al día aunque haya repuestos
+  state.apifyFailActors = new Set(['boncross~indeed-jobs']); settle(); state.apifyRuns = state.apifyRuns.filter(x => !/noarranco/.test(x.run_id) && !['FAILED'].includes(x.status));
+  for (const x of state.apifyRuns) x.started_at = new Date(Date.now() - 40 * 3600 * 1000).toISOString();
+  assert.equal((await post({ action: 'portal_daily', portal: 'indeed', on: 'si' })).status, 422);
+  assert.equal((await post({ action: 'portal_daily', portal: 'indeed', on: true })).status, 200); assert.ok((await call('/api/admin/apify')).json.portals.find(p => p.id === 'indeed').daily);
+  state.apifyItems = [{ id: 'z1', title: 'Closer de ventas high ticket', url: 'https://es.indeed.com/viewjob?jk=z1', company: 'Acme', location: 'Madrid' }]; // la búsqueda sí devuelve ofertas
+  calls = state.apifyCalls.length; const cron = () => call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
+  let k = await cron(); assert.equal(k.status, 200); const indeedActors = ['boncross/indeed-jobs', 'chuckling_hemp/indeed-jobs-scraper', 'ayeeyee/indeed-job-scraper'];
+  assert.deepEqual(k.json.apify.started.filter(x => indeedActors.includes(x.actor)).map(x => [x.actor, x.ok]), [['chuckling_hemp/indeed-jobs-scraper', true]], JSON.stringify(k.json.apify)); // A cae → B; solo UNA búsqueda de Indeed
+  const afterFirst = state.apifyCalls.length;
+  k = await cron(); assert.equal(state.apifyCalls.length, afterFirst, 'una búsqueda diaria por portal: la segunda pasada no lanza nada');
+  state.apifyFailActors = new Set(); state.apifyItems = [];
 await step('privacidad: página pública con borrador visible, sin inventar datos del responsable', async () => {
   const res = await fetch(BASE + '/privacidad'); assert.equal(res.status, 200);
   const html = await res.text();

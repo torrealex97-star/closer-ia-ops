@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { harvestRun, listActors, listRuns, webhookTokenValid } from '../../../../lib/apify';
+import { recoverAfter } from '../../../../lib/apifyAuto';
+import { publicBaseUrl } from '../../../../lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,5 +17,8 @@ export async function POST(request: NextRequest) {
   const [runs, actors] = await Promise.all([listRuns(60), listActors()]);
   const run = runs?.find(r => r.run_id === runId); const actor = actors?.find(a => a.id === run?.actor_id);
   if (!run || !actor) return Response.json({ detail: 'Ejecución desconocida.' }, { status: 404 });
-  return Response.json({ ok: true, ...await harvestRun(run, actor, 45000) });
+  const result = await harvestRun(run, actor, 45000);
+  // Si esta ejecución terminó mal o sin ofertas, se lanza el siguiente buscador del mismo portal.
+  const recovery = await recoverAfter(run, actor, result, publicBaseUrl(request)).catch(() => undefined);
+  return Response.json({ ok: true, ...result, ...(recovery ? { recovery } : {}) });
 }
