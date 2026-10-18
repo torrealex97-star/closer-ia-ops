@@ -168,7 +168,7 @@ export function startMocks({ authPort, enginePort }) {
     if (url.pathname === '/rest/v1/apify_actors') {
       const q = Object.fromEntries(url.searchParams); const id = q.id?.replace('eq.', '');
       if (req.method === 'POST') { state.apifyActors.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), ...body }); return send(res, 201, {}); }
-      if (req.method === 'PATCH') { Object.assign(state.apifyActors.find(a => a.id === id) ?? {}, body); return send(res, 204, {}); }
+      if (req.method === 'PATCH') { const src = q.source?.startsWith('eq.') ? decodeURIComponent(q.source.slice(3)) : null; for (const a of state.apifyActors) if (id ? a.id === id : a.source === src) Object.assign(a, body); return send(res, 204, {}); }
       if (req.method === 'DELETE') { state.apifyActors = state.apifyActors.filter(a => a.id !== id); state.apifyRuns = state.apifyRuns.filter(r => r.actor_id !== id); return send(res, 204, {}); }
       return send(res, 200, state.apifyActors);
     }
@@ -184,6 +184,7 @@ export function startMocks({ authPort, enginePort }) {
     const apifyMatch = url.pathname.match(/^\/v2\/(acts\/([^/]+)\/(builds\/default|runs)|actor-runs\/([^/]+)|datasets\/([^/]+)\/items)$/);
     if (apifyMatch) {
       if (bearer !== 'good-key-1234') return send(res, 401, {});
+      if (state.apifyFailActors?.has(apifyMatch[2]) && apifyMatch[3]) return send(res, 404, {}); // buscador «caído» en pruebas de repuestos
       if (apifyMatch[3] === 'builds/default') {
         const strict = apifyMatch[2].includes('strict');
         return send(res, 200, { data: { inputSchema: JSON.stringify({ properties: strict ? { mandatoryField: { type: 'string' }, search_term: { type: 'string' } } : { search_term: { type: 'string' }, location: { type: 'string' }, results_wanted: { type: 'integer' }, hours_old: { type: 'integer' }, country_indeed: { type: 'string' }, site_name: { type: 'array', items: { type: 'string' } }, proxyConfiguration: { type: 'object' } }, required: strict ? ['mandatoryField'] : ['search_term'] }) } });

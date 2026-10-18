@@ -105,8 +105,9 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 4 activas/).waitFor();
 });
 await step('Apify: añadir el actor, guardar la clave, lanzar y recoger resultados con coste y presupuesto', async () => {
-  await page.getByRole('button', { name: 'Apify', exact: true }).click(); await page.getByRole('heading', { name: 'Miles de ofertas.' }).waitFor();
-  await page.getByText('Falta la clave de Apify.').waitFor(); await page.getByText('0.00 USD de 5 USD').waitFor();
+  await page.getByRole('button', { name: 'Búsqueda automática', exact: true }).click(); await page.getByRole('heading', { name: 'Buscar ofertas.' }).waitFor();
+  await page.getByText(/falta conectar tu cuenta de Apify/).waitFor(); await page.getByText('0.00 USD de 5 USD').waitFor();
+  await page.getByTestId('apify-advanced').locator('summary').click(); // las opciones avanzadas empiezan cerradas
   await page.getByRole('button', { name: 'Usar este actor' }).click();
   assert.equal(await page.getByLabel('Actor de Apify').inputValue(), 'aakash19/jobspy'); assert.equal(await page.getByLabel('Código de la fuente').inputValue(), 'apify-jobspy');
   await page.getByLabel('Máximo de elementos por ejecución').fill('300'); await page.getByRole('button', { name: 'Guardar', exact: true }).click(); await page.getByText('Actor guardado.').waitFor();
@@ -114,15 +115,31 @@ await step('Apify: añadir el actor, guardar la clave, lanzar y recoger resultad
   await page.getByRole('button', { name: 'Lanzar ahora' }).click(); await page.getByText(/Guarda antes la clave de Apify/).first().waitFor(); // sin clave no se lanza
   await page.getByRole('button', { name: 'APIs', exact: true }).click(); await page.getByLabel('Clave de Apify').fill('good-key-1234');
   await page.getByRole('button', { name: 'Guardar', exact: true }).nth(0).click(); await page.getByText('Clave de Apify guardada.').waitFor();
-  await page.getByRole('button', { name: 'Apify', exact: true }).click();
+  await page.getByRole('button', { name: 'Búsqueda automática', exact: true }).click(); await page.getByTestId('apify-advanced').locator('summary').click();
   await page.getByRole('button', { name: 'Lanzar ahora' }).click(); await page.getByText(/Ejecución lanzada en Apify/).waitFor();
   assert.equal(state.apifyCalls.length, 1); assert.equal(state.apifyCalls[0].query.maxItems, '300');
-  await page.getByText('En curso').first().waitFor();
+  await page.getByText('Buscando…').first().waitFor();
   state.apifyItems = [1, 2, 3].map(i => ({ id: `u${i}`, site: 'linkedin', job_url: `https://www.linkedin.com/jobs/view/u${i}`, title: 'Closer de ventas', company: `Empresa ${i}`, location: 'Madrid, España', description: 'Buscamos closer con experiencia en ventas para el equipo comercial' }));
   await page.getByRole('button', { name: 'Recoger resultados' }).click(); await page.getByText(/Recogidas 1 ejecución\(es\): 3 elementos/).waitFor();
   await page.getByText('Terminada').first().waitFor(); await page.getByText('0.070').waitFor();
   assert.equal([...state.external.values()].filter(o => o.source === 'apify-jobspy').length, 3);
   await page.getByText('1.07 USD de 5 USD').waitFor().catch(() => {}); // 0,07 gastados (+ nada en curso)
+});
+await step('Búsqueda automática (modo sencillo): portales en lenguaje llano, prueba de 10 ofertas y repuesto visible', async () => {
+  await page.getByRole('button', { name: 'Búsqueda automática', exact: true }).click(); await page.getByRole('heading', { name: 'Buscar ofertas.' }).waitFor();
+  const text = await page.getByText('Cómo funciona, en 3 líneas').locator('..').innerText();
+  assert.match(text, /prueba otro sola/); assert.ok(!/scraper|actor|proxy/i.test(text), 'la explicación no usa jerga');
+  const card = page.getByTestId('portal-indeed'); await card.waitFor();
+  assert.match(await card.innerText(), /Indeed \(España\)[\s\S]*Sin probar|Funciona|Esperando/);
+  assert.ok(!/boncross|chuckling|actor/i.test(await card.innerText()), 'los nombres técnicos no se ven hasta abrir «repuesto»');
+  await card.locator('summary').click(); assert.match(await card.innerText(), /Buscador de Indeed A/); assert.match(await card.innerText(), /Se usan por orden/);
+  state.apifyFailActors = new Set(['boncross~indeed-jobs']); const before = state.apifyCalls.length;
+  await card.getByRole('button', { name: 'Probar con 10 ofertas' }).click(); await page.getByText(/Prueba lanzada en Indeed \(España\) \(el primer buscador no arrancó; se usó «Buscador de Indeed B»\)/).waitFor();
+  assert.equal(state.apifyCalls.length, before + 1); assert.equal(state.apifyCalls.at(-1).query.maxItems, '10');
+  await card.locator('.status', { hasText: 'Buscando ahora…' }).waitFor();
+  await card.getByLabel('Buscar cada día').click(); await page.getByText('Búsqueda diaria activada en Indeed').waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  state.apifyFailActors = new Set();
 });
 await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su perfil con consentimiento y el enlace de su vídeo', async () => {
   await page.getByRole('button', { name: 'Alumnas' }).click(); await page.getByRole('heading', { name: 'Alumnas con acceso.' }).waitFor();
