@@ -28,6 +28,7 @@ Qué se hace y qué NO. Bloqueos y siguiente acción exacta.
 
 ## Reglas aprendidas (de Growth Ops, adaptadas)
 
+- **Fusión de PRs propias: permitida** (autorización permanente del dueño, 2026-10-18) con CI verde en el head, sin conflictos ni hallazgos rojos abiertos y con merge commit; excepciones que exigen orden expresa en `AGENTS.md`.
 - **Sin merge-base no hay merge.** Antes de fusionar o continuar una rama ajena: `git merge-base main <rama>` debe devolver un commit. Si no, extrae el contenido único, relévalo en una rama nueva desde `main` y cierra la PR como sustituida.
 - **Nunca borres ni reemplaces trabajo no fusionado de otro agente.** Lee su diff y su ficha primero.
 - **Una migración aplicada en producción se versiona en el repo en la misma PR** (`supabase/migrations/`). Aplicar sin versionar deja el historial desalineado.

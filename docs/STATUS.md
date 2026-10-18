@@ -1,5 +1,10 @@
 # Estado
 
+## Autorización permanente de fusión y spike de voz autorizado (sesión 62) — 2026-10-18
+
+- Decisión del dueño: los agentes pueden fusionar sus propias PRs de forma permanente y el spike de voz queda autorizado. Registrado en `AGENTS.md` (con condiciones y excepciones), `docs/handoff/README.md` y `docs/ACTIVE_HANDOFF.md`.
+- Evidencia: *inspeccionado* (solo documentación; `npm run handoff` y `tests/handoff.mjs`); no se ejecutaron tests de runtime.
+
 ## Cierre de #21 (sesión 61) — 2026-10-18
 
 - #21 (menú móvil, métricas sin ceros falsos, IP fijada) fusionada con CI verde en las dos ejecuciones. Se retira su ficha de relevo; no quedan trabajos vivos.
