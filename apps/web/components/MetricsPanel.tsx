@@ -6,7 +6,7 @@ import { TIER_LABEL, type Tier } from '../lib/sourceTiers';
 // Métricas de los últimos 14 días. Reglas de `dashboard-design`: sin dato = «—» con su causa, error ≠ vacío (con reintentar),
 // gráfico con eje en 0, etiquetas directas, colores solo por tokens, y tabla alternativa al gráfico.
 type Metrics = { perTier: Array<{ tier: Tier; total: number; good: number }>; days: string[]; goodPerDay: Record<string, number>; perSource: Array<{ source: string; total: number; good: number; approved: number }>;
-  apify: { cost_usd: number; runs: number; good_offers: number; cost_per_good: number | null }; review: { human_decisions: number; ai_decisions: number; minutes: null } };
+  apify: { cost_usd: number | null; runs: number | null; good_offers: number; cost_per_good: number | null }; review: { human_decisions: number | null; ai_decisions: number | null; minutes: null } };
 
 const day = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const label = (iso: string) => day.format(new Date(`${iso}T00:00:00Z`));
@@ -52,10 +52,10 @@ export default function MetricsPanel({ onSessionLost }: { onSessionLost: () => v
     <summary><strong>Últimos 14 días: {total} ofertas buenas</strong> <span className="card-meta" style={{ margin: 0 }}>({perDay} al día · de {newOffers} nuevas)</span></summary>
     {newOffers === 0 ? <div className="empty" data-testid="metrics-empty"><h3>Sin ofertas nuevas en estos 14 días.</h3><p className="card-meta">Lanza una recogida desde «Recoger APIs ahora» o revisa que las fuentes no estén pausadas. Esto no significa que las fuentes funcionen: significa que no ha entrado nada.</p></div> : <>
       <div className="stat-strip">
-        <span><strong>{m.apify.runs ? usd.format(m.apify.cost_usd) : '—'}</strong>gasto Apify{m.apify.runs ? ` (${m.apify.runs} ejecuciones)` : ': sin ejecuciones'}</span>
-        <span><strong>{m.apify.cost_per_good === null ? '—' : usd.format(m.apify.cost_per_good)}</strong>{m.apify.cost_per_good === null ? (m.apify.runs ? 'por oferta buena de Apify: aún sin ofertas buenas' : 'por oferta buena de Apify: sin ejecuciones') : 'por oferta buena de Apify'}</span>
-        <span><strong>{m.review.human_decisions}</strong>decisiones humanas</span>
-        <span><strong>{m.review.ai_decisions}</strong>decisiones del revisor IA</span>
+        <span><strong>{m.apify.runs && m.apify.cost_usd !== null ? usd.format(m.apify.cost_usd) : '—'}</strong>gasto Apify{m.apify.runs === null ? ': no se pudo leer' : m.apify.runs ? ` (${m.apify.runs} ejecuciones)` : ': sin ejecuciones'}</span>
+        <span><strong>{m.apify.cost_per_good === null ? '—' : usd.format(m.apify.cost_per_good)}</strong>{m.apify.cost_per_good === null ? (m.apify.runs === null ? 'por oferta buena de Apify: gasto no disponible' : m.apify.runs ? 'por oferta buena de Apify: aún sin ofertas buenas' : 'por oferta buena de Apify: sin ejecuciones') : 'por oferta buena de Apify'}</span>
+        <span><strong>{m.review.human_decisions ?? '—'}</strong>decisiones humanas{m.review.human_decisions === null ? ': no se pudo leer' : ''}</span>
+        <span><strong>{m.review.ai_decisions ?? '—'}</strong>decisiones del revisor IA{m.review.ai_decisions === null ? ': no se pudo leer' : ''}</span>
       </div>
       <p className="card-meta">«Buena» = puntuación ≥ 60 y España clara. Minutos de revisión: <strong>no se miden</strong> (la app no registra tiempo; solo cuenta decisiones).</p>
       <DayBars days={m.days} values={values} />

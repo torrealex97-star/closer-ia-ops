@@ -81,6 +81,8 @@ function SourceCatalog({ sources, external = [], paused = [] }: { sources: Cloud
   const [filter, setFilter] = useState<Filter>('all');
   const [category, setCategory] = useState('');
   const [text, setText] = useState('');
+  const [limit, setLimit] = useState(25); // por tandas: el catálogo tiene decenas de filas y en móvil medía ~11.000 px
+  useEffect(() => setLimit(25), [filter, category, text]);
   const ext = new Map(external.map(e => [e.source, e]));
   const cloud = new Map(sources.map(s => [s.code, s]));
   const known = new Set(CATALOG.map(c => c.code));
@@ -108,11 +110,12 @@ function SourceCatalog({ sources, external = [], paused = [] }: { sources: Cloud
     </div>
     {!shown.length ? <div className="empty"><h3>Ninguna fuente con estos filtros.</h3></div> : <div className="table-wrap"><table className="data-table">
       <thead><tr><th>Fuente</th><th>Categoría</th><th>Método</th><th>Estado</th><th className="num">Leídas</th><th className="num">Catálogo</th><th className="num">Elegibles</th></tr></thead>
-      <tbody>{shown.map(r => <tr key={r.code}>
+      <tbody>{shown.slice(0, limit).map(r => <tr key={r.code}>
         <td className="primary-cell"><strong>{r.website ? <a href={r.website} target="_blank" rel="noopener noreferrer">{r.name}</a> : r.name}</strong><span>{r.code}</span>
           {r.cloud?.warning && <span style={{ color: 'var(--warning)' }}>{r.cloud.warning}</span>}{!r.cloud && r.note && <span>{r.note}</span>}</td>
         <td>{r.category ?? '—'}</td><td>{r.acquisition_method ?? '—'}{r.validation_status && <span className="sub">{r.validation_status}</span>}</td>
         <td>{cell(r)}</td><td className="num">{r.cloud?.fetched ?? '—'}</td><td className="num">{r.cloud?.catalog ?? '—'}</td><td className="num">{r.cloud?.eligible ?? '—'}</td></tr>)}</tbody></table></div>}
+    {shown.length > limit && <p className="card-meta" style={{ marginTop: 12 }}><button onClick={() => setLimit(n => n + 25)}>Mostrar {Math.min(25, shown.length - limit)} más</button> <span aria-live="polite">Mostrando {limit} de {shown.length}</span></p>}
   </>;
 }
 

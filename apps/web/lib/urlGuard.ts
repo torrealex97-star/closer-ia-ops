@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import { isIP } from 'node:net';
 import { lookup } from 'node:dns/promises';
 
@@ -25,13 +27,45 @@ export const privateAddress = (ip: string): boolean => {
 };
 
 // Comprueba esquema/host y que el DNS no resuelva a una red interna. `resolve` es inyectable para pruebas.
-export async function assertPublicUrl(rawUrl: string, resolve: (host: string) => Promise<string[]> = async h => (await lookup(h, { all: true })).map(x => x.address)): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
+export async function assertPublicUrl(rawUrl: string, resolve: (host: string) => Promise<string[]> = async h => (await lookup(h, { all: true })).map(x => x.address)): Promise<{ ok: true; url: URL; address?: string } | { ok: false; reason: string }> {
   // Solo para pruebas con servidores simulados: host:port EXACTO fijado por entorno (nunca viene de datos externos).
   const testHost = process.env.URL_GUARD_TEST_ALLOW;
   try { if (testHost && new URL(rawUrl).host === testHost) return { ok: true, url: new URL(rawUrl) }; } catch { /* url inválida: sigue el flujo normal */ }
   const check = hostAllowed(rawUrl);
   if (!check.ok) return check;
-  try { if ((await resolve(check.url.hostname)).some(privateAddress)) return { ok: false, reason: 'resuelve_a_red_interna' }; }
-  catch { return { ok: false, reason: 'dns' }; }
-  return check;
+  let addresses: string[];
+  try { addresses = await resolve(check.url.hostname); } catch { return { ok: false, reason: 'dns' }; }
+  if (!addresses.length) return { ok: false, reason: 'dns' };
+  if (addresses.some(privateAddress)) return { ok: false, reason: 'resuelve_a_red_interna' };
+  return { ok: true, url: check.url, address: addresses[0] };
+}
+
+// GET con la IP FIJADA: la dirección validada es la que se usa para conectar (el DNS no se vuelve a consultar), así que un
+// nombre que cambie de respuesta entre la comprobación y la petición (DNS rebinding) no puede llevar a una red interna.
+// Host y SNI siguen siendo el nombre original. No sigue redirecciones: devuelve `location` para que el llamador revalide cada salto.
+export type PinnedResult = { ok: true; status: number; location: string | null; text: string } | { ok: false; reason: string };
+export async function pinnedGet(rawUrl: string, opts: { timeoutMs: number; maxBytes?: number; resolve?: (host: string) => Promise<string[]> }): Promise<PinnedResult> {
+  const check = await assertPublicUrl(rawUrl, opts.resolve);
+  if (!check.ok) return check;
+  const maxBytes = opts.maxBytes ?? 200000, u = check.url, address = check.address;
+  const client = u.protocol === 'https:' ? https : http;
+  return new Promise<PinnedResult>(resolve => {
+    const done = (r: PinnedResult) => resolve(r);
+    try {
+      const req = client.request({
+        protocol: u.protocol, hostname: u.hostname, port: u.port || undefined, path: `${u.pathname}${u.search}`, method: 'GET', servername: isIP(u.hostname) ? undefined : u.hostname,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)', Accept: 'text/html,*/*;q=0.8' }, signal: AbortSignal.timeout(Math.max(1, Math.floor(opts.timeoutMs))),
+        ...(address ? { lookup: ((_h: string, o: { all?: boolean }, cb: (...a: unknown[]) => void) => { const family = isIP(address); o?.all ? cb(null, [{ address, family }]) : cb(null, address, family); }) as never } : {}),
+      }, res => {
+        const status = res.statusCode ?? 0, location = typeof res.headers.location === 'string' ? res.headers.location : null;
+        if (status >= 300 && status < 400) { res.resume(); return done({ ok: true, status, location, text: '' }); }
+        const chunks: Buffer[] = []; let size = 0;
+        res.on('data', (c: Buffer) => { size += c.length; if (size <= maxBytes) chunks.push(c); else { res.destroy(); } });
+        res.on('close', () => done({ ok: true, status, location, text: Buffer.concat(chunks).toString('utf8').slice(0, maxBytes) }));
+        res.on('error', () => done({ ok: true, status, location, text: Buffer.concat(chunks).toString('utf8') }));
+      });
+      req.on('error', () => done({ ok: false, reason: 'red' }));
+      req.end();
+    } catch { done({ ok: false, reason: 'red' }); }
+  });
 }

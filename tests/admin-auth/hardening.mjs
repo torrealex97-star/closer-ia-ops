@@ -16,7 +16,7 @@ const { monthSpent } = await import('../../apps/web/lib/apify.ts');
 const { pausedSourcesStrict, ingest, verifyOffer } = await import('../../apps/web/lib/external.ts');
 const { externalForStudent } = await import('../../apps/web/lib/externalSurface.ts');
 const { collectProvider } = await import('../../apps/web/lib/collectors.ts');
-const { assertPublicUrl } = await import('../../apps/web/lib/urlGuard.ts');
+const { assertPublicUrl, pinnedGet } = await import('../../apps/web/lib/urlGuard.ts');
 const results = []; const step = async (name, fn) => { try { await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message.split('\n')[0]]); } };
 
 await step('BD caída: el gasto de Apify es «no se sabe» (null), no 0', async () => assert.equal(await monthSpent(), null));
@@ -37,6 +37,12 @@ await step('verifyOffer con URL interna: unknown, sin petición a la URL y razó
   mode = 'up'; offerUrl = 'http://169.254.169.254/latest/meta-data'; hits.length = 0;
   const r = await verifyOffer('11111111-1111-1111-1111-111111111111', 2000);
   assert.equal(r.result, 'unknown'); assert.match(r.reason, /url_no_permitida_ip_literal/);
+});
+await step('DNS rebinding: la IP validada se fija, el DNS se consulta UNA sola vez y no se vuelve a resolver al conectar', async () => {
+  let calls = 0; const resolve = async () => { calls++; return calls === 1 ? ['192.0.2.1'] : ['127.0.0.1']; }; // 1.ª respuesta pública (TEST-NET), 2.ª interna
+  const r = await pinnedGet('https://rebind.ejemplo.es/x', { timeoutMs: 700, resolve });
+  assert.equal(calls, 1); assert.equal(r.ok, false); assert.equal(r.reason, 'red'); // 192.0.2.1 no responde: corta por tiempo, sin tocar 127.0.0.1
+  assert.equal((await pinnedGet('https://interna.ejemplo.es/x', { timeoutMs: 700, resolve: async () => ['10.1.2.3', '93.184.216.34'] })).reason, 'resuelve_a_red_interna', 'si UNA respuesta es interna se rechaza');
 });
 server.close();
 for (const [s, n, m] of results) console.log(`${s}  ${n}${m ? '\n      ' + m : ''}`);
