@@ -43,7 +43,8 @@ Todo lo anterior (PRs #1-#21) está fusionado en `main`. Al fusionar una PR, su 
 - Skills de marketing importadas (para cuando haga falta).
 - Candidaturas: formulario base con consentimiento de autorrelleno futuro aparte (ADR-012).
 - Futuro: roleplays de ventas por voz y simulaciones de entrevista con personalidades de IA; solo licencias MIT/Apache/BSD; base y privacidad en ADR-013 (nada implementado).
-- Fusión de PRs: el dueño autoriza fusionar las que estén listas (CI verde) en cada petición; no es permiso permanente.
+- **Fusión de PRs: autorización PERMANENTE** (dueño, 2026-10-18): los agentes fusionan sus PRs con CI verde, sin conflictos y con merge commit. Siguen exigiendo orden expresa: DDL/secretos reales, activar login de alumnas o revisor IA en `live`, automatización de candidaturas, gasto de pago nuevo (ver `AGENTS.md`).
+- **Spike de voz autorizado** (dueño, 2026-10-18), acotado: sin audio real ni datos de alumnas (ADR-013).
 
 ## 5. Siguiente acción exacta
 
