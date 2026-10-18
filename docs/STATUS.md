@@ -1,5 +1,10 @@
 # Estado
 
+## Cierre de #19 e intermitencia de un test de navegador (sesión 59) — 2026-10-18
+
+- #19 (correcciones de la revisión) fusionada con CI verde. Se retira su ficha de relevo.
+- **Intermitencia observada:** en el commit de #19 el job `verify` falló una vez en `tests/browser/workspace.spec.ts:113` («Groq is visible and switching provider never carries the typed key»: esperó 5 s el texto «Conexión guardada»). Es la app local (Python), que #19 no toca; la otra ejecución del mismo commit pasó y el re-run del job falló-solo pasó en verde. *Probado* solo en CI de GitHub, causa raíz **no investigada**. Si reaparece: esperar el estado de la UI en vez de un timeout fijo; nunca saltar ni desactivar el test.
+
 ## Revisión de código y visual: correcciones (sesión 58) — 2026-10-17
 
 - **Revisión**: skill `code-review` (nivel alto) sobre `apps/web/lib` y `app/api` + capturas Playwright de `/`, `/alumna`, `/admin` (Resumen, Fuentes, Alumnas) en escritorio y móvil (390 px). Visual: sin desbordes horizontales ni errores de consola; el portal de alumna y el panel se ven coherentes con `docs/DESIGN.md`.
