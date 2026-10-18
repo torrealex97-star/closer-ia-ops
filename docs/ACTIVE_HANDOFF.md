@@ -10,9 +10,9 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 
 | Rama | PR | Estado |
 | --- | --- | --- |
-| `fix/review-hardening` (correcciones de la revisión de código) | #19 | validated |
+| _(ninguno: no hay trabajos vivos)_ | — | — |
 
-Todo lo anterior (PRs #1-#18) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
+Todo lo anterior (PRs #1-#19) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
@@ -47,7 +47,7 @@ Todo lo anterior (PRs #1-#18) está fusionado en `main`. Al fusionar una PR, su 
 
 ## 5. Siguiente acción exacta
 
-1. Fusionar #19 (CI verde). Después, candidatos para el siguiente incremento (agente): menú del panel en móvil y lista de Fuentes paginada en móvil; métricas sin ceros falsos (coste Apify ilegible, decisiones fuera de ventana); guarda SSRF con IP fijada contra DNS rebinding; spike acotado de voz (Pipecat) cuando el dueño lo autorice.
+1. Candidatos para el siguiente incremento (agente): menú del panel en móvil y lista de Fuentes paginada en móvil; métricas sin ceros falsos (coste Apify ilegible, decisiones fuera de ventana); guarda SSRF con IP fijada contra DNS rebinding; spike acotado de voz (Pipecat) cuando el dueño lo autorice.
 2. Con datos reales: calibrar matching y revisar el revisor IA con el informe de acuerdo.
 3. Fase 4 (automatización) NO empieza sin autorización escrita: ver ADR-012.
 
