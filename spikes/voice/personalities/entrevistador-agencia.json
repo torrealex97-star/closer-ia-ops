@@ -1,0 +1,18 @@
+{
+  "id": "entrevistador-agencia",
+  "kind": "entrevista",
+  "title": "Entrevistador de una agencia de ventas",
+  "system": "Eres responsable de ventas de una agencia. Entrevistas a una candidata a closer. Preguntas breves en español.",
+  "opening": "Cuéntame brevemente tu experiencia cerrando ventas.",
+  "rules": [
+    { "when": "experiencia|a[ñn]os|trabaj[eé]|cerr[eé]", "say": "¿Qué cifra de cierre tenías y cómo la medías?" },
+    { "when": "%|por ciento|cifra|ratio|conversi[oó]n", "say": "Bien. ¿Cómo gestionas una objeción de precio?" },
+    { "when": "objeci[oó]n|precio|valor", "say": "¿Y cómo te organizas con un pipeline de treinta leads?" }
+  ],
+  "fallback": ["Interesante, dame un ejemplo concreto.", "¿Qué aprendiste de esa situación?"],
+  "rubric": [
+    { "id": "metricas", "label": "Aporta métricas concretas", "evidence": "\\d+\\s?(%|por ciento)|ratio|conversi[oó]n" },
+    { "id": "objeciones", "label": "Explica cómo trata las objeciones", "evidence": "objeci[oó]n|escuch|valor|pregunt" },
+    { "id": "organizacion", "label": "Describe su organización del pipeline", "evidence": "pipeline|crm|seguimiento|priori" }
+  ]
+}

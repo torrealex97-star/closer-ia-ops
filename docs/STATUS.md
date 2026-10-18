@@ -1,5 +1,12 @@
 # Estado
 
+## Spike de voz acotado: personalidades, sesión y feedback con citas (sesión 63) — 2026-10-18
+
+- `spikes/voice/` (aislado de `apps/web`, sin dependencias): interfaces `LLMProvider`/`VoiceProvider` con simuladores, dos personalidades versionadas (cliente escéptico, entrevistador de agencia), sesión por texto con tope de coste y fallos declarados, e informe de feedback que **solo cita fragmentos literales** de la transcripción («no observado» ≠ «malo», sin puntuaciones). Autorizado por el dueño (ADR-013).
+- **Verificación:** *probado* — `spikes/voice/tests/voice.mjs` 6/6 (parte de `run.sh` y CI). *Verificado* solo un hecho externo: `pip download --no-deps pipecat-ai` baja pipecat-ai 1.12.0 con `License-Expression: BSD-2-Clause` (Python ≥ 3.11); no se instaló ni se ejecutó.
+- **No medido:** latencia, coste por sesión y calidad de voz en español con proveedores reales (no hay claves aquí ni se usan datos de alumnas). Receta y plantilla de resultados en `spikes/voice/RUNBOOK.md` para que el dueño la ejecute.
+- **Limitaciones:** el «cliente» simulado responde por reglas, no por un modelo; la rúbrica es por palabras clave (sirve para probar el contrato del informe, no para evaluar a nadie); el consentimiento de audio de alumnas sigue sin texto legal.
+
 ## Cierre de #21 (sesión 61) — 2026-10-18
 
 - #21 (menú móvil, métricas sin ceros falsos, IP fijada) fusionada con CI verde en las dos ejecuciones. Se retira su ficha de relevo; no quedan trabajos vivos.
