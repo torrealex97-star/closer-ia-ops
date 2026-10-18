@@ -7,6 +7,10 @@
 - **SSRF — IP fijada:** `lib/urlGuard.ts` (`pinnedGet`) valida el DNS una vez y conecta a esa IP (Host/SNI intactos, sin seguir redirecciones, tope de bytes). Lo usan la comprobación de enlaces del revisor IA (producción; el camino con `fetchImpl` inyectado se mantiene para pruebas) y `verifyOffer`/vigencia. Un nombre que cambie de respuesta entre la comprobación y la petición ya no puede llevar a una red interna.
 - **Verificación:** *probado* — `run.sh` completo (flujo 39/39, hardening 6/6 con prueba de rebinding, métricas con huecos y decisiones fuera de ventana, UI 9/9 con prueba móvil), tsc, build, `npm run design`. La conexión TLS con IP fijada (SNI) no se probó contra un servidor HTTPS real; solo HTTP local y el corte por tiempo. Nada *verificado* en servicios reales.
 - **Limitaciones:** la lectura de decisiones está limitada a 10.000 filas por ventana de 14 días; el límite de «Mostrar más» es solo de interfaz (el servidor sigue devolviendo todo el catálogo).
+## Cierre de #19 e intermitencia de un test de navegador (sesión 59) — 2026-10-18
+
+- #19 (correcciones de la revisión) fusionada con CI verde. Se retira su ficha de relevo.
+- **Intermitencia observada:** en el commit de #19 el job `verify` falló una vez en `tests/browser/workspace.spec.ts:113` («Groq is visible and switching provider never carries the typed key»: esperó 5 s el texto «Conexión guardada»). Es la app local (Python), que #19 no toca; la otra ejecución del mismo commit pasó y el re-run del job fallido pasó en verde. *Probado* solo en CI de GitHub, causa raíz **no investigada**. Si reaparece: esperar el estado de la UI en vez de un timeout fijo; nunca saltar ni desactivar el test.
 
 ## Revisión de código y visual: correcciones (sesión 58) — 2026-10-17
 
