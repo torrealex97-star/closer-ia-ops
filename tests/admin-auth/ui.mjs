@@ -33,7 +33,10 @@ await step('Fuentes: catálogo completo (todas las del backend + las del motor) 
   await page.getByText('Pennylane').first().waitFor();
   assert.equal(await page.locator('table').first().locator('tbody tr').count(), 1);
   await page.getByLabel('Mostrar').selectOption('local');
-  assert.ok(await page.locator('table').first().locator('tbody tr').count() >= 50);
+  const rowsOf = () => page.locator('table').first().locator('tbody tr').count();
+  assert.equal(await rowsOf(), 25, 'el catálogo se muestra por tandas de 25');
+  while (await page.getByRole('button', { name: /^Mostrar \d+ más$/ }).count()) await page.getByRole('button', { name: /^Mostrar \d+ más$/ }).click();
+  assert.ok(await rowsOf() >= 50, 'con «Mostrar más» se llega al catálogo completo');
   await page.getByLabel('Buscar').fill('infojobs'); assert.equal(await page.locator('table').first().locator('tbody tr').count(), 1);
 });
 await step('Revisión rápida: filtra closers, carga ubicación, oculta no-España, verifica y aprueba en bloque', async () => {
@@ -167,6 +170,19 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
 await step('móvil: Resumen sin scroll horizontal', async () => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Resumen' }).click(); await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+});
+await step('móvil: menú en una sola franja desplazable (no ocupa la pantalla) y Fuentes por tandas con «Mostrar más»', async () => {
+  const sidebarBottom = await page.evaluate(() => document.querySelector('.sidebar').getBoundingClientRect().bottom);
+  assert.ok(sidebarBottom < 260, `la cabecera del panel mide ${Math.round(sidebarBottom)} px en móvil`);
+  const nav = await page.evaluate(() => { const n = document.querySelector('.sidebar nav'); return { scrolls: n.scrollWidth > n.clientWidth, wraps: getComputedStyle(n).flexWrap, overflowX: getComputedStyle(n).overflowX }; });
+  assert.deepEqual(nav, { scrolls: true, wraps: 'nowrap', overflowX: 'auto' });
+  await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
+  const more = page.getByRole('button', { name: /^Mostrar \d+ más$/ }).first();
+  await more.waitFor();
+  const rows = () => page.locator('table').first().locator('tbody tr').count();
+  const before = await rows(); await more.click();
+  assert.ok(await rows() > before, 'al pulsar «Mostrar más» aparecen más fuentes');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 });
 

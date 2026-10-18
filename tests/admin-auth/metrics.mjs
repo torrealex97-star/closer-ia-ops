@@ -13,4 +13,10 @@ assert.deepEqual(m.perSource.map(s => [s.source, s.total, s.good, s.approved]), 
 assert.deepEqual(m.apify, { cost_usd: 0.5, runs: 3, good_offers: 2, cost_per_good: 0.25 });
 assert.deepEqual(m.review, { human_decisions: 1, ai_decisions: 1, minutes: null });
 assert.equal(computeMetrics([], [], now).apify.cost_per_good, null, 'sin ofertas buenas no se inventa un coste');
+// Un hueco no es un cero: lectura fallida de ejecuciones / decisiones = null; decisiones fuera de la ventana de «vistas» sí cuentan
+const gap = computeMetrics([o('infojobs', 70, true, 0)], null, now, 14, null);
+assert.deepEqual(gap.apify, { cost_usd: null, runs: null, good_offers: 0, cost_per_good: null }); assert.deepEqual(gap.review, { human_decisions: null, ai_decisions: null, minutes: null });
+const old = computeMetrics([o('infojobs', 70, true, 0)], [], now, 14, [{ reviewed_by: 'a@x.dev', reviewed_at: now.toISOString() }, { reviewed_by: 'ai-review', reviewed_at: now.toISOString() }, { reviewed_by: 'a@x.dev', reviewed_at: '2026-01-01T00:00:00Z' }]);
+assert.deepEqual(old.review, { human_decisions: 1, ai_decisions: 1, minutes: null }, 'decisiones de ofertas vistas antes de la ventana cuentan; las de fuera de la ventana no');
+assert.deepEqual(old.apify, { cost_usd: 0, runs: 0, good_offers: 0, cost_per_good: null }, 'sin ejecuciones es 0 real, no hueco');
 console.log('PASS  métricas: ofertas buenas por día/fuente, coste por oferta buena, decisiones; minutos = no medido');

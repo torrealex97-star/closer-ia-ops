@@ -1,7 +1,7 @@
 import { enrich } from './offerScore';
 import { callTimeout, timeLeft } from './cronBudget';
 import { salaryFromText } from './salary';
-import { assertPublicUrl } from './urlGuard';
+import { pinnedGet } from './urlGuard';
 import { serviceRest } from './supabaseAuth';
 
 // Fuentes externas (APIs con clave y recolectores programados). Los candidatos llegan tal cual los da la fuente,
@@ -183,20 +183,18 @@ export async function verifyOffer(id: string, timeoutMs = 10000): Promise<{ id: 
   const found = await listOffersById(id);
   if (!found) return null;
   let result: 'open' | 'closed' | 'unknown' = 'unknown'; let reason = 'network_unreachable';
-  const target = await assertPublicUrl(found.url);
-  try {
-    if (!target.ok) throw new Error(target.reason);
-    const response = await fetch(target.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
-    if (response.status === 404 || response.status === 410) { result = 'closed'; reason = 'job_not_found'; }
-    else if (response.status === 403 || response.status === 429) reason = 'source_blocked';
-    else if (response.status >= 300 && response.status < 400) reason = 'redirect_without_verification';
-    else if (response.ok) {
-      const body = (await response.text()).slice(0, 200000).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-      const fold = (t: string | null) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-      const hit = (fold(found.title).length >= 5 && body.includes(fold(found.title))) || (fold(found.company).length >= 3 && body.includes(fold(found.company)));
-      if (hit) { result = 'open'; reason = 'content_matches'; } else reason = 'content_not_corroborated';
-    } else reason = `http_${response.status}`;
-  } catch { if (!target.ok) reason = `url_no_permitida_${target.reason}`; /* red caída o URL no permitida: unknown */ }
+  // IP fijada tras validar (sin segunda resolución DNS) y sin seguir redirecciones: una URL interna nunca recibe la petición.
+  const got = await pinnedGet(found.url, { timeoutMs });
+  if (!got.ok) reason = got.reason === 'red' || got.reason === 'dns' ? 'network_unreachable' : `url_no_permitida_${got.reason}`;
+  else if (got.status === 404 || got.status === 410) { result = 'closed'; reason = 'job_not_found'; }
+  else if (got.status === 403 || got.status === 429) reason = 'source_blocked';
+  else if (got.status >= 300 && got.status < 400) reason = 'redirect_without_verification';
+  else if (got.status >= 200 && got.status < 300) {
+    const body = got.text.slice(0, 200000).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const fold = (t: string | null) => (t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const hit = (fold(found.title).length >= 5 && body.includes(fold(found.title))) || (fold(found.company).length >= 3 && body.includes(fold(found.company)));
+    if (hit) { result = 'open'; reason = 'content_matches'; } else reason = 'content_not_corroborated';
+  } else reason = `http_${got.status}`;
   await serviceRest(`external_offers?org_id=eq.${ORG}&id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ verified_at: new Date().toISOString(), verified_result: result }) });
   return { id, result, reason };
 }

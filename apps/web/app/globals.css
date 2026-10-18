@@ -103,3 +103,4 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:760px){.auth-card{padding:28px 20px}.admin-toolbar label{flex-basis:100%}.sidebar .local-user{display:flex;padding:12px 0 0;border-top:0}.sidebar .local-user button{width:auto;margin-top:0}}
 .data-table .primary-cell strong .source-tag{display:inline-block;margin:0 0 0 8px;font-size:10px;font-weight:600}
 .data-table tbody th[scope=row]{text-transform:none;letter-spacing:0;font-size:inherit;font-weight:400;color:var(--ink);text-align:left}
+@media(max-width:760px){.sidebar nav{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin-top:12px;padding-bottom:4px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}.sidebar nav .nav{width:auto;flex:0 0 auto;white-space:nowrap}.sidebar .local-user{display:flex;padding:10px 0 0;margin-top:8px;font-size:11px}}

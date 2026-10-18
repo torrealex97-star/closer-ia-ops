@@ -1,5 +1,12 @@
 # Estado
 
+## Móvil, métricas sin ceros falsos e IP fijada contra DNS rebinding (sesión 60) — 2026-10-18
+
+- **Menú del panel en móvil:** una sola franja desplazable (antes cada botón ocupaba una fila y el menú llenaba la primera pantalla). **Fuentes por tandas** de 25 con «Mostrar N más» (en móvil la página pasó de ~11.100 px a ~5.700 px). Medido con capturas Playwright a 390 px; sin desbordes.
+- **Métricas — un hueco no es un cero:** si falla la lectura de ejecuciones de Apify, el gasto y el número de ejecuciones son `null` (el panel muestra «—: no se pudo leer»); las decisiones humanas/IA se cuentan sobre las decisiones tomadas en la ventana de cualquier oferta (antes solo las vistas en la ventana) y también son `null` si falla su lectura. Sin ejecuciones sigue siendo 0 real.
+- **SSRF — IP fijada:** `lib/urlGuard.ts` (`pinnedGet`) valida el DNS una vez y conecta a esa IP (Host/SNI intactos, sin seguir redirecciones, tope de bytes). Lo usan la comprobación de enlaces del revisor IA (producción; el camino con `fetchImpl` inyectado se mantiene para pruebas) y `verifyOffer`/vigencia. Un nombre que cambie de respuesta entre la comprobación y la petición ya no puede llevar a una red interna.
+- **Verificación:** *probado* — `run.sh` completo (flujo 39/39, hardening 6/6 con prueba de rebinding, métricas con huecos y decisiones fuera de ventana, UI 9/9 con prueba móvil), tsc, build, `npm run design`. La conexión TLS con IP fijada (SNI) no se probó contra un servidor HTTPS real; solo HTTP local y el corte por tiempo. Nada *verificado* en servicios reales.
+- **Limitaciones:** la lectura de decisiones está limitada a 10.000 filas por ventana de 14 días; el límite de «Mostrar más» es solo de interfaz (el servidor sigue devolviendo todo el catálogo).
 ## Cierre de #19 e intermitencia de un test de navegador (sesión 59) — 2026-10-18
 
 - #19 (correcciones de la revisión) fusionada con CI verde. Se retira su ficha de relevo.

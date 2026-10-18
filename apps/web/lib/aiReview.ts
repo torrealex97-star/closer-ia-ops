@@ -5,7 +5,7 @@ import { getSecret } from './integrations';
 import { serviceRest } from './supabaseAuth';
 import { jevAnnotate } from './jev';
 import { callTimeout, timeLeft } from './cronBudget';
-import { hostAllowed, privateAddress } from './urlGuard';
+import { hostAllowed, pinnedGet, privateAddress } from './urlGuard';
 
 // Revisor IA de ofertas (incremento 1.1). La IA PROPONE; las reglas deterministas DECIDEN.
 // Toda salida del modelo es no confiable: se sanea y valida antes de tocar la base de datos.
@@ -84,27 +84,37 @@ export const looksClosed = (html: string) => { const t = fold(html); return CLOS
 
 export type LinkDeps = { fetchImpl?: typeof fetch; resolve?: (host: string) => Promise<string[]>; deadline?: number };
 export async function checkLink(rawUrl: string, deps: LinkDeps = {}): Promise<Link> {
-  const doFetch = deps.fetchImpl ?? fetch;
   const resolve = deps.resolve ?? (async (h: string) => (await lookup(h, { all: true })).map(a => a.address));
   let current = rawUrl;
   for (let hop = 0; hop < 4; hop++) {
     if (timeLeft(deps.deadline) < 1500) return { result: 'unknown', reason: 'sin_tiempo' }; // el reloj del cron manda: sin tiempo no se empieza otra petición
-    const check = hostAllowed(current);
-    if (!check.ok) return { result: 'skipped', reason: check.reason };
-    try { if ((await resolve(check.url.hostname)).some(privateAddress)) return { result: 'skipped', reason: 'resuelve_a_red_interna' }; }
-    catch { return { result: 'unknown', reason: 'dns' }; }
-    try {
-      const response = await doFetch(check.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(callTimeout(6000, deps.deadline)), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
-      if (response.status === 404 || response.status === 410) return { result: 'closed', reason: `http_${response.status}` };
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location) return { result: 'unknown', reason: 'redirect_sin_destino' };
-        current = new URL(location, check.url).href; continue;
-      }
-      if (response.status === 403 || response.status === 429) return { result: 'unknown', reason: 'fuente_bloquea' };
-      if (!response.ok) return { result: 'unknown', reason: `http_${response.status}` };
-      return looksClosed((await response.text()).slice(0, 200000)) ? { result: 'closed', reason: 'texto_oferta_cerrada' } : { result: 'open', reason: 'http_200' };
-    } catch { return { result: 'unknown', reason: 'red' }; }
+    let status: number, location: string | null, text: () => Promise<string>, base: URL;
+    if (deps.fetchImpl) {
+      // Camino inyectable (pruebas): valida y consulta el DNS aparte.
+      const check = hostAllowed(current);
+      if (!check.ok) return { result: 'skipped', reason: check.reason };
+      try { if ((await resolve(check.url.hostname)).some(privateAddress)) return { result: 'skipped', reason: 'resuelve_a_red_interna' }; }
+      catch { return { result: 'unknown', reason: 'dns' }; }
+      try {
+        const response = await deps.fetchImpl(check.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(callTimeout(6000, deps.deadline)), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
+        status = response.status; location = response.headers.get('location'); text = () => response.text(); base = check.url;
+      } catch { return { result: 'unknown', reason: 'red' }; }
+    } else {
+      // Producción: IP fijada tras validar (sin segunda resolución DNS → sin DNS rebinding).
+      const got = await pinnedGet(current, { timeoutMs: callTimeout(6000, deps.deadline), resolve });
+      if (!got.ok) return got.reason === 'dns' || got.reason === 'red' ? { result: 'unknown', reason: got.reason } : { result: 'skipped', reason: got.reason };
+      status = got.status; location = got.location; text = async () => got.text; base = new URL(current);
+    }
+    if (status === 404 || status === 410) return { result: 'closed', reason: `http_${status}` };
+    if (status >= 300 && status < 400) {
+      if (!location) return { result: 'unknown', reason: 'redirect_sin_destino' };
+      try { current = new URL(location, base).href; } catch { return { result: 'unknown', reason: 'redirect_invalido' }; }
+      continue;
+    }
+    if (status === 403 || status === 429) return { result: 'unknown', reason: 'fuente_bloquea' };
+    if (status < 200 || status >= 300) return { result: 'unknown', reason: `http_${status}` };
+    try { return looksClosed((await text()).slice(0, 200000)) ? { result: 'closed', reason: 'texto_oferta_cerrada' } : { result: 'open', reason: 'http_200' }; }
+    catch { return { result: 'unknown', reason: 'red' }; }
   }
   return { result: 'unknown', reason: 'demasiadas_redirecciones' };
 }
