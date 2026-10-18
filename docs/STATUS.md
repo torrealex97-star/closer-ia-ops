@@ -1,5 +1,7 @@
 # Estado
 
+_Nota (sesión 66): fusionadas #25 (Búsqueda automática) y #26 (borrador de privacidad); se retiran sus fichas de relevo y no quedan trabajos vivos._
+
 ## Borrador de política de privacidad y consentimientos (sesión 65) — 2026-10-18
 
 - Por indicación del propietario («aplica lo que consideres mejor»): página pública **`/privacidad`** (borrador visible, redactado a partir de lo que la app hace de verdad: datos, finalidades, proveedores, borrado, sin IA con datos personales, sin envío por la alumna, solo enlaces de vídeo/CV), textos de consentimiento más claros en `/alumna` y en el formulario base con enlace a la política, versión **`v2-borrador`**, y [docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md](legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md) con el inventario de datos y los 9 puntos que debe decidir el responsable o su asesor.
