@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
 import { ORG, scrub, type ExternalOffer } from './external';
 import { getSecret } from './integrations';
 import { serviceRest } from './supabaseAuth';
 import { jevAnnotate } from './jev';
-import { timeLeft } from './cronBudget';
+import { callTimeout, timeLeft } from './cronBudget';
+import { hostAllowed, privateAddress } from './urlGuard';
 
 // Revisor IA de ofertas (incremento 1.1). La IA PROPONE; las reglas deterministas DECIDEN.
 // Toda salida del modelo es no confiable: se sanea y valida antes de tocar la base de datos.
@@ -73,28 +73,7 @@ export function gate(i: GateInput): GateOutput {
 }
 
 // ---- Verificación del enlace con protección SSRF ----
-const SOCIAL = /(^|\.)(linkedin|facebook|instagram|twitter|tiktok|youtube|t|wa|whatsapp|telegram|reddit|threads)\.(com|me|net)$|(^|\.)x\.com$/i;
-export function hostAllowed(rawUrl: string): { ok: true; url: URL } | { ok: false; reason: string } {
-  let u: URL;
-  try { u = new URL(rawUrl); } catch { return { ok: false, reason: 'url_invalida' }; }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, reason: 'protocolo' };
-  if (u.username || u.password) return { ok: false, reason: 'credenciales_en_url' };
-  if (u.port && u.port !== '80' && u.port !== '443') return { ok: false, reason: 'puerto' };
-  const host = u.hostname.toLowerCase().replace(/\.$/, '');
-  if (isIP(host) || host.startsWith('[') || /^\d+$/.test(host) || /^0x/i.test(host)) return { ok: false, reason: 'ip_literal' };
-  if (!host.includes('.') || /(^|\.)(localhost|local|internal|intranet|lan|home|corp)$/.test(host)) return { ok: false, reason: 'host_interno' };
-  if (SOCIAL.test(host)) return { ok: false, reason: 'red_social' };
-  return { ok: true, url: u };
-}
-export const privateAddress = (ip: string): boolean => {
-  const v = ip.toLowerCase();
-  if (v.includes(':')) return v === '::1' || v === '::' || /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || v.startsWith('::ffff:') && privateAddress(v.slice(7));
-  const p = v.split('.').map(Number);
-  if (p.length !== 4 || p.some(n => !Number.isInteger(n))) return true;
-  const [a, b] = p;
-  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
-};
-
+export { hostAllowed, privateAddress };
 const CLOSED_PATTERNS = [
   'oferta cerrada', 'oferta finalizada', 'oferta caducada', 'esta oferta ha caducado', 'oferta ya no esta disponible', 'ya no esta disponible', 'ya no esta activa',
   'vacante cubierta', 'proceso de seleccion finalizado', 'no longer accepting applications', 'no longer available', 'position has been filled', 'job has expired',
@@ -103,18 +82,19 @@ const CLOSED_PATTERNS = [
 const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 export const looksClosed = (html: string) => { const t = fold(html); return CLOSED_PATTERNS.some(p => t.includes(p)); };
 
-export type LinkDeps = { fetchImpl?: typeof fetch; resolve?: (host: string) => Promise<string[]> };
+export type LinkDeps = { fetchImpl?: typeof fetch; resolve?: (host: string) => Promise<string[]>; deadline?: number };
 export async function checkLink(rawUrl: string, deps: LinkDeps = {}): Promise<Link> {
   const doFetch = deps.fetchImpl ?? fetch;
   const resolve = deps.resolve ?? (async (h: string) => (await lookup(h, { all: true })).map(a => a.address));
   let current = rawUrl;
   for (let hop = 0; hop < 4; hop++) {
+    if (timeLeft(deps.deadline) < 1500) return { result: 'unknown', reason: 'sin_tiempo' }; // el reloj del cron manda: sin tiempo no se empieza otra petición
     const check = hostAllowed(current);
     if (!check.ok) return { result: 'skipped', reason: check.reason };
     try { if ((await resolve(check.url.hostname)).some(privateAddress)) return { result: 'skipped', reason: 'resuelve_a_red_interna' }; }
     catch { return { result: 'unknown', reason: 'dns' }; }
     try {
-      const response = await doFetch(check.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
+      const response = await doFetch(check.url.href, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(callTimeout(6000, deps.deadline)), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WDC-verifier)' } });
       if (response.status === 404 || response.status === 410) return { result: 'closed', reason: `http_${response.status}` };
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
@@ -185,9 +165,9 @@ export async function runAiReview(deps: RunDeps = {}): Promise<ReviewSummary> {
     const raw = await llm(buildPrompt(row)).catch(() => null);
     if (raw === null) continue; // fallo del proveedor: sin anotar, se reintenta mañana
     const proposal = sanitizeProposal(raw);
-    const link = await checkLink(row.url, deps);
+    const link = await checkLink(row.url, { ...deps, deadline });
     const g = gate({ proposal, score: row.score ?? 0, offerRedFlags: row.red_flags ?? [], link, id: row.id, approvedSoFar, maxApprovals: cfg.maxApprovals });
-    const jev = await jevAnnotate(row).catch(() => null); // solo anota, nunca decide
+    const jev = timeLeft(deadline) > 3000 ? await jevAnnotate(row).catch(() => null) : null; // solo anota, nunca decide
     const review = {
       verdict: proposal.verdict, confidence: proposal.confidence, reasons: proposal.reasons, red_flags: proposal.red_flags, signals: proposal.signals,
       link, would_decide: g.decision, gate: g.why, audit_sample: g.audit_sample, mode: cfg.mode, applied: false, model: cfg.model,

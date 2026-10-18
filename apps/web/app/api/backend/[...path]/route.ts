@@ -25,9 +25,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   const { path } = await context.params;
   // Login de alumnas activado: la búsqueda hospedada tampoco responde sin sesión (no basta con ocultar la página).
+  let sessionCookies: string[] = [];
   if (engine && studentLoginRequired() && path.join('/') === 'opportunities/search') {
     const auth = await authenticateStudent(request);
     if (!auth.ok) return Response.json({ detail: 'Inicia sesión como alumna.' }, { status: auth.status });
+    sessionCookies = auth.setCookies; // si la sesión se renovó, los tokens nuevos deben llegar al navegador
   }
   if (local && !process.env.CAREER_LOCAL_TOKEN) return Response.json({ detail: 'Inicia la aplicación con npm run dev desde la raíz.' }, { status: 503 });
   if (path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) return new Response(null, { status: 400 });
@@ -52,6 +54,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       cache: 'no-store', signal: AbortSignal.timeout(path[0] === 'source-assistant' ? 55000 : 45000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store' });
+    for (const value of sessionCookies) headers.append('Set-Cookie', value);
     for (const name of ['content-type', 'content-disposition']) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);

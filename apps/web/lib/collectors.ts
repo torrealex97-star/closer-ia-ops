@@ -1,5 +1,5 @@
 import { getSecret, type Provider } from './integrations';
-import { ingest, pausedSources, type Candidate } from './external';
+import { ingest, pausedSourcesStrict, type Candidate } from './external';
 import { callTimeout, timeLeft, MIN_STEP_MS } from './cronBudget';
 
 // Recolectores de APIs oficiales con clave (InfoJobs, Adzuna, Jooble). Permiso explícito del proveedor:
@@ -48,10 +48,12 @@ export type CollectOutcome = { provider: ApiProvider; ok: boolean; received?: nu
 // Recoge un proveedor con la clave guardada: una consulta tras otra, y un fallo de una no tumba las demás.
 // Con `deadline` (presupuesto del cron) deja de lanzar consultas cuando no queda tiempo, guarda lo ya recogido y lo declara.
 export async function collectProvider(provider: ApiProvider, via: string, deadline?: number): Promise<CollectOutcome> {
-  if ((await pausedSources()).has(provider)) return { provider, ok: false, error: 'Fuente pausada' };
-  const secret = await getSecret(provider as Provider);
-  if (!secret) return { provider, ok: false, error: 'Sin clave guardada' };
   try {
+    const paused = await pausedSourcesStrict();
+    if (!paused) return { provider, ok: false, error: 'No se pudo comprobar si la fuente está pausada; se reintenta en la próxima ejecución.' };
+    if (paused.has(provider)) return { provider, ok: false, error: 'Fuente pausada' };
+    const secret = await getSecret(provider as Provider);
+    if (!secret) return { provider, ok: false, error: 'Sin clave guardada' };
     const fetchQuery = fetchers[provider](secret);
     const all: Candidate[] = []; const errors: string[] = []; let truncated = false;
     for (const query of QUERIES) {

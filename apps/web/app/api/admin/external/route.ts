@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, withCookies } from '../../../../lib/adminAuth';
+import { callTimeout, createBudget, timeLeft } from '../../../../lib/cronBudget';
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
 import { runAiReview, undoAiDecisions } from '../../../../lib/aiReview';
 import { approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
@@ -56,15 +57,21 @@ export async function POST(request: NextRequest) {
   if (error) return error;
   if (body.action === 'collect') {
     const only = typeof body.provider === 'string' && (API_PROVIDERS as readonly string[]).includes(body.provider) ? body.provider as ApiProvider : undefined;
-    return reply(auth!, { outcomes: await collectAll('panel', only) });
+    const budget = createBudget(45_000); // maxDuration = 60: el reloj compartido deja margen y el corte se declara
+    const outcomes = await collectAll('panel', only, budget.deadline(42_000));
+    return reply(auth!, { outcomes, ...(outcomes.some(o => o.truncated) ? { truncated: true } : {}) });
   }
-  if (body.action === 'ai_review') return reply(auth!, await runAiReview());
+  if (body.action === 'ai_review') return reply(auth!, await runAiReview({ deadline: createBudget(45_000).deadline(42_000) }));
   if (body.action === 'ai_undo') return reply(auth!, { undone: await undoAiDecisions(auth!.admin.email) });
   if (body.action === 'verify') {
     const ids = Array.isArray(body.ids) ? body.ids.filter((i): i is string => typeof i === 'string').slice(0, 25) : [];
     const results = [];
-    for (const id of ids) { const r = await verifyOffer(id); if (r) results.push(r); }
-    return reply(auth!, { results });
+    const deadline = createBudget(45_000).deadline(42_000); let truncated = false;
+    for (const id of ids) {
+      if (timeLeft(deadline) < 1500) { truncated = true; break; }
+      const r = await verifyOffer(id, callTimeout(10_000, deadline)); if (r) results.push(r);
+    }
+    return reply(auth!, { results, ...(truncated ? { truncated: true, pending: ids.length - results.length } : {}) });
   }
   if (body.action === 'approve_top') {
     const n = Number(body.n);

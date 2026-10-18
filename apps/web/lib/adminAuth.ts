@@ -81,4 +81,4 @@ export const originBlocked = (request: NextRequest) => {
 
 // Destino del enlace del correo. Fijo por env (no depende de la cabecera Host, que se puede falsear).
 export const publicBaseUrl = (request: NextRequest) =>
-  (process.env.ADMIN_PUBLIC_URL ?? `https://${request.headers.get('host') ?? 'app.womendigitalclosers.com'}`).replace(/\/$/, '');
+  (process.env.ADMIN_PUBLIC_URL ?? (process.env.NODE_ENV === 'production' ? 'https://app.womendigitalclosers.com' : `https://${request.headers.get('host') ?? 'localhost'}`)).replace(/\/$/, '');

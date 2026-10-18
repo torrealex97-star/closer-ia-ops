@@ -26,5 +26,5 @@ export function createBudget(totalMs: number = DEFAULT_TOTAL_MS, now: () => numb
 
 export const timeLeft = (deadline: number | undefined, now: () => number = Date.now) => deadline === undefined ? Infinity : deadline - now();
 /** Timeout de una llamada: el habitual, recortado a lo que queda. */
-export const callTimeout = (usual: number, deadline: number | undefined, now: () => number = Date.now) => Math.max(1, Math.min(usual, timeLeft(deadline, now)));
+export const callTimeout = (usual: number, deadline: number | undefined, now: () => number = Date.now) => Math.max(1, Math.floor(Math.min(usual, timeLeft(deadline, now)))); // entero: AbortSignal.timeout lo exige
 export const totalFromEnv = (env: NodeJS.ProcessEnv = process.env) => { const n = Number(env.CRON_BUDGET_MS); return Number.isFinite(n) && n >= 5_000 && n <= 50_000 ? n : DEFAULT_TOTAL_MS; };
