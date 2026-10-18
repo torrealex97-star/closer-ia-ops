@@ -545,6 +545,7 @@ await step('Apify sencillo: portales con buscadores de repuesto (arranque fallid
   const afterFirst = state.apifyCalls.length;
   k = await cron(); assert.equal(state.apifyCalls.length, afterFirst, 'una búsqueda diaria por portal: la segunda pasada no lanza nada');
   state.apifyFailActors = new Set(); state.apifyItems = [];
+});
 await step('privacidad: página pública con borrador visible, sin inventar datos del responsable', async () => {
   const res = await fetch(BASE + '/privacidad'); assert.equal(res.status, 200);
   const html = await res.text();
