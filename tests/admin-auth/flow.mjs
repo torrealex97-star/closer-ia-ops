@@ -546,6 +546,13 @@ await step('Apify sencillo: portales con buscadores de repuesto (arranque fallid
   k = await cron(); assert.equal(state.apifyCalls.length, afterFirst, 'una búsqueda diaria por portal: la segunda pasada no lanza nada');
   state.apifyFailActors = new Set(); state.apifyItems = [];
 });
+await step('privacidad: página pública con borrador visible, sin inventar datos del responsable', async () => {
+  const res = await fetch(BASE + '/privacidad'); assert.equal(res.status, 200);
+  const html = await res.text();
+  for (const t of ['Borrador pendiente de revisión legal', 'No enviamos tus datos personales a modelos de inteligencia artificial', 'No subimos ni guardamos tu vídeo', 'v2-borrador', '[pendiente de completar]']) assert.ok(html.includes(t), t);
+  assert.ok(!/undefined|null/.test(html.replace(/<script[\s\S]*?<\/script>/g, '')), 'sin valores vacíos visibles');
+  assert.equal(res.headers.get('x-frame-options'), 'DENY');
+});
 await step('pausar una fuente: se rechaza su ingesta, se salta su recogida y desaparece de la vista de alumna', async () => {
   const tok = { authorization: 'Bearer ingest-token-0123456789abcdef0123' };
   const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });

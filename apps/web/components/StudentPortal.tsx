@@ -91,7 +91,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
       <label htmlFor="sp-av">Disponibilidad<input id="sp-av" maxLength={200} placeholder="Ej.: tardes, jornada completa desde enero" value={p.availability ?? ''} onChange={e => setP({ ...p, availability: e.target.value })} /></label>
       <label htmlFor="sp-video">Enlace a tu vídeo de presentación (en tu propio Drive)<input id="sp-video" type="url" maxLength={1000} placeholder="https://drive.google.com/…" value={p.video_url ?? ''} onChange={e => setP({ ...p, video_url: e.target.value })} /></label>
       <p className="card-meta">No subimos ni guardamos tu vídeo: solo este enlace, por si una oferta pide un vídeo en su formulario. Comprueba que el enlace se puede abrir con «cualquiera con el enlace».</p>
-      <label className="check-label" style={{ flexDirection: 'row', alignItems: 'flex-start' }}><input type="checkbox" checked={consent} disabled={Boolean(p.consent_at)} onChange={e => setConsent(e.target.checked)} /> <span>Acepto que Women Digital Closer guarde estos datos para gestionar mis oportunidades de empleo. Puedo borrarlos aquí cuando quiera. <em>(Texto legal provisional, pendiente de revisión.)</em></span></label>
+      <label className="check-label" style={{ flexDirection: 'row', alignItems: 'flex-start' }}><input type="checkbox" checked={consent} disabled={Boolean(p.consent_at)} onChange={e => setConsent(e.target.checked)} /> <span>Acepto que Women Digital Closer guarde estos datos para recomendarme ofertas y ayudarme a preparar candidaturas. No se envían a ninguna empresa ni a sistemas de inteligencia artificial; puedo corregirlos o borrarlos aquí cuando quiera y retirar este permiso. Más información en la <a href="/privacidad" target="_blank" rel="noopener noreferrer">política de privacidad</a>. <em>(Texto provisional, pendiente de revisión legal.)</em></span></label>
       {error && <div className="alert error" role="alert"><span>{error}</span></div>}
       {notice && <div className="auth-note" role="status">{notice}</div>}
       <button className="primary" disabled={busy || (!p.consent_at && !consent)}>{busy ? <LoaderCircle size={16} className="spin" /> : <Save size={16} />} Guardar perfil</button>
@@ -100,7 +100,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
     <Matches refreshKey={saves} onPrepared={() => setApps(n => n + 1)} onLost={onLost} />
     <Applications refreshKey={apps} onLost={onLost} />
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
-      <a href="/">Ver oportunidades</a>
+      <a href="/">Ver oportunidades</a> · <a href="/privacidad">Privacidad</a>
       <span><button type="button" onClick={() => void erase()} disabled={busy}><Trash2 size={14} /> Borrar mi perfil</button> <button type="button" onClick={onLogout}><LogOut size={14} /> Salir</button></span>
     </div>
   </div></div>;

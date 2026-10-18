@@ -1,5 +1,11 @@
 # Estado
 
+## Borrador de política de privacidad y consentimientos (sesión 65) — 2026-10-18
+
+- Por indicación del propietario («aplica lo que consideres mejor»): página pública **`/privacidad`** (borrador visible, redactado a partir de lo que la app hace de verdad: datos, finalidades, proveedores, borrado, sin IA con datos personales, sin envío por la alumna, solo enlaces de vídeo/CV), textos de consentimiento más claros en `/alumna` y en el formulario base con enlace a la política, versión **`v2-borrador`**, y [docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md](legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md) con el inventario de datos y los 9 puntos que debe decidir el responsable o su asesor.
+- Los datos del responsable (razón social, NIF/CIF, dirección, email de privacidad) **no se inventan**: se leen de `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_TAX_ID`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL` (Vercel) y, mientras falten, se muestra «[pendiente de completar]».
+- **Verificación:** *probado* — `run.sh` completo (flujo 40/40 con prueba de `/privacidad`; UI 9/9), tsc, build, `npm run design`; captura móvil sin desbordes. **Esto NO es asesoramiento legal ni está revisado por ningún profesional**: no se debe abrir el acceso a alumnas con este texto sin esa revisión. Base legal, contratos de encargado, transferencias internacionales y plazos son suposiciones marcadas como pendientes.
+- Efecto del cambio de versión: no hay alumnas con consentimiento real todavía; al abrir el acceso, las nuevas aceptarán `v2-borrador`.
 ## Pestaña «Búsqueda automática» (antes Apify): lenguaje llano y buscadores de repuesto (sesión 64) — 2026-10-18
 
 - **Para quien no sabe qué es Apify:** la pestaña explica en 3 líneas qué hace, guía la conexión de la cuenta (3 pasos con enlace) y muestra **portales** (Indeed, InfoJobs, LinkedIn, varios a la vez) con estado en texto + icono, «Probar con 10 ofertas», «Buscar ahora», interruptor «Buscar cada día» y «Buscadores de repuesto» desplegable. Los nombres técnicos y el alta manual de actores quedan en «Opciones avanzadas» (cerradas). Mensajes de error traducidos a frases llanas (`plainError`).

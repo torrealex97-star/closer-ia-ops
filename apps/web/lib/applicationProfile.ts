@@ -10,7 +10,7 @@ export const LEVELS = { basic: 'Básico', intermediate: 'Intermedio', advanced: 
 export const CONTRACTS = { employee: 'Contrato laboral', freelance: 'Autónoma / freelance', commission_only: 'Solo comisiones' } as const;
 export const ANSWER_KEYS = { why_this_role: 'Por qué quiero este puesto', biggest_win: 'Mi mayor logro en ventas', handle_objection: 'Cómo gestiono una objeción', remote_experience: 'Mi experiencia trabajando en remoto' } as const;
 export const LANGUAGE_CODES = ['es', 'en', 'pt', 'fr', 'de', 'it', 'ca'] as const;
-export const AUTOFILL_CONSENT_VERSION = 'v1-borrador'; // texto legal pendiente de revisión
+export const AUTOFILL_CONSENT_VERSION = 'v2-borrador'; // texto legal pendiente de revisión
 
 export type AppProfile = {
   contact_email: string | null; phone: string | null; linkedin_url: string | null; cv_url: string | null; country_residence: string | null;

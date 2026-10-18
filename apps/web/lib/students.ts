@@ -59,7 +59,7 @@ export async function removeStudent(id: string): Promise<boolean> {
 }
 
 // ---- Perfil ----
-export const CONSENT_VERSION = 'v1-borrador'; // texto legal pendiente de revisión
+export const CONSENT_VERSION = 'v2-borrador'; // texto legal pendiente de revisión
 export const LANGUAGES = ['es', 'en', 'pt', 'fr', 'de', 'it', 'ca'] as const;
 export type Profile = { full_name: string | null; city: string | null; target_roles: string[]; languages: string[]; availability: string | null; video_url: string | null; consent_at: string | null; consent_version: string | null };
 const clip = (v: unknown, n: number) => typeof v === 'string' ? scrub(v).slice(0, n) || null : null;
