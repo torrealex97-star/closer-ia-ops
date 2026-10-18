@@ -1,5 +1,12 @@
 # Estado
 
+## Borrador de política de privacidad y consentimientos (sesión 65) — 2026-10-18
+
+- Por indicación del propietario («aplica lo que consideres mejor»): página pública **`/privacidad`** (borrador visible, redactado a partir de lo que la app hace de verdad: datos, finalidades, proveedores, borrado, sin IA con datos personales, sin envío por la alumna, solo enlaces de vídeo/CV), textos de consentimiento más claros en `/alumna` y en el formulario base con enlace a la política, versión **`v2-borrador`**, y [docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md](legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md) con el inventario de datos y los 9 puntos que debe decidir el responsable o su asesor.
+- Los datos del responsable (razón social, NIF/CIF, dirección, email de privacidad) **no se inventan**: se leen de `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_TAX_ID`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL` (Vercel) y, mientras falten, se muestra «[pendiente de completar]».
+- **Verificación:** *probado* — `run.sh` completo (flujo 40/40 con prueba de `/privacidad`; UI 9/9), tsc, build, `npm run design`; captura móvil sin desbordes. **Esto NO es asesoramiento legal ni está revisado por ningún profesional**: no se debe abrir el acceso a alumnas con este texto sin esa revisión. Base legal, contratos de encargado, transferencias internacionales y plazos son suposiciones marcadas como pendientes.
+- Efecto del cambio de versión: no hay alumnas con consentimiento real todavía; al abrir el acceso, las nuevas aceptarán `v2-borrador`.
+
 _Nota (sesión 63): al fusionar #23 y #24 se retiran sus fichas de relevo; no quedan trabajos vivos._
 
 ## Spike de voz acotado: personalidades, sesión y feedback con citas (sesión 63) — 2026-10-18

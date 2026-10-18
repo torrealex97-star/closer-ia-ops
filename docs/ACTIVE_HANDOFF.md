@@ -31,7 +31,7 @@ Todo lo anterior (PRs #1-#21) está fusionado en `main`. Al fusionar una PR, su 
 3. **Pegar el tarball `closer-offers-engine`** y ejecutar `supabase db pull`.
 4. **Vercel:** `INGEST_TOKEN` (y en GitHub secrets); claves InfoJobs/Adzuna/Jooble en Panel → APIs; **redeploy tras cambiar variables**; pasar a **Pro** antes de abrir a alumnas. Primera semana: mirar `truncated`/`spent_ms` del cron en los logs.
 5. **Revisor IA:** 5-7 días en shadow comparando con tus decisiones; el paso a `live` es tuyo.
-6. **Legal:** revisar el texto de consentimiento (`v1-borrador`) y la política de privacidad antes de abrir a alumnas.
+6. **Legal:** el agente redactó un borrador (`/privacidad` + textos de consentimiento `v2-borrador` + `docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md`). Te toca: rellenar en Vercel `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_TAX_ID`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL` (+ redeploy) y pasarlo a un profesional (RGPD/LOPDGDD) con la lista de puntos abiertos.
 7. **Activar el login para las alumnas** (decisión tuya): ya existe el interruptor `STUDENT_LOGIN_REQUIRED=true` en Vercel (+ redeploy); apagado = `/` abierta. Antes: invitar a las alumnas y probar el correo real.
 8. **Revisor IA → live:** confirmar o ajustar la puerta propuesta (≥ 30 pares comparados y ≤ 5 % de falsas aprobaciones; informe en Fuentes externas).
 9. **Voz (futuro):** antes de construir roleplays/entrevistas, acuerdo de tratamiento o retención cero con el proveedor (o modelos autoalojados) y texto legal del consentimiento de audio (ADR-013).
