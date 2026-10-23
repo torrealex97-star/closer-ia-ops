@@ -2,6 +2,16 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Reverificación de las publicadas antes del 25/10 (sesión 70) — 2026-10-23
+
+- **Petición del operador**: reverificar las ofertas publicadas antes de que caduque su vigencia el 25/10 y reportar cuántas siguen abiertas.
+- **Hallazgo previo a la pasada**: las **155 publicadas** tenían vigencia caducada o que caducaba el 25/10 (8 ya expiradas desde el 17–19/10) y **todas seguían con el CTA encendido**. La caducidad no apaga el CTA por sí sola: `next_step.enabled` solo cambia cuando corre una verificación, así que una oferta puede servirse con CTA activo sobre una vigencia vencida hasta la siguiente pasada. Queda como limitación del contrato, no se cambió código.
+- **Pasada ejecutada** (`POST /v1/admin/opportunities/{id}/verify`, 1 fetch real por oferta, secuencial con 600 ms de pausa): **128 reverificadas** (las 27 del lote de hoy se omiten por la guarda de 12 h), **0 fallos de HTTP**.
+- **Resultado**: **115 `open`** (`content_matches`), **0 `closed`**, **13 `unknown`** — las 13 por `redirect_without_verification` (JobToday responde 301/302 y el contrato no sigue redirecciones para verificar).
+- **Estado tras la pasada** (comprobado en detalle, muestra de 8 abiertas y las 13 no verificables): **142 publicadas** con vigencia nueva hasta **2026-10-25 ~14:50–14:56Z** y CTA encendido; **13** con CTA apagado, motivo escrito y `opportunity_status=verifying`. **0 incoherentes**. Catálogo sin cambios: `published` 155, `needs_review` 13, `draft` 2.640.
+- **Superficie**: sigue en **7** por defecto y **59** con perfiles extra; de las 13 no verificables, **3 siguen listadas** con el CTA apagado y 10 quedan fuera por los gates (España, frescura, perfil, duplicado).
+- **Límites honestos**: (1) el TTL es de 48 h desde la comprobación, así que esta pasada deja las 142 abiertas **hasta el 25/10 ~15:00Z**: para pasar de esa fecha hay que repetirla el mismo 25/10 (no hay cron en Sites); (2) las 13 con redirección no se recuperan solas: necesitan que el operador fije la URL canónica con `verify_url`/`url`, y hasta entonces la tarjeta sigue visible con el botón apagado; (3) la reverificación no cambia el estado editorial: una oferta cerrada o no verificable seguiría `published` en la lista.
+
 ## Resto del pool AE activado en producción (sesión 69) — 2026-10-23
 
 - **Petición del operador**: activar los 24 AE publicables restantes en lotes de 10 y reportar publicadas, `needs_review` y diferidas.
