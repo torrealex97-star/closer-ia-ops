@@ -1,7 +1,7 @@
 {
   "apify": {
     "jooble": {
-      "checked_at": "2026-10-15T17:00:59.582652+00:00",
+      "checked_at": "2026-10-23T11:07:48.317198+00:00",
       "candidates": [
         {
           "actor": "agentx/jooble-jobs-scraper",
@@ -28,7 +28,7 @@
       "status": "metadata_checked"
     },
     "simplyhired": {
-      "checked_at": "2026-10-15T17:00:59.583413+00:00",
+      "checked_at": "2026-10-23T11:07:48.318170+00:00",
       "candidates": [
         {
           "actor": "shahidirfan/Simplyhired-Job-Scraper",
@@ -42,6 +42,32 @@
             "results_wanted",
             "max_pages",
             "proxyConfiguration"
+          ],
+          "required": [],
+          "pricing_models": [
+            "PAY_PER_EVENT"
+          ]
+        },
+        {
+          "actor": "memo23/simplyhired-jobs-scraper",
+          "title": "SimplyHired Jobs Scraper [$0.9/1K 💰] Salaries & Companies",
+          "url": "https://apify.com/memo23/simplyhired-jobs-scraper",
+          "build": "0.0.66",
+          "fields": [
+            "startUrls",
+            "keyword",
+            "location",
+            "postedWithinDays",
+            "jobType",
+            "country",
+            "fetchJobDetails",
+            "enrichEmails",
+            "postedWithinHours",
+            "maxItems",
+            "maxConcurrency",
+            "minConcurrency",
+            "maxRequestRetries",
+            "proxy"
           ],
           "required": [],
           "pricing_models": [
@@ -65,38 +91,12 @@
             "FLAT_PRICE_PER_MONTH",
             "PAY_PER_EVENT"
           ]
-        },
-        {
-          "actor": "memo23/simplyhired-jobs-scraper",
-          "title": "SimplyHired Jobs Scraper [$0.9/1K 💰] Salaries & Companies",
-          "url": "https://apify.com/memo23/simplyhired-jobs-scraper",
-          "build": "0.0.65",
-          "fields": [
-            "startUrls",
-            "keyword",
-            "location",
-            "postedWithinDays",
-            "jobType",
-            "country",
-            "fetchJobDetails",
-            "enrichEmails",
-            "postedWithinHours",
-            "maxItems",
-            "maxConcurrency",
-            "minConcurrency",
-            "maxRequestRetries",
-            "proxy"
-          ],
-          "required": [],
-          "pricing_models": [
-            "PAY_PER_EVENT"
-          ]
         }
       ],
       "status": "metadata_checked"
     },
     "infojobs": {
-      "checked_at": "2026-10-15T17:00:59.583740+00:00",
+      "checked_at": "2026-10-23T11:07:48.318395+00:00",
       "candidates": [
         {
           "actor": "haketa/infojobs-scraper",
@@ -153,7 +153,7 @@
       "status": "metadata_checked"
     },
     "computrabajo": {
-      "checked_at": "2026-10-15T17:00:59.583986+00:00",
+      "checked_at": "2026-10-23T11:07:48.318568+00:00",
       "candidates": [
         {
           "actor": "haketa/computrabajo-scraper",
@@ -197,7 +197,7 @@
           "actor": "memo23/computrabajo-scraper",
           "title": "Computrabajo Scraper — Jobs, Salaries & Company Data",
           "url": "https://apify.com/memo23/computrabajo-scraper",
-          "build": "0.1.36",
+          "build": "0.1.38",
           "fields": [
             "searchQueries",
             "startUrls",
@@ -217,7 +217,7 @@
       "status": "metadata_checked"
     },
     "workana": {
-      "checked_at": "2026-10-15T17:00:59.583997+00:00",
+      "checked_at": "2026-10-23T11:07:48.318575+00:00",
       "candidates": [
         {
           "actor": "automation-lab/workana-freelance-projects-scraper",
@@ -277,7 +277,7 @@
       "status": "metadata_checked"
     },
     "getonbrd": {
-      "checked_at": "2026-10-15T17:00:59.584001+00:00",
+      "checked_at": "2026-10-23T11:07:48.318578+00:00",
       "candidates": [
         {
           "actor": "scrapers_lat/getonbrd-scraper",
@@ -359,7 +359,7 @@
       "status": "metadata_checked"
     },
     "linkedin": {
-      "checked_at": "2026-10-15T17:00:59.584003+00:00",
+      "checked_at": "2026-10-23T11:07:48.318580+00:00",
       "candidates": [
         {
           "actor": "curious_coder/linkedin-jobs-scraper",
@@ -418,54 +418,50 @@
           ]
         },
         {
-          "actor": "fantastic-jobs/advanced-linkedin-job-search-api",
-          "title": "Advanced LinkedIn Job Search API",
-          "url": "https://apify.com/fantastic-jobs/advanced-linkedin-job-search-api",
-          "build": "0.0.71",
+          "actor": "cheap_scraper/linkedin-job-scraper",
+          "title": "LinkedIn Jobs Scraper | Remove Duplicate Jobs | Pay Per Result",
+          "url": "https://apify.com/cheap_scraper/linkedin-job-scraper",
+          "build": "0.0.49",
           "fields": [
-            "timeRange",
-            "limit",
-            "removeAgency",
-            "recruiterOnly",
-            "titleSearch",
-            "titleExclusionSearch",
-            "locationSearch",
-            "locationExclusionSearch",
-            "descriptionSearch",
-            "descriptionExclusionSearch",
-            "organizationSlugFilter",
-            "organizationSlugExclusionFilter",
-            "organizationSearch",
-            "organizationExclusionSearch",
-            "descriptionType",
-            "datePostedAfter",
-            "seniorityFilter",
-            "noDirectApply",
-            "directApply",
-            "industryFilter",
-            "organizationEmployeesLte",
-            "organizationEmployeesGte",
-            "aiEmploymentTypeFilter",
-            "excludeATSDuplicate",
-            "populateAiRemoteLocation",
-            "populateAiRemoteLocationDerived",
-            "aiWorkArrangementFilter",
-            "hasSalary",
-            "aiExperienceLevelFilter",
-            "aiVisaSponsorshipFilter",
-            "aiTaxonomiesFilter",
-            "aiTaxonomiesPrimaryFilter",
-            "aiTaxonomiesExclusionFilter",
-            "industryExclusionFilter",
-            "organizationSizeFilter",
-            "aiLanguageFilter",
-            "hasNoLocation",
-            "remote",
-            "EmploymentTypeFilter",
-            "aiHasSalary"
+            "startUrls",
+            "keyword",
+            "locations",
+            "location",
+            "distance",
+            "publishedAt",
+            "jobType",
+            "experienceLevel",
+            "workType",
+            "companyInclude",
+            "filterUnder10Applicants",
+            "filterEasyApply",
+            "subLocationExclude",
+            "companyExclude",
+            "jobTitleExclude",
+            "jobIndustryInclude",
+            "jobIndustryExclude",
+            "excludeRecruitingAgencies",
+            "companySizeMin",
+            "companySizeMax",
+            "companyOrganizationTypeInclude",
+            "companyOrganizationTypeExclude",
+            "companyFoundedDateMin",
+            "companyFoundedDateMax",
+            "companyFollowersCountMin",
+            "companyFollowersCountMax",
+            "requireRecruiterProfile",
+            "requireSalaryInfo",
+            "resumeKeywords",
+            "maxItems",
+            "saveOnlyUniqueItems",
+            "enrichCompanyData",
+            "salaryBase",
+            "jobFunctionInclude",
+            "jobFunctionExclude"
           ],
           "required": [],
           "pricing_models": [
+            "FLAT_PRICE_PER_MONTH",
             "PAY_PER_EVENT",
             "PRICE_PER_DATASET_ITEM"
           ]
@@ -474,7 +470,7 @@
       "status": "metadata_checked"
     },
     "indeed": {
-      "checked_at": "2026-10-15T17:00:59.584007+00:00",
+      "checked_at": "2026-10-23T11:07:48.318582+00:00",
       "candidates": [
         {
           "actor": "misceres/indeed-scraper",
@@ -547,13 +543,13 @@
       "status": "metadata_checked"
     },
     "infoempleo": {
-      "checked_at": "2026-10-15T17:00:59.584009+00:00",
+      "checked_at": "2026-10-23T11:07:48.318585+00:00",
       "candidates": [
         {
           "actor": "bibian/infoempleo-jobs-scraper",
           "title": "Infoempleo Jobs Scraper (Spain)",
           "url": "https://apify.com/bibian/infoempleo-jobs-scraper",
-          "build": "0.1.5",
+          "build": "0.1.6",
           "fields": [
             "keywords",
             "location",
@@ -570,12 +566,12 @@
       "status": "metadata_checked"
     },
     "trabajos": {
-      "checked_at": "2026-10-15T17:00:59.584065+00:00",
+      "checked_at": "2026-10-23T11:07:48.318635+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "torre": {
-      "checked_at": "2026-10-15T17:00:59.584067+00:00",
+      "checked_at": "2026-10-23T11:07:48.318637+00:00",
       "candidates": [
         {
           "actor": "scrapers_lat/torre-scraper",
@@ -598,17 +594,17 @@
       "status": "metadata_checked"
     },
     "weremoto": {
-      "checked_at": "2026-10-15T17:00:59.584069+00:00",
+      "checked_at": "2026-10-23T11:07:48.318638+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "remotoco": {
-      "checked_at": "2026-10-15T17:00:59.584072+00:00",
+      "checked_at": "2026-10-23T11:07:48.318642+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "laborum": {
-      "checked_at": "2026-10-15T17:00:59.584074+00:00",
+      "checked_at": "2026-10-23T11:07:48.318644+00:00",
       "candidates": [
         {
           "actor": "serp.cheap.ofc/bumeran-scraper",
@@ -639,7 +635,7 @@
           "actor": "blackfalcondata/bumeran-scraper",
           "title": "Bumeran Scraper [Just 💰$1] — LATAM Jobs (7 Countries)",
           "url": "https://apify.com/blackfalcondata/bumeran-scraper",
-          "build": "0.1.90",
+          "build": "0.1.94",
           "fields": [
             "query",
             "country",
@@ -700,13 +696,13 @@
       "status": "metadata_checked"
     },
     "elempleo": {
-      "checked_at": "2026-10-15T17:00:59.584076+00:00",
+      "checked_at": "2026-10-23T11:07:48.318645+00:00",
       "candidates": [
         {
           "actor": "logiover/elempleo-colombia-job-scraper",
           "title": "elempleo Colombia Job Scraper — Empleos, No Login",
           "url": "https://apify.com/logiover/elempleo-colombia-job-scraper",
-          "build": "1.0.24",
+          "build": "1.0.25",
           "fields": [
             "keywords",
             "keyword",
@@ -725,41 +721,29 @@
           ]
         },
         {
-          "actor": "corvuslab/elempleo-scraper",
-          "title": "elempleo Job Scraper — Full Descriptions & COP Salaries",
-          "url": "https://apify.com/corvuslab/elempleo-scraper",
-          "build": "0.1.12",
+          "actor": "scrapers_lat/elempleo-scraper",
+          "title": "elempleo Scraper - Colombia Jobs, Salaries, Vacantes & Empleos",
+          "url": "https://apify.com/scrapers_lat/elempleo-scraper",
+          "build": "0.1.28",
           "fields": [
             "keywords",
-            "keyword",
+            "location",
+            "maxJobs",
             "startUrls",
-            "maxResults",
-            "cities",
-            "industry",
+            "startUrl",
             "contractType",
             "workModality",
+            "area",
             "positionLevel",
             "experience",
-            "publishDate",
-            "sortExpression",
-            "requireContact",
-            "includeDetails",
-            "descriptionFormat",
-            "compact",
-            "excludeEmptyFields",
-            "incrementalMode",
-            "stateKey",
-            "emitUnchanged",
-            "emitExpired",
-            "telegramToken",
-            "telegramChatId",
-            "slackWebhookUrl",
-            "discordWebhookUrl",
-            "webhookUrl",
-            "webhookHeaders",
-            "notificationLimit",
-            "proxyConfiguration",
-            "maxRequestRetries"
+            "sector",
+            "salaryMin",
+            "sort",
+            "onlyRemote",
+            "withDetails",
+            "withSummary",
+            "withExtract",
+            "proxyConfiguration"
           ],
           "required": [],
           "pricing_models": [
@@ -770,13 +754,13 @@
       "status": "metadata_checked"
     },
     "upwork": {
-      "checked_at": "2026-10-15T17:00:59.584078+00:00",
+      "checked_at": "2026-10-23T11:07:48.318648+00:00",
       "candidates": [
         {
           "actor": "neatrat/upwork-job-scraper",
           "title": "Upwork Job Scraper",
           "url": "https://apify.com/neatrat/upwork-job-scraper",
-          "build": "0.0.93",
+          "build": "0.0.106",
           "fields": [
             "query",
             "rawUrl",
@@ -805,17 +789,17 @@
       "status": "metadata_checked"
     },
     "freelancer": {
-      "checked_at": "2026-10-15T17:00:59.584079+00:00",
+      "checked_at": "2026-10-23T11:07:48.318650+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "malt": {
-      "checked_at": "2026-10-15T17:00:59.584081+00:00",
+      "checked_at": "2026-10-23T11:07:48.318651+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "eures": {
-      "checked_at": "2026-10-15T17:00:59.584082+00:00",
+      "checked_at": "2026-10-23T11:07:48.318652+00:00",
       "candidates": [
         {
           "actor": "easyapi/eures-job-scraper",
@@ -839,7 +823,7 @@
           "actor": "shahidirfan/eures-job-scraper",
           "title": "Eures Job Scraper",
           "url": "https://apify.com/shahidirfan/eures-job-scraper",
-          "build": "1.0.13",
+          "build": "1.0.14",
           "fields": [
             "startUrl",
             "keyword",
@@ -847,7 +831,9 @@
             "country",
             "sort",
             "results_wanted",
-            "max_pages"
+            "max_pages",
+            "include_details",
+            "proxyConfiguration"
           ],
           "required": [],
           "pricing_models": [
@@ -885,23 +871,23 @@
       "status": "metadata_checked"
     },
     "europe-language": {
-      "checked_at": "2026-10-15T17:00:59.584084+00:00",
+      "checked_at": "2026-10-23T11:07:48.318653+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "jobsqd": {
-      "checked_at": "2026-10-15T17:00:59.584086+00:00",
+      "checked_at": "2026-10-23T11:07:48.318655+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "facebook": {
-      "checked_at": "2026-10-15T17:00:59.584088+00:00",
+      "checked_at": "2026-10-23T11:07:48.318656+00:00",
       "candidates": [
         {
           "actor": "apify/facebook-groups-scraper",
           "title": "Facebook Groups Scraper",
           "url": "https://apify.com/apify/facebook-groups-scraper",
-          "build": "0.0.384",
+          "build": "0.0.386",
           "fields": [
             "startUrls",
             "resultsLimit",
@@ -920,7 +906,7 @@
           "actor": "apify/facebook-posts-scraper",
           "title": "Facebook Posts Scraper",
           "url": "https://apify.com/apify/facebook-posts-scraper",
-          "build": "0.0.402",
+          "build": "0.0.404",
           "fields": [
             "startUrls",
             "resultsLimit",
@@ -940,7 +926,7 @@
           "actor": "scraper_one/facebook-posts-search",
           "title": "Facebook Posts Search",
           "url": "https://apify.com/scraper_one/facebook-posts-search",
-          "build": "0.0.353",
+          "build": "0.0.365",
           "fields": [
             "query",
             "resultsCount",
@@ -963,7 +949,7 @@
       "status": "metadata_checked"
     },
     "linkedin-posts": {
-      "checked_at": "2026-10-15T17:00:59.584090+00:00",
+      "checked_at": "2026-10-23T11:07:48.318658+00:00",
       "candidates": [
         {
           "actor": "harvestapi/linkedin-profile-posts",
@@ -1033,13 +1019,13 @@
       "status": "metadata_checked"
     },
     "skool": {
-      "checked_at": "2026-10-15T17:00:59.584092+00:00",
+      "checked_at": "2026-10-23T11:07:48.318660+00:00",
       "candidates": [
         {
           "actor": "memo23/skool-posts-with-comments-scraper",
           "title": "Skool Classroom Media/Video · Posts · Nested Comments",
           "url": "https://apify.com/memo23/skool-posts-with-comments-scraper",
-          "build": "0.0.122",
+          "build": "0.0.124",
           "fields": [
             "startUrls",
             "tab",
@@ -1067,7 +1053,7 @@
       "status": "metadata_checked"
     },
     "telegram": {
-      "checked_at": "2026-10-15T17:00:59.584093+00:00",
+      "checked_at": "2026-10-23T11:07:48.318662+00:00",
       "candidates": [
         {
           "actor": "tri_angle/telegram-scraper",
@@ -1092,7 +1078,7 @@
           "actor": "lofomachines/telegram-keyword-search-scraper",
           "title": "Telegram Keyword Search Scraper",
           "url": "https://apify.com/lofomachines/telegram-keyword-search-scraper",
-          "build": "0.1.27",
+          "build": "0.1.31",
           "fields": [
             "mode",
             "keywords",
@@ -1116,7 +1102,7 @@
       "status": "metadata_checked"
     },
     "reddit": {
-      "checked_at": "2026-10-15T17:00:59.584095+00:00",
+      "checked_at": "2026-10-23T11:07:48.318664+00:00",
       "candidates": [
         {
           "actor": "trudax/reddit-scraper-lite",
@@ -1159,46 +1145,10 @@
           ]
         },
         {
-          "actor": "fatihtahta/reddit-scraper-search-fast",
-          "title": "Reddit Scraper | Enterprise Grade",
-          "url": "https://apify.com/fatihtahta/reddit-scraper-search-fast",
-          "build": "1.9.48",
-          "fields": [
-            "queries",
-            "sort",
-            "timeframe",
-            "subredditName",
-            "subredditKeywords",
-            "subredditSort",
-            "subredditTimeframe",
-            "urls",
-            "scrapeComments",
-            "maxComments",
-            "dateFrom",
-            "dateTo",
-            "commentDateFrom",
-            "commentDateTo",
-            "forceSortNewForTimeFilteredRuns",
-            "includeNsfw",
-            "strictSearch",
-            "strictTokenFilter",
-            "maxPosts",
-            "maximize_coverage",
-            "sentiment_analysis",
-            "content_analysis",
-            "mcpConnectors"
-          ],
-          "required": [],
-          "pricing_models": [
-            "PAY_PER_EVENT",
-            "PRICE_PER_DATASET_ITEM"
-          ]
-        },
-        {
           "actor": "harshmaur/reddit-scraper",
           "title": "Reddit Scraper - Posts, Comments, Search & Subreddits",
           "url": "https://apify.com/harshmaur/reddit-scraper",
-          "build": "0.0.645",
+          "build": "0.0.733",
           "fields": [
             "searchTerms",
             "searchPosts",
@@ -1247,18 +1197,54 @@
           "pricing_models": [
             "PAY_PER_EVENT"
           ]
+        },
+        {
+          "actor": "fatihtahta/reddit-scraper-search-fast",
+          "title": "Reddit Scraper | Enterprise Grade",
+          "url": "https://apify.com/fatihtahta/reddit-scraper-search-fast",
+          "build": "1.9.64",
+          "fields": [
+            "queries",
+            "sort",
+            "timeframe",
+            "subredditName",
+            "subredditKeywords",
+            "subredditSort",
+            "subredditTimeframe",
+            "urls",
+            "scrapeComments",
+            "maxComments",
+            "dateFrom",
+            "dateTo",
+            "commentDateFrom",
+            "commentDateTo",
+            "forceSortNewForTimeFilteredRuns",
+            "includeNsfw",
+            "strictSearch",
+            "strictTokenFilter",
+            "maxPosts",
+            "maximize_coverage",
+            "sentiment_analysis",
+            "content_analysis",
+            "mcpConnectors"
+          ],
+          "required": [],
+          "pricing_models": [
+            "PAY_PER_EVENT",
+            "PRICE_PER_DATASET_ITEM"
+          ]
         }
       ],
       "status": "metadata_checked"
     },
     "company": {
-      "checked_at": "2026-10-15T17:00:59.584098+00:00",
+      "checked_at": "2026-10-23T11:07:48.318665+00:00",
       "candidates": [
         {
           "actor": "fantastic-jobs/greenhouse-jobs-api",
           "title": "Greenhouse Jobs API",
           "url": "https://apify.com/fantastic-jobs/greenhouse-jobs-api",
-          "build": "0.0.36",
+          "build": "0.0.38",
           "fields": [
             "limit",
             "includeCompanyDetails",
@@ -1327,99 +1313,99 @@
       "status": "metadata_checked"
     },
     "custom": {
-      "checked_at": "2026-10-15T17:00:59.584100+00:00",
+      "checked_at": "2026-10-23T11:07:48.318667+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "jobgether": {
-      "checked_at": "2026-10-15T17:00:59.584101+00:00",
+      "checked_at": "2026-10-23T11:07:48.318668+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "tecnoempleo": {
-      "checked_at": "2026-10-15T17:00:59.584103+00:00",
+      "checked_at": "2026-10-23T11:07:48.318669+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "talent": {
-      "checked_at": "2026-10-15T17:00:59.584104+00:00",
+      "checked_at": "2026-10-23T11:07:48.318671+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "milanuncios": {
-      "checked_at": "2026-10-15T17:00:59.584106+00:00",
+      "checked_at": "2026-10-23T11:07:48.318672+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "primer-empleo": {
-      "checked_at": "2026-10-15T17:00:59.584107+00:00",
+      "checked_at": "2026-10-23T11:07:48.318673+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "jobfluent": {
-      "checked_at": "2026-10-15T17:00:59.584109+00:00",
+      "checked_at": "2026-10-23T11:07:48.318675+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "welcomejungle": {
-      "checked_at": "2026-10-15T17:00:59.584110+00:00",
+      "checked_at": "2026-10-23T11:07:48.318676+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "closers-avenue": {
-      "checked_at": "2026-10-15T17:00:59.584112+00:00",
+      "checked_at": "2026-10-23T11:07:48.318678+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "google": {
-      "checked_at": "2026-10-15T17:00:59.584114+00:00",
+      "checked_at": "2026-10-23T11:07:48.318679+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "remotolist": {
-      "checked_at": "2026-10-15T17:00:59.584115+00:00",
+      "checked_at": "2026-10-23T11:07:48.318681+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "domestika": {
-      "checked_at": "2026-10-15T17:00:59.584117+00:00",
+      "checked_at": "2026-10-23T11:07:48.318682+00:00",
       "candidates": [],
       "status": "not_found"
     }
   },
   "jobtoday_slugs": {
-    "checked_at": "2026-10-15T17:01:07.399030+00:00",
+    "checked_at": "2026-10-23T11:07:55.255364+00:00",
     "slugs": {
       "jobtoday": {
-        "checked_at": "2026-10-15T17:01:07.399202+00:00",
+        "checked_at": "2026-10-23T11:07:55.255535+00:00",
         "url": "https://jobtoday.com/es/trabajos-closer-de-ventas",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-closer-de-ventas",
         "http_status": 200
       },
       "jobtoday-telemarketing": {
-        "checked_at": "2026-10-15T17:01:07.400112+00:00",
+        "checked_at": "2026-10-23T11:07:55.256532+00:00",
         "url": "https://jobtoday.com/es/trabajos-telemarketing",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-telemarketing",
         "http_status": 200
       },
       "jobtoday-remoto": {
-        "checked_at": "2026-10-15T17:01:07.823814+00:00",
+        "checked_at": "2026-10-23T11:07:55.687970+00:00",
         "url": "https://jobtoday.com/es/trabajos-ventas-remoto",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-ventas-remoto",
         "http_status": 200
       },
       "jobtoday-ventas": {
-        "checked_at": "2026-10-15T17:01:07.926863+00:00",
+        "checked_at": "2026-10-23T11:07:55.772695+00:00",
         "url": "https://jobtoday.com/es/trabajos-ventas",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-ventas",
         "http_status": 200
       },
       "jobtoday-comercial": {
-        "checked_at": "2026-10-15T17:01:08.155468+00:00",
+        "checked_at": "2026-10-23T11:07:56.117453+00:00",
         "url": "https://jobtoday.com/es/trabajos-comercial",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-comercial",
