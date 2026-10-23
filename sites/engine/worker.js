@@ -53,6 +53,10 @@ const SOURCES = [
   // nacional no trae. El dedupe por URL colapsa los repetidos; una ciudad que responde
   // 410 (Valencia, Bilbao, Zaragoza, Murcia, Alicante para los términos closer) se
   // omite sin ocultar al resto. Presupuesto: 3 fetches medidos, no 8.
+  // Madrid probado y retirado el 2026-10-23: la nacional ya devuelve el inventario de
+  // Madrid (Velian, Accenture, Talent Class) y la página de ciudad no añadió ni una
+  // oferta nueva al catálogo en la recogida real (17 candidatos leídos, 0 nuevas), así
+  // que gastar un fetch ahí no compra nada. El cuello no es la plaza: es el inventario.
   { code: 'jobtoday-closer-ciudades', name: 'JobToday Closer · ciudades', kind: 'jobtoday-cities',
     paths: ['closer-de-ventas/barcelona', 'closer-de-ventas/sevilla', 'closer-de-ventas/malaga'] },
   // 'ventas-presencial' por ciudad sí tiene inventario en todas (48/25/17 filas frente
