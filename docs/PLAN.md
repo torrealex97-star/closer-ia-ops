@@ -37,6 +37,10 @@ Referencias WDC y adquisición por fuente organizadas en [SOURCE_ACQUISITION](SO
 
 P05B puede usar las fuentes existentes sin esperar toda P04K. Spikes de documentación son preparatorios; mantener una sola fase de implementación activa. Si falta clave Groq, avanzar contrato/fixture/migración sin declarar canary completado. No sustituir P05A por expansión indiscriminada de scrapers.
 
+## Práctica de venta y entrevista (I1 entregado)
+
+Plan revisado el 2026-10-23 a partir del paquete `closer-ai-coach`: método (cebolla de la culpa, looping, regla de silencio, rúbrica con evidencia), señales deterministas, voz del navegador y repaso. **Aprobado I1 y las notas 0-100 por eje y global**; entregado con ocho situaciones, capas de resistencia, feedback de cuatro ejes con cita, señales y respuesta modelo. **I2 (voz) e I3 (repaso/progreso local) siguen pendientes de aprobación**, junto con la lista de descartes y sus motivos: [plan](plans/PRACTICE_UPGRADE_FROM_CLOSER_AI_COACH.md). Estado y límites en [STATUS](STATUS.md).
+
 ## Principios de entrega
 
 Admin conserva adquisición y trazabilidad; alumna ve empresa + oportunidad + condiciones + siguiente paso. Groq es default objetivo; toda IA tiene evidencia/versiones/límites. US hispano no equivale a residencia US ni a elegibilidad España/LATAM. Ver [ADR-007](decisions/ADR-007-groq-opportunity-surfaces.md).

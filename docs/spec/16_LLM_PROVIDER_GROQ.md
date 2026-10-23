@@ -84,3 +84,18 @@ Objetivo medible: 200 candidatos en <=5 minutos p95 en cuenta con capacidad sufi
 ai_generations conserva registros anteriores con provider=openai, sin reinterpretar métricas. Añadir llm_attempts y reservas con migraciones forward-only; índice de caché incluye proveedor. Logs: org/run/generation/attempt, task, modelo, versiones, uso, latencia, error y estado de cuota; nunca clave ni raw completo. Reportar coste desconocido como null y distinguir estimado/reportado.
 
 Pasos P05A: extraer protocolo → encapsular adaptador OpenAI existente → añadir Groq → migrar historial/config sin activar gasto → pruebas HTTP/DB → canary opcional con clave WDC → benchmark ES/EN → habilitar Groq por defecto para nuevas tareas autorizadas. No borrar generaciones antiguas.
+
+## Sala de práctica (rol de venta y entrevista) — 2026-10-22
+
+Perfil de tarea propio, implementado como ruta de servidor de la web (`POST /api/practice`), no en el motor de recogida: catálogo y práctica no comparten datos ni permisos.
+
+- Ocho situaciones ficticias declaradas con nivel (suave / real / dura): llamada en frío, objeción de precio, «lo tengo que pensar», objeción de socio, ataque al ego, entrevista de closer, de setter y objeción de sector. El prompt de cada personaje vive solo en servidor (`app/api/practice/prompts.ts`); el navegador recibe únicamente el catálogo visible.
+- Cada personaje tiene tres niveles de resistencia (circunstancias → terceros → el yo, o su equivalente en entrevista), disparadores que lo desarman o lo cierran y una condición explícita para ceder. El nivel avanza cada tres respuestas de la alumna (`stageFor`, determinista) y no se anuncia en la conversación. La regla de silencio se aplica: rellenar después del precio invita al ataque.
+- Apagada por defecto: sin `GROQ_API_KEY` y `PRACTICE_CODE` responde 503 y la interfaz lo dice. Nunca se simula una conversación sin proveedor ni se fabrica una réplica.
+- Modelo en allowlist (`openai/gpt-oss-20b` por defecto; `openai/gpt-oss-120b` permitido), 260 tokens por turno, 900 en el feedback, timeout 20 s, sin streaming ni tools.
+- Límites: 24 turnos y 18.000 caracteres por petición; 60 turnos/día por IP y 400 por instancia/día (`PRACTICE_DAILY_TURNS`). La interfaz cierra la conversación a los 20 turnos para que el feedback siempre quepa (con el tope anterior de 16 una práctica larga quedaba sin réplica ni feedback posible). En serverless son best-effort: la barrera real es el tope por llamada y el código de cohorte.
+- Feedback con `json_schema` estricto (`summary`, `focus`, `strengths`, `improvements`, `axes`, `model`, `next`). Cuatro ejes por tipo con nota 0-100, nota cualitativa y cita; si falta un eje, no se acepta el feedback (502). Una cita que no aparezca literalmente en los mensajes de la alumna se descarta en servidor: el feedback no puede demostrar algo que no se dijo.
+- La nota global es la **media aritmética de los cuatro ejes**, calculada en servidor; el modelo no devuelve un quinto número. Se presenta siempre como **estimación docente**, no como nota oficial ni probabilidad.
+- Señales de estilo deterministas y sin coste (`app/api/practice/signals.ts`): relleno tras el precio, «pero» tras validar, falta de siguiente paso o de preguntas, mensaje largo, muletillas y respuestas mínimas. Se devuelven con la frase literal que las dispara, como observaciones que no restan nota.
+- Datos: la conversación no se persiste en servidor ni en D1; historial (8 prácticas) y código viven en el navegador. No se envía nada a empresas ni se registra una candidatura.
+- Producto: es un simulacro formativo. El feedback no evalúa la candidatura ni decide nada sobre un proceso; la interfaz lo declara y el código de cohorte es una puerta de aula, no autenticación.
