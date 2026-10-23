@@ -18,10 +18,10 @@ const REFRESH_AHEAD_MS = 2 * 86400000;
 // ATS de la watchlist WDC; sin claves ni scraping autenticado).
 const SOURCES = [
   { code: 'jobtoday', name: 'JobToday España', kind: 'jobtoday', slug: 'closer-de-ventas' },
-  { code: 'jobtoday-telemarketing', name: 'JobToday Telemarketing', kind: 'jobtoday', slug: 'telemarketing' },
-  { code: 'jobtoday-remoto', name: 'JobToday Comercial remoto', kind: 'jobtoday', slug: 'ventas-remoto' },
-  { code: 'jobtoday-ventas', name: 'JobToday Ventas', kind: 'jobtoday', slug: 'ventas' },
-  { code: 'jobtoday-comercial', name: 'JobToday Comercial', kind: 'jobtoday', slug: 'comercial' },
+  // Retirados 2026-10-22 (telemarketing, ventas-remoto, ventas, comercial): 0 elegibles
+  // en la ventana y 4 subrequests que necesitaba el barrido por ciudad. La cobertura
+  // nacional que sí rinde se queda (agente-comercial, vendedor, asesor-de-ventas,
+  // ventas-presencial): entre los cuatro aportan los únicos elegibles de JobToday.
   // Slugs verificados hoy 2026-10-13 (200 + __NEXT_DATA__, 48–68 ofertas cada uno):
   // cobertura comercial amplia en español. Bajado a 7 slugs (2026-10-14): el budget
   // de subrequests por invocación se agotaba y FreeHire LATAM quedaba fuera; los
@@ -33,20 +33,37 @@ const SOURCES = [
   // Añadido tras medir ROI 2026-10-14 (sesión 16): 48 ítems, 48 URLs únicas,
   // 23 NUEVAS vs catálogo real — la mejor ampliación por subrequest medida.
   { code: 'jobtoday-asesor-de-ventas', name: 'JobToday Asesor de ventas', kind: 'jobtoday', slug: 'asesor-de-ventas' },
-  // Ampliación familia closer (2026-10-15): slugs verificados hoy contra el sitio
-  // real (200 + __NEXT_DATA__): 'closers' 8 ítems y 'closer-remoto' 7 — perfiles
-  // reales de closer/setter en español (Skool Scaling, Manager Sales,
-  // Bastida&Farina, Hispaconex, Hotmart). Motivación: con la familia estricta
-  // 'closer' la vista alumna en España rendía solo 3-4; los solapes entre slugs
-  // se dedupean por URL en la superficie, y un 401/410 en algún slug no oculta
-  // las demás fuentes ('closser' es 410 y 'closer-ventas' 308→ canónico, nada que añadir).
-  { code: 'jobtoday-closers', name: 'JobToday Closers', kind: 'jobtoday', slug: 'closers' },
+  // Familia closer (re-medida 2026-10-20 contra el sitio real): el slug 'closers'
+  // responde **410 Gone** en TODOS los runs (fallaba un subrequest cada recogida y
+  // aportaba 0), así que se retira. El inventario real de closer en JobToday está
+  // agotado: 'closer-de-ventas' devuelve 11 anuncios con hasNext=false (una sola
+  // página, sin paginación) y 'closer-remoto' 3; entre los 10 slugs sólo hay UN
+  // anuncio de closer único con URL que pase los gates. Los slugs con inventario
+  // vivo que añaden algo son 'closer-comercial' (2 ítems: 1 closer) y
+  // 'ventas-presencial' (48 ítems: 1 closer + 2 setter elegibles). Ojo: 'high-ticket',
+  // 'setter', 'appointment-setter', 'cerrador', 'cerrador-de-ventas',
+  // 'closer-high-ticket' y 'comercial-closer' (medido: mismo inventario que
+  // 'closer-comercial', se descarta por coste) no aportan fuentes nuevas.
+  { code: 'jobtoday-closer-comercial', name: 'JobToday Closer comercial', kind: 'jobtoday', slug: 'closer-comercial' },
   { code: 'jobtoday-closer-remoto', name: 'JobToday Closer remoto', kind: 'jobtoday', slug: 'closer-remoto' },
-  // Himalayas a 1 término (budget 2026-10-15): hoy 3 fetches produjeron 0 elegibles
-  // en producción (45 revisadas); 'closer' es su término con yield medido. Si el
-  // funnel diurno vuelve a pedir cobertura, se restauran los 3 términos.
-  { code: 'himalayas', name: 'Himalayas', kind: 'himalayas' },
-  { code: 'weworkremotely', name: 'We Work Remotely · ventas', kind: 'rss', slug: 'https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss' },
+  { code: 'jobtoday-ventas-presencial', name: 'JobToday Ventas presencial', kind: 'jobtoday', slug: 'ventas-presencial' },
+  // Barrido por ciudad (medido 2026-10-22 contra el sitio real): las páginas de
+  // ciudad de JobToday NO son la nacional filtrada — devuelven inventario distinto.
+  // 'closer-de-ventas' nacional: 8 anuncios; Barcelona 6, Sevilla 1 y Málaga 1 que la
+  // nacional no trae. El dedupe por URL colapsa los repetidos; una ciudad que responde
+  // 410 (Valencia, Bilbao, Zaragoza, Murcia, Alicante para los términos closer) se
+  // omite sin ocultar al resto. Presupuesto: 3 fetches medidos, no 8.
+  { code: 'jobtoday-closer-ciudades', name: 'JobToday Closer · ciudades', kind: 'jobtoday-cities',
+    paths: ['closer-de-ventas/barcelona', 'closer-de-ventas/sevilla', 'closer-de-ventas/malaga'] },
+  // 'ventas-presencial' por ciudad sí tiene inventario en todas (48/25/17 filas frente
+  // a las 48 de la nacional): aporta sobre todo AE/setter. 3 fetches, no 8: con 8 el
+  // run agotó el presupuesto de subrequests y FreeHire/GetOnBoard/ATS quedaron fuera.
+  { code: 'jobtoday-presencial-ciudades', name: 'JobToday Ventas · ciudades', kind: 'jobtoday-cities',
+    paths: ['ventas-presencial/barcelona', 'ventas-presencial/valencia', 'ventas-presencial/alicante'] },
+  // Himalayas y We Work Remotely se retiran (2026-10-22): 0 elegibles en la ventana,
+  // 104 revisadas y todo en inglés; gastaban 2 fetches del presupuesto de subrequests
+  // que ahora financia el barrido por ciudad (el rol remoto lo cubren GetOnBoard y
+  // FreeHire con inventario español).
   // Añadidas 2026-10-13 con posibilidad de verificación real hoy:
   // GetOnBoard API pública (verificada 2026-10-13: 200, categorías ventas LATAM, 21 páginas);
   // FreeHire ES (200, 2941 totales, reality.class filtrable) y FreeHire LATAM.
@@ -61,7 +78,9 @@ const SOURCES = [
   // = 1 subrequest garantido en 0; si WDC reabre su board, se re-añade con el
   // hallazgo ya documentado aquí. Queda monestcapital (única ATS con closers reales).
   { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
-  { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
+  // La entrada estaba DUPLICADA (2026-10-20): el run recorría el mismo board dos veces,
+  // la segunda instancia quedaba 'queued' para siempre en /api/status y gastaba un
+  // subrequest que necesita la cola ATS.
 ];
 
 // ------ utilidades ------
@@ -87,35 +106,59 @@ async function fetchText(url, timeoutMs = 15000) {
 const pick = (obj, ...keys) => { for (const k of keys) { const v = obj?.[k]; if (v !== undefined && v !== null && v !== '') return v; } return null; };
 
 // ------ extractores por tipo de fuente → candidatos { external_id, payload } ------
-async function sourceJobToday(source) {
-  const html = await fetchText(`https://jobtoday.com/es/trabajos-${source.slug}`);
+// Modelo real de JobToday (verificado contra payloads 2026-10-14):
+// título del puesto en row.role, entidad contratante en companyName,
+// dirección legible en row.address, cuerpo completo en row.description,
+// fecha como createDate (epoch ms) o postedSecondsAgo (edad). Si el
+// extractor usa claves que no existen (title, workplaceAddress) el
+// ingestBatch descarta silenciosamente cada candidato: no hay ofertas.
+function jobTodayCandidate(row) {
+  const external = String(row.key || row.canonicalUrl || '');
+  if (!external) return null;
+  const postedAt = row.createDate ? new Date(Number(row.createDate)).toISOString()
+    : (row.postedSecondsAgo != null ? new Date(Date.now() - Number(row.postedSecondsAgo) * 1000).toISOString() : null);
+  return { external_id: external, payload: {
+    title: pick(row, 'title', 'positionName', 'role', 'companyName'),
+    company: row.companyName ?? row.company?.name ?? null,
+    location: pick(row, 'address', 'workplaceAddress', 'location', 'city'),
+    url: row.canonicalUrl ? (row.canonicalUrl.startsWith('http') ? row.canonicalUrl : `https://jobtoday.com${row.canonicalUrl}`) : null,
+    salary: pick(row, 'salary'),
+    posted_at: postedAt, raw: row,
+  } };
+}
+
+function jobTodayRows(html) {
   const match = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
   if (!match) throw new Error('JobToday no incluye su listado embebido; formato cambiado');
   let data;
   try { data = JSON.parse(match[1]); } catch { throw new Error('NEXT_DATA no parseable'); }
   const sections = data?.props?.pageProps?.feed?.sections;
   if (!Array.isArray(sections)) throw new Error('La estructura embebida de JobToday ha cambiado');
-  const rows = sections.flatMap(s => (s.items || [])).filter(it => it && typeof it.payload === 'object').map(it => it.payload);
-  return rows.slice(0, MAX_ITEMS_PER_SOURCE).map(row => {
-    const external = String(row.key || row.canonicalUrl || '');
-    if (!external) return null;
-    // Modelo real de JobToday (verificado contra payloads 2026-10-14):
-    // título del puesto en row.role, entidad contratante en companyName,
-    // dirección legible en row.address, cuerpo completo en row.description,
-    // fecha como createDate (epoch ms) o postedSecondsAgo (edad). Si el
-    // extractor usa claves que no existen (title, workplaceAddress) el
-    // ingestBatch descarta silenciosamente cada candidato: no hay ofertas.
-    const postedAt = row.createDate ? new Date(Number(row.createDate)).toISOString()
-      : (row.postedSecondsAgo != null ? new Date(Date.now() - Number(row.postedSecondsAgo) * 1000).toISOString() : null);
-    return { external_id: external, payload: {
-      title: pick(row, 'title', 'positionName', 'role', 'companyName'),
-      company: row.companyName ?? row.company?.name ?? null,
-      location: pick(row, 'address', 'workplaceAddress', 'location', 'city'),
-      url: row.canonicalUrl ? (row.canonicalUrl.startsWith('http') ? row.canonicalUrl : `https://jobtoday.com${row.canonicalUrl}`) : null,
-      salary: pick(row, 'salary'),
-      posted_at: postedAt, raw: row,
-    } };
-  }).filter(Boolean);
+  return sections.flatMap(s => (s.items || [])).filter(it => it && typeof it.payload === 'object').map(it => it.payload);
+}
+
+async function sourceJobToday(source) {
+  const rows = jobTodayRows(await fetchText(`https://jobtoday.com/es/trabajos-${source.slug}`));
+  return rows.slice(0, MAX_ITEMS_PER_SOURCE).map(jobTodayCandidate).filter(Boolean);
+}
+
+// Barrido por ciudad: una ruta caída (410/404/red) no invalida las demás, y el
+// resultado se dedupe por external_id dentro de la propia fuente. La nacional no
+// se repite aquí: las ciudades que devuelven lo mismo las colapsa el dedupe por URL.
+async function sourceJobTodayCities(source) {
+  const out = [];
+  const seen = new Set();
+  for (const path of source.paths ?? []) {
+    try {
+      for (const row of jobTodayRows(await fetchText(`https://jobtoday.com/es/trabajos-${path}`))) {
+        const candidate = jobTodayCandidate(row);
+        if (!candidate || seen.has(candidate.external_id)) continue;
+        seen.add(candidate.external_id);
+        out.push(candidate);
+      }
+    } catch { /* ciudad sin listado: se omite, no oculta al resto */ }
+  }
+  return out.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
 async function sourceGreenhouse(source) {
@@ -250,7 +293,7 @@ async function sourceFreehire(source) {
 }
 
 const EXTRACTORS = {
-  jobtoday: sourceJobToday, greenhouse: sourceGreenhouse, ashby: sourceAshby,
+  jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
   recruitee: sourceRecruitee, teamtailor: sourceTeamtailorRss, himalayas: sourceHimalayas, rss: sourceRss,
   getonbrd: sourceGetOnBoard, freehire: sourceFreehire,
 };
@@ -306,6 +349,12 @@ async function ensureSchema(db) {
   // base ya existente la columna está y D1 lo reclama, que es el estado correcto.
   for (const col of ['last_verified_at', 'verified_until', 'status_reason']) {
     try { await db.prepare(`ALTER TABLE opportunities ADD COLUMN ${col} TEXT`).run(); } catch { /* ya existe */ }
+  }
+  // Procedencia del revisor (espejo de opportunity_versions del núcleo local, sesión 38):
+  // el contrato aceptaba `reviewed_by` y lo descartaba, así que la identidad del
+  // operador que aprobó/públicó no quedaba registrada en el cloud. ALTER tolerante.
+  for (const col of ['reviewed_by', 'reviewed_at']) {
+    try { await db.prepare(`ALTER TABLE opportunity_versions ADD COLUMN ${col} TEXT`).run(); } catch { /* ya existe */ }
   }
 }
 
@@ -408,9 +457,19 @@ async function handleAudit(request, env) {
 // internet va por fases; fase 1 = lectura del catálogo cloud. GATE: la cabecera
 // X-Admin-Token debe coincidir con el secreto ADMIN_TOKEN; si no existe, 401
 // (seguro por defecto: sin token desplegado, la superficie admin está cerrada).
+// Comparación en tiempo constante: un `!==` sobre el token filtra su longitud y
+// prefijo por temporización. WORKERS no expone timingSafeEqual, así que se recorre
+// la cadena completa sin cortocircuito.
+function tokenMatches(received, expected) {
+  const a = String(received ?? '');
+  const b = String(expected ?? '');
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
 function requireAdmin(request, env) {
   if (!env.ADMIN_TOKEN) return Response.json({ detail: 'Admin no configurado en el engine' }, { status: 403 });
-  if (request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN) return Response.json({ detail: 'No autorizado' }, { status: 401 });
+  if (!tokenMatches(request.headers.get('X-Admin-Token'), env.ADMIN_TOKEN)) return Response.json({ detail: 'No autorizado' }, { status: 401 });
   return null;
 }
 
@@ -546,31 +605,19 @@ async function checkTarget(url, title, company) {
   const [result, reasonCode] = classifyVerification(status, titleFound, companyFound);
   return [result, reasonCode, { http_status: status, title_found: titleFound, company_found: companyFound, checked_chars: (body || '').length }];
 }
-async function handleAdminVerify(request, env, opportunityId) {
-  const db = env.DB;
-  await ensureSchema(db);
-  const row = await db.prepare('SELECT * FROM opportunities WHERE org_id=? AND id=?').bind(ORG, opportunityId).first();
-  if (!row) return Response.json({ detail: 'Oportunidad no encontrada' }, { status: 404 });
-  // Snapshot del anuncio original vía jobs→posting_id (job_id NUNCA es un posting_id):
-  // el JOIN correcto es el mismo que el resto de la superficie admin.
-  const posting = await db.prepare(`SELECT p.payload AS payload, p.source AS source, p.id AS posting_id
-    FROM jobs j JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
-    WHERE j.org_id=? AND j.id=?`).bind(ORG, row.job_id).first();
-  if (!posting) return Response.json({ detail: 'La oportunidad no tiene oferta original que verificar' }, { status: 409 });
-  // URL a comprobar: explícita del operador (cuerpo), si no la de candidatura de la
-  // revisión, si no la del anuncio original. Nunca se inventa una tercera fuente.
-  let body = {};
-  try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
-  catch { body = {}; } // cuerpo vacío = verificar la URL por defecto
+// Núcleo de la verificación de vigencia (port fase 3): UNA sola ruta de escritura,
+// compartida por el POST /verify de una oferta y por la activación en lote. Devuelve
+// `{ error }` cuando no hay URL verificable (el llamante decide el 409).
+async function runVerification(db, row, posting, requestedUrl) {
   // OJO: el id va en el SELECT — bindearlo después sin traerlo dio 500 undefined-unsupported (misma clase de bug de la sesión 28).
   const current = row.current_version_id
     ? await db.prepare('SELECT id, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? AND id=?').bind(ORG, row.id, row.current_version_id).first()
     : await db.prepare('SELECT id, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? ORDER BY version DESC LIMIT 1').bind(ORG, row.id).first();
   const reviewPayload = current ? JSON.parse(current.payload) : {};
   const postingPayload = JSON.parse(posting.payload);
-  const url = body.url || reviewPayload.application_url || postingPayload.url || null;
+  const url = requestedUrl || reviewPayload.application_url || postingPayload.url || null;
   if (!url || !/^https?:\/\//.test(url))
-    return Response.json({ detail: 'Sin URL verificable: guarda un enlace de candidatura en la revisión' }, { status: 409 });
+    return { error: 'Sin URL verificable: guarda un enlace de candidatura en la revisión' };
   const title = reviewPayload.headline ?? reviewPayload.title ?? postingPayload.title ?? '';
   const company = postingPayload.company ?? '';
   const method = 'http_status_content_v1';
@@ -608,12 +655,33 @@ async function handleAdminVerify(request, env, opportunityId) {
       .bind(JSON.stringify({ ...reviewPayload, next_step: payloadNext }), ORG, current.id).run();
     nextStepEnabled = payloadNext.enabled;
   }
-  return Response.json({
+  return {
     result, method, checked_at: checkedAt, valid_until: validUntil,
     reason_code: reasonCode, evidence_raw_id: evidenceId,
     opportunity_status: statusDerived, next_step_enabled: nextStepEnabled,
     status_reason: statusReason, detail,
-  }, { headers: corsHeaders(request) });
+  };
+}
+
+async function handleAdminVerify(request, env, opportunityId) {
+  const db = env.DB;
+  await ensureSchema(db);
+  const row = await db.prepare('SELECT * FROM opportunities WHERE org_id=? AND id=?').bind(ORG, opportunityId).first();
+  if (!row) return Response.json({ detail: 'Oportunidad no encontrada' }, { status: 404 });
+  // Snapshot del anuncio original vía jobs→posting_id (job_id NUNCA es un posting_id):
+  // el JOIN correcto es el mismo que el resto de la superficie admin.
+  const posting = await db.prepare(`SELECT p.payload AS payload, p.source AS source, p.id AS posting_id
+    FROM jobs j JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+    WHERE j.org_id=? AND j.id=?`).bind(ORG, row.job_id).first();
+  if (!posting) return Response.json({ detail: 'La oportunidad no tiene oferta original que verificar' }, { status: 409 });
+  // URL a comprobar: explícita del operador (cuerpo), si no la de candidatura de la
+  // revisión, si no la del anuncio original. Nunca se inventa una tercera fuente.
+  let body = {};
+  try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
+  catch { body = {}; } // cuerpo vacío = verificar la URL por defecto
+  const outcome = await runVerification(db, row, posting, body.url || null);
+  if (outcome.error) return Response.json({ detail: outcome.error }, { status: 409 });
+  return Response.json(outcome, { headers: corsHeaders(request) });
 }
 
 async function handleAdminReview(request, env, opportunityId) {
@@ -667,20 +735,188 @@ async function handleAdminReview(request, env, opportunityId) {
     payload.next_step.enabled = true;
     delete payload.next_step.disabled_reason;
   }
+  const applied = await applyReview(db, row, payload, editorial_status, finalLocale, reviewed_by);
+  return Response.json({
+    id: row.id, job_id: row.job_id, current_version_id: applied.newId,
+    version: applied.version, editorial_status, opportunity_status: row.opportunity_status,
+    connection_type: row.connection_type, locale: finalLocale, updated_at: applied.created,
+    reviewed_by: applied.reviewed_by,
+    vigencia_activa: vigenciaActiva, cta_auto_enabled: vigenciaActiva && Boolean(payload.application_url),
+  }, { headers: corsHeaders(request) });
+}
+
+// ------ admin (port fase 5: activación en lote, sesión 38) ------
+// Escritura de una revisión editorial (versión NUEVA inmutable + puntero + estado):
+// UNA sola ruta para el PATCH del panel y la activación en lote, con la procedencia
+// del revisor registrada (espejo de opportunity_versions del núcleo local; el cloud
+// aceptaba `reviewed_by` y lo descartaba).
+async function applyReview(db, row, payload, editorialStatus, locale, reviewedBy) {
   const maxVersion = await db.prepare('SELECT max(version) AS v FROM opportunity_versions WHERE org_id=? AND opportunity_id=?').bind(ORG, row.id).first();
   const created = now();
   const newId = 'ver-' + crypto.randomUUID();
+  const reviewer = reviewedBy || null;
+  const reviewedAt = ['approved', 'published', 'withdrawn'].includes(editorialStatus) ? created : null;
   await db.batch([
-    db.prepare(`INSERT INTO opportunity_versions (id,org_id,opportunity_id,version,locale,payload,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)`)
-      .bind(newId, ORG, row.id, (maxVersion?.v ?? 0) + 1, finalLocale, JSON.stringify(payload), 'admin', created),
+    db.prepare(`INSERT INTO opportunity_versions (id,org_id,opportunity_id,version,locale,payload,created_by,created_at,reviewed_by,reviewed_at) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .bind(newId, ORG, row.id, (maxVersion?.v ?? 0) + 1, locale, JSON.stringify(payload), reviewer ?? 'admin', created, reviewer, reviewedAt),
     db.prepare('UPDATE opportunities SET current_version_id=?, editorial_status=?, updated_at=? WHERE org_id=? AND id=?')
-      .bind(newId, editorial_status, created, ORG, row.id),
+      .bind(newId, editorialStatus, created, ORG, row.id),
   ]);
+  return { newId, version: (maxVersion?.v ?? 0) + 1, created, reviewed_by: reviewer, reviewed_at: reviewedAt };
+}
+
+// Cota de escaneo del pool de drafts (no del lote): el catálogo tiene miles y una
+// invocación no puede recorrerlos; la respuesta declara si cortó.
+const SCAN_LIMIT = 400;
+// Cota de ESCRITURA por invocación. Cada oferta escribe versión + puntero y, si se
+// verifica, gasta además 1 fetch y las escrituras de evidencia; un lote grande
+// agotaba el límite de subrequests a mitad y devolvía 500 con escrituras parciales.
+// Los gates no escriben, así que el barrido puede seguir siendo 400.
+const WRITE_BUDGET = 25;
+
+// El cuello de botella real del producto: el catálogo recoge >1300 ofertas y la
+// superficie de alumna solo sirve lo revisado por humanos (spec 15), pero publicar
+// exigía redactar a mano el payload de cada oferta (sin modalidad de candidatura
+// determinada no se publica). Esta ruta deriva el payload de forma DETERMINISTA
+// desde la evidencia raw ya almacenada —nada inventado: título y datos literales,
+// desconocidos explícitos como 'No especificado'—, verifica la vigencia y PUBLICA
+// solo las verificadas `open`; el resto queda `needs_review` con la razón escrita.
+// `dry_run` (por defecto) no escribe nada: devuelve el plan para que el operador decida.
+async function handleAdminActivate(request, env) {
+  const db = env.DB;
+  await ensureSchema(db);
+  let body = {};
+  try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
+  catch { body = {}; }
+  const dryRun = body.dry_run !== false;
+  const verify = body.verify !== false;
+  const market = body.market === undefined ? 'ES' : body.market;
+  if (!['ES', 'any'].includes(market)) return Response.json({ detail: 'market: debe ser ES o any' }, { status: 422 });
+  const role = body.role === undefined || body.role === null ? null : body.role;
+  if (role && !ROLE_KEYWORDS[role]) return Response.json({ detail: 'role: perfil fuera del vocabulario canónico' }, { status: 422 });
+  const reviewedBy = typeof body.reviewed_by === 'string' ? body.reviewed_by.trim().slice(0, 80) || null : null;
+  // Mismo override operador que /verify (la URL del anuncio puede redirigir a una
+  // canónica): la comprobación apunta donde el operador indica, nunca a un tercero nuevo.
+  const verifyUrl = typeof body.verify_url === 'string' && /^https?:\/\//.test(body.verify_url) ? body.verify_url : null;
+  const requested = Array.isArray(body.ids) ? body.ids.filter(v => typeof v === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(v)) : null;
+  // Un `IN ()` no es SQL válido: una lista vacía devolvía 500 en vez de decir que
+  // no había nada que activar. Omitir el campo es lo que significa «escanea el pool».
+  if (requested && !requested.length) return Response.json({ detail: 'ids: la lista está vacía; omite el campo para escanear el pool' }, { status: 422 });
+  const ids = requested ? new Set(requested) : null;
+  // Un override de URL solo tiene sentido para UNA oferta: aplicarlo a un lote
+  // verificaría todas contra la misma página y las marcaría `open` sin evidencia propia.
+  if (verifyUrl && (!ids || ids.size !== 1)) return Response.json({ detail: 'verify_url: requiere exactamente un id; en un lote se verifica la URL de cada anuncio' }, { status: 422 });
+  const source = typeof body.source === 'string' && /^[a-z0-9-]{1,40}$/.test(body.source) ? body.source : null;
+  // Sin `limit` que recorte la cola en silencio: el operador acota con `ids`/`source`.
+  // El SELECT sí lleva una cota de escaneo (SCAN_LIMIT) y la respuesta DICE si cortó:
+  // un plan parcial que se lee como completo es la forma más fácil de creer activado
+  // lo que nunca se consideró.
+  const days = 10; // la misma ventana de frescura de la superficie de alumna
+
+  const rows = await db.prepare(`
+    SELECT o.id AS opportunity_id, o.job_id, o.current_version_id, o.editorial_status, o.opportunity_status,
+           p.id AS posting_id, p.source, p.payload AS posting_payload, c.expires_at, c.first_seen_at
+      FROM opportunities o
+      JOIN jobs j ON j.org_id=o.org_id AND j.id=o.job_id
+      JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+      JOIN catalog_entries c ON c.org_id=o.org_id AND c.job_id=o.job_id
+     WHERE o.org_id=? AND o.editorial_status='draft' AND o.opportunity_status <> 'closed' AND c.expires_at > ?
+       ${source ? 'AND p.source=?' : ''} ${ids ? `AND o.id IN (${[...ids].map(() => '?').join(',')})` : ''}
+     ORDER BY c.first_seen_at DESC LIMIT ${SCAN_LIMIT}`)
+    .bind(ORG, now(), ...(source ? [source] : []), ...(ids ? [...ids] : [])).all();
+
+  const items = [];
+  const counters = { published: 0, needs_review: 0, skipped: 0, deferred: 0 };
+  const writeBudget = dryRun ? 0 : WRITE_BUDGET;
+  let written = 0;
+  for (const row of rows.results) {
+    // Identidad de la oportunidad con los MISMOS nombres de campo que espera el PATCH
+    // (row.id/row.job_id): las dos rutas de escritura, applyReview y runVerification,
+    // reciben este objeto. El SELECT de aquí usa o.id AS opportunity_id, y bindear un
+    // undefined dio 500 en la primera ejecución real (workerd 2026-10-16).
+    const opp = { id: row.opportunity_id, job_id: row.job_id, posting_id: row.posting_id,
+      current_version_id: row.current_version_id, source: row.source };
+    const p = JSON.parse(row.posting_payload);
+    const description = descriptionOf(p);
+    const derivedRole = classifyRole(p, fold(`${p.title ?? ''} ${p.location ?? ''} ${description}`));
+    const skip = reason => { counters.skipped += 1; items.push({ id: row.opportunity_id, job_id: row.job_id, action: 'skipped', reason }); };
+    if (!derivedRole) { skip('sin clasificación determinista de perfil'); continue; }
+    if (role && derivedRole !== role) { skip(`perfil ${derivedRole} distinto del pedido (${role})`); continue; }
+    if (!role && EXTRA_ROLES.has(derivedRole)) { skip(`perfil extra ${derivedRole}: se activa con role=${derivedRole} explícito (no protagoniza la vista por defecto)`); continue; }
+    if (market === 'ES' && (nonSpain(p) || !spainSignal(p))) { skip('sin señal de mercado España'); continue; }
+    if (!spanishBodyGate(description, false).ok) { skip('el anuncio no está en español (gate de cuerpo)'); continue; }
+    const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
+    if (ages !== null && Number.isFinite(ages) && ages > days) { skip(`publicado hace ${Math.floor(ages)} días: fuera de la ventana de frescura de ${days} días`); continue; }
+    const url = typeof p.url === 'string' && /^https:\/\//.test(p.url) ? p.url : null;
+    const applicationType = row.source.startsWith('ats-') ? 'company_ats' : (url ? 'external_platform' : 'unknown');
+    let domain = null;
+    try { domain = url ? new URL(url).host : null; } catch { domain = null; }
+    const payload = {
+      headline: String(p.title ?? '').slice(0, 180),
+      role: ROLE_LABELS[derivedRole],
+      short_summary: '',
+      what_they_are_looking_for: [],
+      what_you_would_do: [],
+      why_it_may_be_interesting: [],
+      compensation_summary: typeof p.salary === 'string' && p.salary.trim() ? p.salary.trim().slice(0, 300) : 'No especificado',
+      location_summary: asText(p.location) ?? 'No especificado',
+      language_requirements: ['Español'],
+      experience_summary: 'No especificado',
+      application_type: applicationType,
+      application_url: url,
+      next_step: { action: 'view_process', label: 'Ver proceso de candidatura', destination_label: 'Publicación original',
+        destination_domain: domain, requires_account: null, enabled: false,
+        disabled_reason: 'Verificación de vigencia pendiente' },
+    };
+    if (dryRun) {
+      items.push({ id: row.opportunity_id, job_id: row.job_id, action: url ? 'publish_si_open' : 'needs_review', role: derivedRole,
+        headline: payload.headline, company: p.company ?? null, source: row.source, application_type: applicationType,
+        application_url: url, reason: url ? null : 'sin URL https del anuncio: no se publica una tarjeta sin destino' });
+      continue;
+    }
+    if (written >= writeBudget) { counters.deferred += 1; continue; }
+    if (!row.current_version_id && !(await db.prepare('SELECT id FROM opportunity_versions WHERE org_id=? AND opportunity_id=? LIMIT 1').bind(ORG, row.opportunity_id).first())) {
+      skip('sin versión que revisar'); continue;
+    }
+    written += 1;
+    let verification = null;
+    const target = verifyUrl || url;
+    if (verify && target) {
+      verification = await runVerification(db, opp,
+        { payload: row.posting_payload, source: row.source, posting_id: row.posting_id }, target);
+      if (verification.error) verification = { result: 'unknown', reason_code: 'no_verificable', status_reason: verification.error };
+    }
+    // El CTA de la versión nueva se deriva de la verificación recién hecha (la MISMA
+    // regla que runVerification aplica sobre la versión vigente): sin esto la publicada
+    // nacía con `enabled:false` y una razón ya obsoleta, y el panel mostraba un CTA
+    // apagado sobre una oferta verificada abierta.
+    if (verification?.result === 'open') {
+      payload.next_step.enabled = true;
+      delete payload.next_step.disabled_reason;
+    } else if (verification?.result) {
+      payload.next_step.enabled = false;
+      payload.next_step.disabled_reason = verification.status_reason;
+    }
+    // Sin URL no se publica: una tarjeta sin destino no se puede abrir y su CTA
+    // nacería apagado. `application_type` conocido no sustituye al enlace.
+    const publisher = Boolean(url) && applicationType !== 'unknown' && (!verify || verification?.result === 'open');
+    const status = publisher ? 'published' : 'needs_review';
+    const applied = await applyReview(db, opp, payload, status, 'es', reviewedBy ?? 'admin-activate');
+    counters[status] += 1;
+    items.push({ id: row.opportunity_id, job_id: row.job_id, action: status, role: derivedRole, version: applied.version,
+      application_type: applicationType, application_url: url,
+      verification: verification ? { result: verification.result, reason_code: verification.reason_code, valid_until: verification.valid_until ?? null } : null,
+      reason: publisher ? null
+        : !url ? 'sin URL del anuncio: no se publica una tarjeta sin destino'
+        : applicationType === 'unknown' ? 'modalidad de candidatura indeterminada'
+        : verification?.status_reason ?? 'sin verificación' });
+  }
   return Response.json({
-    id: row.id, job_id: row.job_id, current_version_id: newId,
-    version: (maxVersion?.v ?? 0) + 1, editorial_status, opportunity_status: row.opportunity_status,
-    connection_type: row.connection_type, locale: finalLocale, updated_at: created,
-    vigencia_activa: vigenciaActiva, cta_auto_enabled: vigenciaActiva && Boolean(payload.application_url),
+    dry_run: dryRun, verify, market, role, source, considered: rows.results.length,
+    // `truncated` cubre las dos cotas: el barrido y las escrituras. `deferred` dice
+    // cuántas se quedaron fuera del presupuesto para la siguiente pasada.
+    scan: { limit: SCAN_LIMIT, write_budget: dryRun ? null : writeBudget, truncated: rows.results.length >= SCAN_LIMIT || counters.deferred > 0 },
+    counts: counters, items,
   }, { headers: corsHeaders(request) });
 }
 
@@ -965,18 +1201,29 @@ const isoWhen = v => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 };
 
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
-function plain(value) {
-  let text = String(value ?? '');
-  text = text.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
-  text = text.replace(/<\/?(p|div|li|br|h[1-6])\b[^>]*>/gi, '\n');
-  text = text.replace(/<[^>]+>/g, '');
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ', apos: "'", ndash: '–', mdash: '—', hellip: '…', raquo: '»', laquo: '«', middot: '·' };
+function decodeEntities(text) {
   return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, entity) => {
     if (ENTITIES[entity]) return ENTITIES[entity];
     if (entity.startsWith('#x')) return String.fromCodePoint(parseInt(entity.slice(2), 16));
     if (entity.startsWith('#')) return String.fromCodePoint(parseInt(entity.slice(1), 10));
     return m;
-  }).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, 20000);
+  });
+}
+// HTML doblemente escapado (Teamtailor RSS entrega `&lt;p&gt;`): si se decodifican las
+// entidades DESPUÉS de quitar etiquetas, el cuerpo vuelve a tener `<strong>` y la tarjeta
+// lo enseña como si fuera salario. Por eso: decodificar → quitar etiquetas → decodificar
+// otra vez → quitar solo etiquetas con forma real (no cualquier `<...>` del texto).
+function stripTags(text) {
+  return text.replace(/<\/?(?:a|b|strong|em|i|u|s|span|p|div|br|li|ul|ol|h[1-6]|small|big|mark|blockquote|table|tbody|thead|tr|td|th|img|iframe|figure|figcaption|section|article|header|footer|font|sub|sup|hr|dl|dt|dd)\b[^>]*>/gi, (tag) => /^<\/?(?:p|div|li|br|h[1-6]|ul|ol|tr|blockquote)\b/i.test(tag) ? '\n' : '');
+}
+function plain(value) {
+  let text = String(value ?? '');
+  text = text.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+  text = stripTags(decodeEntities(text));
+  text = stripTags(decodeEntities(text));
+  return text.replace(/\u200b/g, '').replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n').trim().slice(0, 20000);
 }
 
 // La descripción vive en el raw de la fuente (ya almacenado en qué apuntaba p.raw);
@@ -996,6 +1243,32 @@ function excerpt(details, pattern, fallback) {
   return fallback;
 }
 
+// Una línea que menciona 'salario' o 'comisiones' NO es una cifra: sin importe
+// verificable (€, EUR, USD, /mes, /hora, brutos, fijo, base) la oferta dice
+// 'Importe no publicado'. Antes se publicaba como compensación cualquier párrafo
+// que mencionara 'comisión' y contuviera un dígito (p. ej. '…desde 0').
+const PAY_AMOUNT = /(?:\d[\d.,]*\s*(?:€|eur\b|euros?\b|k\b|mil\b|\$|usd\b|brutos?\b|netos?\b|líquidos?\b))|(?:(?:€|\$)\s*\d)|(?:\d[\d.,]*\s*(?:al mes|\/\s*mes|mensual(?:es)?|por mes|hora|\/\s*h(?:ora)?\b|a la semana|semanales?|anual(?:es)?|al año))/i;
+const PAY_CONTEXT = /\b(?:salario|sueldo|compensacion|remuneracion|pago|retribucion|comisiones?|fijo|base|ote|variable)\b/;
+function payFromDescription(details) {
+  for (const line of details.split(/\n+|(?<=[.!?])\s+/)) {
+    if (!COMP_WORDS.test(fold(line))) continue;
+    const evidence = payEvidence(line);
+    if (evidence) return evidence;
+  }
+  return null;
+}
+function payEvidence(line) {
+  if (!line) return null;
+  const folded = fold(line);
+  if (!PAY_CONTEXT.test(folded) || !PAY_AMOUNT.test(line)) return null;
+  const clean = line.replace(/\s+/g, ' ').replace(/^[-–·•\s]+/, '').trim();
+  // Corte en palabra completa: 'Y en nuestra vertical de <strong>Inversor Pro…' ya no
+  // puede acabar en mitad de una etiqueta ni de una palabra.
+  if (clean.length <= 180) return clean;
+  const cut = clean.slice(0, 180);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), 120)).trim()}…`;
+}
+
 const COMP_WORDS = /\b(?:salario|sueldo|compensacion|remuneracion|pago|comisiones|salary|compensation|pay rate)\b/;
 const VARIABLE_WORDS = /\b(?:comision|commission|ote|promedio|potencial|hasta)\b/;
 
@@ -1006,6 +1279,19 @@ const VARIABLE_WORDS = /\b(?:comision|commission|ote|promedio|potencial|hasta)\b
 const LANG_ES = /\b(?:buscamos|ofrecemos|equipo|ventas|puesto|funciones|formacion|trabajar|nuestro|nuestra|tienes|seras|salario|horario|comisiones|necesitamos|incorporacion|llamadas|remuneracion|contratamos|tareas|experiencia|clientes?|telefono|sms|mail|lider|liderar|exito|crecimiento|capacitacion|entrenamiento|campana|incentivos|candidat[oa]s?|requisitos?|responsabilidades|interesad[oa]s|postul[ae]tes?|carrera|lunes|viernes|sabado|disciplina|proactiv[oa]|objetivos?|empresas?|persona|oferta|semana|mensual|seguimiento|proceso|convocatoria|entrevista)\b/g;
 const LANG_EN_REQ = /\b(?:bilingual|bilingue|fluent|fluency|required|must|proficient|speaking|spoken|communication|requiere|requerido|dominio|nativo|hablantes|idioma|atencion|clientes)\b/;
 const LANG_EN = /\b(?:english|ingles)\b/;
+
+// Gate de cuerpo en español: UNA sola regla para la superficie de alumna y para la
+// activación del operador (sin copias que diverjan). Portugués ≠ español: los lexemas
+// legales compuestos se confunden al plegar ('vendas', 'comissoes', 'voce'); un anuncio
+// portugués nunca es oferta en español, ni siquiera con el opt-in bilingüe.
+const PORTUGUESE_TEXT = /\b(?:vendas|voce|comissoes|portugues|brasil)\b/;
+function spanishBodyGate(description, includeBilingual = false) {
+  const hayES = fold(description);
+  const portuguese = PORTUGUESE_TEXT.test(hayES);
+  const langES = (hayES.match(LANG_ES) || []).length >= 3;
+  const enRequired = Boolean(hayES.match(LANG_EN)) && Boolean(hayES.match(LANG_EN_REQ));
+  return { ok: !portuguese && (includeBilingual || (langES && !enRequired)), portuguese, langES, enRequired };
+}
 
 function spainSignal(p) { return ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase().includes(k)); }
 function nonSpain(p) { return NON_ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''}`.toLowerCase().includes(k)); }
@@ -1051,6 +1337,10 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
 
   const items = [];
   const evidence = new Set();
+  // El mismo anuncio se publica por ciudad con URL distinta (Velian: Madrid, Sevilla y
+  // Málaga con el mismo título). El dedupe por URL no los ve iguales; empresa+título
+  // normalizados sí, y eso evita tres tarjetas idénticas en la vista de la alumna.
+  const roleKeys = new Set();
   const quality = {};
   for (const row of rows.results) {
     if (starredOnly && !row.starred) continue;
@@ -1063,6 +1353,12 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     const derivedRole = classifyRole(p, fold(text));
     if (!derivedRole) continue; // sin clasificación determinista no pasa como superficie alumna
     if (role && derivedRole !== role) continue;
+    // AE/SDR son trabajo comercial real, pero no protagonizan la vista: se ocultan de la
+    // lista general salvo opt-in explícito (include_extra_roles, o elegir el perfil en el
+    // desplegable), la MISMA regla que el núcleo local (opportunities.py). El flag estaba
+    // en el contrato y se ignoraba: con el catálogo cloud sin AE publicados no se notaba,
+    // y la primera activación de 109 AE los habría servido en la vista por defecto.
+    if (EXTRA_ROLES.has(derivedRole) && !includeExtraRoles && role !== derivedRole) continue;
     if (market === 'ES') {
       if (nonSpain(p) || !spainSignal(p)) continue;
     } else if (market !== 'any') {
@@ -1072,16 +1368,24 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     }
     // El regex de lexemas va sin acentos: se evalúa sobre el texto plegado (fold),
     // nunca sobre el original — 'formación' sin plegar no matchea 'formacion'.
-    const hayES = fold(description);
-    // Portugués ≠ español: los lexémas legales compuestos se confunden al plegar
-    // ('vendas' tiene forma ES distinta, 'comissões'→'comissoes', 'você'→'voce').
-    // Un anuncio portugués nunca es oferta en español, ni siquiera opt-in bilingüe.
-    if (/\b(?:vendas|voce|comissoes|portugues|brasil)\b/.test(hayES)) continue;
-    const langES = (hayES.match(LANG_ES) || []).length >= 3;
-    const enRequired = Boolean(hayES.match(LANG_EN)) && Boolean(hayES.match(LANG_EN_REQ));
-    if (!includeBilingual && (!langES || enRequired)) continue;
-    if (p.url && evidence.has(p.url)) continue;
-    evidence.add(p.url);
+    const language = spanishBodyGate(description, includeBilingual);
+    if (!language.ok) continue;
+    const langES = language.langES;
+    // Solo se deduplica lo que TIENE URL: añadir `undefined` al set colapsaba
+    // todas las ofertas sin enlace en la primera que se veía.
+    if (p.url) {
+      if (evidence.has(p.url)) continue;
+      evidence.add(p.url);
+    }
+    // La dedupe por empresa+título exige AMBOS: con uno vacío, un `|` común
+    // colapsaría ofertas distintas que solo comparten empresa o título.
+    const companyKey = fold(p.company ?? '').trim();
+    const titleKey = fold(p.title ?? '').trim();
+    if (companyKey && titleKey) {
+      const roleKey = `${companyKey}|${titleKey}`;
+      if (roleKeys.has(roleKey)) continue;
+      roleKeys.add(roleKey);
+    }
     const titleHit = ROLE_KEYWORDS[derivedRole].some(k => fold(p.title ?? '').includes(k));
     // Compensación: salario estructurado; si no, la cita literal del anuncio; nunca se inventa.
     let pay = 'Importe no publicado';
@@ -1103,8 +1407,8 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
         note = VARIABLE_WORDS.test(fold(pay)) ? 'La parte variable no es un ingreso garantizado.' : 'Importe anunciado; confirma periodicidad y condiciones.';
       }
     } else {
-      const evidenceLine = excerpt(description, COMP_WORDS, '');
-      if (evidenceLine && /\d|base|fijo|comision/.test(fold(evidenceLine))) pay = evidenceLine;
+      const evidenceLine = payFromDescription(description);
+      if (evidenceLine) pay = evidenceLine;
     }
     const workText = fold(`${p.title ?? ''} ${p.location ?? ''} ${description.slice(0, 4000)}`);
     const modality = /\b(hybrid|hibrid[oa]|semi[ -]?presencial)\b/.test(workText) ? 'Híbrido'
@@ -1137,7 +1441,7 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     });
     quality[row.job_id] = {
       es: spainSignal(p) ? 0 : 1,
-      score: (titleHit ? 50 : 25) + (ages !== null && ages <= 3 ? 20 : 10) + (!pay.startsWith('Importe no publicado') ? 1 : 0),
+      score: (titleHit ? 50 : 25) + (ages !== null && ages <= 3 ? 20 : 10) + (pay !== 'Importe no publicado' ? 1 : 0),
       published_ts: ages !== null ? Date.now() - ages * 86400000 : 0,
       role: derivedRole,
     };
@@ -1178,7 +1482,9 @@ async function handleStudentSearch(request, env) {
   const days = Number.isInteger(body?.days) && body.days >= 1 && body.days <= 10 ? body.days : 10;
   const includeBilingual = body?.include_bilingual === true;
   const starredOnly = body?.starred_only === true;
-  const includeExtraRoles = body?.include_extra_roles !== false;
+  // El default del contrato es false (OpportunityQuery.include_extra_roles): sin la
+  // clave, el comportamiento es el de la alumna, no el del operador.
+  const includeExtraRoles = body?.include_extra_roles === true;
   const { ranked, total, selectionTotal } = await studentSurface(env, { role, market, days, includeBilingual, starredOnly, includeExtraRoles });
   return Response.json({ items: ranked, total, selection_total: selectionTotal }, { headers: corsHeaders(request) });
 }
@@ -1296,6 +1602,9 @@ export default {
       // válida 401. Los gastos (Apify/AI/SerpApi) NO viven aquí.
       const adminCheck = requireAdmin(request, env);
       if (adminCheck) return adminCheck;
+      // Port fase 5 (sesión 38): POST /activate = activación en lote del pool elegible
+      // (dry_run por defecto). Va ANTES de las rutas por id: 'activate' no es un id.
+      if (request.method === 'POST' && adminMatch[1] === 'activate' && !adminMatch[2]) return handleAdminActivate(request, env);
       // Port fase 3 (sesión 32): POST {id}/verify = verificación de vigencia.
       if (request.method === 'POST' && adminMatch[1] && adminMatch[2] === '/verify') return handleAdminVerify(request, env, adminMatch[1]);
       if (request.method === 'PATCH' && adminMatch[1]) return handleAdminReview(request, env, adminMatch[1]);
