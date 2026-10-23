@@ -38,8 +38,11 @@ export default function IntegrationSettings({ onChanged }: { onChanged: () => Pr
         const result = await request<AIConfig>(`integrations/${provider}`, body);
         if (provider === 'apify') { setApify(result.has_token); setApifyKey(''); } else if (provider === 'serpapi') { setSerpapi((result as { has_token: boolean }).has_token); setSerpapiKey(''); } else { setAI(result); setAIKey(''); setDirty(false); }
         request<ClassificationConfig>('ai/classification').then(setClassification).catch(() => {});
-        await onChanged();
+        // El guardado ya ha ido bien: el aviso no puede esperar al refresco del panel
+        // (que consulta varios endpoints y, si uno tarda, dejaba el botón bloqueado y
+        // el mensaje sin aparecer). El refresco sigue, pero no oculta el resultado.
         setMessage(mode === 'remove' ? 'Clave eliminada.' : 'Conexión guardada. Puedes comprobarla sin lanzar una extracción ni generar texto.');
+        void onChanged().catch(() => {});
       }
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }

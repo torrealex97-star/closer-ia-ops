@@ -34,8 +34,14 @@ export default function SourceAssistant({ source, sources, onClose, onConnected,
   async function connect() {
     if (!plan) return;
     setBusy(true); setError('');
-    try { await request('source-assistant/connect', { plan_id: plan.id }); await onConnected(); onClose(); }
-    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try {
+      await request('source-assistant/connect', { plan_id: plan.id });
+      // La fuente ya está guardada: se cierra al instante y el refresco va detrás.
+      // Antes se esperaba al refresco con el botón en «Guardando…», lo que dejaba
+      // abierto el asistente (y permitía un segundo guardado) si el panel tardaba.
+      onClose();
+      void onConnected().catch(() => {});
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   return <section className="connection-form" aria-label="Asistente de fuente">
     <div className="panel-title"><h2><Sparkles size={18} /> Añadir una fuente, paso a paso</h2><button disabled={busy} aria-label="Cerrar asistente" onClick={onClose}><X size={16} /></button></div>
