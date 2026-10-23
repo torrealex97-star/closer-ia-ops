@@ -1,7 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Bookmark, BriefcaseBusiness, ChevronRight, Compass, Globe2, HeartHandshake, LoaderCircle, Search, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ArrowUpRight, Bookmark, BriefcaseBusiness, ChevronRight, Compass, Globe2, HeartHandshake, LoaderCircle, MessageSquare, Search, X } from 'lucide-react';
+import OpportunityRadar from './OpportunityRadar';
+import StudentPractice from './StudentPractice';
+import { hasPay } from './offerFacts';
+import { parsePhrase } from './queryFromPhrase';
 import { request } from './client';
 import type { components } from '../../../packages/contracts/api';
 
@@ -43,6 +47,17 @@ function urlFromQuery(query: Query): string {
 
 const date = (value: string | null) => value ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(value)) : 'Fecha no indicada';
 const rank = (offer: Offer) => offer.is_selected && offer.excellence_rank && offer.excellence_rank <= 3 ? String(offer.excellence_rank) : '';
+// El titular de la tarjeta es el PUESTO que anuncia la empresa, no la familia de rol:
+// 'Teleoperador comercial (H/M/X)' dice qué buscan; 'Setter' solo dice cómo lo clasificamos.
+const jobTitle = (offer: Offer) => (offer.original_title ?? '').trim() || 'Puesto no especificado en el anuncio';
+const initials = (company: string) => company.slice(0, 2).toUpperCase();
+function PayBlock({ offer }: { offer: Offer }) {
+  return <div className={`opportunity-pay ${hasPay(offer) ? '' : 'is-unpublished'}`}>
+    <span>{hasPay(offer) ? 'COMPENSACIÓN PUBLICADA' : 'COMPENSACIÓN'}</span>
+    <p className="pay-value">{hasPay(offer) ? offer.compensation : 'La empresa no publica importe'}</p>
+    <p>{offer.compensation_note}</p>
+  </div>;
+}
 
 // WDC student: compare companies and conditions, then choose her next step.
 // Existing paper/terracotta tokens, quiet borders, 24px cards; pay is the focal fact.
@@ -53,10 +68,13 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
   const [wider, setWider] = useState<Offer[] | null>(null); // hueco ampliado cuando el filtro estrecho devuelve <10
   const [selectionTotal, setSelectionTotal] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [practice, setPractice] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<Offer | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [phrase, setPhrase] = useState('');
+  const [phraseNote, setPhraseNote] = useState('');
   // Modo hospedado: guardar es un marcador de ESTE navegador (fix audit run-1
   // finding 2 — sin credencial individual todavía, la vista alumna no muta el
   // catálogo compartido del operador). El motor admin mantiene su marcador propio.
@@ -107,6 +125,25 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
   useEffect(() => {
     if (detail && dialog.current && !dialog.current.open) dialog.current.showModal();
   }, [detail]);
+  // Una sola puerta de aplicación: formulario, frase y radar escriben el mismo estado real.
+  function applyQuery(next: Query) {
+    setQuery(next); setApplied(next);
+    history.replaceState(null, '', urlFromQuery(next));
+  }
+  // Traducción determinista de la frase a filtros del catálogo: si no entiende, lo dice.
+  function applyPhrase(event: FormEvent) {
+    event.preventDefault();
+    const result = parsePhrase(phrase, query);
+    if (result.saved) { setPhrase(''); setPhraseNote('He abierto tus guardadas.'); setSaved(true); return; }
+    if (!result.matched.length) {
+      setPhraseNote(result.unsupported.length
+        ? `No puedo filtrar por ${result.unsupported.join(' ni por ')}.`
+        : 'No he reconocido ningún filtro. Prueba: «closer en España», «setter esta semana», «SDR en LATAM», «bilingüe», «guardadas».');
+      return;
+    }
+    applyQuery(result.query);
+    setPhraseNote(`He aplicado ${result.matched.join(' · ')}.` + (result.unsupported.length ? ` No filtro por ${result.unsupported.join(' ni por ')}.` : ''));
+  }
   const isStarred = (offer: Offer) => hosted ? localSaves.includes(offer.id) : offer.starred;
   async function star(offer: Offer) {
     setSaving(offer.id); setError('');
@@ -133,24 +170,34 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
     <aside className="sidebar">
       <a className="brand" href="/" aria-label="WDC · Inicio"><span className="brand-mark">w.</span><span>Women Digital<br /><strong>Closer</strong></span></a>
       <div className="workspace-label">TU SIGUIENTE PASO</div>
-      <nav aria-label="Navegación principal"><button className={`nav ${!saved ? 'active' : ''}`} onClick={() => setSaved(false)}><Compass size={18} />Oportunidades</button><button className={`nav ${saved ? 'active' : ''}`} onClick={() => setSaved(true)}><Bookmark size={18} />Guardadas</button></nav>
+      <nav aria-label="Navegación principal"><button className={`nav ${!saved && !practice ? 'active' : ''}`} onClick={() => { setSaved(false); setPractice(false); }}><Compass size={18} />Oportunidades</button><button className={`nav ${saved && !practice ? 'active' : ''}`} onClick={() => { setSaved(true); setPractice(false); }}><Bookmark size={18} />Guardadas</button><button className={`nav ${practice ? 'active' : ''}`} onClick={() => { setPractice(true); setSaved(false); }}><MessageSquare size={18} />Sala de práctica</button></nav>
       <div className="sidebar-note"><span className="eyebrow">TU TALENTO.<br />TU PRÓXIMA EMPRESA.</span><p>Has trabajado para llegar hasta aquí. Ahora elige dónde quieres dar tu siguiente paso.</p></div>
       <div className="local-user"><HeartHandshake size={22} /><div><strong>Comunidad WDC</strong><small>Te acompañamos en el camino</small></div></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div>Women Digital Closer <ChevronRight size={14} /><strong>{saved ? 'Tus guardadas' : 'Oportunidades'}</strong></div><span className="student-tag">De la formación a tu próximo trabajo</span></header>
+      <header className="topbar"><div>Women Digital Closer <ChevronRight size={14} /><strong>{saved ? 'Tus guardadas' : practice ? 'Sala de práctica' : 'Oportunidades'}</strong></div><span className="student-tag">De la formación a tu próximo trabajo</span></header>
       <main>
+        {practice ? <StudentPractice /> : <>
         <div className="page-heading"><div><span className="eyebrow">EMPRESAS QUE BUSCAN TALENTO COMERCIAL</span><h1>{saved ? 'Las que te interesan.' : 'Elige tu próxima oportunidad.'}</h1><p>{saved ? 'Vuelve a comparar sus condiciones y decide tu siguiente paso.' : 'WDC reúne oportunidades en español para que encuentres dónde quieres crecer.'}</p></div><span className="heading-icon"><Compass size={30} strokeWidth={1.2} /></span></div>
-        {!saved &&        <form className="search-panel student-search" onSubmit={e => { e.preventDefault(); setApplied({ ...query }); history.replaceState(null, '', urlFromQuery(query)); }}>
+        {!saved && <div className="search-panel student-search">
+          <form className="phrase-search" onSubmit={applyPhrase}>
+            <label htmlFor="student-phrase">Pídelo en una frase<input id="student-phrase" value={phrase} onChange={e => { setPhrase(e.target.value); setPhraseNote(''); }} placeholder="closer en España de esta semana" autoComplete="off" /></label>
+            <button type="submit" className="primary">Buscar</button>
+          </form>
+          {phraseNote && <p className="phrase-note" role="status">{phraseNote}</p>}
+          <form onSubmit={e => { e.preventDefault(); setApplied({ ...query }); history.replaceState(null, '', urlFromQuery(query)); setPhraseNote(''); }}>
           <div className="search-grid"><label>Perfil profesional<select value={query.role || ''} onChange={e => setQuery({ ...query, role: (e.target.value || null) as Query['role'] })}><option value="">Todos los perfiles</option><option value="closer">Closer</option><option value="setter">Setter</option><option value="cold_caller">Cold Caller</option><option value="account_executive">Ejecutivo comercial</option><option value="sdr">SDR / BDR</option></select></label><label>Desde dónde quieres trabajar<select value={query.market} onChange={e => setQuery({ ...query, market: e.target.value as Query['market'] })}><option value="any">Todos los mercados</option><option value="ES">España</option><option value="EU">Europa</option><option value="LATAM">Latinoamérica</option><option value="US">Estados Unidos</option></select></label><label>Publicación<select value={query.days} onChange={e => setQuery({ ...query, days: Number(e.target.value) })}><option value={1}>Últimas 24 horas</option><option value={3}>Últimos 3 días</option><option value={7}>Últimos 7 días</option><option value={10}>Últimos 10 días</option></select></label><button className="primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}Ver oportunidades</button></div>
           <div className="student-preferences"><span>En español · remoto o híbrido</span><label className="check-label"><input type="checkbox" checked={query.include_bilingual} onChange={e => setQuery({ ...query, include_bilingual: e.target.checked })} />También oportunidades bilingües español / inglés</label></div>
-        </form>}
+          </form>
+        </div>}
         {error && <p className="alert error" role="alert">{error}</p>}
+        {!saved && <OpportunityRadar offers={[...visible, ...(wider ?? [])]} busy={busy} role={applied.role ?? null} onRole={next => applyQuery({ ...applied, role: next })} />}
         <section className="student-results" aria-busy={busy}><div className="results-heading"><h2>{saved ? 'Tus oportunidades guardadas' : 'Oportunidades para explorar'} <span>{busy ? '…' : visible.length + (wider?.length ?? 0)}</span></h2><span className="student-freshness">Actualización diaria</span></div>
           {!saved && !busy && selectionTotal > 0 && <p className="selection-note">Selección del día: las {selectionTotal} que mejor cumplen los requisitos van primero. Puedes explorar el resto del catálogo debajo.</p>}
-          {busy ? <div className="empty"><LoaderCircle className="spin" size={24} /><p>Buscando oportunidades…</p></div> : !visible.length ? <div className="empty"><Compass size={32} strokeWidth={1.3} /><h3>{saved ? 'Guarda las que te hagan dar el siguiente paso.' : 'Aún no hay oportunidades con estos criterios.'}</h3><p>{saved ? 'Pulsa el marcador de una oferta para volver a verla aquí.' : 'Puedes elegir otro perfil o mercado. Seguimos buscando nuevas oportunidades en español.'}</p></div> :          <div className="opportunity-grid">{visible.map(offer => <article className="opportunity-card" key={offer.id}>
-            <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
-            <div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{offer.compensation}</h3><p>{offer.compensation_note}</p></div>
+          {busy ? <div className="opportunity-grid" aria-hidden="true"><div className="opportunity-card is-skeleton"><span className="shimmer-line wide" /><span className="shimmer-line" /><span className="shimmer-line" /><span className="shimmer-line short" /></div><div className="opportunity-card is-skeleton is-late"><span className="shimmer-line wide" /><span className="shimmer-line" /><span className="shimmer-line" /><span className="shimmer-line short" /></div></div> : !visible.length ? <div className="empty"><Compass size={32} strokeWidth={1.3} /><h3>{saved ? 'Guarda las que te hagan dar el siguiente paso.' : 'Aún no hay oportunidades con estos criterios.'}</h3><p>{saved ? 'Pulsa el marcador de una oferta para volver a verla aquí.' : 'Puedes elegir otro perfil o mercado. Seguimos buscando nuevas oportunidades en español.'}</p></div> :          <div className="opportunity-grid">{visible.map((offer, index) => <article className="opportunity-card" key={offer.id} style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}>
+            <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{initials(offer.company)}</div><div><p>{offer.company}</p><span className="role-chip">{offer.role_label}</span>{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${jobTitle(offer)} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
+            <h3 className="opportunity-title">{jobTitle(offer)}</h3>
+            <PayBlock offer={offer} />
             <dl className="opportunity-facts"><div><dt>Modalidad y ubicación</dt><dd><Globe2 size={14} />{offer.modality} · {offer.location}</dd></div><div><dt>Idioma</dt><dd>{offer.language}</dd></div><div><dt>Jornada</dt><dd>{offer.schedule}</dd></div><div><dt>Experiencia</dt><dd>{offer.experience}</dd></div><div><dt>Contrato</dt><dd>{offer.contract}</dd></div></dl>
             <div className="opportunity-footer"><div><small>Publicada: {date(offer.published_at)}</small><a href={offer.source_url} target="_blank" rel="noopener noreferrer">Publicado en {offer.source_name}</a></div><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
           </article>)}</div>}
@@ -158,15 +205,18 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
             <h3>{items.length} con tu filtro · {wider.length} más del catálogo {applied.market !== 'any' ? 'con tu mercado' : 'comercial en español'}</h3>
             <p>Con tu filtro de perfil no aparecían suficientes {applied.role ? `ofertas de ${label(applied.role)}` : 'ofertas en tu mercado'}; estas vienen del mismo catálogo real con el filtro ampliado.</p>
             <div className="opportunity-grid">{wider.map(offer => <article className="opportunity-card" key={offer.id}>
-              <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{offer.company.slice(0, 2).toUpperCase()}</div><div><p>{offer.company}</p><span>{offer.role_label}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${offer.role_label} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
-              <div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{offer.compensation}</h3><p>{offer.compensation_note}</p></div>
+              <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{initials(offer.company)}</div><div><p>{offer.company}</p><span className="role-chip">{offer.role_label}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${jobTitle(offer)} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
+              <h3 className="opportunity-title is-compact">{jobTitle(offer)}</h3>
+              <p className="opportunity-place"><Globe2 size={13} />{offer.modality} · {offer.location} · {offer.language}</p>
+              <PayBlock offer={offer} />
               <div className="opportunity-footer"><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
             </article>)}</div>
           </div> : null}
         </section>
         <p className="footnote"><BriefcaseBusiness size={14} />Tú eliges dónde avanzar. Revisa las condiciones y presenta tu candidatura en el proceso de la empresa.</p>
+        </>}
       </main>
     </div>
-    <dialog ref={dialog} onClose={() => setDetail(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }}>{detail && <div className="detail"><div className="detail-top"><span className="eyebrow">TU SIGUIENTE PASO</span><button className="icon-button" aria-label="Cerrar oportunidad" onClick={() => dialog.current?.close()}><X size={20} /></button></div><p className="job-company">{detail.company}</p><h2>{detail.role_label}</h2><p>{detail.original_title}</p><div className="opportunity-pay"><span>COMPENSACIÓN PUBLICADA</span><h3>{detail.compensation}</h3><p>{detail.compensation_note}</p></div><p>{detail.modality} · {detail.location} · {detail.language}</p><h3>Lo que cuenta la empresa</h3><div className="description">{detail.description}</div><div className="provenance"><span>Publicada: {date(detail.published_at)}</span><span>Publicación de {detail.source_name}. Confirma que el proceso siga abierto antes de enviar tu candidatura.</span></div><div className="detail-actions"><a className="primary" href={detail.source_url} target="_blank" rel="noopener noreferrer">Ver proceso de candidatura<ArrowUpRight size={16} /></a><button disabled={saving === detail.id} onClick={() => void star(detail)}><Bookmark size={16} />{isStarred(detail) ? 'Quitar de guardadas' : 'Guardar oportunidad'}</button></div><p className="inline-hint">Continuarás en la publicación original. Abrir el enlace no envía tu candidatura.</p></div>}</dialog>
+    <dialog ref={dialog} onClose={() => setDetail(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }}>{detail && <div className="detail"><div className="detail-top"><span className="eyebrow">TU SIGUIENTE PASO</span><button className="icon-button" aria-label="Cerrar oportunidad" onClick={() => dialog.current?.close()}><X size={20} /></button></div><p className="job-company">{detail.company}</p><h2>{jobTitle(detail)}</h2><p className="role-chip detail-role">{detail.role_label}</p><PayBlock offer={detail} /><p>{detail.modality} · {detail.location} · {detail.language}</p><h3>Lo que cuenta la empresa</h3><div className="description">{detail.description}</div><div className="provenance"><span>Publicada: {date(detail.published_at)}</span><span>Publicación de {detail.source_name}. Confirma que el proceso siga abierto antes de enviar tu candidatura.</span></div><div className="detail-actions"><a className="primary" href={detail.source_url} target="_blank" rel="noopener noreferrer">Ver proceso de candidatura<ArrowUpRight size={16} /></a><button disabled={saving === detail.id} onClick={() => void star(detail)}><Bookmark size={16} />{isStarred(detail) ? 'Quitar de guardadas' : 'Guardar oportunidad'}</button></div><p className="inline-hint">Continuarás en la publicación original. Abrir el enlace no envía tu candidatura.</p></div>}</dialog>
   </div>;
 }
