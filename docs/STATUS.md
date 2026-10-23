@@ -2,6 +2,18 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Resto del pool AE activado en producción (sesión 69) — 2026-10-23
+
+- **Petición del operador**: activar los 24 AE publicables restantes en lotes de 10 y reportar publicadas, `needs_review` y diferidas.
+- **Medición antes de escribir** (`dry_run`, sin escrituras): barrido `role=account_executive, market=ES` con la ventana de 400 → **24 ids publicables**; por URL son **20 anuncios distintos**, porque el mismo anuncio entra por dos feeds de JobToday (`jobtoday-vendedor`/`jobtoday-agente-comercial`): 4 ids (`opp-xd7rlp`, `opp-xgj1q7`, `opp-xqi74r`, `opp-x0nuh3`) son copia de otro del lote.
+- **Primer intento de ejecución rechazado sin escribir nada**: el cuerpo no llevaba `role`, y el gate de perfiles extra skipeó los 20 ids (`0` publicadas, `0` `needs_review`, `0` diferidas). Es el comportamiento correcto del gate y no dejó estado parcial; se repitió con `role` explícito.
+- **Lotes ejecutados** (`dry_run: false, verify: true, role: account_executive, ids`; 10 ids por invocación, 1 fetch de verificación por oferta): lote 1 → **8 publicadas, 2 `needs_review`**; lote 2 → **9 publicadas, 1 `needs_review`**. Total **17 publicadas, 3 `needs_review`, 0 diferidas, 0 skipeadas** (`scan.write_budget 25`, `truncated false`). Los 4 duplicados por URL se dejaron como `draft` a propósito (publicarlos daría dos tarjetas del mismo anuncio que la vista luego colapsa).
+- **Las 3 `needs_review`** nacen con el CTA apagado y el motivo escrito: `opp-0aeebaq` (vino, JobToday) y `opp-tslz7m` (ecommerce, JobToday) por `redirect_without_verification`; `opp-0cg19t8` (InfoJobs, Tipster Manager) por `content_not_corroborated` (200 sin título ni empresa en el cuerpo).
+- **Verificación contra el engine real** (HTTP): detalle de los 20 → **20/20 coherentes**; las 17 publicadas con `version 2`, `next_step.enabled true`, vigencia activa (`valid_until` 2026-10-25) y `status_reason` de verificación `open/content_matches`; las 3 `needs_review` con `enabled false` y su motivo. Los 4 duplicados siguen `draft`. Contadores: `published` **138 → 155**, `draft` 2.660 → 2.640, `needs_review` 10 → 13.
+- **Superficie de alumna**: la vista por defecto sigue en **7 tarjetas** (el perfil extra no la protagoniza, como manda el contrato); con `include_extra_roles` **59** (49 antes del lote), de las que **11 de las 17 nuevas se ven** y **6 colapsan por URL idéntica** con tarjetas ya publicadas en el lote 1 (verificado id a id: `job-p3ok2w`, `job-ql1kw4`, `job-trd9er`, `job-0nvikrl`, `job-0igjb1k`, `job-k7a4a6`). Ninguna `needs_review` se expone (**0**).
+- **Pool tras el lote**: un `dry_run` nuevo devuelve **7 publicables, todos duplicados** de anuncios ya servidos (los 4 anteriores más 3 feeds de JobToday con la misma URL), es decir **no queda ningún anuncio AE distinto** en la ventana de 400; la siguiente pasada exige recolección nueva, no otra activación.
+- **Límites honestos**: (1) la vigencia TTL de agregador caduca en 48 h: las 17 volverán a pedir verificación el **25/10**; (2) el catálogo sigue con **2.640 drafts** (150 sin clasificación determinista, etc.); (3) el panel no tiene botón de lote: se opera por HTTP con el token server-side; (4) el efecto visible para la alumna es de **11 tarjetas nuevas** al elegir el perfil comercial, no en la vista por defecto.
+
 ## Activación real del primer lote en producción (sesión 68) — 2026-10-23
 
 - **Petición del operador**: ejecutar la activación real del primer lote de ofertas verificadas y reportar publicadas, `needs_review` y diferidas.
