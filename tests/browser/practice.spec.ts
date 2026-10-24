@@ -25,7 +25,9 @@ const emptyCatalog = (route: import('@playwright/test').Route) => route.fulfill(
 
 test('la sala de práctica abre sin código, conversa y devuelve feedback con ejes y señales', async ({ page }) => {
   const calls: Record<string, unknown>[] = [];
+  const activity: Record<string, unknown>[] = [];
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
+  await page.route('**/api/student/activity', route => { activity.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: { ok: true } }); });
   await page.route('**/api/practice', route => {
     const body = route.request().postDataJSON();
     calls.push(body);
@@ -64,6 +66,9 @@ test('la sala de práctica abre sin código, conversa y devuelve feedback con ej
   await expect(page.getByText('Sin siguiente paso concreto')).toBeVisible();
   await expect(page.getByText(/Una forma posible con tus propias palabras/)).toBeVisible();
   expect(calls.filter(call => call.mode === 'debrief')).toHaveLength(1);
+  // La nota y la de cada eje alimentan «Mi progreso»; el texto de la conversación no se envía.
+  await expect.poll(() => activity.length).toBe(1);
+  expect(activity[0]).toEqual({ kind: 'practice', ref: 'venta-fria', score: 61, detail: { mode: 'texto', axes: { apertura: 78, descubrimiento: 64, objecion: 58, cierre: 42 } } });
   // La petición ya no lleva código de cohorte.
   expect(calls.every(call => !('code' in call))).toBe(true);
   await expect(page.locator('.practice-debrief > .practice-note')).toHaveText(/no es una nota oficial/i);
