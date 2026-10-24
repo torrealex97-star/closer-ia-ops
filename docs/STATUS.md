@@ -2,6 +2,16 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Municipios de España en el clasificador, con paridad en el motor (sesión 85) — 2026-10-24
+
+- **Petición del operador**: que el clasificador reconozca los municipios españoles que descartan closers reales, manteniendo la paridad con el motor.
+- **Causa**: `spainSignal` solo conocía diez ciudades (`madrid`, `barcelona`, `valencia`…). Cinco closers auténticos quedaban como «no España»: **Murcia**, **Salou**, **Alcobendas**, **Boiro** y **Carballedo** (más Crémenes y Uña en el mismo lote).
+- **Solución**: gazetteer del INE con **8.132 municipios**, 52 provincias y las comunidades (8.801 nombres plegados, ~115 KB), generado desde el listado que publica Code for Spain con [build-es-places.mjs](../scripts/build-es-places.mjs). Se compara por **segmento exacto de la ubicación** (`O Chazo, Boiro` → `boiro`; `Marzán, O Rosal` → `o rosal`, con la forma gallega invertida resuelta), **nunca por subcadena**: `Uña` se pliega a `una` y esa subcadena aparece en cualquier frase en español, así que los municipios solo miran la ubicación y los hints de siempre siguen igual.
+- **Dónde vive**: [esPlaces.ts](../apps/web/lib/esPlaces.ts) (fuera de `vocabulary.ts` para no meter 115 KB en el bundle del navegador) y la **misma lista copiada en [worker.js](../sites/engine/worker.js)**; [parity.mjs](../tests/admin-auth/parity.mjs) compara lista a lista y prueba los municipios que antes se perdían, que «una» en el título no basta y que Lisboa/Austin no son España.
+- **Resultado medido en producción (verified)**: tras desplegar y repetir la recogida (7 búsquedas, 0,175 USD; **47 recibidas, 44 aceptadas**), `external_offers` pasa a **57** filas con **51 closer/España** (antes 31) y solo **4 closer sin señal de España** (antes 17). Aprobadas las 20 nuevas; la búsqueda de alumna devuelve **32** (3 del motor + **29 externas**, antes 23) y la página pinta **32 tarjetas** con Boiro, Murcia y Alcobendas ya dentro.
+- **Verificado (tested)**: `parity.mjs` PASS (gazetteer, hints y roles idénticos al motor) · `typecheck` OK · `build` OK · suite **42/42** flujo, 6/6 formación, 12/12 Google Jobs, 10/10 superficie, 5/5 actividad, 6/6 voz y **10/11** interfaz: el paso «Progreso» volvió a fallar por una espera y pasa al repetir (inestable conocido, no de este cambio).
+- **Límites**: (1) el **worker del motor tiene el gazetteer en el repositorio pero no se ha desplegado**: sus 2.912 borradores y las próximas ingestas siguen clasificándose con el vocabulario viejo hasta que se publique esa versión; (2) un municipio español homónimo sin país (`Córdoba`, `Granada`, `León`, `Toledo`) cuenta como España si el anuncio no declara otro país — se prefiere perder precisión antes que descartar ofertas reales; (3) los municipios solo se leen en la ubicación: si el pueblo aparece solo en el título no hay señal; (4) siguen faltando InfoJobs/Adzuna/Jooble y Apify sigue devolviendo 0 ítems.
+
 ## Más closers con las fuentes ya conectadas (sesión 84) — 2026-10-24
 
 - **Petición del operador**: «tienes múltiples fuentes, tienes más que suficiente para sacar y cualificar las ofertas tú mismo».
