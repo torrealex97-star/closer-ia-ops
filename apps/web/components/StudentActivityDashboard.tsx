@@ -32,7 +32,7 @@ export default function StudentActivityDashboard({ students, summaries, days }: 
   return <div className="coordinator" data-testid="coordinator">
     <p className="card-meta">Resumen de los últimos {days} días de las {base} alumnas con acceso (las pausadas no cuentan). Son recuentos reales de su actividad en el portal, no una evaluación.</p>
     <div className="progress-grid">
-      <article className="progress-card"><h2>Activación</h2><p className="card-meta">Cuántas han llegado a cada paso.</p>
+      <article className="progress-card"><h2>{data.steps[2].count} de {base} han practicado</h2><p className="card-meta">Activación en los últimos {days} días: cuántas han llegado a cada paso.</p>
         <Bars rows={data.steps} label={`Embudo de activación: ${data.steps.map(step => `${step.label} ${step.count}`).join(', ')}.`} /></article>
       <article className="progress-card"><h2>Formación por módulo</h2><p className="card-meta">Alumnas que han repasado cada módulo (cualquier fecha dentro del periodo).</p>
         <Bars rows={data.modules.map(item => ({ id: item.ref, label: MODULE_LABELS[item.ref] ?? item.ref, count: item.count, pct: item.pct }))} label={`Alumnas por módulo repasado: ${data.modules.map(item => `${MODULE_LABELS[item.ref] ?? item.ref} ${item.count}`).join(', ')}.`} /></article>

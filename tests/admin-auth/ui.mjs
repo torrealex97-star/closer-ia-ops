@@ -201,6 +201,12 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await board.getByText('Ver como tabla').first().click(); assert.equal(await board.locator('details').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
   assert.match(await board.innerText(), /Hace falta que al menos 5 alumnas/, 'con una sola alumna no hay distribución de notas');
   if (process.env.SHOT3) await board.screenshot({ path: process.env.SHOT3 });
+  assert.match(await board.getByRole('heading', { level: 2 }).first().innerText(), /\d+ de \d+ han practicado/, 'el titular dice la conclusión');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'panel de coordinación sin scroll horizontal en móvil');
+  assert.ok(await board.locator('.funnel-row').first().isVisible());
+  if (process.env.SHOT4) await board.screenshot({ path: process.env.SHOT4 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/7/);
   await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL').waitFor();
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
