@@ -12,6 +12,7 @@ let hasKey = true;
 let paused = [];
 let recentRows = [];
 let mode = 'ok';            // ok | fail | error
+let runsDown = false;       // el histórico de entradas no se puede leer
 
 // Fichas orgánicas como las devuelve Google: título con el sufijo del portal y enlace al anuncio.
 const organic = (name, link) => ({
@@ -51,6 +52,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/rest/v1/external_ingest_runs') {
     if (req.method === 'POST') return send(201, {});
+    if (runsDown) return send(500, {});
     return send(200, recentRows);
   }
   return send(404, {});
@@ -79,7 +81,7 @@ assert.ok(computrabajo && occ && infojobs, 'los portales del SOP están definido
 
 const results = [];
 const step = async (name, fn) => {
-  searches = []; saved = []; hasKey = true; paused = []; recentRows = []; mode = 'ok';
+  searches = []; saved = []; hasKey = true; paused = []; recentRows = []; mode = 'ok'; runsDown = false;
   delete process.env.SERPAPI_FALLBACK_MAX_SEARCHES;
   delete process.env.DAILY_TARGET_OFFERS;
   try { await fn(); results.push(['PASS', name]); }
@@ -150,6 +152,15 @@ await step('si el día ya cumplió el objetivo no se gasta ni una búsqueda', as
   assert.equal(out.ok, true);
   assert.equal(out.searches, 0);
   assert.match(out.outcomes[0].skipped, /objetivo diario/);
+  assert.equal(searches.length, 0);
+});
+
+await step('sin poder leer el objetivo diario no se gasta y se declara', async () => {
+  runsDown = true;
+  const out = await collectFallback('test', { missing: ['adzuna'] });
+  assert.equal(out.truncated, true);
+  assert.equal(out.searches, 0);
+  assert.match(out.outcomes[0].error, /objetivo diario/);
   assert.equal(searches.length, 0);
 });
 

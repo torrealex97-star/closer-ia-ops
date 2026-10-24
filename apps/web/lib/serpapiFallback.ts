@@ -130,7 +130,8 @@ export async function collectFallback(via: string, deps: Deps = {}): Promise<Fal
   const before = deps.need === undefined ? await acceptedToday() : null;
   const need = deps.need === undefined ? (before === null ? null : targetPerDay() - before) : deps.need;
   out.need = need; out.accepted_before = before;
-  if (need === null) return { ...out, truncated: true };
+  // Sin saber cuántas ofertas lleva el día no se puede decidir si hace falta respaldo: no se gasta y se dice por qué.
+  if (need === null) return { ...out, truncated: true, outcomes: [{ source: 'serpapi', portal: '—', ok: false, searches: 0, cost_usd: 0, error: 'No se pudo leer el objetivo diario de ofertas: no se gasta en respaldo.' }] };
   if (need <= 0) return { ...out, ok: true, outcomes: [{ source: 'serpapi', portal: '—', ok: true, searches: 0, cost_usd: 0, skipped: `objetivo diario cumplido (${targetPerDay()})` }] };
 
   const secret = await getSecret('serpapi');
