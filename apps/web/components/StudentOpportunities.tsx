@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowUpRight, Bookmark, BriefcaseBusiness, ChevronRight, Compass, Globe2, GraduationCap, HeartHandshake, LoaderCircle, MessageSquare, Search, X } from 'lucide-react';
+import { ArrowUpRight, Bookmark, BriefcaseBusiness, ChevronRight, Compass, Globe2, GraduationCap, HeartHandshake, LoaderCircle, MessageSquare, Search, TrendingUp, X } from 'lucide-react';
 import OpportunityRadar from './OpportunityRadar';
 import StudentPractice from './StudentPractice';
+import StudentProgress from './StudentProgress';
 import StudentTraining from './StudentTraining';
 import { hasPay } from './offerFacts';
 import { parsePhrase } from './queryFromPhrase';
@@ -76,6 +77,7 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
   const [saved, setSaved] = useState(false);
   const [practice, setPractice] = useState(false);
   const [training, setTraining] = useState(false);
+  const [progress, setProgress] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [degraded, setDegraded] = useState(false);
@@ -182,14 +184,14 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
     <aside className="sidebar">
       <a className="brand" href="/" aria-label="WDC · Inicio"><span className="brand-mark">w.</span><span>Women Digital<br /><strong>Closer</strong></span></a>
       <div className="workspace-label">TU SIGUIENTE PASO</div>
-      <nav aria-label="Navegación principal"><button className={`nav ${!saved && !practice && !training ? 'active' : ''}`} onClick={() => { setSaved(false); setPractice(false); setTraining(false); }}><Compass size={18} />Oportunidades</button><button className={`nav ${saved && !practice && !training ? 'active' : ''}`} onClick={() => { setSaved(true); setPractice(false); setTraining(false); }}><Bookmark size={18} />Guardadas</button><button className={`nav ${practice ? 'active' : ''}`} onClick={() => { setPractice(true); setSaved(false); setTraining(false); }}><MessageSquare size={18} />Sala de práctica</button><button className={`nav ${training ? 'active' : ''}`} onClick={() => { setTraining(true); setSaved(false); setPractice(false); }}><GraduationCap size={18} />Formación</button></nav>
+      <nav aria-label="Navegación principal"><button className={`nav ${!saved && !practice && !training && !progress ? 'active' : ''}`} onClick={() => { setSaved(false); setPractice(false); setTraining(false); setProgress(false); }}><Compass size={18} />Oportunidades</button><button className={`nav ${saved && !practice && !training ? 'active' : ''}`} onClick={() => { setSaved(true); setPractice(false); setTraining(false); setProgress(false); }}><Bookmark size={18} />Guardadas</button><button className={`nav ${practice ? 'active' : ''}`} onClick={() => { setPractice(true); setSaved(false); setTraining(false); setProgress(false); }}><MessageSquare size={18} />Sala de práctica</button><button className={`nav ${training ? 'active' : ''}`} onClick={() => { setTraining(true); setSaved(false); setPractice(false); setProgress(false); }}><GraduationCap size={18} />Formación</button><button className={`nav ${progress ? 'active' : ''}`} onClick={() => { setProgress(true); setSaved(false); setPractice(false); setTraining(false); }}><TrendingUp size={18} />Mi progreso</button></nav>
       <div className="sidebar-note"><span className="eyebrow">TU TALENTO.<br />TU PRÓXIMA EMPRESA.</span><p>Has trabajado para llegar hasta aquí. Ahora elige dónde quieres dar tu siguiente paso.</p></div>
       <div className="local-user"><HeartHandshake size={22} /><div><strong>Comunidad WDC</strong><small>Te acompañamos en el camino</small></div></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div>Women Digital Closer <ChevronRight size={14} /><strong>{saved ? 'Tus guardadas' : practice ? 'Sala de práctica' : training ? 'Formación' : 'Oportunidades'}</strong></div><span className="student-tag">De la formación a tu próximo trabajo</span></header>
+      <header className="topbar"><div>Women Digital Closer <ChevronRight size={14} /><strong>{saved ? 'Tus guardadas' : practice ? 'Sala de práctica' : training ? 'Formación' : progress ? 'Tu progreso' : 'Oportunidades'}</strong></div><span className="student-tag">De la formación a tu próximo trabajo</span></header>
       <main>
-        {training ? <StudentTraining /> : practice ? <StudentPractice /> : <>
+        {progress ? <StudentProgress /> : training ? <StudentTraining /> : practice ? <StudentPractice /> : <>
         <div className="page-heading"><div><span className="eyebrow">EMPRESAS QUE BUSCAN TALENTO COMERCIAL</span><h1>{saved ? 'Las que te interesan.' : 'Elige tu próxima oportunidad.'}</h1><p>{saved ? 'Vuelve a comparar sus condiciones y decide tu siguiente paso.' : 'WDC reúne oportunidades en español para que encuentres dónde quieres crecer.'}</p></div><span className="heading-icon"><Compass size={30} strokeWidth={1.2} /></span></div>
         {!saved && <div className="search-panel student-search">
           <form className="phrase-search" onSubmit={applyPhrase}>

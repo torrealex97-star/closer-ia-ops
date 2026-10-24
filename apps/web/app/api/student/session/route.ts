@@ -3,6 +3,7 @@ import { originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { authenticateStudent, clearStudentCookies, STUDENT_ACCESS, studentCookies, studentSessionAvailable } from '../../../../lib/studentAuth';
 import { normalizeEmail, passwordLogin, signOut } from '../../../../lib/supabaseAuth';
 import { linkStudent, studentByEmail } from '../../../../lib/students';
+import { recordActivity } from '../../../../lib/studentActivity';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,6 +28,8 @@ export async function POST(request: NextRequest) {
   const row = await studentByEmail(session.user.email);
   if (!row || row.status === 'paused') return Response.json({ detail: 'Tu cuenta no tiene acceso al portal de alumnas.' }, { status: 403 });
   await linkStudent(row, session.user.id).catch(() => undefined);
+  // La entrada cuenta como actividad; si la tabla aún no existe el login no se rompe.
+  await recordActivity(row.id, { kind: 'session', ref: null, score: null, detail: {} }).catch(() => false);
   return withCookies(Response.json({ authenticated: true, email: session.user.email }), studentCookies(session.tokens));
 }
 
