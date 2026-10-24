@@ -2,7 +2,7 @@
 
 > **Lee esto primero** al retomar el trabajo, junto con `AGENTS.md`, `docs/STATUS.md` y el último commit de `main`.
 > Documento corto a propósito (≤ ~150 líneas). Histórico → `docs/handoff/archive/`. Trabajos vivos → `docs/handoff/claims/` (`npm run handoff`). Reglas → `docs/handoff/README.md`.
-> Última actualización: 2026-10-17.
+> Última actualización: 2026-10-24.
 
 ## 1. Tablero (trabajos vivos)
 
@@ -12,11 +12,13 @@ Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude,
 | --- | --- | --- |
 | _(ninguno: no hay trabajos vivos)_ | — | — |
 
-Todo lo anterior (PRs #1-#21) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
+Todo lo anterior (PRs #1-#27 y los commits directos de las sesiones 76-89) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
 - **Fusionado hoy** (PRs #1-#18, con CI de GitHub en verde antes de cada fusión): revisor IA shadow, métricas, ingesta robusta, niveles de fuentes + leads B2B + grants, presupuesto de tiempo del cron, login de alumnas + perfil + RLS, recomendaciones, candidaturas asistidas, interruptor `STUDENT_LOGIN_REQUIRED`, informe de acuerdo IA/humano, baseline de esquema, ADR-013 (voz), contraste `--muted`, skills y relevo entre agentes. Detalle: `docs/handoff/archive/2026-10.md`.
+- **Sesiones 76-89 (otra rama, ya en `main`, 2026-10-24):** formación (6 módulos + examen determinista), Google Jobs con 7 búsquedas, agrupación de republicaciones, modo degradado si el motor cae, gazetteer de 8.132 municipios (también en el worker, desplegado), cualificación automática (reglas; tope 100/día; mercado por moneda; migración `apply_url/company_url/contact/market_basis/auto_review` aplicada), respaldo SerpApi para portales sin API oficial (tope 4 búsquedas/día, ≈0,275 USD/día en el peor caso). Detalle: `docs/STATUS.md` sesiones 76-89.
+- **Pendiente de esa rama:** confirmar que el respaldo SerpApi (sesión 89) está desplegado; InfoJobs/Adzuna/Jooble sin clave (~767 anuncios fuera); Apify `aakash19/jobspy` devuelve 0 ítems (hay que mirar su dataset con la clave del panel); el motor repite tarjetas («Conquista Tu Maternidad» ×9); paso «Progreso» de `ui.mjs` inestable.
 - **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2). Las 9 tablas previas siguen sin migraciones originales: hay un snapshot de referencia en `supabase/schema/` (hace falta `supabase db pull` para lo definitivo).
 - **Evidencia (inspeccionado / probado / verificado):**
   - *Verificado en GitHub:* el workflow `Quality` (jobs `verify` y `web-admin`) pasa en verde en las PRs #5-#10.
