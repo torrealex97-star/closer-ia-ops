@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock3, Gauge, LoaderCircle, MessageSquare, Play, Quote, RotateCcw, Send, Sparkles, Target, Volume2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock3, Gauge, LoaderCircle, MessageSquare, Mic, MicOff, Play, Quote, RotateCcw, Send, Sparkles, Target, Volume2 } from 'lucide-react';
 import { INTENSITY_LABELS, PRACTICE_SCENARIOS, scenarioById } from './practiceScenarios';
 import type { PracticeScenario } from './practiceScenarios';
+import JarvisOrb from './JarvisOrb';
+import type { OrbState } from './JarvisOrb';
+import { useVoiceInput } from './useVoiceInput';
 
 type Turn = { role: 'user' | 'coach'; content: string };
 type Axis = { id: string; label: string; score: number; note: string; quote: string };
@@ -59,6 +62,9 @@ export default function StudentPractice() {
   const [now, setNow] = useState(Date.now());
   const [history, setHistory] = useState<Stored[]>([]);
   const [canSpeak, setCanSpeak] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  // Dictado del navegador: lo que se reconoce se añade al borrador, nunca se envía solo.
+  const voice = useVoiceInput(text => setDraft(current => current.trim() ? `${current.trimEnd()} ${text}` : text));
   const chat = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
@@ -81,6 +87,7 @@ export default function StudentPractice() {
   const studentTurns = useMemo(() => turns.filter(turn => turn.role === 'user').length, [turns]);
   const elapsed = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : 0;
   const atLimit = turns.length >= TURN_LIMIT;
+  const orb: OrbState = voice.listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
 
   function saveHistory(next: Stored[]) {
     setHistory(next);
@@ -90,6 +97,9 @@ export default function StudentPractice() {
     if (!canSpeak) return;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'es-ES';
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   }
@@ -154,15 +164,17 @@ export default function StudentPractice() {
       </div>
       <div className="practice-grid">
         <div className="practice-chat">
-          <div className="practice-chat-head"><span className="practice-avatar" aria-hidden="true"><MessageSquare size={16} /></span><div><strong>Interlocutor</strong><small>Simulación · empresa ficticia</small></div></div>
+          <div className="practice-chat-head"><span className="practice-avatar" aria-hidden="true"><MessageSquare size={16} /></span><div><strong>Interlocutor</strong><small>Simulación · empresa ficticia</small></div><div className="practice-voice"><JarvisOrb state={orb} /><small>{orb === 'listening' ? 'Te escucho' : orb === 'thinking' ? 'Pensando' : orb === 'speaking' ? 'Hablando' : 'Voz en espera'}</small></div></div>
           <div className="practice-body" ref={chat} aria-live="polite">
             {turns.map((turn, index) => <Bubble key={`${index}-${turn.role}`} turn={turn} onSpeak={canSpeak && turn.role === 'coach' ? speak : undefined} />)}
             {busy && <div className="practice-turn is-them"><div className="practice-bubble is-typing" aria-label="El interlocutor está escribiendo"><i /><i /><i /></div></div>}
           </div>
           {error && <p className="practice-error" role="alert"><CircleAlert size={15} />{error}</p>}
+          {voice.error && <p className="practice-error" role="alert"><CircleAlert size={15} />{voice.error}</p>}
           <form className="practice-composer" onSubmit={send}>
             <label htmlFor="practice-reply" className="sr-only">Tu respuesta</label>
-            <textarea ref={composer} id="practice-reply" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) void send(event); }} placeholder={atLimit ? 'La conversación ha llegado a su final.' : 'Responde como lo dirías en la conversación real…'} rows={2} maxLength={800} disabled={busy || atLimit} />
+            {voice.supported && <button type="button" className="practice-mic" data-listening={voice.listening} aria-pressed={voice.listening} onClick={() => voice.listening ? voice.stop() : voice.start()} disabled={busy || atLimit} aria-label={voice.listening ? 'Parar el dictado' : 'Dictar la respuesta'} title={voice.listening ? 'Parar el dictado' : 'Dictar la respuesta'}>{voice.listening ? <MicOff size={17} /> : <Mic size={17} />}</button>}
+            <textarea ref={composer} id="practice-reply" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) void send(event); }} placeholder={atLimit ? 'La conversación ha llegado a su final.' : voice.interim || 'Responde como lo dirías en la conversación real…'} rows={2} maxLength={800} disabled={busy || atLimit} />
             <button className="primary" type="submit" disabled={busy || atLimit || !draft.trim()} aria-label="Enviar respuesta">{busy ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />}Enviar</button>
           </form>
           <div className="practice-finish">

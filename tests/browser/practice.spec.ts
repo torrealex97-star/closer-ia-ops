@@ -131,6 +131,63 @@ test('la sala cierra la conversación antes de que el feedback sea imposible', a
   await expect(page.getByRole('heading', { name: 'Qué ha funcionado y qué pulir.' })).toBeVisible();
 });
 
+test('el dictado añade lo reconocido al borrador sin enviarlo y el orbe marca el estado', async ({ page }) => {
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      lang = ''; interimResults = false; continuous = false;
+      onresult: ((event: unknown) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        const scope = window as unknown as { __fakeVoiceStarted?: boolean };
+        scope.__fakeVoiceStarted = true;
+        setTimeout(() => {
+          const result = [{ transcript: 'he cerrado doce mil euros este trimestre' }] as Array<{ transcript: string }> & { isFinal?: boolean };
+          result.isFinal = true;
+          (window as unknown as { __fakeResultSent?: boolean }).__fakeResultSent = true;
+          this.onresult?.({ resultIndex: 0, results: [result] });
+        }, 250);
+        setTimeout(() => this.onend?.(), 900);
+      }
+      stop() { this.onend?.(); }
+      abort() { /* nada */ }
+    }
+    // defineProperty: asignar a window.SpeechRecognition puede ser ignorado si la propiedad no es escribible.
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: FakeRecognition });
+    Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: FakeRecognition });
+  });
+  await page.route('**/api/backend/opportunities/search', emptyCatalog);
+  await page.route('**/api/practice', route => route.fulfill({ json: { reply: 'Sigue.' } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sala de práctica' }).click();
+  await page.locator('.practice-card').first().getByRole('button', { name: 'Practicar' }).click();
+  await expect(page.locator('.jarvis-orb')).toHaveAttribute('data-state', 'idle');
+  await page.getByRole('button', { name: 'Dictar la respuesta' }).click();
+  // El orbe refleja el micrófono abierto mientras escucha.
+  await expect(page.locator('.jarvis-orb')).toHaveAttribute('data-state', 'listening');
+  // Se ha usado el reconocimiento simulado, no el del navegador.
+  expect(await page.evaluate(() => Boolean((window as unknown as { __fakeVoiceStarted?: boolean }).__fakeVoiceStarted))).toBe(true);
+  await page.waitForFunction(() => Boolean((window as unknown as { __fakeResultSent?: boolean }).__fakeResultSent));
+  await expect(page.getByLabel('Tu respuesta')).toHaveValue(/he cerrado doce mil euros/);
+  // Nadie envía por hablar: el borrador espera a que la alumna pulse Enviar.
+  await expect(page.locator('.practice-turn.is-mine')).toHaveCount(0);
+});
+
+test('sin reconocimiento de voz no se ofrece el micrófono y se puede escribir', async ({ page }) => {
+  await page.addInitScript(() => {
+    const scope = window as unknown as Record<string, unknown>;
+    scope.SpeechRecognition = undefined;
+    scope.webkitSpeechRecognition = undefined;
+  });
+  await page.route('**/api/backend/opportunities/search', emptyCatalog);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sala de práctica' }).click();
+  await page.locator('.practice-card').first().getByRole('button', { name: 'Practicar' }).click();
+  await expect(page.getByRole('button', { name: 'Dictar la respuesta' })).toHaveCount(0);
+  await page.getByLabel('Tu respuesta').fill('Escribo la respuesta a mano.');
+  await expect(page.getByRole('button', { name: 'Enviar respuesta' })).toBeEnabled();
+});
+
 test('sin proveedor la sala lo dice y no inventa una respuesta', async ({ page }) => {
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.route('**/api/practice', route => route.fulfill({ status: 503, json: { detail: 'La sala de práctica no está configurada en este despliegue.' } }));

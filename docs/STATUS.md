@@ -2,6 +2,13 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Voz y orbe Javis en la sala de práctica (sesión 75) — 2026-10-24
+
+- **Petición del operador**: añadir la entrada por voz y el orbe al roleplay de entrevistas.
+- **Entregado**: dictado con la API del navegador (`useVoiceInput`, `es-ES`): lo reconocido **se añade al borrador y nunca se envía solo**; errores de permiso, silencio o red se explican sin romper la sala. Si el navegador no soporta reconocimiento, el micrófono no se muestra. Orbe de voz (`JarvisOrb`) en la cabecera del chat con cuatro estados —en espera, escuchando, pensando (mientras responde el proveedor) y hablando (síntesis de voz ya existente)— dibujado solo con tokens de `globals.css` y sin animación cuando `prefers-reduced-motion`.
+- **Verificado (tested)**: `typecheck` y `build` OK; `playwright` con `PLAYWRIGHT_CHANNEL=chrome` → **16/16** en la suite de práctica, con dos casos nuevos: el dictado deposita el texto en el borrador sin enviarlo y el orbe pasa a `listening`; sin `SpeechRecognition` no hay botón de micrófono y se puede escribir. Comprobado en navegador real: orbe de 44 px con el color del token (`rgb(142,133,130)` en reposo), etiqueta «Voz en espera» y botón «Dictar la respuesta».
+- **Límites**: el dictado depende del navegador (Chrome/Edge) y del permiso de micrófono; en Safari/Firefox no aparece. El audio no se envía a ningún servidor (lo transcribe el navegador), pero eso también significa que no hay transcripción en el historial ni control de calidad sobre el reconocimiento.
+
 ## Entrevistas por perfil con rúbrica WDC (sesión 74) — 2026-10-24
 
 - **Petición del operador**: portar el rol de entrevistas del paquete anterior (perfiles de entrevistador y evaluación de seis criterios), tras quitar la puerta de la sala.
