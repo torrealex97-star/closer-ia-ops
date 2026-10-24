@@ -15,8 +15,8 @@ function Bars({ rows, label }: { rows: { id: string; label: string; count: numbe
       <div className="meter" aria-hidden="true"><span style={{ width: `${row.pct ?? 0}%` }} /></div>
       <b>{row.count}{row.pct !== null ? ` · ${row.pct} %` : ''}</b>
     </div>)}</div>
-    <details><summary>Ver como tabla</summary><div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Paso</th><th scope="col" className="num">Alumnas</th><th scope="col" className="num">%</th></tr></thead>
-      <tbody>{rows.map(row => <tr key={row.id}><th scope="row">{row.label}</th><td className="num">{row.count}</td><td className="num">{row.pct === null ? '—' : `${row.pct} %`}</td></tr>)}</tbody></table></div></details>
+    <details><summary>Ver como tabla</summary><div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Paso</th><th scope="col" className="num">Alumnas</th></tr></thead>
+      <tbody>{rows.map(row => <tr key={row.id}><th scope="row">{row.label}</th><td className="num">{row.count} ({row.pct === null ? '—' : `${row.pct} %`})</td></tr>)}</tbody></table></div></details>
   </>;
 }
 
