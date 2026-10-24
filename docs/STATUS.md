@@ -2,6 +2,16 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Verificación de `main` tras las sesiones 76-89: CI en rojo y código de actividad sin subir (sesión 90) — 2026-10-24
+
+- **Petición del operador**: poner al día el relevo y resolver lo que falta de esta rama tras el trabajo de la otra.
+- **Hallazgo (verified en GitHub)**: el workflow `Quality` de `main` está en **rojo** en los pushes recientes (p. ej. `974310b`, run 207): `web-admin` falla en `test:web` y `verify` falla en `test:e2e`.
+- **Causa 1 — código ausente (inspected + tested)**: [flow.mjs](../tests/admin-auth/flow.mjs) (paso «alumnas», línea 195) llama a `/api/student/progress` y `/api/student/activity`, y [run.sh](../tests/admin-auth/run.sh) ejecuta `tests/admin-auth/activity.mjs`, y [mock-services.mjs](../tests/admin-auth/mock-services.mjs) simula la tabla `student_activity`. **Nada de eso existe en el repositorio**: no hay rutas `apps/web/app/api/student/progress|activity`, ni `activity.mjs`, ni la migración `20261024_student_activity.sql` que la sesión de progreso describe, y `git log --all -S` no encuentra el código en ninguna rama. Parece un incremento que vive solo en la copia de trabajo de otro agente y cuyos tests y notas sí se subieron. Resultado local: `flow.mjs` **42/43** (`404 !== 200` en esa línea); `run.sh` se detiene ahí por `set -e`, así que el resto de suites de nodo no se ejecutaron en esta pasada. Las líneas de `run.sh` llevan `2>/dev/null`, que oculta el motivo de un fallo.
+- **Causa 2 — test desfasado (corregido, tested)**: el e2e `student.spec.ts` buscaba el enlace «Ver proceso de candidatura», que la sesión 88 sustituyó por «Aplicar en <dominio>». Se actualizó la expectativa (sin enlace de candidatura propio apunta a la fuente) y el spec pasa **7/7** contra `next dev` local.
+- **No se ha hecho (a propósito)**: no se han borrado ni saltado los pasos que referencian el código ausente (sería esconder el fallo) ni se ha reconstruido la función de actividad a partir de los tests (sería inventar su contrato y su DDL). Hace falta que quien tiene ese código lo suba, o decisión expresa del dueño.
+- **Verificado en esta pasada (tested)**: `typecheck` OK · `design` OK · `build` OK · `handoff` OK. Sin ejecutar: el resto de suites de `run.sh` tras el corte, `ui.mjs`, pytest.
+- **Sigue sin comprobar**: si el respaldo SerpApi (sesión 89) está desplegado; Apify (0 ítems); claves InfoJobs/Adzuna/Jooble.
+
 ## Cobertura garantizada: API oficial primero, respaldo por portal después (sesión 89) — 2026-10-24
 
 - **Petición del operador**: usar todas las APIs oficiales (Adzuna, InfoJobs…) y, donde no exista API oficial, SerpApi, Apify «o lo que sea necesario» para que la cantidad de ofertas sea siempre la necesaria.
