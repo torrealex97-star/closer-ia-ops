@@ -24,12 +24,17 @@ function declared(raw: Record<string, unknown> | undefined) {
 export function toOpportunity(o: ExternalOffer, role: RoleFamily) {
   let host = 'fuente externa';
   try { host = new URL(o.url).hostname.replace(/^www\./, ''); } catch { /* url ya validada al guardar */ }
+  // Google Jobs entrega su propia ficha y no el portal cuando el anuncio no publica
+  // enlace de candidatura. Decir «publicado en google.com» sería falso: se nombra el
+  // portal que Google atribuye (`via`, guardado en raw.site) y se declara el salto.
+  const via = typeof o.raw?.site === 'string' ? o.raw.site.trim() : '';
+  const sourceName = via && /(^|\.)google\./i.test(host) ? `${via} · vía Google Jobs` : host;
   return {
     id: `ext-${o.id}`, role, role_label: ROLE_LABELS[role], original_title: o.title, company: o.company || 'Empresa no indicada',
     compensation: o.salary || 'Importe no publicado', compensation_note: o.salary ? 'Tal como figura en el anuncio original.' : 'Pregunta por el fijo y las comisiones antes de avanzar.',
     modality: declared(o.raw).modality ?? 'Modalidad no indicada', location: o.location || 'Ubicación no indicada', language: 'Anuncio en español', experience: 'Experiencia no indicada', schedule: declared(o.raw).schedule ?? 'Jornada no indicada', contract: declared(o.raw).contract ?? 'Contrato no indicado',
     description: o.description || 'Consulta el anuncio original para ver las condiciones completas.',
-    published_at: o.posted_at, expires_at: o.expires_at, source_name: host, source_url: o.url, starred: false, excellence_rank: null, is_selected: false,
+    published_at: o.posted_at, expires_at: o.expires_at, source_name: sourceName, source_url: o.url, starred: false, excellence_rank: null, is_selected: false,
   };
 }
 
