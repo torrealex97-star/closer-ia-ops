@@ -3,7 +3,7 @@
 // se revisan con reglas sobre el texto (trainingCheck) y el examen es determinista.
 // Las cifras del ejercicio de Venta Lógica son ficticias y se rotulan como tales.
 
-export type TrainingId = 'precall' | 'logica' | 'freezing' | 'yellows' | 'star' | 'certificacion';
+export type TrainingId = 'precall' | 'logica' | 'freezing' | 'yellows' | 'star' | 'cierres' | 'descubrimiento' | 'certificacion';
 
 export type TrainingModule = {
   id: TrainingId;
@@ -48,6 +48,20 @@ export const TRAINING_MODULES: TrainingModule[] = [
     summary: 'Situación, timing, autoridad y recursos antes de cerrar. Sin los cuatro, la objeción no es de cierre.',
     tag: 'Antes de cerrar',
     minutes: 6,
+  },
+  {
+    id: 'cierres',
+    title: 'Los diez cierres',
+    summary: 'Cuándo usar cada cierre, su fórmula y un ejemplo. Después, cinco situaciones: ¿qué cierre pide cada llamada?',
+    tag: 'Durante la llamada',
+    minutes: 15,
+  },
+  {
+    id: 'descubrimiento',
+    title: 'Los nueve pasos de descubrimiento',
+    summary: 'De la situación a la repetición, en orden y con una frase de ejemplo. Después, cinco frases: ¿a qué paso pertenece cada una?',
+    tag: 'Durante la llamada',
+    minutes: 12,
   },
   {
     id: 'certificacion',
@@ -382,4 +396,55 @@ export const FINAL_EXAM: ExamQuestion[] = [
     options: ['Explicar el precio del programa', 'Guardar silencio', 'Preguntar «¿qué prefieres?»', 'Ofrecer un descuento'],
     correctAnswer: 'Guardar silencio',
   },
+];
+
+// ---- Biblioteca de cierres y pasos de descubrimiento -------------------------
+// Contenido del método propio (closer-ai-coach, salesMethodology.ts). Los importes y plazos concretos del original
+// se sustituyen por [importe] y [plazo]: no se publica una cifra que no sea de una oferta real.
+export type ExactClose = { id: string; name: string; formula: string; when: string; example: string; concept: string };
+
+export const EXACT_CLOSES: ExactClose[] = [
+  { id: 'decadere', name: 'Decadere', formula: 'Presentar el precio como algo que ya se ha decidido, no como una pregunta.', when: 'Cuando el cliente ha superado las 3 capas de objeciones y está listo para decidir.', example: '"El programa son [importe]. El proceso de inscripción te lo envío ahora mismo."', concept: 'El precio se presenta como hecho, no como pregunta. La certeza del closer transfiere certeza al cliente.' },
+  { id: 'closer-or-further', name: 'Closer or Further', formula: 'Preguntar si la conversación nos acerca o nos aleja de la decisión.', when: 'Cuando el cliente divaga o evita la decisión.', example: '"¿Esta conversación nos acerca a que empieces hoy, o nos aleja?"', concept: 'Forzar al cliente a reconocer si está avanzando o escapando.' },
+  { id: 'six-inches', name: 'Six Inches From Gold', formula: 'Recordar al cliente que está a un paso de lograr lo que quiere.', when: 'Cuando el cliente duda en el último momento.', example: '"Estás a seis pulgadas del oro. Lo único que te separa de tu objetivo es dar este paso."', concept: 'El cliente está más cerca de lo que cree. Recordárselo reduce la fricción del último paso.' },
+  { id: 'support-not-permission', name: 'Support Not Permission', formula: 'Reencuadrar «necesito permiso de mi pareja» como «necesitas apoyo, no permiso».', when: 'Cuando el cliente invoca a un tercero (pareja, socio).', example: '"No necesitas permiso de tu pareja. Necesitas su apoyo. Y para tener su apoyo, primero necesitas estar segura tú."', concept: 'Cambiar el marco de «pedir permiso» a «buscar apoyo» devuelve la agencia al cliente.' },
+  { id: 'good-its-a-lot', name: "It's Good That It's A Lot", formula: 'Reencuadrar el precio alto como señal positiva de valor.', when: 'Cuando el cliente dice «es mucho dinero».', example: '"Es bueno que sea mucho. Si costara una fracción, no te daría los resultados que buscas. El precio refleja el valor."', concept: 'El precio alto es una característica, no un defecto. Reencuadrarlo como prueba de valor.' },
+  { id: 'some-now-more-later', name: 'Some Now or More Later', formula: 'Ofrecer empezar con una parte ahora y el resto después.', when: 'Cuando el cliente no puede pagar todo de golpe.', example: '"Puedes empezar ahora con el módulo 1 y sumar el resto en [plazo], o pagar todo ahora y ahorrar. ¿Cuál prefieres?"', concept: 'Dar al cliente una opción entre dos caminos que ambos llevan a la venta, no a la fuga.' },
+  { id: 'dont-burn-twice', name: "Don't Let It Burn You Twice", formula: 'Usar el dolor de una experiencia pasada como motivación para no repetirlo.', when: 'Cuando el cliente ha tenido una mala experiencia anterior.', example: '"Ya te quemaste una vez sin tener acompañamiento. No dejes que te queme dos veces. Esta vez vas a tener soporte real."', concept: 'El dolor pasado es combustible para la decisión presente. No ignorarlo, usarlo.' },
+  { id: '1-10-close', name: '1-10 Close', formula: 'Pedir al cliente que califique su interés del 1 al 10.', when: 'Para medir el nivel real de interés antes de invertir más tiempo.', example: '"Del 1 al 10, ¿dónde estás ahora mismo con esto? Si eres menos de un 7, te digo que no es para ti."', concept: 'El número revela la verdad. Un 5 significa que hay una objeción oculta. Un 8+ significa que hay que cerrar.' },
+  { id: 'nervousness-close', name: 'Nervousness Close', formula: 'Normalizar los nervios como señal de que la decisión importa.', when: 'Cuando el cliente expresa nerviosismo o miedo a decidir.', example: '"Es normal sentir nervios. Significa que esto te importa de verdad. Las decisiones que no importan no dan nervios."', concept: 'Los nervios no son una señal de parar, son una señal de que la decisión es importante.' },
+  { id: 'mechanic-close', name: 'Mechanic / Surgeon Secretary Close', formula: 'Explicar el mecanismo exacto de cómo funciona el programa.', when: 'Cuando el cliente analítico necesita entender el sistema antes de decidir.', example: '"Déjame explicarte el mecanismo exacto: semana 1 hacemos X, semana 2 hacemos Y, semana 3 medimos Z. Es un sistema, no improvisación."', concept: 'El cliente analítico no compra resultados, compra sistemas. Mostrar el mecanismo desarma la duda.' },
+];
+
+export type DiscoveryStep = { step: number; name: string; description: string; technique: string; example: string };
+
+export const DISCOVERY_STEPS: DiscoveryStep[] = [
+  { step: 1, name: 'Situación', description: 'Entender dónde está el prospecto hoy.', technique: 'Preguntas abiertas sobre su contexto actual.', example: '"¿Cómo está tu negocio ahora mismo?"' },
+  { step: 2, name: 'Deseo', description: 'Descubrir qué quiere lograr.', technique: 'Preguntas sobre su meta ideal.', example: '"¿A dónde quieres llegar en los próximos 12 meses?"' },
+  { step: 3, name: 'Obstáculo', description: 'Identificar qué le impide lograrlo.', technique: 'Preguntar directamente por la barrera.', example: '"¿Qué crees que te impide llegar ahí hoy?"' },
+  { step: 4, name: 'Razón', description: 'Entender por qué quiere lograrlo (su porqué).', technique: 'Profundizar en la motivación emocional.', example: '"¿Por qué es importante para ti lograr eso?"' },
+  { step: 5, name: 'Detalle', description: 'Hacer que el prospecto articule su dolor en detalle.', technique: 'Preguntas de profundización: «¿puedes darme un ejemplo?», «¿qué te impide lograrlo solo hoy?».', example: '"¿Puedes darme un ejemplo concreto de cuando eso te pasó?"' },
+  { step: 6, name: 'Resumen', description: 'Resumir lo que el prospecto ha dicho.', technique: 'Repetir en tus palabras lo que escuchaste.', example: '"Déjame ver si lo entiendo: quieres llegar a X, pero Y te lo impide, y si no lo resuelves, Z pasará."' },
+  { step: 7, name: 'Etiqueta', description: 'Etiquetar la emoción del prospecto.', technique: 'Nombrar lo que el prospecto está sintiendo.', example: '"Suena como que te sientes frustrado con tu situación actual."' },
+  { step: 8, name: 'Confirmación', description: 'Confirmar que el prospecto está de acuerdo con el resumen.', technique: 'Preguntar si el resumen es correcto.', example: '"¿Es eso correcto? ¿Me dejo algo?"' },
+  { step: 9, name: 'Repetición', description: 'Repetir el proceso si hay más capas de dolor.', technique: 'Volver al paso 1 si el prospecto revela nueva información.', example: '"¿Hay algo más que no has mencionado todavía?"' },
+];
+
+// Bancos de cinco situaciones, corregidos por clave (sin IA ni texto libre). `answer` es siempre una de las `options`.
+export type BankQuestion = { id: string; prompt: string; options: string[]; answer: string };
+const close = (id: string) => (EXACT_CLOSES.find(item => item.id === id) as ExactClose).name;
+export const CLOSE_BANK: BankQuestion[] = [
+  { id: 'c1', prompt: '«Me encanta, pero tengo que hablarlo con mi pareja antes de decidir.»', options: [close('support-not-permission'), close('decadere'), close('1-10-close'), close('six-inches')], answer: close('support-not-permission') },
+  { id: 'c2', prompt: '«Uf, es mucho dinero para mí ahora mismo.»', options: [close('good-its-a-lot'), close('mechanic-close'), close('closer-or-further'), close('nervousness-close')], answer: close('good-its-a-lot') },
+  { id: 'c3', prompt: '«La última vez que invertí en un curso me sentí sola y no pasó nada.»', options: [close('dont-burn-twice'), close('decadere'), close('some-now-more-later'), close('1-10-close')], answer: close('dont-burn-twice') },
+  { id: 'c4', prompt: '«Me pongo nerviosa solo de pensar en dar el paso.»', options: [close('nervousness-close'), close('six-inches'), close('mechanic-close'), close('good-its-a-lot')], answer: close('nervousness-close') },
+  { id: 'c5', prompt: '«Antes de decidir quiero entender exactamente cómo funciona el sistema, semana a semana.»', options: [close('mechanic-close'), close('support-not-permission'), close('closer-or-further'), close('dont-burn-twice')], answer: close('mechanic-close') },
+];
+const step = (n: number) => (DISCOVERY_STEPS.find(item => item.step === n) as DiscoveryStep).name;
+export const DISCOVERY_BANK: BankQuestion[] = [
+  { id: 'd1', prompt: '«¿Cómo está tu negocio ahora mismo?»', options: [step(1), step(2), step(4), step(9)], answer: step(1) },
+  { id: 'd2', prompt: '«¿Qué crees que te impide llegar ahí hoy?»', options: [step(3), step(1), step(5), step(7)], answer: step(3) },
+  { id: 'd3', prompt: '«Déjame ver si lo entiendo: quieres llegar a X, pero Y te lo impide, y si no lo resuelves, Z pasará.»', options: [step(6), step(8), step(2), step(4)], answer: step(6) },
+  { id: 'd4', prompt: '«Suena como que te sientes frustrado con tu situación actual.»', options: [step(7), step(6), step(3), step(9)], answer: step(7) },
+  { id: 'd5', prompt: '«¿Es eso correcto? ¿Me dejo algo?»', options: [step(8), step(5), step(7), step(1)], answer: step(8) },
 ];

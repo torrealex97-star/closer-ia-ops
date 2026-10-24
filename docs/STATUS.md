@@ -2,6 +2,15 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Formación: «Los diez cierres» y «Los nueve pasos de descubrimiento» (sesión 91) — 2026-10-24
+
+- **Petición del operador**: seguir mejorando la app con el contenido de `closer-ai-coach`. La PR #29 (actividad y progreso) quedó fusionada con `verify` y `web-admin` en verde.
+- **Entregado**: dos módulos nuevos en la Formación (que pasa de seis a ocho tarjetas), portados de `src/data/salesMethodology.ts` de `closer-ai-coach` (contenido propio del dueño): los **diez cierres** (cuándo, fórmula, ejemplo y concepto) y los **nueve pasos** (descripción, técnica y ejemplo). Cada módulo trae un **banco de cinco situaciones corregido por clave** (qué cierre pide la frase; a qué paso pertenece), sin IA ni texto libre, y solo guarda el número de aciertos como `training_review`.
+- **Decisiones de contenido**: los importes del original («2.997 €», «50 €», «el próximo mes») se sustituyen por `[importe]` y `[plazo]` y el módulo lo explica; los nombres en inglés de los pasos 5-9 (*Pull Teeth, Recap, Label, Confirm, Repeat*) pasan al español (Detalle, Resumen, Etiqueta, Confirmación, Repetición) con la misma técnica y ejemplo. Las frases de cliente de los bancos las he redactado yo a partir del «cuándo usarlo» de cada cierre y de los ejemplos de cada paso: son material de práctica, no citas del método.
+- **Progreso**: `REVIEW_REFS` pasa de 5 a 7 módulos; «Formación completa» exige ahora los siete (quien ya tenía cinco repasados deja de tenerlo hasta repasar los dos nuevos).
+- **Verificado (tested, servicios simulados)**: `typecheck` OK · `design` OK · `training.mjs` PASS (10 cierres con campos completos y ids únicos, ningún ejemplo con importe en euros, nueve pasos en orden y en español, claves dentro de las opciones, 5/5 y 4/5 con un fallo, sin respuestas = 0) · `activity.mjs` 5/5 · `training.spec.ts` y `student.spec.ts` **12/12** contra `next dev` (incluye el caso nuevo: diez y nueve fichas, `[importe]` visible, corrección 4/5 señalando la correcta, repetir y 5/5, sin scroll horizontal a 390 px). `build` y `run.sh` completo: ver más abajo si constan.
+- **Límites**: el banco corrige por clave, no evalúa cómo suena un cierre en una llamada real; la migración `student_activity` sigue sin aplicar (hasta entonces el repaso se ejecuta pero no queda en el progreso).
+
 ## Actividad y progreso de alumnas reconstruidos; CI de `main` en rojo explicado (sesión 90) — 2026-10-24
 
 - **Petición del operador**: reconstruir el código de actividad/progreso que faltaba (opción B), avanzar con Apify y los dashboards de `closer-ai-coach`.

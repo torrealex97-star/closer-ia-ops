@@ -8,13 +8,13 @@ import {
   Sparkles, Target, TrendingUp, X, Zap,
 } from 'lucide-react';
 import {
-  BELIEF_LADDER, CERTIFICATION_WEEKS, FINAL_EXAM, FREEZING, IDENTITY_FRAMES, LOGICA,
+  BELIEF_LADDER, CERTIFICATION_WEEKS, CLOSE_BANK, DISCOVERY_BANK, DISCOVERY_STEPS, EXACT_CLOSES, FINAL_EXAM, FREEZING, IDENTITY_FRAMES, LOGICA,
   PRE_CALL_STEPS, SHOW_RATE_RULES, STAR_CRITERIA, STAR_RULE, TRAINING_MODULES,
   YELLOW_LEADS, YELLOW_RULE,
 } from './trainingContent';
-import type { TrainingId } from './trainingContent';
+import type { BankQuestion, TrainingId } from './trainingContent';
 import {
-  EXAM_PASS, YELLOW_BLOCK, freezingFalls, gradeExam, moralFor, reviewCloseLine,
+  EXAM_PASS, YELLOW_BLOCK, freezingFalls, gradeBank, gradeExam, moralFor, reviewCloseLine,
   reviewFreezing, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
 } from './trainingCheck';
 import type { Review } from './trainingCheck';
@@ -452,16 +452,81 @@ function Certification() {
   </div>;
 }
 
+// ---- Módulos 6 y 7: biblioteca de cierres y pasos de descubrimiento ----------
+
+// Banco de situaciones corregido por clave: sin IA ni texto libre. Solo se guarda el número de aciertos.
+function Bank({ bank, refId, legend, verb }: { bank: BankQuestion[]; refId: 'cierres' | 'descubrimiento'; legend: string; verb: string }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [result, setResult] = useState<ReturnType<typeof gradeBank> | null>(null);
+  function submit() {
+    const graded = gradeBank(bank, answers);
+    setResult(graded);
+    void logActivity({ kind: 'training_review', ref: refId, detail: { met: graded.correct, total: graded.total } });
+  }
+  return <div className="training-card" data-testid={`bank-${refId}`}>
+    <div className="training-card-head"><h3>{legend}</h3><span className="training-count">{bank.length} situaciones</span></div>
+    <ol className="training-exam">{bank.map((question, i) => <li key={question.id} className="training-question">
+      <p><span>{i + 1}</span>{question.prompt}</p>
+      <fieldset className="training-options" disabled={Boolean(result)}><legend className="sr-only">{question.prompt}</legend>
+        {question.options.map(option => <label key={option} data-selected={answers[question.id] === option}>
+          <input type="radio" name={question.id} value={option} checked={answers[question.id] === option} onChange={() => setAnswers(current => ({ ...current, [question.id]: option }))} />
+          {option}
+        </label>)}
+      </fieldset>
+      {result && <p className="training-note" data-ok={!result.wrong.includes(question.id)}>{result.wrong.includes(question.id) ? `Era: ${question.answer}.` : 'Correcta.'}</p>}
+    </li>)}</ol>
+    {!result ? <div className="training-actions"><button type="button" className="primary" onClick={submit} disabled={bank.some(question => !answers[question.id])}><Flag size={15} />{verb}</button></div>
+      : <div className="training-result"><div className="training-result-score" data-band={result.correct === result.total ? 'alto' : 'bajo'}><b>{result.correct}</b><span>/{result.total}</span><small>aciertos</small></div>
+        <div className="training-actions"><button type="button" onClick={() => { setAnswers({}); setResult(null); }}><RotateCcw size={15} />Repetir</button></div></div>}
+    <p className="training-note">Se corrige por clave, no evalúa cómo suena en una llamada real. Solo se guarda cuántas aciertas.</p>
+  </div>;
+}
+
+function Closes() {
+  return <div className="training-module">
+    <div className="training-intro">
+      <Target size={18} />
+      <div><h2>Los diez cierres</h2><p>Cada cierre sirve para un momento concreto. Los ejemplos llevan [importe] y [plazo] donde el método original traía cifras: pon las de tu oferta real, no las de otra.</p></div>
+    </div>
+    <ol className="training-ladder">{EXACT_CLOSES.map(item => <li key={item.id}>
+      <strong>{item.name}</strong>
+      <em>Cuándo: {item.when}</em>
+      <p>{item.formula}</p>
+      <blockquote>{item.example}</blockquote>
+      <p className="training-note">{item.concept}</p>
+    </li>)}</ol>
+    <Bank bank={CLOSE_BANK} refId="cierres" legend="¿Qué cierre pide cada llamada?" verb="Corregir mis respuestas" />
+  </div>;
+}
+
+function Discovery() {
+  return <div className="training-module">
+    <div className="training-intro">
+      <Brain size={18} />
+      <div><h2>Los nueve pasos de descubrimiento</h2><p>Se recorren en orden: entender dónde está, qué quiere, qué se lo impide y por qué le importa, antes de resumir y confirmar. Si aparece más dolor, se vuelve al principio.</p></div>
+    </div>
+    <ol className="training-ladder">{DISCOVERY_STEPS.map(item => <li key={item.step}>
+      <strong>{item.step}. {item.name}</strong>
+      <p>{item.description}</p>
+      <em>{item.technique}</em>
+      <blockquote>{item.example}</blockquote>
+    </li>)}</ol>
+    <Bank bank={DISCOVERY_BANK} refId="descubrimiento" legend="¿A qué paso pertenece cada frase?" verb="Corregir mis respuestas" />
+  </div>;
+}
+
 const BODIES: Record<TrainingId, ComponentType> = {
   precall: PreCall,
   logica: Logica,
   freezing: Freezing,
   yellows: Yellows,
   star: Star,
+  cierres: Closes,
+  descubrimiento: Discovery,
   certificacion: Certification,
 };
 
-// Formación comercial: seis módulos de método y un examen. Todo se corrige en el
+// Formación comercial: ocho módulos de método y un examen. Todo se corrige en el
 // navegador con reglas; nada se envía a un proveedor ni evalúa a la alumna.
 export default function StudentTraining() {
   const [open, setOpen] = useState<TrainingId | null>(null);
@@ -482,7 +547,7 @@ export default function StudentTraining() {
       <div>
         <span className="eyebrow">FORMACIÓN COMERCIAL</span>
         <h1>Aprende el método antes de improvisar.</h1>
-        <p>Seis módulos para practicar las partes de la conversación que se pueden entrenar: antes de la llamada, la brecha, la presión, los leads difíciles, la calificación y el examen final.</p>
+        <p>Ocho módulos para practicar las partes de la conversación que se pueden entrenar: antes de la llamada, la brecha, la presión, los leads difíciles, la calificación, los diez cierres, el descubrimiento y el examen final.</p>
       </div>
       <span className="training-icon"><GraduationCap size={28} strokeWidth={1.4} /></span>
     </div>

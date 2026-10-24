@@ -4,7 +4,8 @@ import {
   freezingFalls, gradeExam, moralFor, parseAmount, reviewCloseLine, reviewFreezing,
   reviewFreezingReply, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
 } from '../../apps/web/components/trainingCheck';
-import { FINAL_EXAM, LOGICA, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
+import { CLOSE_BANK, DISCOVERY_BANK, DISCOVERY_STEPS, EXACT_CLOSES, FINAL_EXAM, LOGICA, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
+import { gradeBank } from '../../apps/web/components/trainingCheck';
 
 // Formato español: el punto es de miles y la coma decimal.
 assert.equal(parseAmount('3.200'), 3200);
@@ -88,3 +89,24 @@ assert.equal(gradeExam({}).passed, false);
 assert.equal(gradeExam({}).score, 0);
 
 console.log('PASS  formación: formato de cifras, criterios de los seis ejercicios, moral y examen 85 %');
+
+// Biblioteca de cierres y pasos de descubrimiento: contenido completo, sin cifras inventadas y bancos corregibles por clave.
+assert.equal(EXACT_CLOSES.length, 10); assert.equal(new Set(EXACT_CLOSES.map(c => c.id)).size, 10, 'ids únicos');
+for (const item of EXACT_CLOSES) {
+  for (const field of ['name', 'formula', 'when', 'example', 'concept']) assert.ok(item[field]?.trim(), `${item.id} sin ${field}`);
+  assert.ok(!/\d[\d.,]*\s?€/.test(item.example), `${item.id}: el ejemplo no lleva un importe en euros`);
+}
+assert.ok(EXACT_CLOSES.some(c => c.example.includes('[importe]')) && EXACT_CLOSES.some(c => c.example.includes('[plazo]')));
+assert.deepEqual(DISCOVERY_STEPS.map(s => s.step), [1, 2, 3, 4, 5, 6, 7, 8, 9], 'nueve pasos en orden');
+for (const item of DISCOVERY_STEPS) for (const field of ['name', 'description', 'technique', 'example']) assert.ok(item[field]?.trim(), `paso ${item.step} sin ${field}`);
+assert.ok(DISCOVERY_STEPS.every(s => !/^(Pull Teeth|Recap|Label|Confirm|Repeat)$/.test(s.name)), 'pasos 5-9 en español');
+for (const bank of [CLOSE_BANK, DISCOVERY_BANK]) {
+  assert.equal(bank.length, 5); assert.equal(new Set(bank.map(q => q.id)).size, 5);
+  for (const q of bank) { assert.ok(q.options.includes(q.answer), `${q.id}: la clave está entre las opciones`); assert.equal(new Set(q.options).size, q.options.length, `${q.id}: opciones sin repetir`); }
+  const key = Object.fromEntries(bank.map(q => [q.id, q.answer]));
+  assert.deepEqual(gradeBank(bank, key), { correct: 5, total: 5, wrong: [] });
+  const one = { ...key, [bank[0].id]: bank[0].options.find(o => o !== bank[0].answer) };
+  assert.deepEqual(gradeBank(bank, one), { correct: 4, total: 5, wrong: [bank[0].id] });
+  assert.equal(gradeBank(bank, {}).correct, 0, 'sin respuestas no hay aciertos inventados');
+}
+console.log('PASS  formación: diez cierres, nueve pasos y bancos corregibles por clave');
