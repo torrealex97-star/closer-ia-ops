@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       ],
       temperature: 0.3,
       max_tokens: 900,
-      response_format: { type: 'json_schema', json_schema: { name: 'practice_debrief', strict: true, schema: debriefSchema(scenario.kind) } },
+      response_format: { type: 'json_schema', json_schema: { name: 'practice_debrief', strict: true, schema: debriefSchema(scenario) } },
     });
     if (!result.ok) return failure(result.error);
     const debrief = cleanDebrief(result.content, turns, scenario);

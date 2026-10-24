@@ -26,7 +26,7 @@ const clampScore = (input: unknown) => {
 
 // El feedback se valida en servidor: sin ejes completos no hay nota, y una cita
 // que no esté literalmente en la conversación se descarta. La puntuación global
-// es la media de los cuatro ejes, no un número que el modelo pueda inventar.
+// sale de los ejes (media ponderada si la rúbrica tiene pesos), nunca del modelo.
 export function cleanDebrief(raw: string, turns: PracticeTurn[], scenario: PracticeScenario): PracticeDebrief | null {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return null; }
@@ -36,7 +36,7 @@ export function cleanDebrief(raw: string, turns: PracticeTurn[], scenario: Pract
   const list = (input: unknown) => Array.isArray(input) ? input.map(item => text(item, 240)).filter(Boolean).slice(0, 3) : [];
   const student = turns.filter(turn => turn.role === 'user').map(turn => normalize(turn.content));
 
-  const definitions = axesFor(scenario.kind);
+  const definitions = axesFor(scenario);
   if (!Array.isArray(value.axes) || value.axes.length !== definitions.length) return null;
   const received = new Map<string, Record<string, unknown>>();
   for (const item of value.axes) {
@@ -65,7 +65,10 @@ export function cleanDebrief(raw: string, turns: PracticeTurn[], scenario: Pract
   const improvements = list(value.improvements);
   const focus = text(value.focus, 240) || improvements[0] || '';
   const model = text(value.model, 600);
-  const score = Math.round(axes.reduce((total, axis) => total + axis.score, 0) / axes.length);
+  // Media ponderada cuando la rúbrica trae pesos (entrevista WDC); media simple si no.
+  const weights = new Map(definitions.map(definition => [definition.id, definition.weight ?? 1]));
+  const totalWeight = axes.reduce((total, axis) => total + (weights.get(axis.id) ?? 1), 0);
+  const score = Math.round(axes.reduce((total, axis) => total + axis.score * (weights.get(axis.id) ?? 1), 0) / totalWeight);
 
   return { summary, focus, strengths, improvements, axes, score, model, next, scenario: scenario.title };
 }

@@ -2,6 +2,13 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Entrevistas por perfil con rúbrica WDC (sesión 74) — 2026-10-24
+
+- **Petición del operador**: portar el rol de entrevistas del paquete anterior (perfiles de entrevistador y evaluación de seis criterios), tras quitar la puerta de la sala.
+- **Entregado (incremento 1)**: cuatro entrevistas con perfil en el catálogo de la sala —Carlos el directo, Patricia la escéptica, Miguel el amable y Lucía la exigente— con comportamiento, capas de resistencia y desarmes propios en servidor. Usan la **rúbrica WDC de seis criterios con peso** (confianza 25, claridad 20, evidencia 20, objeciones 15, encaje 10, iniciativa 10) en vez de los cuatro genéricos; la nota global pasa a ser la **media ponderada** calculada en servidor, y el esquema exige los seis ejes (si falta uno, 502 y no se inventa un feedback parcial).
+- **Verificado (tested)**: `npm run typecheck` y `npm run build` OK; `playwright test tests/browser/practice.spec.ts tests/browser/practice-method.spec.ts` con `PLAYWRIGHT_CHANNEL=chrome` → **14/14**, incluido un caso nuevo que comprueba que la ponderación cambia la nota (69 con pesos frente a 70 con media simple) y que un eje de menos se rechaza. En navegador real: el catálogo muestra **12 situaciones** (5 duras, 1 suave) con las cuatro entrevistas nuevas.
+- **No entregado en este incremento** (partes del paquete anterior): banco de preguntas con respuestas modelo y banderas rojas visibles antes de practicar, entrada por voz del navegador (el orbe Javis) y evaluación por criterio con pesos en el historial. El historial sigue guardando la conversación y la nota en el navegador.
+
 ## Sala de práctica sin código de cohorte (sesión 73) — 2026-10-24
 
 - **Petición del operador**: quitar el acceso que pide la sala de práctica. Era un código de cohorte (`PRACTICE_CODE`, guardado en el navegador) con validación en servidor.

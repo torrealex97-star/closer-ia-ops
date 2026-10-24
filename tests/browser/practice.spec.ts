@@ -35,8 +35,8 @@ test('la sala de práctica abre sin código, conversa y devuelve feedback con ej
   await page.goto('/');
   await page.getByRole('button', { name: 'Sala de práctica' }).click();
   await expect(page.getByRole('heading', { name: 'Ensaya la conversación antes de la real.' })).toBeVisible();
-  await expect(page.locator('.practice-card')).toHaveCount(8);
-  await expect(page.locator('.practice-level[data-intensity="dura"]')).toHaveCount(3);
+  await expect(page.locator('.practice-card')).toHaveCount(12);
+  await expect(page.locator('.practice-level[data-intensity="dura"]')).toHaveCount(5);
   // Sin puerta previa: «Practicar» entra directo a la sala.
   await page.locator('.practice-card').first().getByRole('button', { name: 'Practicar' }).click();
   await expect(page.getByText('¿Sí? Dime, que estoy entre reuniones.')).toBeVisible();

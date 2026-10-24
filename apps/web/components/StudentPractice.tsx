@@ -195,7 +195,7 @@ export default function StudentPractice() {
           <small>estimación</small>
         </div>
         <div className="practice-score-detail">
-          <div className="practice-score-head"><h2>Los cuatro ejes</h2><small>Media de ejes. No es una nota oficial.</small></div>
+          <div className="practice-score-head"><h2>{debrief.axes.length === 4 ? 'Los cuatro ejes' : `Los ${debrief.axes.length} criterios`}</h2><small>{scenario?.rubric === 'wdc-entrevista' ? 'Media ponderada según la rúbrica.' : 'Media de ejes.'} No es una nota oficial.</small></div>
           <dl className="practice-axes">
             {debrief.axes.map(axis => <div className="practice-axis" key={axis.id}>
               <dt><span>{axis.label}</span><b data-band={band(axis.score)}>{axis.score}</b></dt>

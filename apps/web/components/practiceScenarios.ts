@@ -4,6 +4,8 @@
 export type PracticeScenario = {
   id: string;
   kind: 'venta' | 'entrevista';
+  // Entrevista con perfil: usa la rúbrica WDC de seis criterios en vez de los cuatro genéricos.
+  rubric?: 'wdc-entrevista';
   title: string;
   context: string;
   summary: string;
@@ -116,6 +118,59 @@ export const PRACTICE_SCENARIOS: PracticeScenario[] = [
     level: 'Entrevista · objeción',
     intensity: 'dura',
     minutes: 9,
+  },
+  // Entrevistas por perfil (rúbrica WDC de seis criterios).
+  {
+    id: 'perfil-directo',
+    kind: 'entrevista',
+    rubric: 'wdc-entrevista',
+    title: 'Entrevista con Carlos, el dueño directo',
+    context: 'Empresa ficticia de servicios B2B · 14 personas',
+    summary: 'Un dueño que va al grano: quiere números, casos y retorno. Practicas responder corto, con cifras propias, sin rodeos.',
+    objectives: ['Dar cifras concretas sin inflarlas', 'Contar un caso con resultado', 'Aceptar una repregunta sin ponerte a la defensiva', 'Cerrar con una pregunta de negocio'],
+    opening: 'Vamos al grano, que tengo poco tiempo. ¿Cuántas llamadas haces al día y cuál es tu tasa de cierre?',
+    level: 'Entrevista · dueño directo',
+    intensity: 'real',
+    minutes: 8,
+  },
+  {
+    id: 'perfil-esceptico',
+    kind: 'entrevista',
+    rubric: 'wdc-entrevista',
+    title: 'Entrevista con Patricia, la escéptica',
+    context: 'Agencia ficticia · ya contrató closers que no funcionaron',
+    summary: 'Ha quemado dinero con closers y no cree nada sin pruebas. Practicas sostener la confianza cuando cada afirmación se cuestiona.',
+    objectives: ['No defenderte de la desconfianza', 'Dar un ejemplo verificable, no una promesa', 'Reconocer lo que no tienes medido', 'Proponer cómo demostrarlo'],
+    opening: 'Te seré sincera: he contratado a tres closers y ninguno ha durado. ¿Por qué debería creerte a ti?',
+    level: 'Entrevista · escéptica',
+    intensity: 'dura',
+    minutes: 9,
+  },
+  {
+    id: 'perfil-amable',
+    kind: 'entrevista',
+    rubric: 'wdc-entrevista',
+    title: 'Entrevista con Miguel, el amable',
+    context: 'Tienda online ficticia · equipo pequeño',
+    summary: 'Conversación relajada que observa si eres auténtica o recitas un guion. Practicas conectar sin perder concreción.',
+    objectives: ['Contar quién eres sin guion', 'Conectar con su forma de trabajar', 'No perder las cifras por quedar bien', 'Hacer una pregunta personal y otra de negocio'],
+    opening: 'Qué gusto conocerte. Antes de nada, cuéntame cómo llegaste a ventas, sin el discurso de siempre.',
+    level: 'Entrevista · cercana',
+    intensity: 'suave',
+    minutes: 7,
+  },
+  {
+    id: 'perfil-exigente',
+    kind: 'entrevista',
+    rubric: 'wdc-entrevista',
+    title: 'Entrevista con Lucía, la exigente',
+    context: 'Startup ficticia · busca closer senior',
+    summary: 'Nivel alto: pide métricas complejas, escalabilidad y criterio propio. Practicas no desmoronarte cuando la pregunta sube de nivel.',
+    objectives: ['Razonar sobre métricas, no solo recitarlas', 'Explicar cómo escalar proceso', 'Sostener una pregunta que no sabes', 'Cerrar con una hipótesis propia'],
+    opening: 'Necesito una closer senior. ¿Cómo decide tu equipo en qué invertir el esfuerzo comercial cuando el ciclo se alarga?',
+    level: 'Entrevista · senior',
+    intensity: 'dura',
+    minutes: 10,
   },
 ];
 

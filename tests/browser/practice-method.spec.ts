@@ -94,6 +94,28 @@ test('el personaje sube de nivel con las respuestas y una situación suave cede 
   expect(stageFor(dura, 14)).toBe(3);
 });
 
+test('la entrevista por perfil puntúa seis criterios y pesa la nota, no hace media simple', () => {
+  const scenario = scenarioById('perfil-exigente')!;
+  const axes = [
+    { id: 'confianza', score: 80, note: '', quote: '' },
+    { id: 'claridad', score: 80, note: '', quote: '' },
+    { id: 'evidencia', score: 40, note: '', quote: '' },
+    { id: 'objecion', score: 60, note: '', quote: '' },
+    { id: 'encaje', score: 60, note: '', quote: '' },
+    { id: 'iniciativa', score: 100, note: '', quote: '' },
+  ];
+  const base = { summary: 'Entrevista senior.', focus: 'Cifras.', strengths: [], improvements: [], model: '', next: 'Repite.' };
+  const debrief = cleanDebrief(JSON.stringify({ ...base, axes }), [say('Hola.')], scenario)!;
+  expect(debrief.axes.map(axis => axis.id)).toEqual(['confianza', 'claridad', 'evidencia', 'objecion', 'encaje', 'iniciativa']);
+  // 25/20/20/15/10/10 → 20+16+8+9+6+10 = 69; la media simple habría dado 70.
+  expect(debrief.score).toBe(69);
+  // Un eje de menos no se acepta: nunca se inventa un feedback parcial.
+  expect(cleanDebrief(JSON.stringify({ ...base, axes: axes.slice(0, 5) }), [say('Hola.')], scenario)).toBeNull();
+  // La rúbrica genérica de cuatro ejes sigue intacta para las entrevistas sin perfil.
+  const generica = scenarioById('entrevista-closer')!;
+  expect(cleanDebrief(JSON.stringify({ ...base, axes }), [say('Hola.')], generica)).toBeNull();
+});
+
 test('la nota se acota a 0-100 y un feedback sin los cuatro ejes no se acepta', () => {
   const scenario = scenarioById('entrevista-closer')!;
   const base = {

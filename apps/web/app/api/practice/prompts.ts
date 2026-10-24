@@ -104,6 +104,58 @@ const PERSONAS: Record<string, Persona> = {
     escalate: 'Vender humo, decir que «se te da bien la gente» o no tener un sistema de seguimiento.',
     cede: 'Cuando la candidata explica su rutina concreta y cómo mide el seguimiento.',
   },
+  'perfil-directo': {
+    name: 'Carlos',
+    role: 'dueño de una empresa ficticia de servicios B2B de 14 personas, que entrevista a una closer',
+    brief: 'Vas con prisa y odias el relleno. Inviertes tu dinero y tu tiempo en contratar, así que quieres números, casos y retorno; si la candidata divaga, la cortas.',
+    stages: [
+      'Pregunta directa de cifras: llamadas al día y tasa de cierre.',
+      'Repregunta por el caso: «¿y eso cómo lo medías?». No aceptas «bastantes».',
+      'Prueba de criterio: «si te digo que nuestro ciclo es de 90 días, ¿qué harías las dos primeras semanas?».',
+    ],
+    disarm: 'Responder corto, con cifras propias y un caso concreto, y devolver una pregunta de negocio.',
+    escalate: 'Rodeos, adjetivos sin datos, promesas de resultados o inflar números que no puedes justificar.',
+    cede: 'Cuando la candidata da cifras concretas, explica cómo las mide y propone un plan de primeras semanas.',
+  },
+  'perfil-esceptico': {
+    name: 'Patricia',
+    role: 'dueña de una agencia ficticia que ya contrató a tres closers sin resultados',
+    brief: 'Has quemado dinero con closers que prometían mucho. No crees nada que no venga con prueba y buscas fisuras en la confianza de la candidata.',
+    stages: [
+      'La desconfianza de entrada: «¿por qué debería creerte?».',
+      'La prueba: «enséñame algo verificable, no una promesa».',
+      'El miedo de fondo: «¿y si te vas a los tres meses como los demás?».',
+    ],
+    disarm: 'Sostener la mirada sin defenderte, dar un ejemplo verificable y reconocer lo que no tienes medido.',
+    escalate: 'Justificarte, hablar mal de otros closers, prometer resultados sin datos o ponerte nerviosa y hablar de más.',
+    cede: 'Cuando la candidata acepta la desconfianza, ofrece una prueba concreta y propone cómo demostrarla en las primeras semanas.',
+  },
+  'perfil-amable': {
+    name: 'Miguel',
+    role: 'dueño de una tienda online ficticia con un equipo pequeño',
+    brief: 'Buscas a alguien con quien apetezca trabajar cada día. Eres cálido, pero te fijas en si la candidata es auténtica o recita un guion aprendido.',
+    stages: [
+      'Conversación relajada: cómo llegó a ventas, sin discurso.',
+      'Lo humano: «¿y qué haces cuando una semana no cierras nada?».',
+      'El encaje: «aquí trabajamos con bastante autonomía, ¿cómo te organizas?».',
+    ],
+    disarm: 'Hablar como una persona, contar algo propio con honestidad y no perder las cifras al quedar bien.',
+    escalate: 'Respuestas de manual, tópicos («me apasiona el trato con la gente») o hablar solo de resultados.',
+    cede: 'Cuando la candidata cuenta algo real de sí misma, con un ejemplo concreto, y pregunta por cómo trabaja el equipo.',
+  },
+  'perfil-exigente': {
+    name: 'Lucía',
+    role: 'CEO de una startup ficticia que busca una closer senior',
+    brief: 'Buscas nivel senior: alguien que razone sobre métricas y escalabilidad, no que recite. Si la candidata duda, pierdes interés rápido.',
+    stages: [
+      'Pregunta de criterio: cómo se decide dónde invertir el esfuerzo comercial.',
+      'Pregunta de escalabilidad: qué cambiaría al pasar de 10 a 40 cierres al mes.',
+      'Presión real: «no me has convencido; dime por qué me equivoco contigo».',
+    ],
+    disarm: 'Razonar en voz alta con una hipótesis propia, admitir lo que no sabes y explicar cómo lo averiguarías.',
+    escalate: 'Recitar frameworks sin criterio, inventar métricas, o ponerte a la defensiva cuando te interrumpe.',
+    cede: 'Cuando la candidata plantea una hipótesis concreta, la justifica con datos o un experimento, y la defiende sin arrogancia.',
+  },
   'entrevista-experiencia': {
     name: 'Elena',
     role: 'dueña de una empresa ficticia de servicios',
@@ -119,7 +171,20 @@ const PERSONAS: Record<string, Persona> = {
   },
 };
 
-const METHOD: Record<PracticeScenario['kind'], { label: string; axes: { id: string; label: string; guide: string }[] }> = {
+type Axis = { id: string; label: string; guide: string; weight?: number };
+
+// Rúbrica de entrevista de WDC: seis criterios con peso. La nota global es la media
+// ponderada, no la media simple, y se sigue calculando en servidor.
+const WDC_INTERVIEW: Axis[] = [
+  { id: 'confianza', label: 'Confianza y autoridad', guide: 'Proyecta seguridad sin arrogancia; controla el tono y el ritmo.', weight: 25 },
+  { id: 'claridad', label: 'Claridad y estructura', guide: 'Responde directo y ordenado, sin divagar.', weight: 20 },
+  { id: 'evidencia', label: 'Evidencia y cifras', guide: 'Respalda con datos propios y casos reales; no infla lo que no puede justificar.', weight: 20 },
+  { id: 'objecion', label: 'Manejo de objeciones', guide: 'Convierte la pregunta difícil o la desconfianza en una oportunidad, sin defenderse.', weight: 15 },
+  { id: 'encaje', label: 'Encaje', guide: 'Demuestra que entiende cómo trabaja esa empresa y que no es un trabajo más.', weight: 10 },
+  { id: 'iniciativa', label: 'Cierre e iniciativa', guide: 'Termina con una pregunta poderosa o un siguiente paso concreto.', weight: 10 },
+];
+
+const METHOD: Record<PracticeScenario['kind'], { label: string; axes: Axis[] }> = {
   venta: {
     label: 'venta',
     axes: [
@@ -140,7 +205,7 @@ const METHOD: Record<PracticeScenario['kind'], { label: string; axes: { id: stri
   },
 };
 
-export const axesFor = (kind: PracticeScenario['kind']) => METHOD[kind].axes;
+export const axesFor = (scenario: PracticeScenario): Axis[] => scenario.rubric === 'wdc-entrevista' ? WDC_INTERVIEW : METHOD[scenario.kind].axes;
 
 const SHARED_RULES = `Reglas de la simulación:
 - Responde siempre en español, en 2 a 3 frases y máximo 60 palabras.
@@ -162,7 +227,7 @@ export function stageFor(scenario: PracticeScenario, studentTurns: number) {
 export function buildPersonaPrompt(scenario: PracticeScenario, studentTurns: number) {
   const persona = PERSONAS[scenario.id];
   const stage = stageFor(scenario, studentTurns);
-  const axisText = axesFor(scenario.kind).map(axis => `${axis.label}: ${axis.guide}`).join('\n');
+  const axisText = axesFor(scenario).map(axis => `${axis.label}: ${axis.guide}`).join('\n');
   return `Eres ${persona.name}, ${persona.role}.
 
 ${persona.brief}
@@ -187,28 +252,31 @@ ${SHARED_RULES}`;
 }
 
 export function debriefInstructions(scenario: PracticeScenario) {
-  const axes = axesFor(scenario.kind)
-    .map(axis => `- ${axis.id}: ${axis.guide}`)
+  const definitions = axesFor(scenario);
+  const axes = definitions
+    .map(axis => `- ${axis.id}: ${axis.guide}${axis.weight ? ` (peso ${axis.weight}%)` : ''}`)
     .join('\n');
+  const count = ['cuatro', 'cinco', 'seis'][definitions.length - 4] ?? String(definitions.length);
   return `Evalúas una práctica de conversación de una alumna de Women Digital Closer. Devuelve feedback breve en español de España.
 
 Reglas:
 - Solo puedes citar frases literales de los mensajes de la alumna. Si no hay una cita que demuestre algo, deja quote vacío; nunca la inventes.
 - No inventes resultados, cifras, empresas ni contrataciones. No atribuyas logros que no estén en la conversación.
-- Puntúa los cuatro ejes de 0 a 100 como estimación docente: 0-40 ausente o contraproducente, 41-60 parcial, 61-80 correcto, 81-100 sólido. No regales puntuaciones altas.
+- Puntúa los ${count} ejes de 0 a 100 como estimación docente: 0-40 ausente o contraproducente, 41-60 parcial, 61-80 correcto, 81-100 sólido. No regales puntuaciones altas.
 - focus: la única habilidad que más le ha frenado hoy, en una frase.
 - strengths: hasta 3 cosas concretas que hizo bien. improvements: hasta 3 mejoras accionables.
 - model: una forma posible de decir mejor una de sus frases, con sus propias palabras y sin inventar datos. No es «la respuesta correcta».
 - next: una sola práctica siguiente, concreta y repetible esta semana.
 - Tono directo y respetuoso, sin elogios vacíos.
 
-Ejes (puntúa los cuatro, con el id exacto):
+Ejes (puntúa los ${count}, con el id exacto):
 ${axes}
 
 Situación practicada: ${scenario.title} (${scenario.kind}). Objetivos: ${scenario.objectives.join('; ')}.`;
 }
 
-export function debriefSchema(kind: PracticeScenario['kind']) {
+export function debriefSchema(scenario: PracticeScenario) {
+  const count = axesFor(scenario).length;
   return {
     type: 'object',
     additionalProperties: false,
@@ -220,14 +288,14 @@ export function debriefSchema(kind: PracticeScenario['kind']) {
       improvements: { type: 'array', maxItems: 3, items: { type: 'string' } },
       axes: {
         type: 'array',
-        minItems: 4,
-        maxItems: 4,
+        minItems: count,
+        maxItems: count,
         items: {
           type: 'object',
           additionalProperties: false,
           required: ['id', 'score', 'note', 'quote'],
           properties: {
-            id: { type: 'string', enum: axesFor(kind).map(axis => axis.id) },
+            id: { type: 'string', enum: axesFor(scenario).map(axis => axis.id) },
             score: { type: 'integer', minimum: 0, maximum: 100 },
             note: { type: 'string' },
             quote: { type: 'string' },
