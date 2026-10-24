@@ -185,6 +185,33 @@ await step('alumnas: invitación, recuperación, login, perfil con consentimient
   assert.ok(login.raw.headers.getSetCookie().every(c => /HttpOnly/.test(c) && c.startsWith('wdc_student_')), 'cookies propias y HttpOnly');
   // Primera entrada enlaza el usuario y activa la ficha
   assert.equal(state.students.find(x => x.email === E).status, 'active'); assert.ok(state.students.find(x => x.email === E).user_id);
+  // Progreso: la entrada ya cuenta; formación y examen solo se registran con sesión.
+  const studentHeaders = { cookies: false, headers: { cookie: studentCookie() } };
+  const before = await call('/api/student/progress', studentHeaders);
+  assert.equal(before.status, 200); assert.equal(before.json.progress.sessions, 1, 'el login cuenta como entrada');
+  assert.equal(before.json.progress.practice.count, 0); assert.equal(before.json.progress.training.examBest, null, 'sin examen es null, no 0');
+  assert.equal((await call('/api/student/activity', { cookies: false, method: 'POST', body: { kind: 'training_review', ref: 'precall', detail: { met: 4, total: 4 } } })).status, 401);
+  assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_review', ref: 'modulo-falso', detail: { met: 1, total: 1 } } })).status, 422);
+  assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 101 } })).status, 422);
+  assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_review', ref: 'precall', detail: { met: 4, total: 4 } } })).status, 201);
+  const exam = await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100, detail: { correct: 6, total: 6, passed: false } } });
+  assert.equal(exam.status, 201); assert.equal(exam.json.passed, true, 'el servidor recalcula el superado');
+  const after = await call('/api/student/progress', studentHeaders);
+  assert.deepEqual(after.json.progress.training.modules, ['precall']); assert.equal(after.json.progress.training.examBest, 100); assert.equal(after.json.progress.training.examPassed, true);
+  assert.equal(after.json.progress.recent[0].kind, 'training_exam', 'lo más reciente primero');
+  assert.equal(after.json.progress.lifetime.training.examBest, 100, 'el resumen de siempre también trae el examen');
+  // La nota la calcula el servidor con las respuestas acertadas: un `score` inflado
+  // no se guarda y el «superado» se recalcula.
+  const forged = await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100, detail: { correct: 2, total: 6, passed: true } } });
+  assert.equal(forged.status, 201); assert.equal(forged.json.score, 33, '2 de 6 = 33, no el 100 del navegador'); assert.equal(forged.json.passed, false);
+  assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100 } })).status, 422, 'sin respuestas no hay nota');
+  const recomputed = await call('/api/student/progress', studentHeaders);
+  assert.equal(recomputed.json.progress.recent[0].score, 33); assert.equal(recomputed.json.progress.recent[0].detail.passed, false);
+  const adminView = await call('/api/admin/students'); assert.equal(adminView.status, 200);
+  assert.ok(adminView.json.activity.some(a => a.student.email === E && a.summary.training.examBest === 100));
+  assert.ok(adminView.json.totals.entered7 >= 1);
+  assert.equal(adminView.json.activity_available, true, 'la actividad se pudo leer');
+  assert.equal(adminView.json.truncated, false);
   // Perfil: exige consentimiento; saneado; el vídeo es un enlace https
   const own = { cookies: false, headers: { cookie: studentCookie() } };
   assert.equal((await call('/api/student/profile', own)).json.profile, null);
@@ -327,7 +354,10 @@ await step('recogida de APIs oficiales: solo propietario; usa las claves guardad
   const saved = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });
   assert.equal((await call('/api/admin/external', { method: 'POST', body: { action: 'collect' } })).status, 403); jar = saved;
   const r = await call('/api/admin/external', { method: 'POST', body: { action: 'collect' } }); assert.equal(r.status, 200);
-  assert.deepEqual(r.json.outcomes.map(o => [o.provider, o.ok]), [['infojobs', true], ['adzuna', true], ['jooble', true]], JSON.stringify(r.json.outcomes));
+  assert.deepEqual(r.json.outcomes.filter(o => o.provider).map(o => [o.provider, o.ok]), [['infojobs', true], ['adzuna', true], ['jooble', true]], JSON.stringify(r.json.outcomes));
+  // Google Jobs (SerpApi) se intenta en la misma pasada; en las pruebas está apagado por SERPAPI_JOBS_MAX_DORKS=0.
+  const google = r.json.outcomes.find(o => o.source === 'google-jobs');
+  assert.ok(google && google.ok === false && /desactivada/.test(google.error), JSON.stringify(google));
   const bySource = Object.fromEntries([...state.external.values()].map(o => [o.source, o]));
   assert.equal(bySource.infojobs.title, 'Closer de ventas high ticket'); assert.equal(bySource.adzuna.location, 'Barcelona, España'); assert.equal(bySource.jooble.editorial_status, 'draft');
   assert.equal(state.ingestRuns.filter(x => x.via === 'panel').length, 3);
@@ -581,6 +611,24 @@ await step('vigencia automática (cron): verifica las aprobadas viejas y retira 
   const r = await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
   assert.equal(r.status, 200); assert.ok(r.json.vigencia.checked >= 2);
   assert.equal(live.editorial_status, 'approved'); assert.equal(dead.editorial_status, 'withdrawn'); assert.equal(dead.reviewed_by, 'auto-vigencia'); assert.equal(fresh.editorial_status, 'approved');
+});
+await step('motor caído: la alumna sigue viendo las externas aprobadas y la vista lo declara', async () => {
+  const id = crypto.randomUUID();
+  state.external.set('e2e|down', { id, source: 'indeed', external_id: 'down', title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', description: 'Buscamos closer para cerrar ventas consultivas con leads cualificados.', url: 'https://es.indeed.com/down', editorial_status: 'approved', role: 'closer', spain: true, score: 80, raw: {}, posted_at: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), also_seen: [] });
+  const search = (body = {}) => call('/api/backend/opportunities/search', { method: 'POST', cookies: false, body: { role: 'closer', market: 'ES', days: 10, include_bilingual: false, starred_only: false, include_extra_roles: true, ...body } });
+  state.engineDown = true;
+  const down = await search();
+  assert.equal(down.status, 200, 'un motor caído no convierte la vista en un error');
+  assert.equal(down.json.degraded, 'motor');
+  assert.ok(down.json.items.length > 0, 'se sirven las externas');
+  assert.ok(down.json.items.every(i => String(i.id).startsWith('ext-')), 'solo externas: el motor no aporta nada');
+  assert.equal(down.json.total, down.json.items.length);
+  state.engineDown = false;
+  const back = await search();
+  assert.equal(back.status, 200);
+  assert.equal(back.json.degraded, undefined, 'con el motor arriba no se declara degradado');
+  assert.ok(back.json.items.some(i => !String(i.id).startsWith('ext-')), 'vuelven las del motor');
+  state.external.delete('e2e|down');
 });
 await step('seguridad: cabeceras en todas las respuestas', async () => {
   const res = await fetch(BASE + '/admin');

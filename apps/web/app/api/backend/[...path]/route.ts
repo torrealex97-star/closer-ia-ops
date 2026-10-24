@@ -59,6 +59,17 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }
+    // Motor caído (pausa de cuota, 503): sus ofertas no llegan, pero las externas
+    // aprobadas siguen en Supabase. Ocultarlas convertiría un fallo del motor en
+    // «no hay ofertas»; se sirven solas y la vista lo declara (`degraded`).
+    if (engine && !upstream.ok && path.join('/') === 'opportunities/search' && request.method === 'POST') {
+      try {
+        const body = JSON.parse(requestBody) as { role?: string | null; market?: string; days?: number; include_bilingual?: boolean; starred_only?: boolean };
+        const extra = await externalForStudent({ role: body.role ?? null, market: body.market ?? 'any', days: Number(body.days) || 10, include_bilingual: Boolean(body.include_bilingual), starred_only: Boolean(body.starred_only) });
+        if (extra.length) return Response.json({ items: extra, total: extra.length, selection_total: 0, degraded: 'motor' }, { headers });
+      } catch { /* sin externas no hay nada que servir: se devuelve el fallo del motor */ }
+      return new Response(upstream.body, { status: upstream.status, headers });
+    }
     // Hosted: la búsqueda de alumna suma las ofertas externas aprobadas a las del motor (sin duplicar enlaces).
     if (engine && upstream.ok && path.join('/') === 'opportunities/search' && request.method === 'POST') {
       try {

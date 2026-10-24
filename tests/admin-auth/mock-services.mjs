@@ -7,6 +7,7 @@ export function startMocks({ authPort, enginePort }) {
     users: new Map([['owner@test.dev', { id: 'u1', password: 'Correcta-12345' }]]),
     admins: [{ email: 'owner@test.dev', role: 'owner', invited_by: 'bootstrap', created_at: '2026-10-16T00:00:00Z' }],
     connections: new Map(), external: new Map(), sourceSettings: new Map(), apifyActors: [], apifyRuns: [], apifyCalls: [], apifyItems: [], apifyStatus: 'SUCCEEDED', ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
+    engineDown: false, // simula la pausa de cuota del motor (Sites devuelve 503)
   };
   const send = (res, code, body, extra = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...extra }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
@@ -102,6 +103,18 @@ export function startMocks({ authPort, enginePort }) {
       if (req.method === 'POST') { if (state.students.some(r => r.email === body.email)) return send(res, 409, {}); state.students.unshift({ id: crypto.randomUUID(), user_id: null, status: 'invited', created_at: new Date().toISOString(), ...body }); return send(res, 201, {}); }
       if (req.method === 'PATCH') { rows.forEach(r => Object.assign(r, body)); return send(res, 200, rows); }
       if (req.method === 'DELETE') { state.students = state.students.filter(r => !rows.includes(r)); return send(res, 204, {}); }
+      return send(res, 200, rows);
+    }
+    if (url.pathname === '/rest/v1/student_activity') {
+      state.activity ??= []; const q = Object.fromEntries(url.searchParams);
+      if (req.method === 'POST') { state.activity.unshift({ id: crypto.randomUUID(), org_id: 'cloud-wdc', created_at: new Date().toISOString(), ref: null, score: null, detail: {}, ...body }); return send(res, 201, []); }
+      const eqv = k => q[k]?.startsWith('eq.') ? decodeURIComponent(q[k].slice(3)) : null;
+      const gte = q.created_at?.startsWith('gte.') ? decodeURIComponent(q.created_at.slice(4)) : null;
+      let rows = state.activity.slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
+      if (eqv('org_id')) rows = rows.filter(r => r.org_id === eqv('org_id'));
+      if (eqv('student_id')) rows = rows.filter(r => r.student_id === eqv('student_id'));
+      if (gte) rows = rows.filter(r => r.created_at >= gte);
+      if (Number(q.limit)) rows = rows.slice(0, Number(q.limit));
       return send(res, 200, rows);
     }
     if (url.pathname === '/rest/v1/student_application_profiles') {
@@ -212,6 +225,7 @@ export function startMocks({ authPort, enginePort }) {
   ];
   const engine = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const body = ['POST', 'PATCH'].includes(req.method) ? await read(req) : {};
+    if (state.engineDown && url.pathname.startsWith('/v1/')) return send(res, 503, { detail: 'Site temporarily unavailable' });
     if (url.pathname === '/page/ok') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<h1>Closer de ventas en Madrid</h1>'); }
     if (url.pathname === '/page/gone') return send(res, 404, {});
     if (url.pathname === '/api/status') return send(res, 200, { catalog_active: 12, raw_items: 300, latest_run: { day: '2026-10-16', status: 'completed', completed_at: '2026-10-16T08:00:00Z', sources: [] } });

@@ -12,7 +12,9 @@ import type { components } from '../../../packages/contracts/api';
 
 type Offer = components['schemas']['Opportunity'];
 type Query = components['schemas']['OpportunityQuery'];
-type Results = components['schemas']['OpportunityList'];
+// `degraded` solo lo añade el proxy web cuando el motor no responde y sirve las
+// externas aprobadas a solas: no forma parte del contrato del motor.
+type Results = components['schemas']['OpportunityList'] & { degraded?: 'motor' };
 const defaults: Query = { role: null, market: 'any', days: 10, include_bilingual: false, starred_only: false, include_extra_roles: false };
 const ROLES = ['closer', 'setter', 'cold_caller', 'account_executive', 'sdr'] as const;
 const ROLE_LABELS: Record<NonNullable<Query['role']>, string> = { closer: 'las del perfil Closer', setter: 'las del perfil Setter', cold_caller: 'las del perfil Cold Caller', account_executive: 'las de Ejecutivo comercial', sdr: 'las de SDR / BDR' };
@@ -73,6 +75,7 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
   const [training, setTraining] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const [degraded, setDegraded] = useState(false);
   const [detail, setDetail] = useState<Offer | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [phrase, setPhrase] = useState('');
@@ -87,6 +90,10 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
   useEffect(() => {
     const fromUrl = queryFromUrl();
     if (fromUrl) { setQuery(fromUrl); setApplied(fromUrl); }
+    // Enlaces directos del panel de la alumna: /?tab=formacion y /?tab=practica.
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab === 'formacion') setTraining(true);
+    else if (tab === 'practica') setPractice(true);
   }, []);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -98,12 +105,12 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
   useEffect(() => {
     let stopped = false;
     const id = ++sequence.current;
-    setBusy(true); setError(''); setWider(null);
+    setBusy(true); setError(''); setWider(null); setDegraded(false);
     // Hosted: Guardadas son las marcadas en Este navegador (filtrado en cliente);
     // el marcador starred_only del engine queda como curación del operador.
     request<Results>('opportunities/search', saved ? (hosted ? { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: false, include_extra_roles: true } : { role: null, market: 'any', days: 10, include_bilingual: true, starred_only: true, include_extra_roles: true }) : applied)
       .then(result => {
-        if (!stopped && sequence.current === id) { setItems(result.items); setSelectionTotal(result.selection_total ?? 0); }
+        if (!stopped && sequence.current === id) { setItems(result.items); setSelectionTotal(result.selection_total ?? 0); setDegraded(result.degraded === 'motor'); }
         // Filtro estrecho con pocas ofertas: presentamos también el hueco más amplio
         // (mismo mercado y días, sin filtro de rol) rotulado como tal, con los mismos
         // datos reales del motor — la alumna compara sin creer que el catálogo se vació.
@@ -193,6 +200,7 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
           </form>
         </div>}
         {error && <p className="alert error" role="alert">{error}</p>}
+        {degraded && !busy && <p className="selection-note" role="status">El catálogo general no responde ahora mismo. Estas son las ofertas externas ya revisadas y aprobadas; el resto volverá cuando el buscador se recupere.</p>}
         {!saved && <OpportunityRadar offers={[...visible, ...(wider ?? [])]} busy={busy} role={applied.role ?? null} onRole={next => applyQuery({ ...applied, role: next })} />}
         <section className="student-results" aria-busy={busy}><div className="results-heading"><h2>{saved ? 'Tus oportunidades guardadas' : 'Oportunidades para explorar'} <span>{busy ? '…' : visible.length + (wider?.length ?? 0)}</span></h2><span className="student-freshness">Actualización diaria</span></div>
           {!saved && !busy && selectionTotal > 0 && <p className="selection-note">Selección del día: las {selectionTotal} que mejor cumplen los requisitos van primero. Puedes explorar el resto del catálogo debajo.</p>}
