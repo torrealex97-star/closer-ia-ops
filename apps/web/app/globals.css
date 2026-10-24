@@ -531,3 +531,6 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .achievements{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
 .achievements li{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;background:var(--inset)}.achievements li[data-on="true"]{border-color:var(--sage);background:var(--sage-soft)}
 .achievements small{color:var(--secondary)}
+.funnel{display:grid;gap:10px;margin:12px 0}.funnel-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(60px,2fr) auto;gap:10px;align-items:center;font-size:12px}
+.funnel-row .meter{margin:0}.funnel-row b{font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+@media(max-width:560px){.funnel-row{grid-template-columns:1fr auto}.funnel-row .meter{grid-column:1 / -1;order:3}}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Pause, Play, Trash2, UserPlus } from 'lucide-react';
 import { api } from './AdminShell';
 import { REVIEW_REFS } from './trainingRefs';
+import StudentActivityDashboard from './StudentActivityDashboard';
 
 // Alumnas: invitar, pausar/reactivar (reversible) y dar de baja (solo propietario, irreversible). Sin datos de perfil aquí.
 type Row = { id: string; email: string; status: 'invited' | 'active' | 'paused'; invited_by: string | null; created_at: string };
@@ -47,6 +48,7 @@ export default function StudentsTab({ owner, onSessionLost }: { owner: boolean; 
     <div className="training-chips" role="group" aria-label="Periodo de actividad">{PERIODS.map(p => <button key={p} aria-pressed={days === p} onClick={() => setDays(p)}>Últimos {p} días</button>)}</div>
     {overview && !live && <div className="alert" role="status"><span>La actividad de las alumnas no se pudo leer ahora mismo (la tabla puede no estar creada todavía). Se muestra «—» en vez de ceros; la lista de acceso funciona igual.</span></div>}
     {overview && live && overview.totals && <div className="stat-strip" aria-label={`Actividad de los últimos ${overview.days} días`}><span><strong>{overview.totals.entered7}</strong>entraron en 7 días</span><span><strong>{overview.totals.active}</strong>con actividad en {overview.days} días</span><span><strong>{overview.totals.practices}</strong>prácticas</span><span><strong>{overview.totals.exams_passed}</strong>con examen superado</span></div>}
+    {overview && live && <StudentActivityDashboard students={rows} summaries={summaries} days={overview.days} />}
     {overview?.truncated && <p className="card-meta" role="status">Hay más de 5.000 movimientos en el periodo: los totales pueden quedarse cortos.</p>}
     {busy ? <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p> : !rows.length ? <div className="empty"><h3>Aún no hay alumnas invitadas.</h3></div> : <div className="table-wrap"><table className="data-table">
       <thead><tr><th>Alumna</th><th>Estado</th><th>Alta</th><th>Última entrada</th><th className="num">Prácticas</th><th className="num">Formación</th><th>Examen</th><th /></tr></thead>

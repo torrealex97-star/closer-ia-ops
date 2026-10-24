@@ -196,6 +196,11 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   assert.ok(await alumna.getByRole('img', { name: /Nota media semanal de prácticas/ }).isVisible());
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con progreso');
   await page.getByRole('button', { name: 'Últimos 7 días' }).click();
+  const board = page.getByTestId('coordinator'); await board.waitFor();
+  assert.match(await board.innerText(), /Han practicado\s*\d+ · \d+ %/); assert.ok(await board.getByRole('img', { name: /Embudo de activación/ }).isVisible());
+  await board.getByText('Ver como tabla').first().click(); assert.equal(await board.locator('details').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
+  assert.match(await board.innerText(), /Hace falta que al menos 5 alumnas/, 'con una sola alumna no hay distribución de notas');
+  if (process.env.SHOT3) await board.screenshot({ path: process.env.SHOT3 });
   const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/7/);
   await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL').waitFor();
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
