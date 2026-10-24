@@ -7,13 +7,19 @@ import { getProfile, type Profile } from './students';
 // Candidatura ASISTIDA (3.2): la app prepara un borrador y los datos para copiar; la alumna los revisa, los pega en la web
 // de la empresa y envía ELLA. La app solo anota en qué punto está (borrador → abierta → enviada por ella → descartada).
 // No hay ninguna ruta que envíe correos, rellene formularios ni contacte con la empresa.
-export const STATUSES = ['draft', 'opened', 'applied', 'discarded'] as const;
+// `responded`, `interview`, `offer` y `rejected` los declara la alumna cuando la empresa contesta (hoy nada lo detecta solo).
+export const STATUSES = ['draft', 'opened', 'applied', 'discarded', 'responded', 'interview', 'offer', 'rejected'] as const;
+export const OUTCOMES = ['responded', 'interview', 'offer', 'rejected'] as const;
+export const SENT = ['applied', ...OUTCOMES] as const;
 export type AppStatus = (typeof STATUSES)[number];
 export type Application = { id: string; offer_ref: string; offer_title: string; offer_company: string | null; offer_url: string; status: AppStatus; cover_message: string | null; notes: string | null; created_at: string; updated_at: string; applied_at: string | null };
 const COLS = 'id,offer_ref,offer_title,offer_company,offer_url,status,cover_message,notes,created_at,updated_at,applied_at';
 
 // Transiciones permitidas (la alumna decide; el servidor solo evita saltos incoherentes).
-const NEXT: Record<AppStatus, AppStatus[]> = { draft: ['opened', 'applied', 'discarded'], opened: ['draft', 'applied', 'discarded'], applied: ['discarded'], discarded: ['draft'] };
+const NEXT: Record<AppStatus, AppStatus[]> = {
+  draft: ['opened', 'applied', 'discarded'], opened: ['draft', 'applied', 'discarded'], applied: ['responded', 'interview', 'offer', 'rejected', 'discarded'], discarded: ['draft'],
+  responded: ['interview', 'offer', 'rejected', 'discarded'], interview: ['offer', 'rejected', 'discarded'], offer: ['discarded'], rejected: ['discarded'],
+};
 export const canMove = (from: AppStatus, to: AppStatus) => from === to || NEXT[from].includes(to);
 
 // Borrador DETERMINISTA (sin IA): solo usa datos que ella ha escrito; lo que falta se omite, nunca se inventa.
@@ -101,6 +107,8 @@ export async function updateApplication(userId: string, id: unknown, patch: { st
   // Guarda: solo sus filas y solo si el estado no cambió entretanto (otra pestaña).
   const r = await serviceRest(`student_applications?org_id=eq.${ORG}&user_id=eq.${userId}&id=eq.${id}&status=eq.${current.status}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
   const rows = r.ok ? await r.json().catch(() => null) : null;
+  // Estados de resultado antes de aplicar la migración (check_violation 23514): se dice, no se finge que se guardó.
+  if (!r.ok && body.status && (OUTCOMES as readonly string[]).includes(body.status as string)) { const e = await r.json().catch(() => null) as { code?: string } | null; if (e?.code === '23514') return { ok: false, status: 503, detail: 'Anotar la respuesta de la empresa aún no está activado en la base de datos. Inténtalo más adelante.' }; }
   return Array.isArray(rows) && rows.length === 1 ? { ok: true, application: rows[0] } : { ok: false, status: 409, detail: 'La candidatura cambió mientras la editabas. Recarga e inténtalo de nuevo.' };
 }
 
