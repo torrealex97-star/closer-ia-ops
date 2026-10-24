@@ -2,6 +2,11 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Cierre de las PRs #29-#33 (sesión 95) — 2026-10-24
+
+- Fusionadas en `main` con `verify` y `web-admin` en verde sobre su head: #29 actividad y progreso, #30 cierres y descubrimiento, #31 práctica → progreso, #32 chequeo de referencias huérfanas, #33 panel de coordinación. No quedan PRs ni fichas vivas de claude-cloud tras esta. Relevo actualizado (`ACTIVE_HANDOFF.md`).
+- Pendiente del dueño: aplicar la migración `student_activity` (hasta entonces el progreso de alumnas no se guarda ni se muestra); lo demás de la lista de tareas del relevo.
+
 ## Panel de coordinación en «Alumnas» (sesión 94) — 2026-10-24
 
 - **Petición del operador**: copiar lo bueno de los dashboards de `closer-ai-coach` (`ManagerDashboardView.tsx`). De él se toma la estructura (KPIs, embudo, puntos débiles, a quién atender); **no** sus datos de demostración ni sus gráficos en tema oscuro.
