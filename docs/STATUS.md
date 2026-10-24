@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Regla y chequeo contra pruebas sin su código (sesión 93) — 2026-10-24
+
+- **Origen**: el 24-oct-2026 `main` estuvo en rojo varios pushes porque se subieron tests, mocks y notas de la actividad de alumnas **sin su código** (ver sesión 90).
+- **Regla** (en [AGENTS.md](../AGENTS.md) y [docs/handoff/README.md](handoff/README.md)): tests, mocks, notas de STATUS y documentos viajan en la misma rama que el código que describen; no se cierra una sesión con trabajo sin subir.
+- **Chequeo** ([tests/orphan-refs.mjs](../tests/orphan-refs.mjs)): falla con un mensaje legible si `flow.mjs`/`ui.mjs` llaman a una ruta `/api` que no existe en `apps/web/app/api` (entiende `[id]` y `[...path]`) o si `run.sh`/`quality.yml` invocan un fichero de prueba que no está. Se ejecuta **al principio de `run.sh`** (y por tanto en el job `web-admin`) junto con su prueba negativa [orphan-refs.selftest.mjs](../tests/orphan-refs.selftest.mjs). Además `run.sh` deja de ocultar el error de cada suite (`2>/dev/null` fuera; los avisos experimentales de Node se silencian con `NODE_NO_WARNINGS`).
+- **Verificado (tested)**: la prueba negativa pasa, el chequeo pasa sobre el repositorio actual (27 rutas conocidas) y, aplicado al `flow.mjs` y `run.sh` de `974310b` (el commit rojo), **detecta exactamente** `/api/student/progress`, `/api/student/activity` y `tests/admin-auth/activity.mjs`.
+- **Límites**: solo mira rutas escritas como literal (no las construidas con variables) y no comprueba que el contrato de la respuesta coincida; no sustituye a revisar que la rama contenga todo lo que se describe.
+
 ## La sala de práctica alimenta «Mi progreso» (sesión 92) — 2026-10-24
 
 - **Qué**: al terminar una práctica, la nota global y la de cada eje se registran como actividad (`kind: practice`, escenario y ejes; modo `texto`). **No se envía el texto de la conversación ni el feedback**: solo números. Sin sesión de alumna la práctica funciona igual y no queda registrada. «Mi progreso» muestra ahora las competencias con su nombre (Apertura y marco, Confianza y autoridad…) y el historial con el título del escenario.
