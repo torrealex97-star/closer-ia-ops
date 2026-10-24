@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Motor desplegado con el gazetteer de municipios (sesión 86) — 2026-10-24
+
+- **Petición del operador**: desplegar el worker del motor con el nuevo vocabulario y comprobar que su superficie sigue respondiendo.
+- **Desplegado en Sites (verified)**: `closer-ia-ops-engine` → **preview** `e59fc3cc-d9f7-4e82-a547-4bd92cdf40e8` y **production** `dadec786-af9d-42ba-9632-5c5a1ac1974e`, ambos `succeeded`; `deployed_at=2026-10-24T16:06:04Z`, `published=true`, y los bindings (`DB` D1, `ADMIN_TOKEN`, `COLLECT_TOKEN`) siguen en su sitio. `node --check` sobre el worker antes de publicar y 223 KB de módulo (100 KB son el gazetteer).
+- **El manifiesto con cron no se puede publicar**: Sites rechaza `deploy-manifest-cron.json` («Invalid deploy manifest») porque el despliegue no admite `crons`; se publicó con `deploy-manifest.json`. La recogida del motor sigue viniendo de fuera de Sites (su último run de hoy, `2026-10-24T13:49`, está `completed`).
+- **Superficie comprobada por HTTP contra el worker real**: `/health` **200**; `/api/status` **200** (`raw_items` 3.347, `catalog_active` 2.343, último run completado); `POST /v1/opportunities/search` con `market=ES` **200** y **48** ítems (los mismos que antes del despliegue); con perfil closer **200** y **3**; y la web (`/api/backend/opportunities/search`) **200** con **32** (3 del motor + 29 externas, sin marca de degradado).
+- **Límite honesto**: no hay forma de aislar en vivo el efecto del gazetteer en este worker: su catálogo no tiene ninguna oferta cuya ubicación sea **solo** un municipio (todas llevan «España», «Madrid» o una capital), y el motor no expone un endpoint de clasificación bajo demanda. La regla nueva está cubierta por [parity.mjs](../tests/admin-auth/parity.mjs) (Boiro, O Rosal, Murcia, Salou, Alcobendas, Crémenes, «una» en el título, Lisboa, Austin) y el despliegue por el recibo de Sites; **actuará en la próxima ingesta**, no en las filas ya clasificadas.
+
 ## Municipios de España en el clasificador, con paridad en el motor (sesión 85) — 2026-10-24
 
 - **Petición del operador**: que el clasificador reconozca los municipios españoles que descartan closers reales, manteniendo la paridad con el motor.
