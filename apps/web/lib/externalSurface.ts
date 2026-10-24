@@ -1,5 +1,6 @@
 import { spanishWords } from './offerScore';
 import { listOffers, pausedSourcesStrict, type ExternalOffer } from './external';
+import { marketFor, type Market } from './market';
 import { spainSignal } from './esPlaces';
 import { fold, roleFromTitle, ROLE_LABELS, type RoleFamily } from './vocabulary';
 
@@ -68,6 +69,10 @@ export function toOpportunity(o: ExternalOffer, role: RoleFamily) {
   const sourceName = via && /(^|\.)google\./i.test(host) ? `${via} · vía Google Jobs` : host;
   return {
     id: `ext-${o.id}`, role, role_label: ROLE_LABELS[role], original_title: o.title, company: o.company || 'Empresa no indicada',
+    // Aplicar sin rodeos: primero el enlace de candidatura que publica la fuente, después el anuncio.
+    // `company_url` solo existe si el anuncio publica una web que no es un portal de empleo.
+    apply_url: o.apply_url || o.url, company_url: o.company_url ?? null, contact: o.contact ?? null,
+    market: (o.market as Market | null | undefined) ?? marketFor(o).market,
     compensation: o.salary || 'Importe no publicado', compensation_note: o.salary ? 'Tal como figura en el anuncio original.' : 'Pregunta por el fijo y las comisiones antes de avanzar.',
     modality: declared(o.raw).modality ?? 'Modalidad no indicada', location: o.location || 'Ubicación no indicada', language: 'Anuncio en español', experience: 'Experiencia no indicada', schedule: declared(o.raw).schedule ?? 'Jornada no indicada', contract: declared(o.raw).contract ?? 'Contrato no indicado',
     description: o.description || 'Consulta el anuncio original para ver las condiciones completas.',
@@ -75,8 +80,23 @@ export function toOpportunity(o: ExternalOffer, role: RoleFamily) {
   };
 }
 
+const MARKET_OK = new Set(['any', 'ES', 'EU', 'LATAM', 'US']);
+
+// Mercado de una oferta externa: usa el guardado al entrar (con su motivo) y, si falta, lo calcula.
+const marketOf = (o: ExternalOffer) => (o.market as Market | null | undefined) ?? marketFor(o).market;
+
+/** ¿Esta oferta entra en el mercado que pide la alumna? Ubicación cuando la hay; importe cuando no. */
+export function inMarket(o: ExternalOffer, wanted: string): boolean {
+  if (wanted === 'any') return true;
+  const market = marketOf(o);
+  if (wanted === 'ES' || wanted === 'EU') return spainSignal(o.title, o.location) === true;
+  if (wanted === 'LATAM') return market === 'LATAM' || market === 'US_LATINO';
+  if (wanted === 'US') return market === 'US_LATINO';
+  return false;
+}
+
 export async function externalForStudent(q: Query) {
-  if (q.starred_only || !['any', 'ES'].includes(q.market)) return [];
+  if (q.starred_only || !MARKET_OK.has(q.market)) return [];
   // Solo aprobadas, ya ordenadas por puntuación en el servidor (con miles de borradores no se pierde ninguna aprobada).
   const [all, paused] = await Promise.all([listOffers({ statuses: ['approved', 'published'], byScore: true, limit: 600, onlyLive: true }), pausedSourcesStrict()]);
   if (!paused) return []; // no se sabe qué fuentes están pausadas: ante la duda no se muestra nada
@@ -87,7 +107,7 @@ export async function externalForStudent(q: Query) {
     if (o.editorial_status !== 'approved' && o.editorial_status !== 'published') continue;
     const role = roleFromTitle(o.title);
     if (!role || (q.role && role !== q.role)) continue;
-    if (q.market === 'ES' && spainSignal(o.title, o.location) !== true) continue;
+    if (!inMarket(o, q.market)) continue;
     if (o.posted_at && Date.parse(o.posted_at) < cutoff) continue;
     const text = fold(`${o.title} ${o.description ?? ''}`);
     if (PORTUGUESE.test(text)) continue;

@@ -11,18 +11,29 @@ export const GOOGLE_JOBS_SOURCE = 'google-jobs';
 
 // El vocabulario canónico del repo (ROLE_FAMILIES.closer), no inventado aquí:
 // closer puro, high ticket y el título combinado setter/closer.
-export const GOOGLE_JOBS_DORKS = [
-  'closer de ventas España',
-  'closer high ticket España',
-  'setter closer España',
-  // Cada dork devuelve inventario distinto: los tres primeros se quedaban en 19
-  // anuncios y siempre los mismos. Estos añaden el ángulo remoto, el sinónimo
-  // castellano («cerrador»), el comercial y el inbound.
-  'closer remoto España',
-  'cerrador de ventas España',
-  'closer comercial España',
-  'closer inbound España',
-] as const;
+// Cada dork se busca en su país (`gl`) y en español (`hl`). El documento de prospección de WDC
+// confirma que el mismo perfil se busca en España y en LatAm; las ofertas de LatAm son las que
+// suelen pagar en dólares y antes no entraban en ninguna búsqueda.
+export type Dork = { q: string; gl: 'es' | 'mx' | 'co' | 'ar'; hl: 'es' };
+export const GOOGLE_JOBS_DORKS: readonly Dork[] = [
+  // España
+  { q: 'closer de ventas España', gl: 'es', hl: 'es' },
+  { q: 'closer high ticket España', gl: 'es', hl: 'es' },
+  { q: 'setter closer España', gl: 'es', hl: 'es' },
+  { q: 'closer remoto España', gl: 'es', hl: 'es' },
+  // LatAm · mercado en dólares
+  { q: 'closer de ventas remoto', gl: 'mx', hl: 'es' },
+  { q: 'closer high ticket', gl: 'co', hl: 'es' },
+  { q: 'closer de ventas', gl: 'ar', hl: 'es' },
+  // Ampliación: solo corre si se sube SERPAPI_JOBS_MAX_DORKS (cada búsqueda cuesta).
+  { q: 'cerrador de ventas España', gl: 'es', hl: 'es' },
+  { q: 'closer inbound', gl: 'mx', hl: 'es' },
+  { q: 'ejecutivo de ventas remoto', gl: 'ar', hl: 'es' },
+];
+
+// Búsquedas incluidas en el presupuesto por defecto: 4 de España + 3 de LatAm = 7 × 0,025 USD.
+// Subirlo se hace con SERPAPI_JOBS_MAX_DORKS (hasta el total de dorks de arriba); el panel muestra el coste.
+export const DEFAULT_MAX_DORKS = 7;
 
 // Precio de lista de SerpApi por búsqueda (Starter: 25 USD/1000). En el plan
 // gratuito las búsquedas salen de las 250 mensuales; el coste se declara igual
@@ -30,8 +41,8 @@ export const GOOGLE_JOBS_DORKS = [
 export const SEARCH_USD = 0.025;
 
 export const maxDorks = (env: NodeJS.ProcessEnv = process.env) => {
-  const raw = Number(env.SERPAPI_JOBS_MAX_DORKS ?? GOOGLE_JOBS_DORKS.length);
-  return Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 0), GOOGLE_JOBS_DORKS.length) : GOOGLE_JOBS_DORKS.length;
+  const raw = Number(env.SERPAPI_JOBS_MAX_DORKS ?? DEFAULT_MAX_DORKS);
+  return Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 0), GOOGLE_JOBS_DORKS.length) : DEFAULT_MAX_DORKS;
 };
 
 // Fecha relativa tal como la publica Google («hace 2 días», «3 days ago»). Solo
@@ -118,12 +129,12 @@ export type GoogleJobsOutcome = {
   truncated?: boolean;
 };
 
-type Fetcher = (query: string, timeoutMs: number) => Promise<Candidate[]>;
+type Fetcher = (dork: Dork, timeoutMs: number) => Promise<Candidate[]>;
 
 export function serpapiFetcher(secret: string): Fetcher {
-  return async (query, timeoutMs) => {
+  return async (dork, timeoutMs) => {
     const base = process.env.SERPAPI_API_BASE ?? 'https://serpapi.com';
-    const url = `${base}/search.json?engine=google_jobs&q=${encodeURIComponent(query)}&gl=es&hl=es&api_key=${encodeURIComponent(secret)}`;
+    const url = `${base}/search.json?engine=google_jobs&q=${encodeURIComponent(dork.q)}&gl=${dork.gl}&hl=${dork.hl}&api_key=${encodeURIComponent(secret)}`;
     const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json() as Record<string, unknown>;
@@ -163,7 +174,7 @@ export async function collectGoogleJobs(via: string, deadline?: number, fetchFor
     const settled = await Promise.allSettled(dorks.map(dork => fetchQuery(dork, timeout)));
     settled.forEach((result, i) => {
       if (result.status === 'fulfilled') all.push(...result.value);
-      else errors.push(`${dorks[i]}: ${(result.reason as Error)?.message ?? 'fallo'}`);
+      else errors.push(`${dorks[i].q} (${dorks[i].gl}): ${(result.reason as Error)?.message ?? 'fallo'}`);
     });
     const searches = dorks.length;
     if (deadline !== undefined && Date.now() >= deadline) truncated = true;

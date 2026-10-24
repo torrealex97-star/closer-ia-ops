@@ -69,7 +69,7 @@ delete process.env.SERPAPI_JOBS_MAX_DORKS;
 
 const { encryptSecret } = await import('../../apps/web/lib/secrets.ts');
 process.env.TEST_SECRET = encryptSecret('serpapi-key-1234');
-const { collectGoogleJobs, postedAt, toCandidate, GOOGLE_JOBS_DORKS, SEARCH_USD } = await import('../../apps/web/lib/googleJobs.ts');
+const { collectGoogleJobs, postedAt, toCandidate, GOOGLE_JOBS_DORKS, DEFAULT_MAX_DORKS, SEARCH_USD } = await import('../../apps/web/lib/googleJobs.ts');
 
 const results = [];
 const step = async (name, fn) => {
@@ -82,8 +82,8 @@ const step = async (name, fn) => {
 await step('mapea Google Jobs a candidatos con empresa, ubicación, salario, fecha y enlace', async () => {
   const out = await collectGoogleJobs('test');
   assert.equal(out.ok, true);
-  assert.equal(out.searches, GOOGLE_JOBS_DORKS.length);
-  assert.equal(out.cost_usd, Number((GOOGLE_JOBS_DORKS.length * SEARCH_USD).toFixed(3)));
+  assert.equal(out.searches, DEFAULT_MAX_DORKS);
+  assert.equal(out.cost_usd, Number((DEFAULT_MAX_DORKS * SEARCH_USD).toFixed(3)));
   // Dedupe: job-1 y job-2 una vez; job-3 cae por enlace no http.
   assert.equal(out.received, 2, `recibidas ${out.received}`);
   assert.equal(out.accepted, 2);
@@ -109,19 +109,21 @@ await step('mapea Google Jobs a candidatos con empresa, ubicación, salario, fec
   assert.equal(row.spain, true);
 });
 
-await step('pide cada dork a Google Jobs en español y sin paginar', async () => {
+await step('pide cada dork a Google Jobs en su país, en español y sin paginar', async () => {
   await collectGoogleJobs('test');
-  assert.equal(searches.length, GOOGLE_JOBS_DORKS.length);
+  assert.equal(searches.length, DEFAULT_MAX_DORKS);
   for (const search of searches) {
     assert.equal(search.engine, 'google_jobs');
-    assert.equal(search.gl, 'es');
     assert.equal(search.hl, 'es');
     assert.equal(search.api_key, 'serpapi-key-1234');
     assert.equal(search.next_page_token ?? null, null, 'no se paga una segunda página');
   }
-  assert.deepEqual(searches.map(s => s.q), [...GOOGLE_JOBS_DORKS]);
-  assert.ok(searches.every(s => /España/.test(s.q)));
-  assert.ok(searches.some(s => /remoto/.test(s.q)) && searches.some(s => /cerrador/.test(s.q)), 'la ampliación está viva');
+  assert.deepEqual(searches.map(s => s.q), GOOGLE_JOBS_DORKS.slice(0, DEFAULT_MAX_DORKS).map(d => d.q));
+  assert.deepEqual(searches.map(s => s.gl), GOOGLE_JOBS_DORKS.slice(0, DEFAULT_MAX_DORKS).map(d => d.gl));
+  // El presupuesto por defecto cubre los dos mercados: 4 dorks de España y 3 de LatAm (dólares).
+  assert.equal(searches.filter(s => s.gl === 'es').length, 4);
+  assert.equal(searches.filter(s => s.gl !== 'es').length, 3);
+  assert.ok(searches.some(s => s.gl === 'mx') && searches.some(s => s.gl === 'co') && searches.some(s => s.gl === 'ar'));
 });
 
 await step('fechas: relativas sí, desconocidas no se inventan', async () => {
@@ -145,9 +147,9 @@ await step('los dorks van en paralelo: caben en el tramo corto del cron', async 
     return [toCandidate(job(`par-${calls}`))];
   });
   // En serie serían 1,5 s por dork; con un tope de 4 s se declararía el corte y se perderían los últimos.
-  assert.equal(out.searches, GOOGLE_JOBS_DORKS.length);
+  assert.equal(out.searches, DEFAULT_MAX_DORKS);
   assert.equal(out.truncated, undefined);
-  assert.equal(out.received, GOOGLE_JOBS_DORKS.length, `recibidas ${out.received}`);
+  assert.equal(out.received, DEFAULT_MAX_DORKS, `recibidas ${out.received}`);
 });
 
 await step('un dork caído no oculta los demás y se anota', async () => {
@@ -221,7 +223,7 @@ await step('sin tiempo se corta y se declara, sin gastar', async () => {
 await step('el coste se declara en dólares, no se oculta', async () => {
   const out = await collectGoogleJobs('test');
   assert.equal(typeof out.cost_usd, 'number');
-  assert.equal(out.cost_usd, Number((GOOGLE_JOBS_DORKS.length * SEARCH_USD).toFixed(3)));
+  assert.equal(out.cost_usd, Number((DEFAULT_MAX_DORKS * SEARCH_USD).toFixed(3)));
 });
 
 server.close();

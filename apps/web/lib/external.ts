@@ -4,11 +4,14 @@ import { salaryFromText } from './salary';
 import { pinnedGet } from './urlGuard';
 import { serviceRest } from './supabaseAuth';
 
-// Fuentes externas (APIs con clave y recolectores programados). Los candidatos llegan tal cual los da la fuente,
-// sin datos de contacto de personas, y no son visibles para una alumna hasta que un operador los aprueba.
+// Fuentes externas (APIs con clave y recolectores programados). Los candidatos llegan tal cual los da la fuente.
+// El texto guardado va anonimizado; el contacto se guarda APARTE y solo si el anuncio lo publica literalmente
+// (decisión del propietario, sesión 88), nunca deducido. Nada es visible para una alumna hasta que las reglas
+// o una persona lo aprueban.
 export const ORG = 'cloud-wdc';
-export type Candidate = { external_id: string; title: string; company?: string | null; location?: string | null; url: string; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown> };
-export type ExternalOffer = { role?: string | null; spain?: boolean | null; score?: number; also_seen?: string[]; raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null; ai_review?: Record<string, unknown> | null };
+export type Contact = { emails: string[]; phones: string[] };
+export type Candidate = { external_id: string; title: string; company?: string | null; location?: string | null; url: string; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown>; apply_url?: string | null; company_url?: string | null; contact?: Contact | null };
+export type ExternalOffer = { role?: string | null; spain?: boolean | null; score?: number; market?: string | null; market_basis?: string | null; currency?: string | null; apply_url?: string | null; company_url?: string | null; contact?: Contact | null; auto_review?: Record<string, unknown> | null; also_seen?: string[]; raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null; ai_review?: Record<string, unknown> | null };
 export const SOURCE_RE = /^[a-z0-9-]{2,40}$/;
 export const MAX_CANDIDATES = 300;
 const STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
@@ -37,6 +40,49 @@ export function normalizeUrl(raw: string): string {
   } catch { return raw; }
 }
 
+// ---- Candidatura y contacto -------
+// Portales y agregadores: un enlace a uno de ellos es el anuncio, no la web de la empresa. Se excluyen
+// para no etiquetar un portal como «web de la empresa»; los ATS (Greenhouse, Lever, Teamtailor…) sí
+// cuentan, porque ahí es donde la empresa recibe la candidatura.
+const BOARD_HOSTS = [
+  'infojobs.net', 'linkedin.com', 'indeed.com', 'indeed.es', 'glassdoor.com', 'glassdoor.es', 'jooble.org',
+  'adzuna.es', 'adzuna.com', 'google.com', 'trabajo.org', 'jobleads.com', 'bebee.com', 'talent.com',
+  'jobtoday.com', 'computrabajo.com', 'computrabajo.es', 'bumeran.com', 'occ.com.mx', 'workana.com', 'upwork.com',
+  'freelancer.com', 'freelancer.es', 'fiverr.com', 'malt.es', 'malt.com', 'weworkremotely.com', 'remoteok.com',
+  'remotive.com', 'himalayas.app', 'jobicy.com', 'arbeitnow.com', 'getonbrd.com', 'torre.ai', 'welcometothejungle.com',
+  'jobfluent.com', 'europelanguagejobs.com', 'ziprecruiter.com', 'simplyhired.com', 'infoempleo.com', 'trabajos.com',
+];
+const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; } };
+const isBoard = (url: string) => { const host = hostOf(url); return !host || BOARD_HOSTS.some(b => host === b || host.endsWith(`.${b}`)); };
+const HTTP_IN_TEXT = /https?:\/\/[^\s<>"'`)\]]+/gi;
+
+/** Primera web publicada en el anuncio que no sea un portal de empleo. Literal: si no aparece, no hay. */
+export function companyUrlIn(...texts: Array<string | null | undefined>): string | null {
+  for (const text of texts) {
+    for (const match of (text ?? '').matchAll(HTTP_IN_TEXT)) {
+      const url = match[0].replace(/[.,;:]+$/, '');
+      if (!isBoard(url)) return url.slice(0, 1000);
+    }
+  }
+  return null;
+}
+
+// Contacto publicado en el anuncio (decisión del propietario: se muestra tal cual). Solo corporativo
+// en la práctica —los anuncios publican «rrhh@empresa.com» o un móvil de selección—, nunca se deduce
+// ni se completa con datos de otra fuente. Se lee del texto ORIGINAL, antes de anonimizarlo.
+const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]{2,}/g;
+const PHONE = /(?<![\w/])(?:\+?\d[\d\s().-]{7,}\d)(?![\w/])/g;
+export function contactsIn(text?: string | null): Contact | null {
+  if (!text) return null;
+  const uniq = (list: string[]) => [...new Set(list.map(s => s.trim()).filter(Boolean))];
+  const emails = uniq((text.match(EMAIL) ?? []).filter(e => !/\.(png|jpe?g|gif|webp|svg)$/i.test(e))).slice(0, 2);
+  // Una lista de teléfonos separados por espacios no debe leerse como un número larguísimo: si el
+  // candidato pasa de 13 dígitos, se parte por espacios y se queda cada número de 9 o más.
+  const phones = uniq((text.match(PHONE) ?? []).flatMap(chunk => (chunk.replace(/\D/g, '').length > 13 ? chunk.split(/\s+/) : [chunk]))
+    .filter(p => p.replace(/\D/g, '').length >= 9 && p.replace(/\D/g, '').length <= 13)).slice(0, 2);
+  return emails.length || phones.length ? { emails, phones } : null;
+}
+
 export type Rejection = 'no_objeto' | 'sin_id' | 'sin_titulo' | 'sin_url' | 'url_no_http';
 export function classify(input: unknown): { candidate: Candidate } | { reason: Rejection } {
   if (!input || typeof input !== 'object') return { reason: 'no_objeto' };
@@ -54,7 +100,12 @@ export function classify(input: unknown): { candidate: Candidate } | { reason: R
   const raw = Object.fromEntries(Object.entries(rawIn).filter(([k, v]) => RAW_KEYS.includes(k) && ['string', 'number', 'boolean'].includes(typeof v)));
   // Sin salario estructurado, se rescata la frase literal del texto (solo con importe en € y periodo o bruto/neto).
   const salary = clip(c.salary, 200) ?? (typeof c.description === 'string' ? salaryFromText(c.description) : null);
-  return { candidate: { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary, description, posted_at, raw } };
+  // Enlace de candidatura propio (SerpApi lo da en apply_options; otros portales, en su campo).
+  const applyRaw = clip(c.apply_url, 1000);
+  const apply_url = applyRaw && /^https?:\/\/[^\s]+$/i.test(applyRaw) ? applyRaw : null;
+  const company_url = companyUrlIn(typeof c.description === 'string' ? c.description : null, clip(c.company_url, 1000));
+  const contact = contactsIn(typeof c.description === 'string' ? c.description : null);
+  return { candidate: { external_id, title, company: clip(c.company, 200), location: clip(c.location, 200), url, salary, description, posted_at, raw, apply_url, company_url, contact } };
 }
 export const sanitize = (input: unknown): Candidate | null => { const r = classify(input); return 'candidate' in r ? r.candidate : null; };
 
@@ -136,7 +187,7 @@ export async function ingest(source: string, via: string, candidates: unknown[],
   return { received, accepted, rejected: received - accepted };
 }
 
-const COLS = 'role,spain,score,also_seen,raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result,ai_review';
+const COLS = 'role,spain,score,also_seen,raw,id,source,external_id,title,company,location,url,salary,description,posted_at,first_seen_at,last_seen_at,expires_at,editorial_status,verified_at,verified_result,ai_review,market,market_basis,currency,apply_url,company_url,contact,auto_review';
 export async function listOffers(opts: { status?: string; statuses?: string[]; source?: string; limit?: number; onlyLive?: boolean; byScore?: boolean }): Promise<ExternalOffer[] | null> {
   const q = [`org_id=eq.${ORG}`, `select=${COLS}`, opts.byScore ? 'order=score.desc,posted_at.desc.nullslast' : 'order=posted_at.desc.nullslast,first_seen_at.desc', `limit=${Math.min(opts.limit ?? 200, 1000)}`];
   if (opts.status) q.push(`editorial_status=eq.${encodeURIComponent(opts.status)}`);
@@ -269,6 +320,28 @@ export async function countsByStatus(): Promise<Record<string, number> | null> {
   }));
   for (const [st, n] of results) { if (n === null) return null; if (n) out[st] = n; }
   return out;
+}
+
+// Aprobación automática por reglas: reclamo atómico en UNA escritura. La guarda `editorial_status=eq.draft`
+// hace que solo se muevan las filas que siguen siendo borrador: si una persona (o la IA) las movió entre
+// la lectura y la escritura, no se pisa. Se cuenta lo que la base devuelve, nunca lo que se envió.
+export async function approveByRule(ids: string[], review: Record<string, unknown>): Promise<number | null> {
+  if (!ids.length || ids.length > 100 || ids.some(i => !/^[0-9a-f-]{36}$/.test(i))) return null;
+  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&id=in.(${ids.join(',')})&editorial_status=eq.draft`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ editorial_status: 'approved', reviewed_by: 'auto-reglas', reviewed_at: new Date().toISOString(), auto_review: review }),
+  });
+  const rows = response.ok ? await response.json().catch(() => null) : null;
+  return Array.isArray(rows) ? rows.length : null;
+}
+
+/** Aprobadas hoy por la regla automática (UTC). `null` = no se pudo saber: sin dato no se gasta cuota. */
+export async function approvalsToday(by = 'auto-reglas'): Promise<number | null> {
+  const start = new Date(); start.setUTCHours(0, 0, 0, 0);
+  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&reviewed_by=eq.${by}&reviewed_at=gte.${encodeURIComponent(start.toISOString())}&select=id&limit=1`, { headers: { Prefer: 'count=exact' } });
+  if (!response.ok) return null;
+  const total = Number((response.headers.get('content-range') ?? '').split('/')[1]);
+  return Number.isFinite(total) ? total : null;
 }
 
 // «Aprobar las N mejores»: toma los borradores que cumplen los filtros, por puntuación, y los aprueba. Reversible.

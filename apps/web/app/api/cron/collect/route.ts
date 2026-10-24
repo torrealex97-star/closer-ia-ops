@@ -4,7 +4,8 @@ import { collectAll } from '../../../../lib/collectors';
 import { collectGoogleJobs } from '../../../../lib/googleJobs';
 import { dailyAuto as dailyApify } from '../../../../lib/apifyAuto';
 import { publicBaseUrl } from '../../../../lib/adminAuth';
-import { runAiReview, weeklyAiReport } from '../../../../lib/aiReview';
+import { weeklyAiReport } from '../../../../lib/aiReview';
+import { runAutoReview } from '../../../../lib/autoReview';
 import { loadMetrics } from '../../../../lib/metrics';
 import { skipPaidTier } from '../../../../lib/sourceTiers';
 import { refreshVigencia } from '../../../../lib/external';
@@ -40,9 +41,12 @@ export async function GET(request: NextRequest) {
   if ('truncated' in apify && apify.truncated) budget.cut('apify');
   const vigencia = budget.remaining() >= MIN_STEP_MS ? await refreshVigencia(20, budget.deadline(6_000)).catch(() => ({ checked: 0, withdrawn: 0 })) : (budget.cut('vigencia'), { checked: 0, withdrawn: 0 });
   if ('truncated' in vigencia && vigencia.truncated) budget.cut('vigencia');
-  // Revisor IA: solo con tiempo para al menos una oferta; un fallo no tumba el resto.
-  const aiReview = budget.remaining() >= 20_000 ? await runAiReview({ deadline: budget.end }).catch(() => ({ skipped: 'error' })) : (budget.cut('aiReview'), { skipped: 'sin tiempo en el presupuesto del cron' });
-  if ('truncated' in aiReview && aiReview.truncated) budget.cut('aiReview');
+  // Cualificación automática al final: primero aprueba por reglas lo que cumple hechos comprobables y,
+  // si queda hueco de tope y la IA está en vivo, le pasa solo las dudosas. Un fallo no tumba el resto.
+  const auto = budget.remaining() >= MIN_STEP_MS
+    ? await runAutoReview({ deadline: budget.end }).catch(() => ({ checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true }))
+    : (budget.cut('auto'), { checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true });
+  if (auto.truncated) budget.cut('auto');
   const report = new Date().getUTCDay() === 1 && budget.remaining() >= MIN_STEP_MS ? await weeklyAiReport().catch(() => false) : null;
-  return Response.json({ outcomes, googleJobs, vigencia, apify, aiReview, weeklyReport: report, paidTierSkipped: paid.skip ? ('reason' in paid ? paid.reason : 'sin tiempo') : null, truncated: budget.truncated, spent_ms: budget.spent() });
+  return Response.json({ outcomes, googleJobs, vigencia, apify, auto, aiReview: auto.ai, weeklyReport: report, paidTierSkipped: paid.skip ? ('reason' in paid ? paid.reason : 'sin tiempo') : null, truncated: budget.truncated, spent_ms: budget.spent() });
 }

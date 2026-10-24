@@ -1051,6 +1051,16 @@ export interface components {
              */
             max_charge_usd: number;
         };
+        /**
+         * Contact
+         * @description Contacto publicado por el anuncio; vacío cuando no publica ninguno.
+         */
+        Contact: {
+            /** Emails */
+            emails?: string[];
+            /** Phones */
+            phones?: string[];
+        };
         /** ExportRequest */
         ExportRequest: {
             /** Run Id */
@@ -1246,6 +1256,13 @@ export interface components {
              * @default false
              */
             is_selected: boolean;
+            /** Apply Url */
+            apply_url?: string | null;
+            /** Company Url */
+            company_url?: string | null;
+            contact?: components["schemas"]["Contact"] | null;
+            /** Market */
+            market?: ("ES" | "LATAM" | "US_LATINO") | null;
         };
         /** OpportunityList */
         OpportunityList: {

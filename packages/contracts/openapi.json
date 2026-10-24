@@ -2959,6 +2959,27 @@
         ],
         "title": "ConnectionInput"
       },
+      "Contact": {
+        "properties": {
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Emails"
+          },
+          "phones": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Phones"
+          }
+        },
+        "type": "object",
+        "title": "Contact",
+        "description": "Contacto publicado por el anuncio; vac\u00edo cuando no publica ninguno."
+      },
       "ExportRequest": {
         "properties": {
           "run_id": {
@@ -3449,6 +3470,54 @@
             "type": "boolean",
             "title": "Is Selected",
             "default": false
+          },
+          "apply_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apply Url"
+          },
+          "company_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Url"
+          },
+          "contact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Contact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ES",
+                  "LATAM",
+                  "US_LATINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
           }
         },
         "type": "object",

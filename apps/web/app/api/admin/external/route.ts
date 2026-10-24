@@ -4,7 +4,8 @@ import { callTimeout, createBudget, timeLeft } from '../../../../lib/cronBudget'
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
 import { collectGoogleJobs, GOOGLE_JOBS_SOURCE } from '../../../../lib/googleJobs';
 import { runAiReview, undoAiDecisions } from '../../../../lib/aiReview';
-import { approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
+import { approvalsToday, approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
+import { DAILY_CAP, runAutoReview } from '../../../../lib/autoReview';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,11 +31,11 @@ export async function GET(request: NextRequest) {
   if (error) return error;
   const p = request.nextUrl.searchParams;
   const pageSize = Math.min(Math.max(num(p.get('page_size'), 50), 10), 100), page = Math.max(num(p.get('page'), 1), 1);
-  const [list, counts, sources, runs, paused] = await Promise.all([
-    listOffersPage({ ...queryOf(p), limit: pageSize, offset: (page - 1) * pageSize }), countsByStatus(), statsBySource(), recentRuns(), pausedSources(),
+  const [list, counts, sources, runs, paused, autoUsed] = await Promise.all([
+    listOffersPage({ ...queryOf(p), limit: pageSize, offset: (page - 1) * pageSize }), countsByStatus(), statsBySource(), recentRuns(), pausedSources(), approvalsToday(),
   ]);
   if (!list) return Response.json({ detail: 'No se pudo leer las fuentes externas.' }, { status: 503 });
-  return reply(auth!, { offers: list.rows, total: list.total, page, page_size: pageSize, counts: counts ?? {}, sources: sources ?? [], runs: runs ?? [], paused: [...paused] });
+  return reply(auth!, { offers: list.rows, total: list.total, page, page_size: pageSize, counts: counts ?? {}, sources: sources ?? [], runs: runs ?? [], paused: [...paused], auto: { used_today: autoUsed, cap: DAILY_CAP } });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -54,8 +55,13 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({})) as { action?: unknown; provider?: unknown; ids?: unknown; n?: unknown; filters?: Record<string, string> };
-  const { auth, error } = await gate(request, body.action === 'collect' || body.action === 'ai_review' || body.action === 'ai_undo');
+  const { auth, error } = await gate(request, body.action === 'collect' || body.action === 'ai_review' || body.action === 'ai_undo' || body.action === 'auto_review');
   if (error) return error;
+  if (body.action === 'auto_review') {
+    // Mismo camino que el cron, con su reloj y su tope: aprobar a mano desde el panel no gasta otra cuota.
+    const summary = await runAutoReview({ deadline: Date.now() + 45_000 }).catch(() => null);
+    return summary ? reply(auth!, summary) : Response.json({ detail: 'No se pudo completar la revisión automática.' }, { status: 503 });
+  }
   if (body.action === 'collect') {
     const only = typeof body.provider === 'string' && (API_PROVIDERS as readonly string[]).includes(body.provider) ? body.provider as ApiProvider : undefined;
     const budget = createBudget(45_000); // maxDuration = 60: el reloj compartido deja margen y el corte se declara

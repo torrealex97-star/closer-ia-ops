@@ -57,6 +57,15 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:1100px){.opportunity-grid{grid-template-columns:1fr}.student-tag{display:none}}
 @media(max-width:700px){.opportunity-card{padding:20px}.opportunity-pay{padding:16px}.opportunity-footer{flex-wrap:wrap}.student-freshness{display:none}.student-shell .page-heading h1{font-size:36px}.student-preferences{gap:12px}.student-preferences .check-label{font-size:11px}.student-shell .topbar{min-height:56px}}
 
+/* Contacto que el anuncio publica literalmente: se ve como cita, no como dato verificado por WDC. */
+.contact-published{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:8px;display:grid;gap:6px;background:var(--sheet)}
+.contact-published h3{margin:0;font-size:14px}
+.contact-published p{margin:0;font-size:13px}
+.contact-published .inline-hint{margin-top:4px}
+/* Panel de fuentes sugeridas del SOP: plegado por defecto para no competir con la tabla de ofertas. */
+.source-ideas summary{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
+.source-ideas summary::marker{color:var(--secondary)}
+
 /* Panel hospedado /admin: mismo papel, tipografía y ritmo que el panel local; solo añade acceso, tarjetas y tablas. */
 .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:32px 16px}
 .auth-card{width:min(420px,100%);background:var(--sheet);border:1px solid var(--line);border-radius:var(--radius);padding:36px 32px;display:flex;flex-direction:column;gap:20px}

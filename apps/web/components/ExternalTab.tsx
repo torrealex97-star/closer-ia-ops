@@ -8,10 +8,11 @@ import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 // Llegan como borradores; una alumna solo ve lo que apruebes y que además cumple las reglas básicas de la vista.
 import MetricsPanel from './MetricsPanel';
 import AiAgreement from './AiAgreement';
+import SourceIdeas from './SourceIdeas';
 type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[]; ai_review?: AiReview | null };
 type AiReview = { verdict: string; confidence: number; reasons: string[]; red_flags: string[]; would_decide: string; gate: string; mode: string; applied: boolean; audit_sample?: boolean; link?: { result: string; reason: string }; jev?: { verdict: string | null; score: number | null; note: string | null } };
 const WOULD: Record<string, string> = { approve: 'Aprobaría', withdraw: 'Retiraría', human: 'Cola humana' };
-type Data = { offers: Offer[]; total: number; page: number; page_size: number; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[] };
+type Data = { offers: Offer[]; total: number; page: number; page_size: number; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[]; auto?: { used_today: number | null; cap: number } };
 const STATUS: Record<string, string> = { draft: 'Borrador', needs_review: 'A revisar', approved: 'Aprobada', published: 'Publicada', withdrawn: 'Retirada' };
 const PLURAL: Record<string, string> = { draft: 'borradores', needs_review: 'a revisar', approved: 'aprobadas', published: 'publicadas', withdrawn: 'retiradas' };
 const VERDICT: Record<string, string> = { open: 'Activa', closed: 'Cerrada', unknown: 'No verificable' };
@@ -99,6 +100,16 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     try { await call({ method: 'PATCH', body: JSON.stringify({ source: src, enabled }) }); setNotice(`${src}: ${enabled ? 'reanudada' : 'pausada. No se recoge ni se muestra a las alumnas hasta que la reanudes'}.`); load(); }
     catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
+  // Misma revisión que hace el cron cada mañana: reglas primero y la IA solo en las dudosas.
+  async function autoReview() {
+    setWorking('auto'); setError(''); setNotice('');
+    try {
+      const r = await call<{ checked: number; approved: number; exceptions: number; cap: number; used_before: number | null; by_reason: Record<string, number>; ai?: { mode: string; applied: number; skipped?: string } | null }>({ method: 'POST', body: JSON.stringify({ action: 'auto_review' }) });
+      const reasons = Object.entries(r.by_reason ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
+      setNotice(`Revisadas ${r.checked}: ${r.approved} aprobadas solas · ${r.exceptions} a tu cola${reasons ? ` (${reasons})` : ''}. Tope de hoy: ${r.used_before ?? 0}/${r.cap}.${r.ai?.skipped ? ` IA: ${r.ai.skipped}.` : r.ai ? ` IA ${r.ai.mode}: ${r.ai.applied} aplicadas.` : ''}`);
+      load();
+    } catch (err) { lost(err as Error); } finally { setWorking(''); }
+  }
   async function collect() {
     setWorking('collect'); setError(''); setNotice('');
     try {
@@ -131,10 +142,15 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <div className="stat-strip" style={{ margin: 0 }}>{Object.entries(PLURAL).map(([k, l]) => <span key={k}><strong>{counts[k] ?? 0}</strong>{l}</span>)}</div>
-      {owner && <button disabled={working !== ''} onClick={() => void collect()}>{working === 'collect' ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />} Recoger APIs ahora</button>}
+        <div className="admin-toolbar" style={{ gap: 8, margin: 0 }}>
+        {owner && <button disabled={working !== ''} onClick={() => void autoReview()} title="Reglas: perfil, mercado, español, puntuación y enlace vivo. Solo lo dudoso va a tu cola.">{working === 'auto' ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />} Aprobar las claras</button>}
+        {owner && <button disabled={working !== ''} onClick={() => void collect()}>{working === 'collect' ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />} Recoger APIs ahora</button>}
+        <span className="card-meta" style={{ margin: 0 }}>Aprobadas solas hoy: <strong>{data?.auto?.used_today ?? '—'}</strong>/{data?.auto?.cap ?? 100}</span>
+      </div>
     </div>
     <MetricsPanel onSessionLost={onSessionLost} />
     <AiAgreement onSessionLost={onSessionLost} />
+    <SourceIdeas />
     <div className="table-wrap" style={{ marginBottom: 20 }}><table className="data-table">
       <thead><tr><th>Fuente</th><th>Vía</th><th>Estado</th><th className="num">Activas</th><th className="num">Aprobadas</th><th>Última vez</th><th /></tr></thead>
       <tbody>{KNOWN.map(([code, name, via]) => { const st = data?.sources.find(x => x.source === code); const off = data?.paused.includes(code); return <tr key={code}>

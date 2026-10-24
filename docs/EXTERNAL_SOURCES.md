@@ -9,12 +9,13 @@ Se recogen solas cada día a las 06:00 UTC y desde el botón «Recoger APIs ahor
 3. **Jooble**: es.jooble.org/api/about → clave. **Cada dominio de país emite su propia clave**: la de jooble.org solo devuelve ofertas de EE. UU., así que para España hay que registrarse en es.jooble.org. El plan gratuito son **500 peticiones por clave en total** (no al mes): cada pasada de recogida gasta 7.
 4. Pulsa «Probar» en cada una (no gasta crédito) y luego «Recoger APIs ahora».
 
-## 1 bis. Google Jobs (SerpApi), la fuente que trae closers de España sin clave nueva
-Google Jobs indexa InfoJobs, LinkedIn y portales, así que es la vía para acercarse al inventario real de closer en España mientras no haya clave de InfoJobs.
+## 1 bis. Google Jobs (SerpApi), la fuente que trae closers de España y de LatAm sin clave nueva
+Google Jobs indexa InfoJobs, LinkedIn, Computrabajo, Bumerán, OCCMundial y portales, así que es la vía para acercarse al inventario real de closer mientras no haya más claves conectadas.
 1. La clave ya conectada en Panel → APIs → SerpApi se usa sola; no hay que guardar nada más.
-2. El cron recoge **3 dorks** (`closer de ventas España`, `closer high ticket España`, `setter closer España`), una búsqueda cada uno y **sin paginar** (una segunda página se cobra aparte). Entran como **borradores** en Fuentes externas; nada se publica sin aprobación.
-3. **Coste**: 0,025 USD por búsqueda → 0,075 USD/día (≈2,25 USD/mes) en plan de pago. En el plan gratuito salen de las 250 búsquedas/mes. `SERPAPI_JOBS_MAX_DORKS=0` lo apaga; 1–3 acota el gasto. La fuente se pausa como cualquier otra desde Fuentes externas (código `google-jobs`).
+2. El cron recoge **7 dorks** con su país (`gl`) y en español (`hl`): **4 de España** (`closer de ventas España`, `closer high ticket España`, `setter closer España`, `closer remoto España`) y **3 de LatAm** (`closer de ventas remoto` en México, `closer high ticket` en Colombia, `closer de ventas` en Argentina). Una búsqueda cada uno y **sin paginar** (una segunda página se cobra aparte). Hay 3 dorks más definidos que solo corren si se sube el tope.
+3. **Coste**: 0,025 USD por búsqueda → **0,175 USD/día** (≈5,25 USD/mes) en plan de pago; en el plan gratuito salen de las 250 búsquedas/mes. `SERPAPI_JOBS_MAX_DORKS` fija cuántas se lanzan (7 por defecto, 0 apaga, máximo 10). Para gastar más hay que subir esa variable en Vercel → Settings → Environment Variables; el panel muestra el coste por pasada.
 4. Sin tiempo en el cron se corta y lo declara (`truncated`); lo ya recogido se guarda y la siguiente pasada continúa.
+5. La fuente se pausa como cualquier otra desde Fuentes externas (código `google-jobs`).
 
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
@@ -51,5 +52,19 @@ Los actores de Apify corren en la infraestructura de Apify, que ya incluye sus p
 ## 7. Filtrar miles de ofertas
 En Fuentes externas los filtros (estado, perfil, fuente, España, puntuación mínima, búsqueda, orden) y la paginación se hacen **en el servidor**. Cada oferta lleva una **puntuación 0-100** (perfil por título, España explícita, sueldo publicado, comisiones, frescura, calidad del texto) y una **huella** que une el mismo anuncio llegado por varias fuentes (se anota «también en …»). «Aprobar las N mejores» aprueba los borradores que cumplen los filtros por orden de puntuación; es reversible.
 
-## 8. Revisor IA (shadow)
+## 8. Cualificación automática: solo lo dudoso llega a tu cola
+1. **Reglas primero** ([autoReview.ts](../apps/web/lib/autoReview.ts), mismo camino en el cron y en el botón «Aprobar las claras»): se aprueba sola la oferta que tiene **perfil comercial**, **mercado deducido**, **texto en español** (≥3 palabras), **puntuación ≥ 55**, **ninguna bandera roja** y **enlace no cerrado**. Lo que falle una condición se queda en borrador: esa es la cola de excepciones.
+2. **Tope de 100 al día** (UTC), contado en la base (`reviewed_by='auto-reglas'`). Si no se puede leer el contador, no se aprueba nada: el tope es una garantía. La escritura lleva la guarda `editorial_status=eq.draft`, así que no pisa lo que una persona movió entretanto, y se cuenta lo que la base confirma (`return=representation`).
+3. **La IA desempata solo si se enciende**: con `AI_REVIEW_MODE=live` y clave de Groq, las dudosas pasan por el revisor con umbral alto (confianza ≥ 85, puntuación ≥ 80, enlace vivo) y su cuota también descuenta de las 100. En `shadow` (por defecto) la IA solo anota y las dudosas esperan a una persona. Encenderlo es cambiar esa variable en Vercel.
+4. **Motivo guardado**: cada aprobación automática guarda `auto_review` (`cumple_reglas`) y cada descarte su motivo (`sin_perfil`, `sin_mercado`, `idioma_dudoso`, `score_bajo`, `banderas_rojas`, `enlace_cerrado`, `mercado_dudoso`, `tope_diario`), visible en el panel al filtrar por «Cola humana».
+
+## 9. Mercado y moneda, y cómo aplicar
+- **Mercado** ([market.ts](../apps/web/lib/market.ts)): manda la ubicación (gazetteer de municipios incluido). Si no dice nada útil —«Remoto» a secas no es un país—, decide el importe: **€ ⇒ España/Europa**, **$ ⇒ dólares (LatAm y EE. UU.)**. Se guarda `market` + `market_basis` y la tarjeta declara el motivo en el panel.
+- **Candidatura**: `apply_url` es el enlace de candidatura que publica la fuente (SerpApi lo entrega en `apply_options`); si no existe, se usa el anuncio. `company_url` solo aparece si el texto del anuncio publica una web que **no** es un portal de empleo; no se deduce ni se completa. La tarjeta de la alumna pone «Aplicar en <dominio>» y, en el detalle, la web publicada.
+- **Contacto**: se guarda `contact` (máximo 2 correos y 2 teléfonos) **solo si el anuncio lo publica**, y se muestra con la nota de que WDC no lo verifica. El texto de la descripción sigue anonimizado.
+
+## 10. Fuentes del SOP que aún no se recogen
+El panel de Fuentes externas lista, plegado, las fuentes del SOP diario de WDC con su encaje, su coste y su vía: conector activo, «añadir pegando su búsqueda» (asistente de fuentes) o manual. Solo se incluyen URL reales del documento; las que el SOP marca como «asumido» quedan fuera hasta comprobarlas. Las comunidades (Facebook, Telegram, Skool) exigen sesión personal y no se automatizan: son ritual diario de la alumna.
+
+## 11. Revisor IA (shadow)
 Variables opcionales (Vercel): `AI_REVIEW_ENABLED` (`false` apaga), `AI_REVIEW_MODE` (`live` decide; por defecto shadow), `AI_REVIEW_MODEL`, `AI_REVIEW_MAX_CALLS` (15), `AI_REVIEW_MAX_APPROVALS` (25), `AUTO_PUBLISH` (`true` publica), `JEV_API_KEY`/`JEV_API_URL` (anotación opcional). Necesita la clave de Groq en Panel → APIs. En shadow no cambia ningún estado; mira la columna «Revisor IA» y el filtro «Cola humana» en Fuentes externas. Detalle en STATUS (sesión 41).

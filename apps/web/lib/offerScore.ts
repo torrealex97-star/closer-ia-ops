@@ -1,11 +1,12 @@
 import { spainSignal } from './esPlaces';
+import { marketFor, type Currency, type Market, type MarketBasis } from './market';
 import { fold, roleFromTitle } from './vocabulary';
 
 // Puntuación 0-100 para ordenar miles de ofertas y quedarse con las mejores. Solo usa lo que la oferta dice:
 // perfil por el título (closer > setter > …), España explícita, sueldo publicado, frescura y calidad del texto.
 // Es una ayuda para priorizar; aprobar sigue siendo una decisión del operador.
 export type Scorable = { title: string; company?: string | null; location?: string | null; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown> };
-export type Enrichment = { role: string | null; spain: boolean | null; score: number; fingerprint: string | null };
+export type Enrichment = { role: string | null; spain: boolean | null; score: number; fingerprint: string | null; market: Market | null; market_basis: MarketBasis; currency: Currency | null };
 
 const SPANISH = /\b(?:de|la|el|los|las|para|con|en|y|que|una|un|experiencia|ventas|empresa|buscamos|incorporar|comercial|trabajo|oferta|requisitos|funciones|salario|jornada)\b/g;
 export const spanishWords = (text: string) => (fold(text).match(SPANISH) ?? []).length;
@@ -38,5 +39,7 @@ export function enrich(c: Scorable, now = Date.now()): Enrichment {
   const length = (c.description ?? '').length;
   score += length >= 1000 ? 6 : length >= 300 ? 4 : 0;
   if (spanishWords(text) >= 3) score += 5;
-  return { role, spain, score: Math.max(0, Math.min(100, Math.round(score))), fingerprint: fingerprintOf(c) };
+  // Mercado y moneda se guardan al entrar para poder filtrar por ellos sin recalcular miles de filas.
+  const verdict = marketFor(c);
+  return { role, spain, score: Math.max(0, Math.min(100, Math.round(score))), fingerprint: fingerprintOf(c), market: verdict.market, market_basis: verdict.basis, currency: verdict.currency };
 }

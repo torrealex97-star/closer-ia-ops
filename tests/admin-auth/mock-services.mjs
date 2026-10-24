@@ -156,6 +156,9 @@ export function startMocks({ authPort, enginePort }) {
       if (q.role === 'is.null') rows = rows.filter(r => !r.role); else if (q.role?.startsWith('eq.')) rows = rows.filter(r => r.role === q.role.slice(3));
       if (q.spain === 'is.true') rows = rows.filter(r => r.spain === true);
       if (q.score?.startsWith('gte.')) rows = rows.filter(r => (r.score ?? 0) >= Number(q.score.slice(4)));
+      if (q.reviewed_by?.startsWith('eq.')) rows = rows.filter(r => r.reviewed_by === q.reviewed_by.slice(3));
+      if (q.reviewed_at?.startsWith('gte.')) rows = rows.filter(r => r.reviewed_at && r.reviewed_at >= decodeURIComponent(q.reviewed_at.slice(4)));
+      if (q.market?.startsWith('eq.')) rows = rows.filter(r => r.market === q.market.slice(3));
       if (q.expires_at?.startsWith('gt.')) rows = rows.filter(r => r.expires_at > decodeURIComponent(q.expires_at.slice(3)));
       if (q.or?.includes('verified_at.is.null')) { const lt = q.or.match(/verified_at\.lt\.([^,)]+)/)?.[1]; rows = rows.filter(r => !r.verified_at || (lt && r.verified_at < lt)); }
       else if (q.or?.includes('ilike')) { const term = decodeURIComponent(q.or.match(/title\.ilike\.\*([^*]*)\*/)?.[1] ?? '').toLowerCase(); rows = rows.filter(r => `${r.title} ${r.company ?? ''}`.toLowerCase().includes(term)); }

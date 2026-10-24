@@ -55,6 +55,12 @@ class OpportunityQuery(BaseModel):
     include_extra_roles: bool = False
 
 
+class Contact(BaseModel):
+    """Contacto publicado por el anuncio; vacío cuando no publica ninguno."""
+    emails: list[str] = Field(default_factory=list)
+    phones: list[str] = Field(default_factory=list)
+
+
 class Opportunity(BaseModel):
     id: str
     role: Role
@@ -77,6 +83,12 @@ class Opportunity(BaseModel):
     starred: bool
     excellence_rank: int | None = None
     is_selected: bool = False
+    # Opcionales: solo las ofertas externas traen enlace de candidatura propio, web corporativa
+    # publicada, contacto literal y mercado deducido. El motor no los emite, así que ausente ≠ error.
+    apply_url: str | None = None
+    company_url: str | None = None
+    contact: Contact | None = None
+    market: Literal['ES', 'LATAM', 'US_LATINO'] | None = None
 
 
 class OpportunityList(BaseModel):

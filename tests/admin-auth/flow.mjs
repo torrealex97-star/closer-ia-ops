@@ -146,6 +146,10 @@ await step('ingest: cerrado sin token; valida el cuerpo; limpia datos personales
   assert.equal(r.status, 200); assert.deepEqual([r.json.received, r.json.accepted, r.json.rejected], [4, 2, 2]);
   const stored = [...state.external.values()].find(o => o.external_id === 'a1');
   assert.ok(!/rrhh@acme|600 123|<b>/.test(stored.description) && /correo omitido/.test(stored.description));
+  // El contacto se guarda aparte, solo si el anuncio lo publica (decisión del propietario); el texto sigue anonimizado.
+  assert.deepEqual(stored.contact, { emails: ['rrhh@acme.com'], phones: ['+34 600 123 456'] });
+  assert.equal(stored.company_url, null, 'sin URL corporativa en el texto no se inventa una');
+  assert.equal(stored.market, 'ES'); assert.equal(stored.market_basis, 'ubicacion_espana');
   assert.deepEqual(Object.keys(stored.raw), ['site']); assert.equal(stored.editorial_status, 'draft');
   assert.equal(state.ingestRuns[0].source, 'indeed');
 });
@@ -393,7 +397,12 @@ await step('vista de alumna: suma solo externas aprobadas que cumplen perfil, Es
   const declared = (await search({})).json.items.find(i => i.source_url.includes('a1')); assert.equal(declared.modality, 'Remoto'); assert.equal(declared.schedule, 'Jornada completa'); assert.equal(declared.contract, 'Indefinido');
   assert.equal(r.json.total, r.json.items.length);
   assert.ok((await search({ role: 'setter' })).json.items.every(i => !i.source_url.includes('a1')));
-  assert.ok((await search({ market: 'EU' })).json.items.every(i => !i.id.startsWith('ext-')));
+  // Europa incluye España: la externa aprobada de Madrid entra; la de Houston no.
+  const eu = (await search({ market: 'EU' })).json.items;
+  assert.ok(eu.every(i => !i.id.startsWith('ext-') || /Madrid|España/.test(i.location)), 'EU: solo lo español entre las externas');
+  // LatAm y EE. UU. se sirven por mercado, no por ubicación española.
+  const latam = (await search({ market: 'LATAM' })).json.items;
+  assert.ok(latam.every(i => !i.id.startsWith('ext-') || !/Madrid|España/.test(i.location)), 'LatAm no repite las de España');
   assert.ok((await search({ starred_only: true })).json.items.every(i => !i.id.startsWith('ext-')));
 });
 await step('escala: puntuación, filtros en servidor, paginación, deduplicado entre fuentes y «aprobar las mejores»', async () => {
@@ -606,6 +615,9 @@ await step('pausar una fuente: se rechaza su ingesta, se salta su recogida y des
 });
 await step('vigencia automática (cron): verifica las aprobadas viejas y retira solo las cerradas', async () => {
   const mk = (id, url) => { const o = { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url, editorial_status: 'approved', verified_at: null, verified_result: null, posted_at: null, expires_at: new Date(Date.now() + 5 * 864e5).toISOString() }; state.external.set('v|' + id, o); return o; };
+  // La cualificación automática del cron aprueba borradores antes de este paso: se marcan como
+  // comprobados hace un momento para que la cola de vigencia (20 más antiguas) llegue a estas tres.
+  for (const o of state.external.values()) if (o.editorial_status === 'approved' && !o.verified_at) o.verified_at = new Date().toISOString();
   const live = mk('live', 'http://127.0.0.1:8792/page/ok'), dead = mk('dead', 'http://127.0.0.1:8792/page/gone');
   const fresh = mk('fresh', 'http://127.0.0.1:8792/page/gone'); fresh.verified_at = new Date().toISOString(); // comprobada hace poco: no se toca
   const r = await call('/api/cron/collect', { cookies: false, headers: { authorization: 'Bearer cron-secret-0123456789' } });
@@ -635,6 +647,32 @@ await step('seguridad: cabeceras en todas las respuestas', async () => {
   assert.equal(res.headers.get('x-frame-options'), 'DENY'); assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(res.headers.get('referrer-policy'), 'strict-origin-when-cross-origin'); assert.match(res.headers.get('permissions-policy'), /camera=\(\)/);
   assert.equal(res.headers.get('x-powered-by'), null);
+});
+await step('cualificación automática: aprueba lo claro por reglas, deja lo dudoso y declara su tope', async () => {
+  const today = new Date().toISOString();
+  const mk = (id, extra) => state.external.set(`au|${id}`, {
+    id: crypto.randomUUID(), source: 'au', external_id: id, title: 'Closer de ventas', company: 'Acme',
+    location: 'Madrid, España', url: `https://www.infojobs.net/oferta/${id}`, salary: '30.000 €/año',
+    description: 'Buscamos closer para cerrar ventas del programa en el equipo comercial de la empresa.',
+    posted_at: today, expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), first_seen_at: today, last_seen_at: today,
+    editorial_status: 'draft', role: 'closer', spain: true, score: 80, market: 'ES', market_basis: 'ubicacion_espana', currency: 'EUR', raw: {}, also_seen: [], ...extra,
+  });
+  // El cron de pasos anteriores ya gastó el tope del día: se simula el día siguiente.
+  const yesterday = new Date(Date.now() - 864e5).toISOString();
+  for (const o of state.external.values()) if (o.reviewed_by === 'auto-reglas') o.reviewed_at = yesterday;
+  mk('ok1', {}); mk('ok2', {}); mk('dudoso', { role: null });
+  const before = await call('/api/admin/external?status=draft&page_size=100');
+  assert.ok(before.json.total > 0, `el panel ve ${before.json.total} borradores y el mock ${[...state.external.values()].filter(o => o.editorial_status === 'draft').length}`);
+  const r = await call('/api/admin/external', { method: 'POST', body: { action: 'auto_review' } });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.approved >= 2, `aprobadas ${r.json.approved} de ${r.json.checked} · usadas ${r.json.used_before} · auto-reglas en mock: ${[...state.external.values()].filter(o => o.reviewed_by === 'auto-reglas').length}`);
+  assert.equal(r.json.cap, 100);
+  assert.equal(state.external.get('au|ok1').editorial_status, 'approved');
+  assert.equal(state.external.get('au|ok1').reviewed_by, 'auto-reglas');
+  assert.equal(state.external.get('au|ok1').auto_review.why, 'cumple_reglas');
+  assert.equal(state.external.get('au|dudoso').editorial_status, 'draft', 'lo dudoso no se aprueba solo');
+  const listed = await call('/api/admin/external?status=draft');
+  assert.equal(listed.status, 200); assert.equal(typeof listed.json.auto.cap, 'number');
 });
 await step('logout limpia cookies y la sesión deja de valer', async () => {
   await call('/api/admin/session', { method: 'DELETE' });
