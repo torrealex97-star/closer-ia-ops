@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Sala de práctica sin código de cohorte (sesión 73) — 2026-10-24
+
+- **Petición del operador**: quitar el acceso que pide la sala de práctica. Era un código de cohorte (`PRACTICE_CODE`, guardado en el navegador) con validación en servidor.
+- **Cambio**: se retira la puerta completa —pantalla «Un código y empezamos», estado y persistencia en el navegador— y el servidor deja de exigir código; solo necesita `GROQ_API_KEY`. Se mantienen los topes de gasto (60 turnos/día por IP, 400 por instancia), que pasan a ser la única barrera: sin ellos, un enlace público gastaría crédito de Groq sin control.
+- **Verificado (tested)**: `npm run typecheck` y `npm run build` OK; `playwright test tests/browser/practice.spec.ts tests/browser/practice-method.spec.ts` con `PLAYWRIGHT_CHANNEL=chrome` → **13/13**. El caso «código rechazado» se sustituyó por «un error del proveedor no pierde la conversación ni devuelve a una puerta». Además, comprobado en navegador real contra el dev server local: «Practicar» entra directo a la sala (0 nodos `.practice-gate`), el mensaje enviado sigue en la conversación y el error se muestra sin inventar réplica.
+- **No verificado**: el comportamiento con `GROQ_API_KEY` real en producción (aquí no hay clave): solo se ha probado el camino sin proveedor.
+- **Pendiente del operador**: si `PRACTICE_CODE` sigue en Vercel, ya no se usa; se puede borrar. La sala queda abierta a quien tenga el enlace.
+
 ## Conector de Jooble apuntado a su dominio de España (sesión 72) — 2026-10-24
 
 - **Petición del operador**: ejecutar la recogida de InfoJobs y aprobar el primer lote de closer/ES. Al ir a ejecutarla, la clave **no estaba guardada**: `integration_connections` seguía con **tres** filas (`apify`, `groq`, `serpapi`) y en los logs de Supabase de las últimas 24 h **no había ni una escritura** a esa tabla, solo lecturas. Descartado que fuera la base o el panel: la restricción admite `infojobs`, el único `admin_users` es `owner` y `/api/admin/connections` responde 401 sin sesión (ruta viva). El operador eligió **Jooble** como alternativa de clave inmediata.

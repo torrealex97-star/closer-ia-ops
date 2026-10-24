@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto';
 import { scenarioById } from '../../../components/practiceScenarios';
 import { buildPersonaPrompt, debriefInstructions, debriefSchema } from './prompts';
 import { cleanDebrief } from './debrief';
@@ -9,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 // Sala de práctica: el proveedor se configura por entorno y la ruta queda apagada
 // por defecto. La clave vive solo en el servidor y nunca viaja al navegador.
+// El acceso es abierto (sin código de cohorte): el gasto se contiene con los topes
+// de turnos por IP y globales de más abajo, que son la única puerta que queda.
 const GROQ_BASE = (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/$/, '');
 const ALLOWED_MODEL = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
 const MODEL = ALLOWED_MODEL.includes(process.env.PRACTICE_MODEL || '') ? process.env.PRACTICE_MODEL! : ALLOWED_MODEL[0];
@@ -26,13 +27,7 @@ const MAX_TOTAL_CHARS = 18000;
 const DAILY_TURNS = Number(process.env.PRACTICE_DAILY_TURNS || 400);
 const IP_DAILY_TURNS = 60;
 
-type Body = { code?: unknown; scenario?: unknown; messages?: unknown; mode?: unknown };
-
-function validCode(received: string, expected: string) {
-  const a = Buffer.from(received);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+type Body = { scenario?: unknown; messages?: unknown; mode?: unknown };
 
 // Topes por instancia: en serverless son best-effort, por eso además se limita
 // cada petición (turnos y caracteres) y el gasto por llamada (max_tokens).
@@ -91,14 +86,11 @@ export async function POST(request: Request) {
   if (origin && origin !== `https://${host}` && origin !== `http://${host}`) {
     return Response.json({ detail: 'Origen no permitido' }, { status: 403 });
   }
-  if (!process.env.GROQ_API_KEY || !process.env.PRACTICE_CODE) {
+  if (!process.env.GROQ_API_KEY) {
     return Response.json({ detail: 'La sala de práctica no está configurada en este despliegue.' }, { status: 503 });
   }
   let body: Body;
   try { body = await request.json() as Body; } catch { return Response.json({ detail: 'Cuerpo no válido' }, { status: 422 }); }
-  const code = typeof body.code === 'string' ? body.code.trim() : '';
-  if (!code) return Response.json({ detail: 'Falta el código de tu cohorte.' }, { status: 401 });
-  if (!validCode(code, process.env.PRACTICE_CODE)) return Response.json({ detail: 'Ese código no abre la sala de práctica.' }, { status: 401 });
   const scenario = typeof body.scenario === 'string' ? scenarioById(body.scenario) : null;
   if (!scenario) return Response.json({ detail: 'Situación desconocida' }, { status: 422 });
   const turns = readTurns(body.messages);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock3, Gauge, LoaderCircle, LockKeyhole, MessageSquare, Play, Quote, RotateCcw, Send, Sparkles, Target, Volume2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock3, Gauge, LoaderCircle, MessageSquare, Play, Quote, RotateCcw, Send, Sparkles, Target, Volume2 } from 'lucide-react';
 import { INTENSITY_LABELS, PRACTICE_SCENARIOS, scenarioById } from './practiceScenarios';
 import type { PracticeScenario } from './practiceScenarios';
 
@@ -25,9 +25,8 @@ type Debrief = {
 
 const band = (score: number) => score >= 70 ? 'alto' : score >= 40 ? 'medio' : 'bajo';
 type Stored = { id: string; scenarioId: string; title: string; startedAt: number; turns: number; debrief: Debrief };
-type View = 'scenarios' | 'code' | 'room' | 'debrief';
+type View = 'scenarios' | 'room' | 'debrief';
 
-const CODE_KEY = 'wdc_practice_code';
 const HISTORY_KEY = 'wdc_practice_history';
 // La ruta acepta 24 turnos por petición. La sala corta antes para que el feedback
 // siempre quepa: sin este tope, una conversación larga acababa en 422 y no había
@@ -50,10 +49,7 @@ function Bubble({ turn, onSpeak }: { turn: Turn; onSpeak?: (text: string) => voi
 // se dice; el feedback cita solo frases literales de la alumna (validadas en servidor).
 export default function StudentPractice() {
   const [view, setView] = useState<View>('scenarios');
-  const [code, setCode] = useState('');
-  const [codeDraft, setCodeDraft] = useState('');
   const [scenario, setScenario] = useState<PracticeScenario | null>(null);
-  const [pending, setPending] = useState<PracticeScenario | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,7 +64,6 @@ export default function StudentPractice() {
 
   useEffect(() => {
     try {
-      setCode(window.localStorage.getItem(CODE_KEY) ?? '');
       const stored = JSON.parse(window.localStorage.getItem(HISTORY_KEY) ?? '[]');
       if (Array.isArray(stored)) setHistory(stored.filter((item): item is Stored => Boolean(item?.id && item?.title)));
     } catch { /* almacenamiento no disponible: la práctica sigue funcionando sin historial */ }
@@ -98,10 +93,8 @@ export default function StudentPractice() {
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   }
-  function begin(item: PracticeScenario, withCode = code) {
+  function begin(item: PracticeScenario) {
     setError('');
-    // El código recién escrito llega en el mismo evento: no se espera al estado.
-    if (!withCode) { setPending(item); setCodeDraft(''); setView('code'); return; }
     setScenario(item);
     setTurns([{ role: 'coach', content: item.opening }]);
     setDebrief(null);
@@ -110,27 +103,10 @@ export default function StudentPractice() {
     setNow(Date.now());
     setView('room');
   }
-  function openCode(event: React.FormEvent) {
-    event.preventDefault();
-    const value = codeDraft.trim();
-    if (!value || !pending) return;
-    try { window.localStorage.setItem(CODE_KEY, value); } catch { /* sin persistencia */ }
-    setCode(value);
-    // Un 401 a mitad de conversación devuelve a la puerta SIN perder lo escrito:
-    // al reentrar el código se retoma la misma sala, no se empieza de cero.
-    if (turns.length > 1) { setError(''); setView('room'); return; }
-    begin(pending, value);
-  }
   async function post(body: Record<string, unknown>) {
-    const response = await fetch('/api/practice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...body }) });
+    const response = await fetch('/api/practice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await response.json().catch(() => ({})) as { detail?: string };
-    if (!response.ok) {
-      if (response.status === 401) {
-        try { window.localStorage.removeItem(CODE_KEY); } catch { /* nada */ }
-        setCode(''); setPending(scenario); setView('code');
-      }
-      throw new Error(typeof data.detail === 'string' ? data.detail : 'No se ha podido completar la práctica.');
-    }
+    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'No se ha podido completar la práctica.');
     return data as { reply?: string; debrief?: Debrief };
   }
   async function send(event?: React.FormEvent) {
@@ -163,26 +139,6 @@ export default function StudentPractice() {
     } finally {
       setBusy(false);
     }
-  }
-
-  if (view === 'code' && pending) {
-    return <section className="practice">
-      <button className="practice-back" type="button" onClick={() => setView('scenarios')}><ArrowLeft size={16} />Volver a las situaciones</button>
-      <div className="practice-gate">
-        <span className="practice-icon"><LockKeyhole size={22} /></span>
-        <span className="eyebrow">SALA DE PRÁCTICA</span>
-        <h1>Un código y empezamos.</h1>
-        <p>La sala de práctica está reservada a tu cohorte. Pide el código a tu coordinadora; se guarda solo en este navegador.</p>
-        {error && <p className="practice-error" role="alert"><CircleAlert size={15} />{error}</p>}
-        <form onSubmit={openCode}>
-          <label htmlFor="practice-code">Código de tu cohorte<input id="practice-code" value={codeDraft} onChange={event => setCodeDraft(event.target.value)} autoComplete="off" placeholder="Por ejemplo, wdc-otoño" /></label>
-          <button className="primary" type="submit" disabled={!codeDraft.trim()}>Entrar y practicar</button>
-        </form>
-        <small>{turns.length > 1
-          ? 'Tu conversación sigue aquí: al entrar, retomas donde lo dejaste.'
-          : `Vas a practicar «${pending.title}». La conversación es un simulacro, no una entrevista real.`}</small>
-      </div>
-    </section>;
   }
 
   if (view === 'room' && scenario) {

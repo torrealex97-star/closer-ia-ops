@@ -23,7 +23,7 @@ const debrief = {
 // La vista de alumna carga oportunidades al montar: se neutraliza para aislar la práctica.
 const emptyCatalog = (route: import('@playwright/test').Route) => route.fulfill({ json: { items: [], total: 0 } });
 
-test('la sala de práctica pide código, conversa y devuelve feedback con ejes y señales', async ({ page }) => {
+test('la sala de práctica abre sin código, conversa y devuelve feedback con ejes y señales', async ({ page }) => {
   const calls: Record<string, unknown>[] = [];
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.route('**/api/practice', route => {
@@ -37,12 +37,10 @@ test('la sala de práctica pide código, conversa y devuelve feedback con ejes y
   await expect(page.getByRole('heading', { name: 'Ensaya la conversación antes de la real.' })).toBeVisible();
   await expect(page.locator('.practice-card')).toHaveCount(8);
   await expect(page.locator('.practice-level[data-intensity="dura"]')).toHaveCount(3);
-  // Sin código guardado no se empieza: la sala está reservada a la cohorte.
+  // Sin puerta previa: «Practicar» entra directo a la sala.
   await page.locator('.practice-card').first().getByRole('button', { name: 'Practicar' }).click();
-  await expect(page.getByRole('heading', { name: 'Un código y empezamos.' })).toBeVisible();
-  await page.getByLabel('Código de tu cohorte').fill('wdc-demo');
-  await page.getByRole('button', { name: 'Entrar y practicar' }).click();
   await expect(page.getByText('¿Sí? Dime, que estoy entre reuniones.')).toBeVisible();
+  expect(await page.locator('.practice-gate').count()).toBe(0);
   const reply = page.getByLabel('Tu respuesta');
   await reply.fill('Hola Marta, te llamo porque he visto que perdéis seguimientos.');
   await page.getByRole('button', { name: 'Enviar respuesta' }).click();
@@ -66,7 +64,8 @@ test('la sala de práctica pide código, conversa y devuelve feedback con ejes y
   await expect(page.getByText('Sin siguiente paso concreto')).toBeVisible();
   await expect(page.getByText(/Una forma posible con tus propias palabras/)).toBeVisible();
   expect(calls.filter(call => call.mode === 'debrief')).toHaveLength(1);
-  expect(await page.evaluate(() => window.localStorage.getItem('wdc_practice_code'))).toBe('wdc-demo');
+  // La petición ya no lleva código de cohorte.
+  expect(calls.every(call => !('code' in call))).toBe(true);
   await expect(page.locator('.practice-debrief > .practice-note')).toHaveText(/no es una nota oficial/i);
   // El historial local conserva la puntuación de la sesión.
   await page.getByRole('button', { name: 'Elegir otra situación' }).click();
@@ -79,7 +78,6 @@ test('una práctica vieja sin ejes se sigue pudiendo leer desde el historial', a
     debrief: { summary: 'Resumen antiguo.', strengths: ['Algo bien'], improvements: ['Algo a pulir'], moments: [{ quote: 'Hola', why: 'Apertura.' }], next: 'Repite.' },
   };
   await page.addInitScript(value => {
-    window.localStorage.setItem('wdc_practice_code', 'wdc-demo');
     window.localStorage.setItem('wdc_practice_history', JSON.stringify([value]));
   }, legacy);
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
@@ -93,31 +91,21 @@ test('una práctica vieja sin ejes se sigue pudiendo leer desde el historial', a
   await expect(page.locator('.practice-score')).toHaveCount(0);
 });
 
-test('un código rechazado explica el motivo y al reentrarlo retoma la conversación', async ({ page }) => {
-  await page.addInitScript(() => window.localStorage.setItem('wdc_practice_code', 'wdc-malo'));
+test('un error del proveedor no pierde la conversación ni la puerta vuelve', async ({ page }) => {
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
-  await page.route('**/api/practice', route => {
-    const body = route.request().postDataJSON();
-    if (body.code !== 'wdc-demo') return route.fulfill({ status: 401, json: { detail: 'Ese código no abre la sala de práctica.' } });
-    return route.fulfill({ json: { reply: 'Ahora sí, seguimos.' } });
-  });
+  await page.route('**/api/practice', route => route.fulfill({ status: 502, json: { detail: 'No se ha podido completar la respuesta. La conversación no se ha perdido: vuelve a intentarlo.' } }));
   await page.goto('/');
   await page.getByRole('button', { name: 'Sala de práctica' }).click();
   await page.locator('.practice-card').first().getByRole('button', { name: 'Practicar' }).click();
   await page.getByLabel('Tu respuesta').fill('Hola, ¿qué tal?');
   await page.getByRole('button', { name: 'Enviar respuesta' }).click();
-  // Vuelve a la puerta y dice por qué; no deja a la alumna adivinando.
-  await expect(page.getByRole('heading', { name: 'Un código y empezamos.' })).toBeVisible();
-  await expect(page.locator('.practice-gate .practice-error')).toHaveText(/no abre la sala de práctica/);
-  await page.getByLabel('Código de tu cohorte').fill('wdc-demo');
-  await page.getByRole('button', { name: 'Entrar y practicar' }).click();
-  // Lo ya escrito sigue en la sala: no se reinicia la práctica al reautenticar.
+  await expect(page.locator('.practice-error')).toHaveText(/no se ha perdido/);
+  // Se queda en la sala con lo escrito: no hay puerta a la que volver.
   await expect(page.locator('.practice-turn.is-mine')).toHaveCount(1);
-  await expect(page.getByText('Hola, ¿qué tal?')).toBeVisible();
+  await expect(page.getByLabel('Tu respuesta')).toBeVisible();
 });
 
 test('la sala cierra la conversación antes de que el feedback sea imposible', async ({ page }) => {
-  await page.addInitScript(() => window.localStorage.setItem('wdc_practice_code', 'wdc-demo'));
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.route('**/api/practice', route => {
     const body = route.request().postDataJSON();
@@ -144,7 +132,6 @@ test('la sala cierra la conversación antes de que el feedback sea imposible', a
 });
 
 test('sin proveedor la sala lo dice y no inventa una respuesta', async ({ page }) => {
-  await page.addInitScript(() => window.localStorage.setItem('wdc_practice_code', 'wdc-demo'));
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.route('**/api/practice', route => route.fulfill({ status: 503, json: { detail: 'La sala de práctica no está configurada en este despliegue.' } }));
   await page.goto('/');
