@@ -6,7 +6,7 @@ Qué hace cada pieza y qué tiene que hacer el operador. Contexto y riesgos: [AD
 Se recogen solas cada día a las 06:00 UTC y desde el botón «Recoger APIs ahora» (Panel → Fuentes externas).
 1. **InfoJobs**: cuenta de desarrollador en developer.infojobs.net → crear aplicación → `client_id` y `client_secret`. En Panel → APIs pega `client_id:client_secret`.
 2. **Adzuna**: developer.adzuna.com → `app_id` y `app_key`. Pega `app_id:app_key`. (No se ha podido comprobar desde el entorno de desarrollo que Adzuna cubra España: si «Probar» o la recogida devuelven error, es esto.)
-3. **Jooble**: jooble.org/api/about → clave. Pégala tal cual.
+3. **Jooble**: es.jooble.org/api/about → clave. **Cada dominio de país emite su propia clave**: la de jooble.org solo devuelve ofertas de EE. UU., así que para España hay que registrarse en es.jooble.org. El plan gratuito son **500 peticiones por clave en total** (no al mes): cada pasada de recogida gasta 7.
 4. Pulsa «Probar» en cada una (no gasta crédito) y luego «Recoger APIs ahora».
 
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions

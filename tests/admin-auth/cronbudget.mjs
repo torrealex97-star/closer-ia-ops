@@ -85,4 +85,32 @@ const none = await E.refreshVigencia(12, Date.now() + 500); assert.equal(none.ch
 pageCalls = 0;
 const unbounded = await E.refreshVigencia(12); assert.equal(unbounded.checked, 12); assert.equal(unbounded.truncated, undefined);
 console.log('PASS  vigencia: el reloj gobierna cada comprobación, corte declarado, sin deadline comprueba todas');
+
+// 4) Jooble: sin JOOBLE_API_BASE se pega al dominio de España. Cada país emite su propia clave y la de jooble.org
+// solo devuelve ofertas de EE. UU., así que un dominio equivocado deja la fuente vacía sin dar error.
+rest.removeAllListeners('request');
+rest.on('request', (req, res) => {
+  let body = ''; req.on('data', c => body += c); req.on('end', () => {
+    const url = new URL(req.url, 'http://x'); const send = (s, d) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(d)); };
+    if (url.pathname === '/rest/v1/integration_connections') return send(200, [{ secret_ciphertext: secretCipher }]);
+    if (url.pathname === '/rest/v1/rpc/external_upsert') return send(200, JSON.parse(body).p_rows.length);
+    if (url.pathname === '/rest/v1/external_ingest_runs') return send(201, {});
+    send(200, []);
+  });
+});
+const seen = [];
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+  const target = String(url);
+  if (!/^https?:\/\/[^/]*jooble/.test(target)) return realFetch(url, init); // solo el host de Jooble: la URL simulada de Supabase también lleva «jooble» en la consulta
+  seen.push(target);
+  return new Response(JSON.stringify({ jobs: [{ id: 'es1', title: 'Closer', company: 'Acme', location: 'Madrid', link: 'https://es.example.com/1' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+};
+delete process.env.JOOBLE_API_BASE;
+const es = await C.collectProvider('jooble', 'test', Date.now() + 30_000);
+globalThis.fetch = realFetch;
+process.env.JOOBLE_API_BASE = `http://127.0.0.1:${jooble.address().port}`;
+assert.equal(es.ok, true, `recogida: ${es.error}`); assert.equal(seen.length, 7);
+assert.ok(seen.every(u => u.startsWith('https://es.jooble.org/api/')), `dominio por defecto: ${seen[0]}`);
+console.log('PASS  Jooble: por defecto pega a es.jooble.org (clave por país)');
 for (const s of [rest, jooble, pages]) s.closeAllConnections?.(), s.close();

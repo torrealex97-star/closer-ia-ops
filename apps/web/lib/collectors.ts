@@ -34,8 +34,10 @@ const fetchers: Record<ApiProvider, (secret: string) => Fetcher> = {
       }));
     };
   },
+  // Jooble emite una clave POR DOMINIO de país: la de jooble.org solo devuelve ofertas de EE. UU.
+  // Para España hay que usar la clave de es.jooble.org y pegarle a ese dominio.
   jooble: secret => async (query, timeoutMs) => {
-    const data = await json(await fetch(`${process.env.JOOBLE_API_BASE ?? 'https://jooble.org'}/api/${encodeURIComponent(secret)}`, { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: query, location: 'España', page: 1, searchMode: 1 }) }));
+    const data = await json(await fetch(`${process.env.JOOBLE_API_BASE ?? 'https://es.jooble.org'}/api/${encodeURIComponent(secret)}`, { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: query, location: 'España', page: 1, searchMode: 1 }) }));
     return (data.jobs ?? []).map((o: Record<string, any>) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
       external_id: String(o.id ?? o.link), title: o.title, company: o.company ?? null, location: o.location ?? null, url: o.link,
       salary: o.salary || null, posted_at: o.updated ?? null, description: o.snippet ?? null, raw: { provider: 'jooble', job_type: o.type ?? '' },
