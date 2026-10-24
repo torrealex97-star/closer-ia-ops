@@ -3,6 +3,7 @@ import { authenticate, originBlocked, withCookies } from '../../../../lib/adminA
 import { callTimeout, createBudget, timeLeft } from '../../../../lib/cronBudget';
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
 import { collectGoogleJobs, GOOGLE_JOBS_SOURCE } from '../../../../lib/googleJobs';
+import { collectFallback } from '../../../../lib/serpapiFallback';
 import { runAiReview, undoAiDecisions } from '../../../../lib/aiReview';
 import { approvalsToday, approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
 import { DAILY_CAP, runAutoReview } from '../../../../lib/autoReview';
@@ -70,9 +71,17 @@ export async function POST(request: NextRequest) {
       const googleJobs = await collectGoogleJobs('panel', budget.deadline(42_000));
       return reply(auth!, { outcomes: [googleJobs], ...(googleJobs.truncated ? { truncated: true } : {}) });
     }
-    const outcomes = await collectAll('panel', only, budget.deadline(only ? 42_000 : 30_000));
+    const outcomes = await collectAll('panel', only, budget.deadline(only ? 42_000 : 22_000));
     const googleJobs = only ? null : await collectGoogleJobs('panel', budget.deadline(10_000));
-    return reply(auth!, { outcomes: googleJobs ? [...outcomes, googleJobs] : outcomes, ...((outcomes.some(o => o.truncated) || googleJobs?.truncated) ? { truncated: true } : {}) });
+    // Los portales sin API oficial se buscan en Google (mismo fallo declarado, sin ocultar lo que sí entró).
+    const missing = outcomes.filter(o => !o.ok && o.error !== 'Fuente pausada').map(o => o.provider);
+    const fallback = only ? null : await collectFallback('panel', { deadline: budget.deadline(9_000), missing }).catch(() => null);
+    const out = fallback?.outcomes ?? [];
+    return reply(auth!, {
+      outcomes: [...outcomes, ...(googleJobs ? [googleJobs] : []), ...out],
+      ...(fallback && out.length ? { fallback } : {}),
+      ...((outcomes.some(o => o.truncated) || googleJobs?.truncated || fallback?.truncated) ? { truncated: true } : {}),
+    });
   }
   if (body.action === 'ai_review') return reply(auth!, await runAiReview({ deadline: createBudget(45_000).deadline(42_000) }));
   if (body.action === 'ai_undo') return reply(auth!, { undone: await undoAiDecisions(auth!.admin.email) });

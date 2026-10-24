@@ -113,11 +113,13 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   async function collect() {
     setWorking('collect'); setError(''); setNotice('');
     try {
-      const r = await call<{ outcomes: Array<{ provider?: string; source?: string; ok: boolean; accepted?: number; error?: string; searches?: number; cost_usd?: number }> }>({ method: 'POST', body: JSON.stringify({ action: 'collect' }) });
+      const r = await call<{ outcomes: Array<{ provider?: string; source?: string; portal?: string; ok: boolean; accepted?: number; error?: string; skipped?: string; searches?: number; cost_usd?: number }> }>({ method: 'POST', body: JSON.stringify({ action: 'collect' }) });
       setNotice(r.outcomes.map(o => {
-        const label = o.provider ?? o.source ?? 'fuente';
-        const extra = o.source === 'google-jobs' && o.ok ? ` · ${o.searches} búsquedas (~${o.cost_usd} USD)` : '';
-        return `${label}: ${o.ok ? `${o.accepted} guardadas${extra}` : o.error}`;
+        const label = o.portal ?? o.provider ?? o.source ?? 'fuente';
+        // Google Jobs y el respaldo por portal cuestan por búsqueda: se dice cuánto se gastó, no solo qué entró.
+        const paid = o.ok && o.searches ? ` · ${o.searches} búsqueda(s) (~${o.cost_usd} USD)` : '';
+        const why = o.skipped ? ` (${o.skipped})` : '';
+        return `${label}: ${o.ok ? `${o.accepted ?? 0} guardadas${paid}${why}` : (o.error ?? 'falló')}`;
       }).join(' · ')); load();
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
@@ -137,7 +139,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
 
   const counts = data?.counts ?? {};
   return <section aria-label="Fuentes externas">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (hasta 7 búsquedas al día, 0,175 USD) y también desde el workflow de GitHub con JobSpy; LinkedIn, Indeed y Glassdoor llegan por ese workflow, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
+    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (hasta 7 búsquedas al día, 0,175 USD) y, si un portal no tiene API oficial (sin clave o caída), su búsqueda se hace en Google acotada a ese portal (hasta 4 más, 0,1 USD) para que no falte inventario; también entra desde el workflow de GitHub con JobSpy, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>

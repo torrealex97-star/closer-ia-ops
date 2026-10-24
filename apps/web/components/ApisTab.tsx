@@ -4,7 +4,7 @@ import { KeyRound, LoaderCircle, PlugZap, Trash2 } from 'lucide-react';
 
 type Connection = { provider: string; name: string; configured: boolean; last4: string | null; updated_by: string | null; updated_at: string | null; last_test_at: string | null; last_test_ok: boolean | null; last_test_detail: string | null };
 const fmt = (v: string | null) => v ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '—';
-const PURPOSE: Record<string, string> = { apify: 'Extracción de portales con actores de Apify.', serpapi: 'Búsqueda de ofertas indexadas en Google (incluye InfoJobs y LinkedIn). El cron la usa 3 veces al día para closer en España (~0,075 USD/día).', groq: 'Clasificación y resúmenes con IA (proveedor por defecto).', openai: 'Análisis individual de ofertas con IA.',
+const PURPOSE: Record<string, string> = { apify: 'Extracción de portales con actores de Apify.', serpapi: 'Búsqueda de ofertas indexadas en Google (incluye InfoJobs y LinkedIn). El cron la usa 7 veces al día para closer en España y LatAm y hasta 4 más para cubrir los portales sin API oficial propia (~0,275 USD/día).', groq: 'Clasificación y resúmenes con IA (proveedor por defecto).', openai: 'Análisis individual de ofertas con IA.',
   infojobs: 'API oficial de InfoJobs (cuenta de desarrollador gratuita, con aprobación). Formato: client_id:client_secret.', adzuna: 'API de Adzuna (clave gratuita). Formato: app_id:app_key.', jooble: 'API de Jooble (clave gratuita en es.jooble.org/api/about: cada país tiene su propia clave; la de jooble.org solo trae ofertas de EE. UU.).' };
 
 async function api<T>(init?: RequestInit, query = ''): Promise<T> {

@@ -17,6 +17,15 @@ Google Jobs indexa InfoJobs, LinkedIn, Computrabajo, Bumerán, OCCMundial y port
 4. Sin tiempo en el cron se corta y lo declara (`truncated`); lo ya recogido se guarda y la siguiente pasada continúa.
 5. La fuente se pausa como cualquier otra desde Fuentes externas (código `google-jobs`).
 
+## 1 ter. Respaldo por portal: si su API oficial falta, se busca en Google acotado a ese portal
+Cuando un portal del SOP no tiene API oficial conectada (sin clave, clave rechazada o caída) se busca su inventario con Google + SerpApi (`site:<portal>`), en su país y en español. Así no queda un mercado sin ofertas porque falte una clave: **la API oficial manda y SerpApi solo cubre el hueco**.
+1. **Qué portales** ([serpapiFallback.ts](../apps/web/lib/serpapiFallback.ts)): Computrabajo (`co`), OCCMundial (`mx`), Bumerán (`ar`), BeBee (`es`), e InfoJobs, Indeed, LinkedIn, Adzuna y Jooble. Cada uno tiene su patrón de enlace de oferta: una ficha orgánica que no apunte al anuncio del portal se descarta.
+2. **Orden y ahorro**: primero los portales cuya API falta; después los que no tienen ninguna otra vía (LatAm y agregadores); y solo al final los que ya tienen API, y únicamente si esa fuente **no trajo nada en 24 h**. Un portal que ya trajo ofertas ayer no se vuelve a pagar hoy. Una fuente **pausada** no cuenta como ausente ni se busca.
+3. **Tope**: `SERPAPI_FALLBACK_MAX_SEARCHES` (4 por defecto, 0 lo apaga, máximo 9). Además se detiene solo cuando el día ya cumplió `DAILY_TARGET_OFFERS` (60 por defecto) o cuando cada búsqueda aportaría más de lo que falta.
+4. **Coste**: 0,025 USD por búsqueda → **≤0,1 USD/día** con el tope por defecto, dentro de las mismas 250 búsquedas/mes del plan gratuito que usa Google Jobs (7 + 4 = 11 al día como mucho; el tope diario de ofertas y la regla de 24 h lo bajan en la práctica).
+5. **Datos**: de una ficha de Google solo se toman título, enlace y el resumen publicado. **Empresa, ubicación y salario no se inventan**: quedan como «no indicado» salvo que el texto los mencione con una cifra literal. Entra como borrador, como todo lo demás.
+6. **Visibilidad**: el panel lo declara en cada recogida (`Computrabajo: 6 guardadas · 1 búsqueda (~0,025 USD)`) y un corte por tiempo se anota como `truncated`.
+
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
 2. Vercel → proyecto → Settings → Environment Variables: `INGEST_TOKEN` = ese token (Production).
@@ -25,7 +34,7 @@ Google Jobs indexa InfoJobs, LinkedIn, Computrabajo, Bumerán, OCCMundial y port
 Los runners de GitHub a veces son bloqueados por LinkedIn/Indeed: un fallo aparece en el log del workflow y en el aviso de la entrada, y no afecta al resto.
 
 ## 3. Variables de entorno (Vercel, producción)
-`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` o `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (integración de Supabase), `CAREER_ENGINE_URL`, `CAREER_ADMIN_TOKEN`, `CRON_SECRET` (autoriza el cron), `INGEST_TOKEN` (autoriza el recolector de GitHub), opcional `ADMIN_SECRETS_KEY`. Opcional de la recogida de Google Jobs: `SERPAPI_JOBS_MAX_DORKS` (3 por defecto; 0 apaga).
+`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` o `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (integración de Supabase), `CAREER_ENGINE_URL`, `CAREER_ADMIN_TOKEN`, `CRON_SECRET` (autoriza el cron), `INGEST_TOKEN` (autoriza el recolector de GitHub), opcional `ADMIN_SECRETS_KEY`. Opcionales de la recogida de Google Jobs: `SERPAPI_JOBS_MAX_DORKS` (7 por defecto; 0 apaga) y `SERPAPI_FALLBACK_MAX_SEARCHES` (4 por defecto; 0 apaga el respaldo por portal), más `DAILY_TARGET_OFFERS` (60) para el objetivo diario.
 
 ## 4. Control diario
 - **Pausar/reanudar** una fuente: Panel → Fuentes externas → tabla de fuentes (solo propietario). Pausada = no se recoge, no se acepta y no se muestra.
