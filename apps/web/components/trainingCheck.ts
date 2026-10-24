@@ -3,6 +3,7 @@
 // cumple no es «suspenso»: la UI lo presenta como algo que falta, con su motivo.
 
 import { FINAL_EXAM, LOGICA } from './trainingContent';
+import type { BankQuestion } from './trainingContent';
 
 export type Criterion = { id: string; label: string; ok: boolean; detail: string };
 export type Review = { criteria: Criterion[]; met: number; total: number; ratio: number };
@@ -248,3 +249,12 @@ export function gradeExam(answers: Record<string, string>): ExamResult {
   return { correct, total: multiple.length, score, passed: score >= EXAM_PASS, wrong };
 }
 
+
+// ---- Bancos de situaciones (cierres, descubrimiento) -------------------------
+
+export type BankResult = { correct: number; total: number; wrong: string[] };
+// Corrección por clave: una pregunta sin responder cuenta como fallo y se señala, no se supone.
+export function gradeBank(bank: BankQuestion[], answers: Record<string, string>): BankResult {
+  const wrong = bank.filter(question => answers[question.id] !== question.answer).map(question => question.id);
+  return { correct: bank.length - wrong.length, total: bank.length, wrong };
+}

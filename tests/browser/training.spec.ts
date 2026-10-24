@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { FINAL_EXAM, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
+import { CLOSE_BANK, DISCOVERY_BANK, EXACT_CLOSES, FINAL_EXAM, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
 
 // La vista de alumna carga oportunidades al montar: se neutraliza para aislar formación.
 const emptyCatalog = (route: import('@playwright/test').Route) => route.fulfill({ json: { items: [], total: 0 } });
@@ -8,12 +8,12 @@ const open = async (page: import('@playwright/test').Page, title: string) => {
   await page.locator('.training-grid .training-card').filter({ hasText: title }).getByRole('button', { name: 'Abrir módulo' }).click();
 };
 
-test('la formación ofrece los seis módulos y revisa la secuencia de pre-llamada', async ({ page }) => {
+test('la formación ofrece los ocho módulos y revisa la secuencia de pre-llamada', async ({ page }) => {
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.goto('/');
   await page.getByRole('button', { name: 'Formación' }).click();
   await expect(page.getByRole('heading', { name: 'Aprende el método antes de improvisar.' })).toBeVisible();
-  await expect(page.locator('.training-grid .training-card')).toHaveCount(6);
+  await expect(page.locator('.training-grid .training-card')).toHaveCount(8);
   await expect(page.locator('.training-grid .training-card').first()).toContainText('Ejercicio sin nota');
 
   await page.locator('.training-grid .training-card').first().getByRole('button', { name: 'Abrir módulo' }).click();
@@ -115,4 +115,31 @@ test('STAR impide cerrar sin calificar y el examen se corrige sobre las respuest
 
   await page.getByRole('button', { name: 'Todos los módulos' }).click();
   await expect(page.locator('.training-grid .training-card').filter({ hasText: 'Ruta de cuatro semanas' }).locator('.training-card-foot span')).toHaveText('Examen superado · 100/100');
+});
+
+test('los diez cierres y los nueve pasos se estudian y se corrigen por clave', async ({ page }) => {
+  await page.route('**/api/backend/opportunities/search', emptyCatalog);
+  await page.goto('/');
+  await open(page, 'Los diez cierres');
+  await expect(page.getByRole('heading', { name: 'Los diez cierres' })).toBeVisible();
+  await expect(page.locator('.training-ladder > li')).toHaveCount(EXACT_CLOSES.length);
+  await expect(page.getByText('[importe]').first()).toBeVisible();
+  const bank = page.getByTestId('bank-cierres');
+  await expect(bank.getByRole('button', { name: 'Corregir mis respuestas' })).toBeDisabled();
+  for (const [i, q] of CLOSE_BANK.entries()) await bank.locator('.training-question').nth(i).getByLabel(i === 0 ? q.options.find(o => o !== q.answer)! : q.answer, { exact: true }).check();
+  await bank.getByRole('button', { name: 'Corregir mis respuestas' }).click();
+  await expect(bank.locator('.training-result-score b')).toHaveText('4');
+  await expect(bank.getByText(`Era: ${CLOSE_BANK[0].answer}.`)).toBeVisible();
+  await bank.getByRole('button', { name: 'Repetir' }).click();
+  await expect(bank.getByRole('button', { name: 'Corregir mis respuestas' })).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Todos los módulos' }).click();
+  await open(page, 'Los nueve pasos de descubrimiento');
+  await expect(page.locator('.training-ladder > li')).toHaveCount(9);
+  const steps = page.getByTestId('bank-descubrimiento');
+  for (const [i, q] of DISCOVERY_BANK.entries()) await steps.locator('.training-question').nth(i).getByLabel(q.answer, { exact: true }).check();
+  await steps.getByRole('button', { name: 'Corregir mis respuestas' }).click();
+  await expect(steps.locator('.training-result-score b')).toHaveText('5');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

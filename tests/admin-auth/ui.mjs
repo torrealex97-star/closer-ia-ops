@@ -191,12 +191,12 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.goto(BASE + '/'); await alumna.getByRole('button', { name: 'Mi progreso' }).click(); await alumna.getByRole('heading', { name: 'Tu progreso.' }).waitFor();
   await alumna.locator('.stat-strip').waitFor();
   const strip = await alumna.locator('.stat-strip').innerText(); assert.match(strip, /1\s*prácticas/); assert.match(strip, /72\s*nota media/);
-  assert.match(await alumna.locator('.student-progress').innerText(), /1 de 5 módulos repasados/);
+  assert.match(await alumna.locator('.student-progress').innerText(), /1 de 7 módulos repasados/);
   await alumna.getByText('Ver como tabla').click(); assert.equal(await alumna.locator('.progress-card details tbody tr').count(), 6, 'seis semanas en la tabla alternativa');
   assert.ok(await alumna.getByRole('img', { name: /Nota media semanal de prácticas/ }).isVisible());
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con progreso');
   await page.getByRole('button', { name: 'Últimos 7 días' }).click();
-  const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/5/);
+  const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/7/);
   await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL').waitFor();
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
 });
