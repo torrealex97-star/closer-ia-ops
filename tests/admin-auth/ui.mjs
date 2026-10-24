@@ -85,7 +85,7 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.unroute('**/api/admin/metrics'); await page.getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('metrics').waitFor();
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'métricas sin scroll horizontal en móvil'); await page.setViewportSize({ width: 1280, height: 900 });
   if (process.env.SHOT) { await page.getByTestId('metrics').getByText('Ver tabla por día').click(); await page.getByTestId('metrics').screenshot({ path: process.env.SHOT }); }
-  await page.getByText('Closer de ventas').first().waitFor();
+  await page.locator('table td', { hasText: 'Closer de ventas' }).first().waitFor(); // la frase también aparece oculta en las búsquedas de Google Jobs
   assert.equal(await page.locator('table').last().locator('tbody tr').count(), 1); // closer + España; el de Texas y el setter quedan fuera
   assert.equal(await page.locator('table', { has: page.getByRole('columnheader', { name: 'Vía' }) }).locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
   await page.getByRole('button', { name: 'Pausar InfoJobs' }).click(); await page.getByText(/infojobs: pausada/).waitFor();
@@ -197,6 +197,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con progreso');
   await page.getByRole('button', { name: 'Últimos 7 días' }).click();
   const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/7/);
+  await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL').waitFor();
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
 });
 await step('móvil: Resumen sin scroll horizontal', async () => {
