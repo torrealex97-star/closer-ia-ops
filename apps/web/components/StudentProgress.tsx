@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Award, Flame, LoaderCircle, RotateCw } from 'lucide-react';
 import { REVIEW_REFS } from './trainingRefs';
 import { TRAINING_MODULES } from './trainingContent';
+import { scenarioById } from './practiceScenarios';
 import type { Progress } from '../lib/studentActivity';
 
 // Progreso de la alumna (adaptado del panel «Mis métricas» de closer-ai-coach): solo datos reales de su actividad.
@@ -11,6 +12,8 @@ type State = { kind: 'loading' } | { kind: 'login' } | { kind: 'error'; message:
 const PERIODS = [7, 30, 90] as const;
 const REVIEW_LABELS: Record<string, string> = Object.fromEntries(TRAINING_MODULES.map(m => [m.id, m.title]));
 const KIND_LABELS: Record<string, string> = { session: 'Entrada', training_review: 'Formación', training_exam: 'Examen de egreso', practice: 'Sala de práctica' };
+// Ejes de la sala de práctica (venta y entrevista); un eje desconocido se muestra con su identificador.
+const AXIS_LABELS: Record<string, string> = { apertura: 'Apertura y marco', descubrimiento: 'Descubrimiento', objecion: 'Objeciones', cierre: 'Cierre', confianza: 'Confianza y autoridad', claridad: 'Claridad y estructura', evidencia: 'Evidencia y cifras', encaje: 'Encaje', iniciativa: 'Cierre e iniciativa' };
 const number = new Intl.NumberFormat('es');
 const dateFmt = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' });
 const weekLabel = (iso: string) => dateFmt.format(new Date(`${iso}T12:00:00Z`));
@@ -75,7 +78,7 @@ function Ready({ progress: p }: { progress: Progress }) {
         <WeeklyBars weekly={p.weekly} />
         <details><summary>Ver como tabla</summary><div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Semana del</th><th scope="col" className="num">Prácticas</th><th scope="col" className="num">Nota media</th></tr></thead><tbody>{p.weekly.map(w => <tr key={w.week}><th scope="row">{weekLabel(w.week)}</th><td className="num">{w.count}</td><td className="num">{dash(w.avg)}</td></tr>)}</tbody></table></div></details></article>
       <article className="progress-card"><h2>Tus competencias</h2><p className="card-meta">Media por eje en las prácticas de los últimos {p.days} días.</p>
-        {p.axes.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Eje</th><th scope="col">Nota</th></tr></thead><tbody>{p.axes.map(a => <tr key={a.axis}><th scope="row">{a.axis}</th><td><div className="meter" role="progressbar" aria-label={a.axis} aria-valuemin={0} aria-valuemax={100} aria-valuenow={a.avg}><span style={{ width: `${a.avg}%` }} /></div><span className="num">{a.avg}/100</span></td></tr>)}</tbody></table></div>
+        {p.axes.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Eje</th><th scope="col">Nota</th></tr></thead><tbody>{p.axes.map(a => <tr key={a.axis}><th scope="row">{AXIS_LABELS[a.axis] ?? a.axis}</th><td><div className="meter" role="progressbar" aria-label={AXIS_LABELS[a.axis] ?? a.axis} aria-valuemin={0} aria-valuemax={100} aria-valuenow={a.avg}><span style={{ width: `${a.avg}%` }} /></div><span className="num">{a.avg}/100</span></td></tr>)}</tbody></table></div>
           : <p className="card-meta">— Todavía no hay prácticas puntuadas por eje en este periodo.</p>}</article>
       <article className="progress-card"><h2>Formación</h2><p className="card-meta">{p.lifetime.training.modules.length} de {REVIEW_REFS.length} módulos repasados (en total, no solo este periodo).</p>
         <ul className="plain-list">{REVIEW_REFS.map(ref => { const done = p.lifetime.training.modules.includes(ref); return <li key={ref}><span className={done ? 'status ok' : 'status'}>{done ? 'Repasado' : 'Pendiente'}</span> {REVIEW_LABELS[ref] ?? ref}</li>; })}</ul>
@@ -86,7 +89,7 @@ function Ready({ progress: p }: { progress: Progress }) {
     <h2 className="progress-heading">Actividad reciente</h2>
     {p.recent.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Qué</th><th scope="col">Detalle</th><th scope="col" className="num">Nota</th></tr></thead><tbody>{p.recent.map((r, i) => <tr key={r.id ?? i}>
       <td>{dateFmt.format(new Date(r.created_at))}</td><td>{KIND_LABELS[r.kind] ?? r.kind}</td>
-      <td>{r.kind === 'training_review' ? `${REVIEW_LABELS[r.ref ?? ''] ?? r.ref}: ${r.detail.met}/${r.detail.total} criterios` : r.kind === 'training_exam' ? (r.detail.passed ? 'Superado' : 'No superado') : r.ref ?? '—'}</td>
+      <td>{r.kind === 'training_review' ? `${REVIEW_LABELS[r.ref ?? ''] ?? r.ref}: ${r.detail.met}/${r.detail.total} criterios` : r.kind === 'training_exam' ? (r.detail.passed ? 'Superado' : 'No superado') : (r.kind === 'practice' ? scenarioById(r.ref ?? '')?.title : null) ?? r.ref ?? '—'}</td>
       <td className="num">{dash(r.score)}</td></tr>)}</tbody></table></div>
       : <p className="card-meta">— Nada en los últimos {p.days} días.</p>}
   </>;

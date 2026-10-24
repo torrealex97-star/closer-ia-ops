@@ -2,6 +2,12 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## La sala de práctica alimenta «Mi progreso» (sesión 92) — 2026-10-24
+
+- **Qué**: al terminar una práctica, la nota global y la de cada eje se registran como actividad (`kind: practice`, escenario y ejes; modo `texto`). **No se envía el texto de la conversación ni el feedback**: solo números. Sin sesión de alumna la práctica funciona igual y no queda registrada. «Mi progreso» muestra ahora las competencias con su nombre (Apertura y marco, Confianza y autoridad…) y el historial con el título del escenario.
+- **Verificado (tested, servicios simulados)**: `practice.spec.ts`, `practice-method.spec.ts` y `training.spec.ts` **21/21** contra `next dev` (el caso de la sala comprueba la petición exacta: `ref: venta-fria`, nota 61 y ejes 78/64/58/42); `typecheck` y `design` OK. `build` y `run.sh`: ver abajo si constan.
+- **Límites**: sigue sin aplicarse la migración `student_activity`; hasta entonces la nota se calcula y se muestra en la sala, pero no queda guardada en el progreso. La nota es una estimación del modelo (así se declara en la sala), no una medición.
+
 ## Formación: «Los diez cierres» y «Los nueve pasos de descubrimiento» (sesión 91) — 2026-10-24
 
 - **Petición del operador**: seguir mejorando la app con el contenido de `closer-ai-coach`. La PR #29 (actividad y progreso) quedó fusionada con `verify` y `web-admin` en verde.

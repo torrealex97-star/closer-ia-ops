@@ -1,5 +1,6 @@
 'use client';
 
+import { logActivity } from './studentActivityClient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock3, Gauge, LoaderCircle, MessageSquare, Mic, MicOff, Play, Quote, RotateCcw, Send, Sparkles, Target, Volume2 } from 'lucide-react';
 import { INTENSITY_LABELS, PRACTICE_SCENARIOS, scenarioById } from './practiceScenarios';
@@ -143,6 +144,8 @@ export default function StudentPractice() {
       if (!data.debrief) throw new Error('No se ha recibido feedback. Vuelve a intentarlo.');
       setDebrief(data.debrief);
       setView('debrief');
+      // Alimenta «Mi progreso» (solo con sesión; sin ella la práctica sigue igual). Se guarda la nota y la de cada eje, no el texto.
+      if (typeof data.debrief.score === 'number') void logActivity({ kind: 'practice', ref: scenario.id, score: Math.max(0, Math.min(100, Math.round(data.debrief.score))), detail: { mode: 'texto', axes: Object.fromEntries((data.debrief.axes ?? []).map(axis => [axis.id, Math.max(0, Math.min(100, Math.round(axis.score)))])) } });
       saveHistory([{ id: crypto.randomUUID?.() ?? String(Date.now()), scenarioId: scenario.id, title: scenario.title, startedAt, turns: studentTurns, debrief: data.debrief }, ...history]);
     } catch (exception) {
       setError((exception as Error).message);
