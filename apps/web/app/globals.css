@@ -522,3 +522,12 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:1100px){.training-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:980px){.training-examples{grid-template-columns:1fr}.training-star{grid-template-columns:1fr}.training-figures{grid-template-columns:1fr 1fr}.training-grid-3{grid-template-columns:1fr}.training-head h1{font-size:36px}}
 @media(max-width:700px){.training-grid{grid-template-columns:1fr}.training-head{flex-direction:column;align-items:flex-start}.training-icon{display:none}.training-card{padding:20px}.training-composer{flex-direction:column;align-items:stretch}.training-composer button{width:100%}.training-moral{flex-wrap:wrap}.training-moral-count{border-left:0;padding-left:0;text-align:left}.training-step{font-size:10.5px}.training-actions button{flex:1}}
+.progress-grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));margin:20px 0 28px}
+.progress-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--sheet);padding:20px;min-width:0}
+.progress-card h2,.progress-heading{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}.progress-heading{margin:8px 0 12px}
+.progress-card details{margin-top:12px;font-size:12px}.progress-card summary{cursor:pointer;color:var(--accent)}
+.meter{height:6px;min-width:80px;background:var(--inset);border-radius:99px;overflow:hidden;margin-bottom:4px}.meter>span{display:block;height:100%;background:var(--accent)}
+.plain-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px;font-size:13px}
+.achievements{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.achievements li{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;background:var(--inset)}.achievements li[data-on="true"]{border-color:var(--sage);background:var(--sage-soft)}
+.achievements small{color:var(--secondary)}

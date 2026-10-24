@@ -1,5 +1,6 @@
 'use client';
 
+import { logActivity } from './studentActivityClient';
 import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Award, Brain, Calculator, Check, CheckCircle2,
@@ -88,6 +89,7 @@ function PreCall() {
   function check() {
     const result = reviewPreCall(step.id, draft);
     setReviews(current => current.map((item, i) => i === index ? result : item));
+    void logActivity({ kind: 'training_review', ref: 'precall', detail: { met: result.met, total: result.total } });
   }
   const review = reviews[index];
   const done = reviews.filter(complete).length;
@@ -164,7 +166,7 @@ function Logica() {
         {field('meses', 'Meses de ahorro para igualar un mes de brecha', 'Brecha ÷ ahorro')}
       </div>
       <div className="training-actions">
-        <button type="button" className="primary" onClick={() => setReview(reviewLogica(inputs))} disabled={!inputs.brecha.trim() && !inputs.coste.trim() && !inputs.meses.trim()}><Check size={15} />Comprobar el cálculo</button>
+        <button type="button" className="primary" onClick={() => { const result = reviewLogica(inputs); setReview(result); void logActivity({ kind: 'training_review', ref: 'logica', detail: { met: result.met, total: result.total } }); }} disabled={!inputs.brecha.trim() && !inputs.coste.trim() && !inputs.meses.trim()}><Check size={15} />Comprobar el cálculo</button>
       </div>
       {review && <Outcome review={review} title="Cálculo" note="Si las tres cuentas están bien, ya tienes la frase. El resto es no estropearla hablando." />}
       {all && <div className="training-script">
@@ -181,7 +183,7 @@ function Logica() {
         <textarea id="logica-close" value={close} onChange={event => { setClose(event.target.value); setCloseReview(null); }} rows={3} maxLength={600} placeholder="Con lo que me cuentas, tienes dos caminos…" />
       </label>
       <div className="training-actions">
-        <button type="button" onClick={() => setCloseReview(reviewCloseLine(close))} disabled={!close.trim()}><Check size={15} />Revisar mi frase</button>
+        <button type="button" onClick={() => { const result = reviewCloseLine(close); setCloseReview(result); void logActivity({ kind: 'training_review', ref: 'logica', detail: { met: result.met, total: result.total } }); }} disabled={!close.trim()}><Check size={15} />Revisar mi frase</button>
       </div>
       {closeReview && <Outcome review={closeReview} title="Tu frase" note="El ejercicio no puede comprobar el silencio: eso lo decides tú en la llamada real. Aquí solo se revisa que no pidas aprobación al soltar el número." />}
     </div>
@@ -212,7 +214,7 @@ function Freezing() {
     const next = [...messages, { role: 'you' as const, text }];
     if (spoke < FREEZING.attacks.length) next.push({ role: 'them', text: FREEZING.attacks[spoke] });
     setMessages(next); setDraft('');
-    if (spoke >= FREEZING.attacks.length) setDone(true);
+    if (spoke >= FREEZING.attacks.length) { setDone(true); void logActivity({ kind: 'training_review', ref: 'freezing', detail: { met: FREEZING.attacks.length - freezingFalls([...answers, text]), total: FREEZING.attacks.length } }); }
     if (freezingFalls([...answers, text]) >= 2) setReactivation(true);
   }
 
@@ -319,7 +321,7 @@ function Yellows() {
       </form> : null}
     </div>
     <div className="training-actions">
-      {!done && !blocked && <button type="button" onClick={() => setDone(true)} disabled={answers.length < 2}><Flag size={15} />Terminar y revisar</button>}
+      {!done && !blocked && <button type="button" onClick={() => { setDone(true); void logActivity({ kind: 'training_review', ref: 'yellows', detail: { met: Math.max(0, answers.length - yellowMistakes(answers)), total: Math.max(1, answers.length) } }); }} disabled={answers.length < 2}><Flag size={15} />Terminar y revisar</button>}
       {done && <Outcome review={review} title="Qué ha pasado con este lead" note="Se cuentan preguntas, concreción y longitud. No se juzga si el lead era o no real: eso no se puede saber desde un guion." />}
     </div>
   </div>;
@@ -350,7 +352,7 @@ function Star() {
       <p>{STAR_RULE}</p>
     </div>
     <div className="training-actions">
-      <button type="button" className={all ? 'primary' : ''} onClick={() => setTried(true)}>{all ? <><CheckCircle2 size={15} />Lead calificado: puedes cerrar</> : <>Intentar cerrar con este lead</>}</button>
+      <button type="button" className={all ? 'primary' : ''} onClick={() => { setTried(true); void logActivity({ kind: 'training_review', ref: 'star', detail: { met: STAR_CRITERIA.filter(item => checked[item.letter]).length, total: STAR_CRITERIA.length } }); }}>{all ? <><CheckCircle2 size={15} />Lead calificado: puedes cerrar</> : <>Intentar cerrar con este lead</>}</button>
     </div>
     {tried && all && <p className="training-emphasis">Los cuatro criterios están verificados. Ahora el cierre es una decisión, no una sorpresa.</p>}
     {tried && !all && <div className="training-warning" role="status"><AlertTriangle size={16} /><div><strong>Intento de cierre sin calificar</strong><p>La objeción que recibas no será la real: será el síntoma de que preguntaste tarde. Vuelve a la conversación y verifica lo que falta.</p></div></div>}
@@ -370,6 +372,7 @@ function Certification() {
   function submit() {
     const graded = gradeExam(answers);
     setResult(graded);
+    void logActivity({ kind: 'training_exam', ref: 'final', detail: { correct: graded.correct, total: graded.total } });
     const saved: ExamStored = { score: graded.score, total: graded.total, passed: graded.passed, at: Date.now() };
     setStored(saved);
     try { window.localStorage.setItem(EXAM_KEY, JSON.stringify(saved)); } catch { /* sin almacenamiento */ }

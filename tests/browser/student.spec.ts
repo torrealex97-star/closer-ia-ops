@@ -24,7 +24,8 @@ test('student sees three profiles and decision facts without operational control
   await expect.poll(() => requests.some(r => r.role === 'cold_caller')).toBe(true);
   await page.getByRole('button', { name: 'Ver oportunidad', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Ver proceso de candidatura' })).toHaveAttribute('href', offer.source_url);
+  // Sin enlace de candidatura propio en el anuncio, «Aplicar» apunta a la publicación de la fuente.
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Aplicar en example.com' })).toHaveAttribute('href', offer.source_url);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
