@@ -2,6 +2,15 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Reclasificar el catálogo del motor: no hay nada que migrar (sesión 87) — 2026-10-24
+
+- **Petición del operador**: reclasificar las ofertas ya guardadas del motor con el vocabulario nuevo, sin esperar a la próxima ingesta.
+- **Corrección de lo que dije en la sesión 86**: el motor **no guarda** la clasificación. El esquema D1 no tiene columnas `role`, `spain` ni `score` (`raw_items`, `job_postings`, `jobs`, `catalog_entries`, `collection_runs`, `opportunities`…); `studentSurface`, el escaneo de borradores y `/api/funnel` la **calculan en cada lectura** desde `job_postings.payload` (`classifyRole`, `spainSignal`, `nonSpanish`). Por eso las ofertas ya guardadas **ya se cualifican con el gazetteer** desde el despliegue de la sesión 86: no existe una pasada de reclasificación que hacer, y una migración de datos no tendría campo donde escribir.
+- **Medido para comprobarlo (verified)**: `/api/offers?limit=500` devuelve **134** ofertas vivas; solo **2** no contienen ningún hint clásico de España y en ambas la ubicación es inservible (`"cl"` y `null`), así que hoy **ninguna tarjeta depende del gazetteer**. Eso explica que `/v1/opportunities/search` dé los mismos **48** (ES) y **3** (closer ES) antes y después del despliegue: es el resultado esperado, no una prueba de que el worker viejo siga publicado.
+- **Evidencia de que la regla funciona**: la misma función (misma lista, `parity.mjs`) reclassificó en la web **5 ofertas reales** que antes caían (Murcia, Boiro, Salou, Alcobendas, Carballedo) al repetir la recogida, y están visibles en la página. En el motor quedará demostrada con la primera oferta que llegue con un municipio como única ubicación.
+- **Único dato almacenado que envejece**: `opportunity_versions.payload` guarda una foto con la etiqueta de perfil del momento de la revisión. La vista de alumna no la lee, así que no afecta a lo que ve; reescribir versiones publicadas para actualizar una etiqueta sería peor que dejarlas.
+- **Límite**: si en el futuro se quiere una pasada explícita (auditoría de lo que cambiaría), habría que añadir un diagnóstico de solo lectura al worker; no se ha hecho porque hoy no hay nada que recalcular.
+
 ## Motor desplegado con el gazetteer de municipios (sesión 86) — 2026-10-24
 
 - **Petición del operador**: desplegar el worker del motor con el nuevo vocabulario y comprobar que su superficie sigue respondiendo.
