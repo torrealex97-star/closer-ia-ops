@@ -43,6 +43,10 @@ export function postedAt(value: unknown, now = Date.now()): string | null {
   if (typeof value !== 'string') return null;
   const text = fold(value).trim();
   if (!text) return null;
+  // Algunas respuestas traen la fecha ya resuelta (ISO o fecha corta) y no una
+  // frase relativa: se acepta tal cual, sin reinterpretarla.
+  const absolute = Date.parse(value);
+  if (Number.isFinite(absolute)) return new Date(absolute).toISOString();
   if (/\b(just posted|recien publicado|hoy|today|ayer|yesterday)\b/.test(text)) {
     return new Date(now - (/ayer|yesterday/.test(text) ? 86400_000 : 0)).toISOString();
   }
@@ -75,7 +79,10 @@ export function toCandidate(row: unknown): Candidate | null {
     ? job.detected_extensions as Record<string, unknown> : {};
   const apply = Array.isArray(job.apply_options) ? job.apply_options : [];
   const first = apply[0] && typeof apply[0] === 'object' ? apply[0] as Record<string, unknown> : {};
-  const url = httpUrl(job.share_link) ?? httpUrl(job.link) ?? httpUrl(first.link);
+  // El enlace del portal va primero. `share_link` es la ficha dentro de Google
+  // Jobs (google.com/search…): sirve de respaldo, pero no es el anuncio original
+  // y la tarjeta de la alumna atribuiría la oferta a google.com.
+  const url = httpUrl(first.link) ?? httpUrl(job.link) ?? httpUrl(job.share_link);
   const title = clip(job.title, 200);
   if (!url || !title) return null; // sin enlace o título no hay oferta verificable
   const external_id = clip(job.job_id, 200) ?? url;
@@ -137,19 +144,34 @@ export async function collectGoogleJobs(via: string, deadline?: number, fetchFor
     const secret = await getSecret('serpapi');
     if (!secret) return { source: GOOGLE_JOBS_SOURCE, ok: false, error: 'Sin clave guardada de SerpApi' };
     const fetchQuery = fetchFor(secret);
-    const all: Candidate[] = []; const errors: string[] = []; let truncated = false; let searches = 0;
-    for (const dork of GOOGLE_JOBS_DORKS.slice(0, limit)) {
-      // 3,5 s: por debajo no da tiempo ni a una llamada útil; se corta y se dice.
-      if (timeLeft(deadline) < 3_500) { truncated = true; break; }
-      searches++;
-      try { all.push(...await fetchQuery(dork, callTimeout(12_000, deadline))); }
-      catch (err) { errors.push(`${dork}: ${(err as Error).message}`); }
+    const dorks = GOOGLE_JOBS_DORKS.slice(0, limit);
+    const all: Candidate[] = []; const errors: string[] = []; let truncated = false;
+    // 3,5 s: por debajo no da tiempo ni a una llamada útil; se corta y se dice.
+    if (timeLeft(deadline) < 3_500) {
+      return { source: GOOGLE_JOBS_SOURCE, ok: false, error: 'Sin tiempo en el presupuesto del cron: se reintentará en la próxima ejecución.', searches: 0, cost_usd: 0, truncated: true };
     }
+    const timeout = callTimeout(12_000, deadline);
+    // En paralelo: los dorks son independientes y en serie no cabían en el tramo del
+    // cron (la primera pasada se cortó en el tercero). Un fallo no oculta los demás.
+    const settled = await Promise.allSettled(dorks.map(dork => fetchQuery(dork, timeout)));
+    settled.forEach((result, i) => {
+      if (result.status === 'fulfilled') all.push(...result.value);
+      else errors.push(`${dorks[i]}: ${(result.reason as Error)?.message ?? 'fallo'}`);
+    });
+    const searches = dorks.length;
+    if (deadline !== undefined && Date.now() >= deadline) truncated = true;
     const cost = Number((searches * SEARCH_USD).toFixed(3));
     if (!all.length && errors.length) return { source: GOOGLE_JOBS_SOURCE, ok: false, error: errors[0], searches, cost_usd: cost, truncated: truncated || undefined };
     if (!all.length && truncated) return { source: GOOGLE_JOBS_SOURCE, ok: false, error: 'Sin tiempo en el presupuesto del cron: se reintentará en la próxima ejecución.', searches, cost_usd: cost, truncated: true };
-    // El mismo anuncio sale en varios dorks: se queda uno por id y por URL canónica.
-    const unique = [...new Map(all.map(c => [`${c.external_id}|${c.url}`, c])).values()];
+    // El mismo anuncio sale en varios dorks. Se queda uno por id y, si alguno trae el
+    // enlace del portal, ese: el de la ficha de Google no debe pisarlo.
+    const isGoogle = (u: string) => /^https?:\/\/(www\.)?google\./i.test(u);
+    const byId = new Map<string, Candidate>();
+    for (const c of all) {
+      const prev = byId.get(c.external_id);
+      if (!prev || (isGoogle(prev.url) && !isGoogle(c.url))) byId.set(c.external_id, c);
+    }
+    const unique = [...byId.values()];
     const notes = [errors.length ? `${errors.length} búsqueda(s) fallaron` : '', truncated ? 'cortada por presupuesto de tiempo' : ''].filter(Boolean).join(' · ') || undefined;
     const result = await ingest(GOOGLE_JOBS_SOURCE, via, unique, notes);
     return { source: GOOGLE_JOBS_SOURCE, ok: true, received: result.received, accepted: result.accepted, searches, cost_usd: cost, truncated: truncated || undefined };

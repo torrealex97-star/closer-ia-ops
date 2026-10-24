@@ -37,7 +37,12 @@ const server = http.createServer(async (req, res) => {
     const q = url.searchParams.get('q') ?? '';
     // El mismo anuncio aparece en dos dorks: debe quedar una sola fila.
     const rows = q.includes('high ticket')
-      ? [job('job-1'), job('job-2', { title: 'Setter/Closer', detected_extensions: { posted_at: 'ayer' } }), job('job-2')]
+      ? [job('job-1'), job('job-2', {
+          title: 'Setter/Closer',
+          share_link: 'https://www.google.com/search?q=closer+ventas&ibp=htl;jobs',
+          apply_options: [{ title: 'InfoJobs', link: 'https://www.infojobs.net/oferta/job-2' }],
+          detected_extensions: { posted_at: 'ayer' },
+        }), job('job-2')]
       : [job('job-1'), job('job-3', { share_link: 'javascript:alert(1)', link: null, apply_options: [] })];
     return send(200, { jobs_results: rows });
   }
@@ -94,6 +99,11 @@ await step('mapea Google Jobs a candidatos con empresa, ubicación, salario, fec
   assert.ok(age > 1.9 * 86400_000 && age < 2.1 * 86400_000, `fecha relativa: ${row.posted_at}`);
   const y = saved.find(r => r.external_id === 'job-2');
   assert.match(y.posted_at, /T/);
+  // Google entrega su propia ficha (google.com/search) y el portal en apply_options:
+  // gana el portal, para que la tarjeta no atribuya la oferta a Google.
+  assert.equal(y.url, 'https://www.infojobs.net/oferta/job-2');
+  const onlyGoogle = toCandidate({ job_id: 'g1', title: 'Closer', share_link: 'https://www.google.com/search?q=x' });
+  assert.equal(onlyGoogle.url, 'https://www.google.com/search?q=x', 'sin portal, la ficha de Google es el respaldo');
   // Rol y España se calculan al entrar; la oferta llega como borrador.
   assert.equal(row.role, 'closer');
   assert.equal(row.spain, true);
@@ -118,11 +128,25 @@ await step('fechas: relativas sí, desconocidas no se inventan', async () => {
   assert.equal(postedAt('3 days ago') !== null, true);
   assert.equal(postedAt('30+ days ago') !== null, true);
   assert.equal(postedAt('ayer') !== null, true);
+  assert.equal(postedAt('2026-10-20T09:00:00Z'), '2026-10-20T09:00:00.000Z', 'una fecha ISO se respeta, no se reinterpreta');
   assert.equal(postedAt(''), null);
   assert.equal(postedAt('publicado recientemente'), null);
   assert.equal(postedAt(undefined), null);
   const c = toCandidate({ job_id: 'x', title: 'Closer', share_link: 'https://x.es/1' });
   assert.equal(c.posted_at, null, 'sin fecha en la fuente queda desconocida');
+});
+
+await step('los dorks van en paralelo: caben en el tramo corto del cron', async () => {
+  let calls = 0;
+  const out = await collectGoogleJobs('test', Date.now() + 4_000, () => async () => {
+    await new Promise(r => setTimeout(r, 1_500));
+    calls++;
+    return [toCandidate(job(`par-${calls}`))];
+  });
+  // En serie serían 4,5 s con un tope de 4 s: el corte se declararía y el tercero se perdería.
+  assert.equal(out.searches, 3);
+  assert.equal(out.truncated, undefined);
+  assert.equal(out.received, 3, `recibidas ${out.received}`);
 });
 
 await step('un dork caído no oculta los demás y se anota', async () => {
