@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ExternalLink, LoaderCircle, MapPin, RefreshCcw, ShieldCheck, Undo2 } from 'lucide-react';
 import { draftFromDetail, sendable, type DetailLike } from '../lib/reviewPayload';
-import { ROLE_LABELS, roleFromTitle, spainSignal, type RoleFamily } from '../lib/vocabulary';
+import { spainSignal } from '../lib/esPlaces';
+import { ROLE_LABELS, roleFromTitle, type RoleFamily } from '../lib/vocabulary';
 
 // Revisión rápida: decide muchas ofertas de una vez. Aprobar solo abre la puerta humana: la alumna ve una
 // oferta únicamente si además cumple las reglas del motor (perfil, idioma, vigencia). Todo es reversible.

@@ -12,7 +12,7 @@ NEXT_PID=$!
 trap 'kill $NEXT_PID 2>/dev/null || true' EXIT
 for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.5; done
 BASE="http://127.0.0.1:$PORT" node tests/admin-auth/flow.mjs
-node --experimental-strip-types tests/admin-auth/parity.mjs 2>/dev/null
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/parity.mjs 2>/dev/null
 node --experimental-strip-types tests/admin-auth/csv.mjs 2>/dev/null
 node --experimental-strip-types tests/admin-auth/salary.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/score.mjs 2>/dev/null

@@ -97,10 +97,5 @@ export function roleFromTitle(title: string | null | undefined): RoleFamily | nu
   return ROLE_EVAL_ORDER.find(role => ROLE_KEYWORDS[role].some(k => t.includes(k))) ?? null;
 }
 
-// Señal de España a partir de título + ubicación (null = sin ubicación cargada todavía, no se afirma nada).
-export function spainSignal(title: string | null | undefined, location: string | null | undefined): boolean | null {
-  if (!location) return null;
-  const hay = `${title ?? ''} ${location}`.toLowerCase();
-  if (NON_ES_HINTS.some(k => hay.includes(k))) return false;
-  return ES_HINTS.some(k => hay.includes(k));
-}
+// La señal de España vive en ./esPlaces: necesita el gazetteer de municipios y no
+// debe viajar al bundle del navegador en cada importación de este módulo.

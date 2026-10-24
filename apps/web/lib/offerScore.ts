@@ -1,4 +1,5 @@
-import { fold, roleFromTitle, spainSignal } from './vocabulary';
+import { spainSignal } from './esPlaces';
+import { fold, roleFromTitle } from './vocabulary';
 
 // Puntuación 0-100 para ordenar miles de ofertas y quedarse con las mejores. Solo usa lo que la oferta dice:
 // perfil por el título (closer > setter > …), España explícita, sueldo publicado, frescura y calidad del texto.

@@ -1,6 +1,7 @@
 import { spanishWords } from './offerScore';
 import { listOffers, pausedSourcesStrict, type ExternalOffer } from './external';
-import { fold, roleFromTitle, ROLE_LABELS, spainSignal, type RoleFamily } from './vocabulary';
+import { spainSignal } from './esPlaces';
+import { fold, roleFromTitle, ROLE_LABELS, type RoleFamily } from './vocabulary';
 
 // Ofertas externas aprobadas, con el contrato Opportunity de la vista de alumna. Nada se inventa: lo que la
 // fuente no dice sale como «no indicado». Mismas puertas básicas que el motor: perfil por título, España por
