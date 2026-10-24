@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Pause, Play, Trash2, UserPlus } from 'lucide-react';
 import { api } from './AdminShell';
+import { REVIEW_REFS } from './trainingRefs';
 
 // Alumnas: invitar, pausar/reactivar (reversible) y dar de baja (solo propietario, irreversible). Sin datos de perfil aquí.
 type Row = { id: string; email: string; status: 'invited' | 'active' | 'paused'; invited_by: string | null; created_at: string };
@@ -56,7 +57,7 @@ export default function StudentsTab({ owner, onSessionLost }: { owner: boolean; 
         {(() => { const a = summaries.get(r.id); return <>
           <td>{!live ? '—' : a?.last_seen ? when.format(new Date(a.last_seen)) : 'Sin actividad'}</td>
           <td className="num">{!live ? '—' : a ? `${a.practice.count}${a.practice.avg !== null ? ` · media ${a.practice.avg}` : ''}` : 0}</td>
-          <td className="num">{!live ? '—' : `${a?.training.modules.length ?? 0}/7`}</td>
+          <td className="num">{!live ? '—' : `${a?.training.modules.length ?? 0}/${REVIEW_REFS.length}`}</td>
           <td>{!live ? '—' : a?.training.examBest == null ? 'Sin intentar' : `${a.training.examBest}/100 · ${a.training.examPassed ? 'superado' : 'no superado'}`}</td></>; })()}
         <td style={{ textAlign: 'right' }}><button onClick={() => void toggle(r)} aria-label={`${r.status === 'paused' ? 'Reactivar' : 'Pausar'} a ${r.email}`}>{r.status === 'paused' ? <Play size={14} /> : <Pause size={14} />} {r.status === 'paused' ? 'Reactivar' : 'Pausar'}</button>{owner && <button onClick={() => void remove(r)} aria-label={`Dar de baja a ${r.email}`}><Trash2 size={14} /> Baja</button>}</td></tr>)}</tbody></table></div>}
   </section>;

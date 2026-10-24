@@ -9,7 +9,7 @@ import type { Progress } from '../lib/studentActivity';
 // Un periodo sin datos es «—», nunca 0; una carga fallida no se pinta como vacío; cada gráfico trae su tabla.
 type State = { kind: 'loading' } | { kind: 'login' } | { kind: 'error'; message: string } | { kind: 'ready'; progress: Progress };
 const PERIODS = [7, 30, 90] as const;
-const REVIEW_LABELS: Record<string, string> = { ...Object.fromEntries(TRAINING_MODULES.map(m => [m.id, m.title])), cierres: 'Los 10 cierres', descubrimiento: 'Los 9 pasos de descubrimiento' };
+const REVIEW_LABELS: Record<string, string> = Object.fromEntries(TRAINING_MODULES.map(m => [m.id, m.title]));
 const KIND_LABELS: Record<string, string> = { session: 'Entrada', training_review: 'Formación', training_exam: 'Examen de egreso', practice: 'Sala de práctica' };
 const number = new Intl.NumberFormat('es');
 const dateFmt = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' });
