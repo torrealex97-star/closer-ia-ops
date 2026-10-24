@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { callTimeout, createBudget, timeLeft } from '../../../../lib/cronBudget';
 import { API_PROVIDERS, collectAll, type ApiProvider } from '../../../../lib/collectors';
+import { collectGoogleJobs, GOOGLE_JOBS_SOURCE } from '../../../../lib/googleJobs';
 import { runAiReview, undoAiDecisions } from '../../../../lib/aiReview';
 import { approveTop, countsByStatus, listOffersPage, pausedSources, recentRuns, setSourceEnabled, setStatus, statsBySource, verifyOffer, type PageQuery } from '../../../../lib/external';
 
@@ -58,8 +59,14 @@ export async function POST(request: NextRequest) {
   if (body.action === 'collect') {
     const only = typeof body.provider === 'string' && (API_PROVIDERS as readonly string[]).includes(body.provider) ? body.provider as ApiProvider : undefined;
     const budget = createBudget(45_000); // maxDuration = 60: el reloj compartido deja margen y el corte se declara
-    const outcomes = await collectAll('panel', only, budget.deadline(42_000));
-    return reply(auth!, { outcomes, ...(outcomes.some(o => o.truncated) ? { truncated: true } : {}) });
+    // Google Jobs se pide solo, o como cuarto paso tras las APIs oficiales cuando no se elige proveedor.
+    if (body.provider === GOOGLE_JOBS_SOURCE) {
+      const googleJobs = await collectGoogleJobs('panel', budget.deadline(42_000));
+      return reply(auth!, { outcomes: [googleJobs], ...(googleJobs.truncated ? { truncated: true } : {}) });
+    }
+    const outcomes = await collectAll('panel', only, budget.deadline(only ? 42_000 : 30_000));
+    const googleJobs = only ? null : await collectGoogleJobs('panel', budget.deadline(10_000));
+    return reply(auth!, { outcomes: googleJobs ? [...outcomes, googleJobs] : outcomes, ...((outcomes.some(o => o.truncated) || googleJobs?.truncated) ? { truncated: true } : {}) });
   }
   if (body.action === 'ai_review') return reply(auth!, await runAiReview({ deadline: createBudget(45_000).deadline(42_000) }));
   if (body.action === 'ai_undo') return reply(auth!, { undone: await undoAiDecisions(auth!.admin.email) });

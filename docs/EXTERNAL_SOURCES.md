@@ -9,6 +9,13 @@ Se recogen solas cada día a las 06:00 UTC y desde el botón «Recoger APIs ahor
 3. **Jooble**: es.jooble.org/api/about → clave. **Cada dominio de país emite su propia clave**: la de jooble.org solo devuelve ofertas de EE. UU., así que para España hay que registrarse en es.jooble.org. El plan gratuito son **500 peticiones por clave en total** (no al mes): cada pasada de recogida gasta 7.
 4. Pulsa «Probar» en cada una (no gasta crédito) y luego «Recoger APIs ahora».
 
+## 1 bis. Google Jobs (SerpApi), la fuente que trae closers de España sin clave nueva
+Google Jobs indexa InfoJobs, LinkedIn y portales, así que es la vía para acercarse al inventario real de closer en España mientras no haya clave de InfoJobs.
+1. La clave ya conectada en Panel → APIs → SerpApi se usa sola; no hay que guardar nada más.
+2. El cron recoge **3 dorks** (`closer de ventas España`, `closer high ticket España`, `setter closer España`), una búsqueda cada uno y **sin paginar** (una segunda página se cobra aparte). Entran como **borradores** en Fuentes externas; nada se publica sin aprobación.
+3. **Coste**: 0,025 USD por búsqueda → 0,075 USD/día (≈2,25 USD/mes) en plan de pago. En el plan gratuito salen de las 250 búsquedas/mes. `SERPAPI_JOBS_MAX_DORKS=0` lo apaga; 1–3 acota el gasto. La fuente se pausa como cualquier otra desde Fuentes externas (código `google-jobs`).
+4. Sin tiempo en el cron se corta y lo declara (`truncated`); lo ya recogido se guarda y la siguiente pasada continúa.
+
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
 2. Vercel → proyecto → Settings → Environment Variables: `INGEST_TOKEN` = ese token (Production).
@@ -17,7 +24,7 @@ Se recogen solas cada día a las 06:00 UTC y desde el botón «Recoger APIs ahor
 Los runners de GitHub a veces son bloqueados por LinkedIn/Indeed: un fallo aparece en el log del workflow y en el aviso de la entrada, y no afecta al resto.
 
 ## 3. Variables de entorno (Vercel, producción)
-`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` o `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (integración de Supabase), `CAREER_ENGINE_URL`, `CAREER_ADMIN_TOKEN`, `CRON_SECRET` (autoriza el cron), `INGEST_TOKEN` (autoriza el recolector de GitHub), opcional `ADMIN_SECRETS_KEY`.
+`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` o `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (integración de Supabase), `CAREER_ENGINE_URL`, `CAREER_ADMIN_TOKEN`, `CRON_SECRET` (autoriza el cron), `INGEST_TOKEN` (autoriza el recolector de GitHub), opcional `ADMIN_SECRETS_KEY`. Opcional de la recogida de Google Jobs: `SERPAPI_JOBS_MAX_DORKS` (3 por defecto; 0 apaga).
 
 ## 4. Control diario
 - **Pausar/reanudar** una fuente: Panel → Fuentes externas → tabla de fuentes (solo propietario). Pausada = no se recoge, no se acepta y no se muestra.

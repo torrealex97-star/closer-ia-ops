@@ -102,8 +102,12 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   async function collect() {
     setWorking('collect'); setError(''); setNotice('');
     try {
-      const r = await call<{ outcomes: Array<{ provider: string; ok: boolean; accepted?: number; error?: string }> }>({ method: 'POST', body: JSON.stringify({ action: 'collect' }) });
-      setNotice(r.outcomes.map(o => `${o.provider}: ${o.ok ? `${o.accepted} guardadas` : o.error}`).join(' · ')); load();
+      const r = await call<{ outcomes: Array<{ provider?: string; source?: string; ok: boolean; accepted?: number; error?: string; searches?: number; cost_usd?: number }> }>({ method: 'POST', body: JSON.stringify({ action: 'collect' }) });
+      setNotice(r.outcomes.map(o => {
+        const label = o.provider ?? o.source ?? 'fuente';
+        const extra = o.source === 'google-jobs' && o.ok ? ` · ${o.searches} búsquedas (~${o.cost_usd} USD)` : '';
+        return `${label}: ${o.ok ? `${o.accepted} guardadas${extra}` : o.error}`;
+      }).join(' · ')); load();
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
   const csvColumns = [
@@ -122,7 +126,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
 
   const counts = data?.counts ?? {};
   return <section aria-label="Fuentes externas">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. LinkedIn, Indeed, Glassdoor y Google Jobs llegan desde el workflow de GitHub con JobSpy, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
+    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (3 búsquedas al día) y también desde el workflow de GitHub con JobSpy; LinkedIn, Indeed y Glassdoor llegan por ese workflow, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>

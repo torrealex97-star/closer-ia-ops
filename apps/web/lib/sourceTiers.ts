@@ -3,11 +3,13 @@ import type { Metrics } from './metrics';
 // Fuentes por niveles de coste y riesgo (ADR-009: coste por oferta buena descendente). Orden de preferencia:
 // official (API con permiso, gratis) → scrape (JobSpy desde GitHub, sin coste, con riesgo de bloqueo) → paid (Apify, por uso).
 export type Tier = 'official' | 'scrape' | 'paid' | 'other';
-export const TIER_LABEL: Record<Tier, string> = { official: 'API oficial', scrape: 'Scraping gratuito', paid: 'De pago (Apify)', other: 'Otras' };
+export const TIER_LABEL: Record<Tier, string> = { official: 'API oficial', scrape: 'Scraping gratuito', paid: 'De pago (Apify, SerpApi)', other: 'Otras' };
 const OFFICIAL = new Set(['infojobs', 'adzuna', 'jooble']);
 const SCRAPE = new Set(['indeed', 'linkedin', 'glassdoor', 'google', 'zip_recruiter', 'zip-recruiter', 'jobspy']);
+// Google Jobs va por SerpApi: se cobra por búsqueda, así que cuenta como nivel de pago.
+const PAID = new Set(['google-jobs']);
 export const tierOf = (source: string): Tier =>
-  OFFICIAL.has(source) ? 'official' : SCRAPE.has(source) ? 'scrape' : /^apify(-|$)/.test(source) ? 'paid' : 'other';
+  OFFICIAL.has(source) ? 'official' : SCRAPE.has(source) ? 'scrape' : PAID.has(source) || /^apify(-|$)/.test(source) ? 'paid' : 'other';
 
 // Ofertas buenas por día de los niveles NO de pago en los últimos 7 días (el calor de las fuentes gratuitas).
 export function freeGoodPerDay(m: Pick<Metrics, 'perSource'>, days = 7): number {
