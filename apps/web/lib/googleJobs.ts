@@ -15,6 +15,13 @@ export const GOOGLE_JOBS_DORKS = [
   'closer de ventas España',
   'closer high ticket España',
   'setter closer España',
+  // Cada dork devuelve inventario distinto: los tres primeros se quedaban en 19
+  // anuncios y siempre los mismos. Estos añaden el ángulo remoto, el sinónimo
+  // castellano («cerrador»), el comercial y el inbound.
+  'closer remoto España',
+  'cerrador de ventas España',
+  'closer comercial España',
+  'closer inbound España',
 ] as const;
 
 // Precio de lista de SerpApi por búsqueda (Starter: 25 USD/1000). En el plan
@@ -23,8 +30,8 @@ export const GOOGLE_JOBS_DORKS = [
 export const SEARCH_USD = 0.025;
 
 export const maxDorks = (env: NodeJS.ProcessEnv = process.env) => {
-  const raw = Number(env.SERPAPI_JOBS_MAX_DORKS ?? 3);
-  return Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 0), GOOGLE_JOBS_DORKS.length) : 3;
+  const raw = Number(env.SERPAPI_JOBS_MAX_DORKS ?? GOOGLE_JOBS_DORKS.length);
+  return Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 0), GOOGLE_JOBS_DORKS.length) : GOOGLE_JOBS_DORKS.length;
 };
 
 // Fecha relativa tal como la publica Google («hace 2 días», «3 days ago»). Solo

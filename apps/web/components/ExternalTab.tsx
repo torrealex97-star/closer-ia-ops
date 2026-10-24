@@ -126,7 +126,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
 
   const counts = data?.counts ?? {};
   return <section aria-label="Fuentes externas">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (3 búsquedas al día) y también desde el workflow de GitHub con JobSpy; LinkedIn, Indeed y Glassdoor llegan por ese workflow, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
+    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (hasta 7 búsquedas al día, 0,175 USD) y también desde el workflow de GitHub con JobSpy; LinkedIn, Indeed y Glassdoor llegan por ese workflow, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>

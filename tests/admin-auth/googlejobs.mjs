@@ -111,7 +111,7 @@ await step('mapea Google Jobs a candidatos con empresa, ubicación, salario, fec
 
 await step('pide cada dork a Google Jobs en español y sin paginar', async () => {
   await collectGoogleJobs('test');
-  assert.equal(searches.length, 3);
+  assert.equal(searches.length, GOOGLE_JOBS_DORKS.length);
   for (const search of searches) {
     assert.equal(search.engine, 'google_jobs');
     assert.equal(search.gl, 'es');
@@ -121,6 +121,7 @@ await step('pide cada dork a Google Jobs en español y sin paginar', async () =>
   }
   assert.deepEqual(searches.map(s => s.q), [...GOOGLE_JOBS_DORKS]);
   assert.ok(searches.every(s => /España/.test(s.q)));
+  assert.ok(searches.some(s => /remoto/.test(s.q)) && searches.some(s => /cerrador/.test(s.q)), 'la ampliación está viva');
 });
 
 await step('fechas: relativas sí, desconocidas no se inventan', async () => {
@@ -143,10 +144,10 @@ await step('los dorks van en paralelo: caben en el tramo corto del cron', async 
     calls++;
     return [toCandidate(job(`par-${calls}`))];
   });
-  // En serie serían 4,5 s con un tope de 4 s: el corte se declararía y el tercero se perdería.
-  assert.equal(out.searches, 3);
+  // En serie serían 1,5 s por dork; con un tope de 4 s se declararía el corte y se perderían los últimos.
+  assert.equal(out.searches, GOOGLE_JOBS_DORKS.length);
   assert.equal(out.truncated, undefined);
-  assert.equal(out.received, 3, `recibidas ${out.received}`);
+  assert.equal(out.received, GOOGLE_JOBS_DORKS.length, `recibidas ${out.received}`);
 });
 
 await step('un dork caído no oculta los demás y se anota', async () => {
@@ -220,7 +221,7 @@ await step('sin tiempo se corta y se declara, sin gastar', async () => {
 await step('el coste se declara en dólares, no se oculta', async () => {
   const out = await collectGoogleJobs('test');
   assert.equal(typeof out.cost_usd, 'number');
-  assert.equal(out.cost_usd, Number((3 * SEARCH_USD).toFixed(3)));
+  assert.equal(out.cost_usd, Number((GOOGLE_JOBS_DORKS.length * SEARCH_USD).toFixed(3)));
 });
 
 server.close();
