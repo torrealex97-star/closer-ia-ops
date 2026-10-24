@@ -25,10 +25,20 @@ assert.equal(cover.length, REVIEW_REFS.length);
 assert.deepEqual(cover.filter(c => c.count).map(c => [c.ref, c.count, c.pct]), [['precall', 1, 25], ['star', 1, 25]]);
 ok('cobertura por módulo: solo cuenta alumnas con acceso');
 
-assert.equal(scoreBuckets(summaries.values()), null, `con menos de ${MIN_GROUP} alumnas con práctica no hay distribución`);
-const many = [10, 45, 50, 71, 95].map(avg => sum({ practice: { count: 1, avg } }));
-assert.deepEqual(scoreBuckets(many).map(b => [b.id, b.count]), [['low', 1], ['mid', 2], ['high', 2]]);
-assert.equal(scoreBuckets([...many.slice(0, 4), sum()]), null, 'quien no practicó (nota null) no cuenta como un 0 ni hace de relleno');
+assert.equal(scoreBuckets(students, summaries), null, `con menos de ${MIN_GROUP} alumnas con práctica no hay distribución`);
+const five = [10, 45, 50, 71, 95].map((avg, i) => [student(`m${i}`), sum({ practice: { count: 1, avg } })]);
+const group = students.concat(five.map(([st]) => st)); const gsum = new Map([...summaries, ...five.map(([st, su]) => [st.id, su])]);
+const buckets = scoreBuckets(group, gsum);
+assert.deepEqual(buckets.map(b => [b.id, b.count, b.pct]), [['low', 2, 29], ['mid', 2, 29], ['high', 3, 43]], 'siete notas (10, 35, 45, 50, 71, 72, 95); porcentajes sobre las que practicaron');
+assert.equal(buckets.reduce((n, b) => n + b.count, 0), 7, 'la pausada (90) no entra y quien no practicó (c, nota null) no cuenta como un 0');
+assert.ok(buckets.every(b => Number.isFinite(b.pct)), 'sin NaN');
+// Cuatro activas que practican + una pausada: sin la pausada no se llega al grupo mínimo, así que no hay distribución.
+const four = ['w', 'x', 'y', 'z'].map(id => [student(id), sum({ practice: { count: 1, avg: 60 } })]);
+const withPaused = [...four.map(([st]) => st), student('q', 'paused')];
+const wsum = new Map([...four.map(([st, su]) => [st.id, su]), ['q', sum({ practice: { count: 4, avg: 90 } })]]);
+assert.equal(scoreBuckets(withPaused, wsum), null, 'una pausada no completa el grupo mínimo');
+assert.equal(scoreBuckets([...four.map(([st]) => st), student('r')], new Map([...wsum, ['r', sum({ practice: { count: 1, avg: 80 } })]])).length, 3, 'con una activa más sí hay distribución');
+assert.deepEqual(scoreBuckets(group.concat(student('m9')), new Map([...gsum, ['m9', sum()]])), buckets, 'una alumna más sin práctica no cambia la distribución');
 ok('distribución de notas: umbral de grupo mínimo y sin ceros falsos');
 
 const nudges = needsNudge(students, summaries);

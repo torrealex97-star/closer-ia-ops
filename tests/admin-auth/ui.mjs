@@ -195,9 +195,9 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.getByText('Ver como tabla').click(); assert.equal(await alumna.locator('.progress-card details tbody tr').count(), 6, 'seis semanas en la tabla alternativa');
   assert.ok(await alumna.getByRole('img', { name: /Nota media semanal de prácticas/ }).isVisible());
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con progreso');
-  await page.getByRole('button', { name: 'Últimos 7 días' }).click();
+  await Promise.all([page.waitForResponse(r => r.url().includes('/api/admin/students?days=7') && r.ok()), page.getByRole('button', { name: 'Últimos 7 días' }).click()]);
   const board = page.getByTestId('coordinator'); await board.waitFor();
-  assert.match(await board.innerText(), /Han practicado\s*\d+ · \d+ %/); assert.ok(await board.getByRole('img', { name: /Embudo de activación/ }).isVisible());
+  assert.match(await board.innerText(), /Han practicado\s*\d+ · \d+ %/); assert.ok(await board.getByRole('img', { name: /Actividad de las alumnas en 7 días/ }).isVisible());
   await board.getByText('Ver como tabla').first().click(); assert.equal(await board.locator('details').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
   assert.match(await board.innerText(), /Hace falta que al menos 5 alumnas/, 'con una sola alumna no hay distribución de notas');
   if (process.env.SHOT3) await board.screenshot({ path: process.env.SHOT3 });

@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LoaderCircle, Pause, Play, Trash2, UserPlus } from 'lucide-react';
 import { api } from './AdminShell';
 import { REVIEW_REFS } from './trainingRefs';
@@ -23,7 +23,7 @@ export default function StudentsTab({ owner, onSessionLost }: { owner: boolean; 
     api<Overview>(`students?days=${days}`).then(d => { if (mine !== seq.current) return; setRows(d.students); setOverview(d); setError(''); }).catch(err => { if (mine === seq.current) fail(err as Error); }).finally(() => { if (mine === seq.current) setBusy(false); });
   }, [fail, days]);
   useEffect(load, [load]);
-  const summaries = new Map((overview?.activity ?? []).map(a => [a.student.id, a.summary]));
+  const summaries = useMemo(() => new Map((overview?.activity ?? []).map(a => [a.student.id, a.summary])), [overview]);
   const live = overview?.activity_available === true;
   async function invite(e: React.FormEvent) {
     e.preventDefault(); setError(''); setNotice('');

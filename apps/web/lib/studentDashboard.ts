@@ -30,18 +30,18 @@ export function moduleCoverage(students: DashStudent[], summaries: Map<string, D
   });
 }
 
-export type ScoreBucket = { id: 'low' | 'mid' | 'high'; label: string; count: number };
-// Distribución de la nota media de práctica por alumna; `null` si hay menos de MIN_GROUP alumnas con práctica.
-export function scoreBuckets(summaries: Iterable<DashSummary>): ScoreBucket[] | null {
-  const avgs = [...summaries].map(s => s.practice.avg).filter((v): v is number => typeof v === 'number');
+export type ScoreBucket = { id: 'low' | 'mid' | 'high'; label: string; count: number; pct: number };
+// Distribución de la nota media de práctica entre las alumnas con acceso (las pausadas no cuentan) que han practicado; `pct`
+// es sobre ESAS alumnas, no sobre todas. `null` si hay menos de MIN_GROUP: no señalar a nadie.
+export function scoreBuckets(students: DashStudent[], summaries: Map<string, DashSummary>): ScoreBucket[] | null {
+  const avgs = students.filter(student => student.status !== 'paused')
+    .map(student => summaries.get(student.id)?.practice.avg).filter((v): v is number => typeof v === 'number');
   if (avgs.length < MIN_GROUP) return null;
-  return [
-    { id: 'low', label: 'Menos de 40', count: avgs.filter(v => v < 40).length },
-    { id: 'mid', label: 'De 40 a 69', count: avgs.filter(v => v >= 40 && v < 70).length },
-    { id: 'high', label: '70 o más', count: avgs.filter(v => v >= 70).length },
-  ];
+  const counts = [['low', 'Menos de 40', avgs.filter(v => v < 40).length], ['mid', 'De 40 a 69', avgs.filter(v => v >= 40 && v < 70).length], ['high', '70 o más', avgs.filter(v => v >= 70).length]] as const;
+  return counts.map(([id, label, count]) => ({ id, label, count, pct: Math.round((count / avgs.length) * 100) }));
 }
 
+export const NUDGE_LIMIT = 8;
 export type Nudge = { id: string; email: string; reason: string };
 // Quién necesita un empujón: con acceso (no pausada) y sin entrar en el periodo, o entrada sin ninguna práctica ni repaso.
 export function needsNudge(students: DashStudent[], summaries: Map<string, DashSummary>): Nudge[] {
