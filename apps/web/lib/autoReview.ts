@@ -1,6 +1,7 @@
 import { ORG, approvalsToday, approveByRule, type ExternalOffer } from './external';
 import { marketFor, type Market } from './market';
 import { spanishWords } from './offerScore';
+import { assessOffer } from './offerRisk';
 import { serviceRest } from './supabaseAuth';
 import { timeLeft } from './cronBudget';
 import { config as aiConfig, runAiReview, type ReviewSummary } from './aiReview';
@@ -29,6 +30,9 @@ export function judgeOffer(row: Row): RuleVerdict {
   if (!market) return human('sin_mercado');
   if (row.spain === false && market === 'ES') return human('mercado_dudoso');
   if ((row.red_flags ?? []).length) return human('banderas_rojas');
+  // Texto del anuncio con señales de estafa o condiciones dudosas: nunca entra sola, la revisa una persona.
+  const risk = assessOffer(row);
+  if (risk.risk_level !== 'SAFE') return human(risk.risk_level === 'BLOCKED' ? 'oferta_peligrosa' : 'oferta_con_avisos');
   if ((row.score ?? 0) < MIN_SCORE) return human('score_bajo');
   const words = spanishWords(`${row.title ?? ''} ${row.description ?? ''}`);
   if (words < 3) return human('idioma_dudoso');
