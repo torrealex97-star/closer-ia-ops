@@ -830,9 +830,21 @@ async function handleAdminActivate(request, env) {
     .bind(ORG, now(), ...(source ? [source] : []), ...(ids ? [...ids] : [])).all();
 
   const items = [];
-  const counters = { published: 0, needs_review: 0, skipped: 0, deferred: 0 };
+  const counters = { published: 0, needs_review: 0, skipped: 0, withdrawn: 0, deferred: 0 };
   const writeBudget = dryRun ? 0 : WRITE_BUDGET;
   let written = 0;
+  // Lo que la puerta determinista descarta NO se queda en el pool de borradores: se retira con su
+  // razón y deja de pedir revisión humana. Se agrupa por razón para retirarlo en pocas escrituras
+  // (una por motivo) en vez de una por oferta. Es reversible: la fila se conserva y un PATCH puede
+  // devolverla a revisión.
+  const rejects = new Map();
+  const reject = (id, reason) => {
+    counters.skipped += 1;
+    const group = rejects.get(reason) ?? [];
+    group.push(id);
+    rejects.set(reason, group);
+    items.push({ id, action: 'withdraw', reason });
+  };
   for (const row of rows.results) {
     // Identidad de la oportunidad con los MISMOS nombres de campo que espera el PATCH
     // (row.id/row.job_id): las dos rutas de escritura, applyReview y runVerification,
@@ -844,13 +856,12 @@ async function handleAdminActivate(request, env) {
     const description = descriptionOf(p);
     const derivedRole = classifyRole(p, fold(`${p.title ?? ''} ${p.location ?? ''} ${description}`));
     const skip = reason => { counters.skipped += 1; items.push({ id: row.opportunity_id, job_id: row.job_id, action: 'skipped', reason }); };
-    if (!derivedRole) { skip('sin clasificación determinista de perfil'); continue; }
+    if (!derivedRole) { reject(row.opportunity_id, 'sin perfil comercial reconocible'); continue; }
     if (role && derivedRole !== role) { skip(`perfil ${derivedRole} distinto del pedido (${role})`); continue; }
-    if (!role && EXTRA_ROLES.has(derivedRole)) { skip(`perfil extra ${derivedRole}: se activa con role=${derivedRole} explícito (no protagoniza la vista por defecto)`); continue; }
-    if (market === 'ES' && (nonSpain(p) || !spainSignal(p))) { skip('sin señal de mercado España'); continue; }
-    if (!spanishBodyGate(description, false).ok) { skip('el anuncio no está en español (gate de cuerpo)'); continue; }
+    if (market === 'ES' && (nonSpain(p) || !spainSignal(p))) { reject(row.opportunity_id, 'sin señal de mercado España'); continue; }
+    if (!spanishBodyGate(description, false).ok) { reject(row.opportunity_id, 'el anuncio no está en español'); continue; }
     const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
-    if (ages !== null && Number.isFinite(ages) && ages > days) { skip(`publicado hace ${Math.floor(ages)} días: fuera de la ventana de frescura de ${days} días`); continue; }
+    if (ages !== null && Number.isFinite(ages) && ages > days) { reject(row.opportunity_id, `publicado hace más de ${days} días`); continue; }
     const url = typeof p.url === 'string' && /^https:\/\//.test(p.url) ? p.url : null;
     const applicationType = row.source.startsWith('ats-') ? 'company_ats' : (url ? 'external_platform' : 'unknown');
     let domain = null;
@@ -914,6 +925,19 @@ async function handleAdminActivate(request, env) {
         : !url ? 'sin URL del anuncio: no se publica una tarjeta sin destino'
         : applicationType === 'unknown' ? 'modalidad de candidatura indeterminada'
         : verification?.status_reason ?? 'sin verificación' });
+  }
+  // Retirada en bloque de lo descartado (solo en ejecución real). Una escritura por motivo;
+  // guarda `editorial_status='draft'` para no pisar lo que una persona movió entretanto.
+  if (!dryRun) {
+    for (const [reason, group] of rejects) {
+      for (let i = 0; i < group.length; i += 80) {
+        const chunk = group.slice(i, i + 80);
+        const applied = await db.prepare(`UPDATE opportunities SET editorial_status='withdrawn', status_reason=?, updated_at=?
+          WHERE org_id=? AND editorial_status='draft' AND id IN (${chunk.map(() => '?').join(',')})`)
+          .bind(`clasificación automática: ${reason}`, now(), ORG, ...chunk).run();
+        counters.withdrawn += Number(applied?.meta?.changes ?? 0);
+      }
+    }
   }
   return Response.json({
     dry_run: dryRun, verify, market, role, source, considered: rows.results.length,

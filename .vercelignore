@@ -1,0 +1,17 @@
+# La CLI sube el código fuente; el build solo necesita apps/web, packages/contracts,
+# package.json y el lockfile. Lo demás pesa y no se usa al construir.
+node_modules
+**/node_modules
+.next
+**/.next
+.venv
+.local
+test-results
+playwright-report
+Growth Oportunity- PLAN
+apps/api
+tests
+docs
+spikes
+supabase
+.github

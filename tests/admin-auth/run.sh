@@ -17,6 +17,7 @@ node --experimental-strip-types tests/admin-auth/csv.mjs 2>/dev/null
 node --experimental-strip-types tests/admin-auth/salary.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/score.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/aireview.mjs 2>/dev/null
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/autoclassify.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/metrics.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/agreement.mjs 2>/dev/null
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/hardening.mjs 2>/dev/null

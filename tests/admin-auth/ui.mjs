@@ -8,7 +8,12 @@ import { startMocks } from './mock-services.mjs';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3100';
 const catalog = JSON.parse(readFileSync(new URL('../../apps/web/lib/sourceCatalog.json', import.meta.url), 'utf8'));
 const { state, close } = startMocks({ authPort: Number(process.env.MOCK_AUTH_PORT ?? 8791), enginePort: Number(process.env.MOCK_ENGINE_PORT ?? 8792) });
-const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_EXECUTABLE || undefined });
+// Mismo selector que playwright.config.ts: canal instalado (PLAYWRIGHT_CHANNEL=chrome)
+// o binario explícito. Sin ninguno de los dos se usa el Chromium de Playwright.
+const browser = await chromium.launch({
+  channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
+  executablePath: process.env.PLAYWRIGHT_EXECUTABLE || undefined,
+});
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.on('dialog', d => d.accept());
 const results = [];
@@ -20,8 +25,13 @@ await step('login y Resumen: contador del objetivo, pendientes y siguiente paso'
   await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
   await page.getByText('Faltan 13').waitFor();
   assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'), '7');
-  await page.getByText('3', { exact: true }).first().waitFor();
-  await page.getByText(/Hay 3 oferta\(s\) sin revisar/).waitFor();
+  // Dos colas separadas: lo que necesita criterio humano y lo que clasifica la
+  // máquina. Sumarlas (lo que hacía antes) presentaba 3.000 borradores como
+  // trabajo de una persona.
+  const card = (title) => page.locator('.source-card').filter({ hasText: title });
+  await card('EXCEPCIONES PARA TI').waitFor();
+  assert.equal(await card('EXCEPCIONES PARA TI').locator('strong').innerText(), '0');
+  assert.equal(await card('POR CLASIFICAR (AUTOMÁTICO)').locator('strong').innerText(), '3');
   assert.ok(await page.getByText(/1 fuente\(s\) fallan/).isVisible());
 });
 await step('Fuentes: catálogo completo (todas las del backend + las del motor) con filtros', async () => {
@@ -59,7 +69,10 @@ await step('Revisión rápida: filtra closers, carga ubicación, oculta no-Espa�
 });
 await step('Revisión una a una: guardar una oferta con payload raw ya no da 422', async () => {
   state.opps[2].editorial_status = 'draft';
-  await page.getByRole('button', { name: 'Revisión una a una' }).click(); await page.getByRole('heading', { name: 'Revisar antes de ofrecer.' }).waitFor();
+  await page.getByRole('button', { name: 'Revisión una a una' }).click(); await page.getByRole('heading', { name: 'Revisar a fondo lo que lo merece.' }).waitFor();
+  // La pestaña abre en las excepciones (lo que de verdad necesita criterio); para
+  // abrir un borrador concreto se pide el estado explícitamente.
+  await page.getByLabel('Filtrar por estado editorial').selectOption('');
   await page.getByRole('button', { name: /Desarrollador Backend/ }).click(); await page.getByLabel('Título (headline)').waitFor();
   await page.getByRole('button', { name: 'Guardar borrador' }).click(); await page.getByText(/Guardado: Borrador/).waitFor();
 });
@@ -67,7 +80,7 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   const mk = (id, over) => state.external.set(id, { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'http://127.0.0.1:8792/page/ok', salary: null, description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa', posted_at: new Date().toISOString(), editorial_status: 'draft', role: 'closer', spain: true, score: 80, also_seen: [], verified_result: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), ...over });
   mk('x1', {}); mk('x2', { location: 'Austin, Texas', spain: false, score: 20 }); mk('x3', { title: 'Setter de ventas', location: 'Valencia', role: 'setter', score: 60 });
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Más ofertas de España.' }).waitFor();
+  await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Ofertas de España y del mercado en dólares.' }).waitFor();
   await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Últimos 14 días: \d+ ofertas buenas/);
   // Contraste: el texto pequeño gris usa --secondary (≥ 4,5:1), no --muted (3,4:1)
   assert.equal(await page.locator('.data-table th').first().evaluate(el => getComputedStyle(el).color), 'rgb(116, 107, 107)', 'cabeceras de tabla con --secondary');
@@ -85,7 +98,10 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.unroute('**/api/admin/metrics'); await page.getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('metrics').waitFor();
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'métricas sin scroll horizontal en móvil'); await page.setViewportSize({ width: 1280, height: 900 });
   if (process.env.SHOT) { await page.getByTestId('metrics').getByText('Ver tabla por día').click(); await page.getByTestId('metrics').screenshot({ path: process.env.SHOT }); }
-  await page.getByText('Closer de ventas').first().waitFor();
+  // La vista abre en la cola humana (needs_review); aquí se revisa la bandeja de borradores a mano.
+  await page.getByLabel('Estado').selectOption('draft');
+  // Acotado a la tabla de ofertas: «closer de ventas» también aparece como término en el panel de fuentes sugeridas.
+  await page.locator('table.data-table').last().getByText('Closer de ventas').first().waitFor();
   assert.equal(await page.locator('table').last().locator('tbody tr').count(), 1); // closer + España; el de Texas y el setter quedan fuera
   assert.equal(await page.locator('table', { has: page.getByRole('columnheader', { name: 'Vía' }) }).locator('tbody tr').count(), 7); // fuentes conocidas: 3 APIs + 4 de JobSpy
   await page.getByRole('button', { name: 'Pausar InfoJobs' }).click(); await page.getByText(/infojobs: pausada/).waitFor();
@@ -183,6 +199,45 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.getByRole('button', { name: 'Ya la he enviado' }).click(); await alumna.getByText('Enviada por ti', { exact: true }).waitFor(); if (process.env.SHOT2) await alumna.screenshot({ path: process.env.SHOT2, fullPage: true }); assert.equal(await alumna.getByRole('button', { name: 'Ya la he enviado' }).count(), 0);
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con candidaturas');
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
+});
+await step('Progreso: la alumna ve su actividad y el panel muestra quién entra y practica', async () => {
+  // El panel se cargó antes del login: hasta refrescar, la fila dice «Sin actividad».
+  const row = page.getByRole('row', { name: /lucia@alumna.dev/ });
+  await row.waitFor(); assert.match(await row.innerText(), /Sin actividad/, 'sin señales todavía');
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await page.waitForFunction(() => ![...document.querySelectorAll('tr')].some(tr => tr.innerText.includes('lucia@alumna.dev') && tr.innerText.includes('Sin actividad')));
+  const kpis = await page.locator('.stat-strip').first().innerText();
+  assert.match(kpis, /entraron · 7 días/); assert.match(kpis, /practicaron · 7 días/);
+  assert.match(kpis, /con práctica · 30 días/);
+  // Filtros: quién practica y quién no, sin borrar filas ni inventar actividad.
+  await page.getByRole('button', { name: 'Practican', exact: true }).click();
+  await page.getByText('Ninguna alumna con ese filtro.').waitFor();
+  await page.getByRole('button', { name: 'Sin práctica', exact: true }).click();
+  await page.getByRole('row', { name: /lucia@alumna.dev/ }).waitFor();
+  await page.getByRole('button', { name: /^Todas/ }).click();
+  await page.getByRole('button', { name: 'Ver actividad de lucia@alumna.dev' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByText('ACTIVIDAD · ÚLTIMOS 30 DÍAS').waitFor();
+  assert.match(await dialog.innerText(), /Entrada/);
+  assert.match(await dialog.innerText(), /Sin ejercicios revisados\./);
+  assert.match(await dialog.innerText(), /Competencias/);
+  assert.match(await dialog.innerText(), /Evolución/);
+  assert.match(await dialog.innerText(), /Sin prácticas registradas en la ventana\./);
+  await page.getByRole('button', { name: 'Cerrar actividad' }).click();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'el panel no desborda en móvil');
+  // La alumna, en su espacio, ve el mismo progreso que registró el servidor.
+  const again = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const herPage = await again.newPage();
+  await herPage.goto(BASE + '/alumna'); await herPage.getByLabel('Email').fill('lucia@alumna.dev'); await herPage.getByLabel('Contraseña').fill('Contraseña-lucia-1');
+  await herPage.getByRole('button', { name: 'Entrar' }).click(); await herPage.getByText('TU PERFIL').waitFor();
+  const panel = herPage.getByRole('region', { name: 'Mi progreso' });
+  await panel.getByText('TU PROGRESO', { exact: true }).waitFor();
+  await panel.getByText('entradas').waitFor({ timeout: 8000 });
+  const text = await panel.innerText();
+  assert.match(text, /entradas/); assert.match(text, /sin prácticas/); assert.match(text, /0 de 7 ejercicios/);
+  assert.ok(!text.includes('Aún no hay actividad'), 'con una entrada ya no está vacío');
+  assert.ok(await herPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'progreso sin scroll horizontal en móvil');
+  await again.close();
 });
 await step('móvil: Resumen sin scroll horizontal', async () => {
   await page.setViewportSize({ width: 390, height: 844 });

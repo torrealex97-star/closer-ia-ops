@@ -29,7 +29,8 @@ async function call<T>(init?: RequestInit, query = ''): Promise<T> {
 
 export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; onSessionLost: () => void }) {
   const [data, setData] = useState<Data | null>(null);
-  const [status, setStatus] = useState('draft');
+  // La vista por defecto es la cola humana: los borradores son el paso previo de la máquina, no trabajo de nadie.
+  const [status, setStatus] = useState('needs_review');
   const [role, setRole] = useState<'' | RoleFamily | 'none'>('closer');
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
@@ -100,13 +101,16 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     try { await call({ method: 'PATCH', body: JSON.stringify({ source: src, enabled }) }); setNotice(`${src}: ${enabled ? 'reanudada' : 'pausada. No se recoge ni se muestra a las alumnas hasta que la reanudes'}.`); load(); }
     catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
-  // Misma revisión que hace el cron cada mañana: reglas primero y la IA solo en las dudosas.
+  // Misma cualificación que hace el cron cada mañana: las reglas cierran lo claro, la IA lee lo dudoso
+  // y solo lo que ninguna puede decidir con fundamento se queda en la cola humana.
   async function autoReview() {
     setWorking('auto'); setError(''); setNotice('');
     try {
-      const r = await call<{ checked: number; approved: number; exceptions: number; cap: number; used_before: number | null; by_reason: Record<string, number>; ai?: { mode: string; applied: number; skipped?: string } | null }>({ method: 'POST', body: JSON.stringify({ action: 'auto_review' }) });
+      const r = await call<{ checked: number; approved: number; withdrawn: number; exceptions: number; cap: number; used_before: number | null; by_reason: Record<string, number>; ai?: { mode: string; applied: number; approved?: number; withdrawn?: number; human: number; reviewed: number; skipped?: string; failed_calls?: number; error?: string } | null }>({ method: 'POST', body: JSON.stringify({ action: 'auto_review' }) });
       const reasons = Object.entries(r.by_reason ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
-      setNotice(`Revisadas ${r.checked}: ${r.approved} aprobadas solas · ${r.exceptions} a tu cola${reasons ? ` (${reasons})` : ''}. Tope de hoy: ${r.used_before ?? 0}/${r.cap}.${r.ai?.skipped ? ` IA: ${r.ai.skipped}.` : r.ai ? ` IA ${r.ai.mode}: ${r.ai.applied} aplicadas.` : ''}`);
+      const ai = r.ai && !r.ai.skipped ? ` IA: ${r.ai.approved ?? 0} aprobadas, ${r.ai.withdrawn ?? 0} retiradas, ${r.ai.human} dudas.` : '';
+      const fail = r.ai?.skipped ? ` IA sin clasificar: ${r.ai.skipped}.` : r.ai?.failed_calls ? ` IA: ${r.ai.failed_calls} llamada(s) fallidas${r.ai.error ? ` (${r.ai.error})` : ''}.` : '';
+      setNotice(`Revisadas ${r.checked}: ${r.approved} aprobadas · ${r.withdrawn} retiradas · ${r.exceptions} a tu cola${reasons ? ` (${reasons})` : ''}. Tope de hoy: ${r.used_before ?? 0}/${r.cap}.${ai}${fail}`);
       load();
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
@@ -139,15 +143,15 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
 
   const counts = data?.counts ?? {};
   return <section aria-label="Fuentes externas">
-    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (hasta 7 búsquedas al día, 0,175 USD) y, si un portal no tiene API oficial (sin clave o caída), su búsqueda se hace en Google acotada a ese portal (hasta 4 más, 0,1 USD) para que no falte inventario; también entra desde el workflow de GitHub con JobSpy, y cualquier portal desde la pestaña Apify. Todo entra como borrador, con puntuación para quedarte con las mejores, y enlaza siempre al anuncio original.</p>
+    <p className="card-meta" style={{ marginTop: 0, marginBottom: 20, maxWidth: 760 }}>InfoJobs, Adzuna y Jooble se recogen con sus claves (pestaña APIs) cada día a las 6:00. Google Jobs llega por SerpApi (hasta 7 búsquedas al día, 0,175 USD) y, si un portal no tiene API oficial (sin clave o caída), su búsqueda se hace en Google acotada a ese portal (hasta 4 más, 0,1 USD) para que no falte inventario; también entra desde el workflow de GitHub con JobSpy, y cualquier portal desde la pestaña Apify. Todo entra como borrador y se clasifica solo: las reglas cierran lo claro, la IA lee lo dudoso y solo lo complejo espera a una persona. Cada oferta enlaza siempre al anuncio original.</p>
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     {notice && <div className="auth-note" role="status" style={{ marginBottom: 16 }}>{notice}</div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <div className="stat-strip" style={{ margin: 0 }}>{Object.entries(PLURAL).map(([k, l]) => <span key={k}><strong>{counts[k] ?? 0}</strong>{l}</span>)}</div>
         <div className="admin-toolbar" style={{ gap: 8, margin: 0 }}>
-        {owner && <button disabled={working !== ''} onClick={() => void autoReview()} title="Reglas: perfil, mercado, español, puntuación y enlace vivo. Solo lo dudoso va a tu cola.">{working === 'auto' ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />} Aprobar las claras</button>}
+        {owner && <button disabled={working !== ''} onClick={() => void autoReview()} title="Reglas: perfil, mercado, español, puntuación y enlace vivo. La IA lee lo dudoso y solo lo complejo llega a tu cola.">{working === 'auto' ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />} Clasificar borradores</button>}
         {owner && <button disabled={working !== ''} onClick={() => void collect()}>{working === 'collect' ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />} Recoger APIs ahora</button>}
-        <span className="card-meta" style={{ margin: 0 }}>Aprobadas solas hoy: <strong>{data?.auto?.used_today ?? '—'}</strong>/{data?.auto?.cap ?? 100}</span>
+        <span className="card-meta" style={{ margin: 0 }}>Aprobadas solas hoy (reglas + IA): <strong>{data?.auto?.used_today ?? '—'}</strong>/{data?.auto?.cap ?? 100}</span>
       </div>
     </div>
     <MetricsPanel onSessionLost={onSessionLost} />
@@ -170,6 +174,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       <label htmlFor="ex-sort">Orden<select id="ex-sort" value={sort} onChange={e => change(setSort)(e.target.value as typeof sort)}><option value="score">Mejor puntuación</option><option value="recent">Más recientes</option></select></label>
       <label className="grow" htmlFor="ex-q">Buscar<input id="ex-q" placeholder="Título o empresa" value={text} onChange={e => setText(e.target.value)} /></label>
       <button disabled={busy} onClick={load}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
+      {status === 'needs_review' && data && !data.total && <span className="card-meta" style={{ margin: 0 }}>Sin excepciones: la IA clasificó todo lo que llegó.</span>}
     </div>
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data?.total ?? '…'}</strong>cumplen los filtros</span><span><strong>{chosen.length}</strong>seleccionadas en esta página</span></div>

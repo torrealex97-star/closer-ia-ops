@@ -3,6 +3,8 @@ import { authenticate, originBlocked, withCookies } from '../../../../lib/adminA
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// La activación en lote verifica el enlace de cada oferta: una pasada puede tardar decenas de segundos.
+export const maxDuration = 60;
 
 // Proxy admin hacia el engine cloud (/v1/admin/*). Datos de control:
 // - CAREER_ENGINE_URL: el engine cloud (Vercel). Sin esta env,modo local: el panel
@@ -25,7 +27,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       method: request.method,
       headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
       body: ['PATCH', 'POST'].includes(request.method) ? await request.text() : undefined,
-      cache: 'no-store', signal: AbortSignal.timeout(30000),
+      cache: 'no-store',
+      // La clasificación en lote verifica enlaces de una en una; el resto de rutas administrativas
+      // no necesita tanto margen.
+      signal: AbortSignal.timeout(path[0] === 'opportunities' && path[1] === 'activate' ? 55_000 : 30_000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     const contentType = upstream.headers.get('content-type');

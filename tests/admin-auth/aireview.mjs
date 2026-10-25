@@ -146,4 +146,20 @@ seed();
 const roomy = await ai.runAiReview({ ...base, env: {}, deadline: Date.now() + 60000 });
 assert.equal(roomy.truncated, undefined); assert.equal(roomy.reviewed, 6);
 console.log('PASS  escrituras: anotación fallida no cuenta, guarda de estado frente a personas, corte por presupuesto');
+
+// 7) Cualificación: modelo vigente de Groq, puerta sin puntuación cuando la IA lee el anuncio y
+//    aplicación explícita sin depender del modo shadow de la revisión manual.
+assert.equal(ai.config({}).model, 'openai/gpt-oss-20b', 'el modelo por defecto tiene que existir en Groq');
+assert.equal(ai.config({ AI_REVIEW_CONCURRENCY: '99' }).concurrency, 10, 'la concurrencia se acota');
+assert.equal(ai.config({ AI_AUTO_QUALIFY: 'false' }).autoQualify, false);
+assert.equal(g({ score: 10, minScore: 0 }).decision, 'approve', 'sin puerta de puntuación manda la IA');
+assert.equal(g({ score: 10, minScore: 0, proposal: { ...ok, red_flags: ['pide_dinero'] } }).decision, 'human', 'una bandera de la IA sigue bloqueando');
+assert.equal(g({ score: 10, minScore: 0, proposal: { ...ok, confidence: 84 } }).decision, 'human', 'la confianza sigue siendo un umbral');
+seed();
+const forced = await ai.runAiReview({ ...base, env: { AI_REVIEW_MODE: 'shadow' }, apply: true });
+assert.equal(forced.mode, 'auto');
+assert.ok(forced.applied >= 1, 'la cualificación automática aplica aunque la revisión manual esté en shadow');
+assert.ok([...rows.values()].some(r => r.editorial_status === 'needs_review'), 'lo dudoso pasa a la cola humana');
+assert.ok([...rows.values()].filter(r => r.reviewed_by === 'ai-review').every(r => r.ai_review.applied === true));
+console.log('PASS  cualificación: modelo vigente, puerta de puntuación opcional y aplicación explícita');
 server.close();

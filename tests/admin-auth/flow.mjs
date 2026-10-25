@@ -138,7 +138,7 @@ await step('ingest: cerrado sin token; valida el cuerpo; limpia datos personales
   assert.equal((await ingest({ source: 'MAL SOURCE', candidates: [] })).status, 422);
   assert.equal((await ingest({ source: 'indeed' })).status, 422);
   const r = await ingest({ source: 'indeed', via: 'jobspy', candidates: [
-    { external_id: 'a1', title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'https://es.indeed.com/viewjob?jk=a1', posted_at: '2026-10-15', description: 'Buscamos closer con experiencia en ventas para el equipo comercial. Escribe a rrhh@acme.com o llama al +34 600 123 456 <b>ya</b>.', raw: { site: 'indeed', emails: 'x@y.com', secreto: 'no' } },
+    { external_id: 'a1', title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'https://es.indeed.com/viewjob?jk=a1', posted_at: new Date(Date.now() - 864e5).toISOString(), description: 'Buscamos closer con experiencia en ventas para el equipo comercial. Escribe a rrhh@acme.com o llama al +34 600 123 456 <b>ya</b>.', raw: { site: 'indeed', emails: 'x@y.com', secreto: 'no' } },
     { external_id: 'a2', title: 'Closer', url: 'javascript:alert(1)' },
     { external_id: 'a3', title: 'Sin url' },
     { external_id: 'a4', title: 'Closer ok', url: 'https://www.ejemplo.es/o/4', location: 'Texas, USA' },
@@ -211,11 +211,21 @@ await step('alumnas: invitación, recuperación, login, perfil con consentimient
   assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100 } })).status, 422, 'sin respuestas no hay nota');
   const recomputed = await call('/api/student/progress', studentHeaders);
   assert.equal(recomputed.json.progress.recent[0].score, 33); assert.equal(recomputed.json.progress.recent[0].detail.passed, false);
+  // La semana en curso se declara aparte: sirve para el objetivo semanal y no
+  // confunde una semana antigua con la de hoy.
+  assert.equal(typeof recomputed.json.progress.thisWeek.count, 'number');
   const adminView = await call('/api/admin/students'); assert.equal(adminView.status, 200);
   assert.ok(adminView.json.activity.some(a => a.student.email === E && a.summary.training.examBest === 100));
   assert.ok(adminView.json.totals.entered7 >= 1);
   assert.equal(adminView.json.activity_available, true, 'la actividad se pudo leer');
   assert.equal(adminView.json.truncated, false);
+  // Lectura de equipo para la coordinadora: sale del mismo resumen de cada alumna.
+  const team = adminView.json.team;
+  assert.ok(team, 'el panel recibe el agregado del equipo');
+  assert.equal(team.students, 1);
+  assert.equal(team.practiceTotal, adminView.json.activity.reduce((total, row) => total + row.summary.practice.count, 0), 'el total del equipo es la suma de sus alumnas');
+  assert.ok(Array.isArray(team.axes) && Array.isArray(team.weeks));
+  assert.equal(team.neverEntered, 0, 'la alumna sí ha entrado');
   // Perfil: exige consentimiento; saneado; el vídeo es un enlace https
   const own = { cookies: false, headers: { cookie: studentCookie() } };
   assert.equal((await call('/api/student/profile', own)).json.profile, null);

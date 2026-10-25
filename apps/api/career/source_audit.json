@@ -1,7 +1,7 @@
 {
   "apify": {
     "jooble": {
-      "checked_at": "2026-10-23T11:07:48.317198+00:00",
+      "checked_at": "2026-10-24T13:34:36.265453+00:00",
       "candidates": [
         {
           "actor": "agentx/jooble-jobs-scraper",
@@ -28,7 +28,7 @@
       "status": "metadata_checked"
     },
     "simplyhired": {
-      "checked_at": "2026-10-23T11:07:48.318170+00:00",
+      "checked_at": "2026-10-24T13:34:36.266026+00:00",
       "candidates": [
         {
           "actor": "shahidirfan/Simplyhired-Job-Scraper",
@@ -96,7 +96,7 @@
       "status": "metadata_checked"
     },
     "infojobs": {
-      "checked_at": "2026-10-23T11:07:48.318395+00:00",
+      "checked_at": "2026-10-24T13:34:36.266231+00:00",
       "candidates": [
         {
           "actor": "haketa/infojobs-scraper",
@@ -153,7 +153,7 @@
       "status": "metadata_checked"
     },
     "computrabajo": {
-      "checked_at": "2026-10-23T11:07:48.318568+00:00",
+      "checked_at": "2026-10-24T13:34:36.266399+00:00",
       "candidates": [
         {
           "actor": "haketa/computrabajo-scraper",
@@ -217,7 +217,7 @@
       "status": "metadata_checked"
     },
     "workana": {
-      "checked_at": "2026-10-23T11:07:48.318575+00:00",
+      "checked_at": "2026-10-24T13:34:36.266406+00:00",
       "candidates": [
         {
           "actor": "automation-lab/workana-freelance-projects-scraper",
@@ -277,7 +277,7 @@
       "status": "metadata_checked"
     },
     "getonbrd": {
-      "checked_at": "2026-10-23T11:07:48.318578+00:00",
+      "checked_at": "2026-10-24T13:34:36.266410+00:00",
       "candidates": [
         {
           "actor": "scrapers_lat/getonbrd-scraper",
@@ -359,7 +359,7 @@
       "status": "metadata_checked"
     },
     "linkedin": {
-      "checked_at": "2026-10-23T11:07:48.318580+00:00",
+      "checked_at": "2026-10-24T13:34:36.266413+00:00",
       "candidates": [
         {
           "actor": "curious_coder/linkedin-jobs-scraper",
@@ -470,7 +470,7 @@
       "status": "metadata_checked"
     },
     "indeed": {
-      "checked_at": "2026-10-23T11:07:48.318582+00:00",
+      "checked_at": "2026-10-24T13:34:36.266414+00:00",
       "candidates": [
         {
           "actor": "misceres/indeed-scraper",
@@ -543,7 +543,7 @@
       "status": "metadata_checked"
     },
     "infoempleo": {
-      "checked_at": "2026-10-23T11:07:48.318585+00:00",
+      "checked_at": "2026-10-24T13:34:36.266416+00:00",
       "candidates": [
         {
           "actor": "bibian/infoempleo-jobs-scraper",
@@ -566,12 +566,12 @@
       "status": "metadata_checked"
     },
     "trabajos": {
-      "checked_at": "2026-10-23T11:07:48.318635+00:00",
+      "checked_at": "2026-10-24T13:34:36.266466+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "torre": {
-      "checked_at": "2026-10-23T11:07:48.318637+00:00",
+      "checked_at": "2026-10-24T13:34:36.266468+00:00",
       "candidates": [
         {
           "actor": "scrapers_lat/torre-scraper",
@@ -594,17 +594,17 @@
       "status": "metadata_checked"
     },
     "weremoto": {
-      "checked_at": "2026-10-23T11:07:48.318638+00:00",
+      "checked_at": "2026-10-24T13:34:36.266469+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "remotoco": {
-      "checked_at": "2026-10-23T11:07:48.318642+00:00",
+      "checked_at": "2026-10-24T13:34:36.266471+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "laborum": {
-      "checked_at": "2026-10-23T11:07:48.318644+00:00",
+      "checked_at": "2026-10-24T13:34:36.266472+00:00",
       "candidates": [
         {
           "actor": "serp.cheap.ofc/bumeran-scraper",
@@ -696,7 +696,7 @@
       "status": "metadata_checked"
     },
     "elempleo": {
-      "checked_at": "2026-10-23T11:07:48.318645+00:00",
+      "checked_at": "2026-10-24T13:34:36.266474+00:00",
       "candidates": [
         {
           "actor": "logiover/elempleo-colombia-job-scraper",
@@ -754,7 +754,7 @@
       "status": "metadata_checked"
     },
     "upwork": {
-      "checked_at": "2026-10-23T11:07:48.318648+00:00",
+      "checked_at": "2026-10-24T13:34:36.266476+00:00",
       "candidates": [
         {
           "actor": "neatrat/upwork-job-scraper",
@@ -789,17 +789,17 @@
       "status": "metadata_checked"
     },
     "freelancer": {
-      "checked_at": "2026-10-23T11:07:48.318650+00:00",
+      "checked_at": "2026-10-24T13:34:36.266477+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "malt": {
-      "checked_at": "2026-10-23T11:07:48.318651+00:00",
+      "checked_at": "2026-10-24T13:34:36.266478+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "eures": {
-      "checked_at": "2026-10-23T11:07:48.318652+00:00",
+      "checked_at": "2026-10-24T13:34:36.266480+00:00",
       "candidates": [
         {
           "actor": "easyapi/eures-job-scraper",
@@ -871,17 +871,17 @@
       "status": "metadata_checked"
     },
     "europe-language": {
-      "checked_at": "2026-10-23T11:07:48.318653+00:00",
+      "checked_at": "2026-10-24T13:34:36.266481+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "jobsqd": {
-      "checked_at": "2026-10-23T11:07:48.318655+00:00",
+      "checked_at": "2026-10-24T13:34:36.266482+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "facebook": {
-      "checked_at": "2026-10-23T11:07:48.318656+00:00",
+      "checked_at": "2026-10-24T13:34:36.266484+00:00",
       "candidates": [
         {
           "actor": "apify/facebook-groups-scraper",
@@ -926,7 +926,7 @@
           "actor": "scraper_one/facebook-posts-search",
           "title": "Facebook Posts Search",
           "url": "https://apify.com/scraper_one/facebook-posts-search",
-          "build": "0.0.365",
+          "build": "0.0.366",
           "fields": [
             "query",
             "resultsCount",
@@ -949,7 +949,7 @@
       "status": "metadata_checked"
     },
     "linkedin-posts": {
-      "checked_at": "2026-10-23T11:07:48.318658+00:00",
+      "checked_at": "2026-10-24T13:34:36.266485+00:00",
       "candidates": [
         {
           "actor": "harvestapi/linkedin-profile-posts",
@@ -1019,7 +1019,7 @@
       "status": "metadata_checked"
     },
     "skool": {
-      "checked_at": "2026-10-23T11:07:48.318660+00:00",
+      "checked_at": "2026-10-24T13:34:36.266487+00:00",
       "candidates": [
         {
           "actor": "memo23/skool-posts-with-comments-scraper",
@@ -1053,7 +1053,7 @@
       "status": "metadata_checked"
     },
     "telegram": {
-      "checked_at": "2026-10-23T11:07:48.318662+00:00",
+      "checked_at": "2026-10-24T13:34:36.266490+00:00",
       "candidates": [
         {
           "actor": "tri_angle/telegram-scraper",
@@ -1102,7 +1102,7 @@
       "status": "metadata_checked"
     },
     "reddit": {
-      "checked_at": "2026-10-23T11:07:48.318664+00:00",
+      "checked_at": "2026-10-24T13:34:36.266491+00:00",
       "candidates": [
         {
           "actor": "trudax/reddit-scraper-lite",
@@ -1148,7 +1148,7 @@
           "actor": "harshmaur/reddit-scraper",
           "title": "Reddit Scraper - Posts, Comments, Search & Subreddits",
           "url": "https://apify.com/harshmaur/reddit-scraper",
-          "build": "0.0.733",
+          "build": "0.0.747",
           "fields": [
             "searchTerms",
             "searchPosts",
@@ -1238,7 +1238,7 @@
       "status": "metadata_checked"
     },
     "company": {
-      "checked_at": "2026-10-23T11:07:48.318665+00:00",
+      "checked_at": "2026-10-24T13:34:36.266492+00:00",
       "candidates": [
         {
           "actor": "fantastic-jobs/greenhouse-jobs-api",
@@ -1313,99 +1313,99 @@
       "status": "metadata_checked"
     },
     "custom": {
-      "checked_at": "2026-10-23T11:07:48.318667+00:00",
+      "checked_at": "2026-10-24T13:34:36.266494+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "jobgether": {
-      "checked_at": "2026-10-23T11:07:48.318668+00:00",
+      "checked_at": "2026-10-24T13:34:36.266495+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "tecnoempleo": {
-      "checked_at": "2026-10-23T11:07:48.318669+00:00",
+      "checked_at": "2026-10-24T13:34:36.266497+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "talent": {
-      "checked_at": "2026-10-23T11:07:48.318671+00:00",
+      "checked_at": "2026-10-24T13:34:36.266498+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "milanuncios": {
-      "checked_at": "2026-10-23T11:07:48.318672+00:00",
+      "checked_at": "2026-10-24T13:34:36.266499+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "primer-empleo": {
-      "checked_at": "2026-10-23T11:07:48.318673+00:00",
+      "checked_at": "2026-10-24T13:34:36.266501+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "jobfluent": {
-      "checked_at": "2026-10-23T11:07:48.318675+00:00",
+      "checked_at": "2026-10-24T13:34:36.266502+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "welcomejungle": {
-      "checked_at": "2026-10-23T11:07:48.318676+00:00",
+      "checked_at": "2026-10-24T13:34:36.266503+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "closers-avenue": {
-      "checked_at": "2026-10-23T11:07:48.318678+00:00",
+      "checked_at": "2026-10-24T13:34:36.266505+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "google": {
-      "checked_at": "2026-10-23T11:07:48.318679+00:00",
+      "checked_at": "2026-10-24T13:34:36.266507+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "remotolist": {
-      "checked_at": "2026-10-23T11:07:48.318681+00:00",
+      "checked_at": "2026-10-24T13:34:36.266508+00:00",
       "candidates": [],
       "status": "not_found"
     },
     "domestika": {
-      "checked_at": "2026-10-23T11:07:48.318682+00:00",
+      "checked_at": "2026-10-24T13:34:36.266510+00:00",
       "candidates": [],
       "status": "not_found"
     }
   },
   "jobtoday_slugs": {
-    "checked_at": "2026-10-23T11:07:55.255364+00:00",
+    "checked_at": "2026-10-24T13:34:43.057933+00:00",
     "slugs": {
       "jobtoday": {
-        "checked_at": "2026-10-23T11:07:55.255535+00:00",
+        "checked_at": "2026-10-24T13:34:43.058117+00:00",
         "url": "https://jobtoday.com/es/trabajos-closer-de-ventas",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-closer-de-ventas",
         "http_status": 200
       },
       "jobtoday-telemarketing": {
-        "checked_at": "2026-10-23T11:07:55.256532+00:00",
+        "checked_at": "2026-10-24T13:34:43.059014+00:00",
         "url": "https://jobtoday.com/es/trabajos-telemarketing",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-telemarketing",
         "http_status": 200
       },
       "jobtoday-remoto": {
-        "checked_at": "2026-10-23T11:07:55.687970+00:00",
+        "checked_at": "2026-10-24T13:34:43.393964+00:00",
         "url": "https://jobtoday.com/es/trabajos-ventas-remoto",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-ventas-remoto",
         "http_status": 200
       },
       "jobtoday-ventas": {
-        "checked_at": "2026-10-23T11:07:55.772695+00:00",
+        "checked_at": "2026-10-24T13:34:43.495205+00:00",
         "url": "https://jobtoday.com/es/trabajos-ventas",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-ventas",
         "http_status": 200
       },
       "jobtoday-comercial": {
-        "checked_at": "2026-10-23T11:07:56.117453+00:00",
+        "checked_at": "2026-10-24T13:34:43.715149+00:00",
         "url": "https://jobtoday.com/es/trabajos-comercial",
         "status": "ok",
         "canonical_url": "https://jobtoday.com/es/trabajos-comercial",
