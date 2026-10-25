@@ -181,6 +181,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   const [tab] = await Promise.all([alumnaCtx.waitForEvent('page'), alumna.getByRole('link', { name: 'Abrir el anuncio' }).click()]); await tab.close();
   await alumna.getByText('Anuncio abierto', { exact: false }).first().waitFor();
   await alumna.getByRole('button', { name: 'Ya la he enviado' }).click(); await alumna.getByText('Enviada por ti', { exact: true }).waitFor(); if (process.env.SHOT2) await alumna.screenshot({ path: process.env.SHOT2, fullPage: true }); assert.equal(await alumna.getByRole('button', { name: 'Ya la he enviado' }).count(), 0);
+  await alumna.getByTestId('outcome-responded').click(); await alumna.getByText('La empresa ha respondido', { exact: true }).first().waitFor();
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con candidaturas');
   // Progreso: una práctica y un repaso registrados con su sesión; la vista muestra solo datos reales y su tabla alternativa.
   const logged = await alumna.evaluate(async () => {
@@ -192,6 +193,9 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.locator('.stat-strip').waitFor();
   const strip = await alumna.locator('.stat-strip').innerText(); assert.match(strip, /1\s*prácticas/); assert.match(strip, /72\s*nota media/);
   assert.match(await alumna.locator('.student-progress').innerText(), /1 de 7 módulos repasados/);
+  await alumna.getByTestId('level').waitFor(); assert.match(await alumna.getByTestId('level').innerText(), /Nivel \d+ · \d+ XP/);
+  assert.match(await alumna.locator('.student-progress').innerText(), /Tasa de respuesta\s*100 %/, 'una enviada y respondida = 100 %');
+  assert.match(await alumna.locator('.student-progress').innerText(), /Maestría por escenario/);
   await alumna.getByText('Ver como tabla').click(); assert.equal(await alumna.locator('.progress-card details tbody tr').count(), 6, 'seis semanas en la tabla alternativa');
   assert.ok(await alumna.getByRole('img', { name: /Nota media semanal de prácticas/ }).isVisible());
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil con progreso');
@@ -200,6 +204,8 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   assert.match(await board.innerText(), /Han practicado\s*\d+ · \d+ %/); assert.ok(await board.getByRole('img', { name: /Actividad de las alumnas en 7 días/ }).isVisible());
   await board.getByText('Ver como tabla').first().click(); assert.equal(await board.locator('details').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
   assert.match(await board.innerText(), /Hace falta que al menos 5 alumnas/, 'con una sola alumna no hay distribución de notas');
+  assert.match(await board.getByTestId('retention').innerText(), /Elige 30 o 90 días/, 'con 7 días no se mide la retención');
+  assert.match(await board.innerText(), /Respuesta de las empresas[\s\S]*Tasa de respuesta\s*100 %/); await board.getByTestId('refer').waitFor();
   if (process.env.SHOT3) await board.screenshot({ path: process.env.SHOT3 });
   assert.match(await board.getByRole('heading', { level: 2 }).first().innerText(), /\d+ de \d+ han practicado/, 'el titular dice la conclusión');
   await page.setViewportSize({ width: 390, height: 844 });

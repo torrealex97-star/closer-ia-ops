@@ -6,9 +6,17 @@ import { Copy, ExternalLink, LoaderCircle, Save } from 'lucide-react';
 type Opts = { work_authorization: Record<string, string>; levels: Record<string, string>; contracts: Record<string, string>; answers: Record<string, string> };
 type AppProfile = { contact_email: string | null; phone: string | null; linkedin_url: string | null; cv_url: string | null; country_residence: string | null; work_authorization: string | null; language_levels: Record<string, string>; years_sales: number | null; years_high_ticket: number | null; sales_experience: string | null; tools: string[]; available_from: string | null; hours_per_week: number | null; contract_preferences: string[]; salary_expectation: string | null; notice_period: string | null; pitch: string | null; motivation: string | null; answers: Record<string, string>; autofill_consent_at: string | null };
 type Form = { contact_email: string; phone: string; linkedin_url: string; cv_url: string; country_residence: string; work_authorization: string; language_levels: Record<string, string>; years_sales: string; years_high_ticket: string; sales_experience: string; tools: string; available_from: string; hours_per_week: string; contract_preferences: string[]; salary_expectation: string; notice_period: string; pitch: string; motivation: string; answers: Record<string, string>; autofill_consent: boolean };
-export type Application = { id: string; offer_ref: string; offer_title: string; offer_company: string | null; offer_url: string; status: 'draft' | 'opened' | 'applied' | 'discarded'; cover_message: string | null; notes: string | null; applied_at: string | null };
+export type Application = { id: string; offer_ref: string; offer_title: string; offer_company: string | null; offer_url: string; status: 'draft' | 'opened' | 'applied' | 'discarded' | 'responded' | 'interview' | 'offer' | 'rejected'; cover_message: string | null; notes: string | null; applied_at: string | null };
 type Copy = { key: string; label: string; value: string };
-const STATUS: Record<Application['status'], string> = { draft: 'Borrador', opened: 'Anuncio abierto', applied: 'Enviada por ti', discarded: 'Descartada' };
+const STATUS: Record<Application['status'], string> = { draft: 'Borrador', opened: 'Anuncio abierto', applied: 'Enviada por ti', discarded: 'Descartada', responded: 'La empresa ha respondido', interview: 'Entrevista', offer: 'Oferta recibida', rejected: 'Respuesta negativa' };
+// Estados «enviada» y sus siguientes pasos, que anota ELLA cuando la empresa contesta (la app no recibe esos correos).
+const SENT_STATES: Application['status'][] = ['applied', 'responded', 'interview', 'offer', 'rejected'];
+const OUTCOME_BUTTONS: { to: Application['status']; label: string; from: Application['status'][]; note: string }[] = [
+  { to: 'responded', label: 'La empresa ha respondido', from: ['applied'], note: 'Anotada la respuesta de la empresa.' },
+  { to: 'interview', label: 'Me han citado a entrevista', from: ['applied', 'responded'], note: 'Anotada la entrevista.' },
+  { to: 'offer', label: 'Me han hecho una oferta', from: ['applied', 'responded', 'interview'], note: 'Anotada la oferta. ¡Enhorabuena!' },
+  { to: 'rejected', label: 'Me han dicho que no', from: ['applied', 'responded', 'interview'], note: 'Anotada la respuesta negativa.' },
+];
 const LANGS: Array<[string, string]> = [['es', 'Español'], ['en', 'Inglés'], ['pt', 'Portugués'], ['fr', 'Francés'], ['de', 'Alemán'], ['it', 'Italiano'], ['ca', 'Catalán']];
 const EMPTY: Form = { contact_email: '', phone: '', linkedin_url: '', cv_url: '', country_residence: '', work_authorization: '', language_levels: {}, years_sales: '', years_high_ticket: '', sales_experience: '', tools: '', available_from: '', hours_per_week: '', contract_preferences: [], salary_expectation: '', notice_period: '', pitch: '', motivation: '', answers: {}, autofill_consent: false };
 
@@ -79,14 +87,15 @@ export function Applications({ refreshKey, onLost }: { refreshKey: number; onLos
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}{note && <div className="auth-note" role="status">{note}</div>}
     {!apps.length ? <p className="card-meta">Todavía no has preparado ninguna. Pulsa «Preparar candidatura» en una oferta de arriba.</p> :
       <ol style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 12 }}>{apps.map(a => <li key={a.id} className="search-panel" data-testid="application">
-        <strong>{a.offer_title}</strong>{a.offer_company ? ` · ${a.offer_company}` : ''} <span className={a.status === 'applied' ? 'status ok' : 'status'} style={{ marginLeft: 6 }}>{STATUS[a.status]}</span>
+        <strong>{a.offer_title}</strong>{a.offer_company ? ` · ${a.offer_company}` : ''} <span className={SENT_STATES.includes(a.status) && a.status !== 'rejected' ? 'status ok' : 'status'} style={{ marginLeft: 6 }}>{STATUS[a.status]}</span>
         <label htmlFor={`msg-${a.id}`}>Mensaje (revísalo y cámbialo)<textarea id={`msg-${a.id}`} rows={7} maxLength={3000} value={msgs[a.id] ?? ''} onChange={e => setMsgs({ ...msgs, [a.id]: e.target.value })} /></label>
         <div className="admin-toolbar" style={{ flexWrap: 'wrap' }}>
           <button onClick={() => void patch(a.id, { cover_message: msgs[a.id] }, 'Mensaje guardado.')}><Save size={14} /> Guardar mensaje</button>
           <button onClick={() => void copyIt(msgs[a.id] ?? '', 'Mensaje')}><Copy size={14} /> Copiar mensaje</button>
           <a href={a.offer_url} target="_blank" rel="noopener noreferrer" onClick={() => { if (a.status === 'draft') void patch(a.id, { status: 'opened' }, 'Anuncio abierto.'); }}><ExternalLink size={14} /> Abrir el anuncio</a>
-          {a.status !== 'applied' && a.status !== 'discarded' && <button className="primary" onClick={() => void patch(a.id, { status: 'applied' }, 'Anotada como enviada por ti.')}>Ya la he enviado</button>}
-          {a.status === 'discarded' ? <button onClick={() => void patch(a.id, { status: 'draft' }, 'Recuperada.')}>Recuperar</button> : a.status !== 'applied' && <button onClick={() => void patch(a.id, { status: 'discarded' }, 'Descartada.')}>Descartar</button>}
+          {!SENT_STATES.includes(a.status) && a.status !== 'discarded' && <button className="primary" onClick={() => void patch(a.id, { status: 'applied' }, 'Anotada como enviada por ti.')}>Ya la he enviado</button>}
+          {a.status === 'discarded' ? <button onClick={() => void patch(a.id, { status: 'draft' }, 'Recuperada.')}>Recuperar</button> : !SENT_STATES.includes(a.status) && <button onClick={() => void patch(a.id, { status: 'discarded' }, 'Descartada.')}>Descartar</button>}
+          {OUTCOME_BUTTONS.filter(button => button.from.includes(a.status)).map(button => <button key={button.to} data-testid={`outcome-${button.to}`} onClick={() => void patch(a.id, { status: button.to }, button.note)}>{button.label}</button>)}
           <button onClick={() => void remove(a.id)}>Borrar</button>
         </div>
       </li>)}</ol>}

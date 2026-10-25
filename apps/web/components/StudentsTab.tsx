@@ -7,8 +7,8 @@ import StudentActivityDashboard from './StudentActivityDashboard';
 
 // Alumnas: invitar, pausar/reactivar (reversible) y dar de baja (solo propietario, irreversible). Sin datos de perfil aquí.
 type Row = { id: string; email: string; status: 'invited' | 'active' | 'paused'; invited_by: string | null; created_at: string };
-type Summary = { sessions: number; last_seen: string | null; practice: { count: number; avg: number | null }; training: { modules: string[]; examBest: number | null; examPassed: boolean }; streak: { current: number } };
-type Overview = { students: Row[]; days: number; activity_available: boolean; activity: { student: { id: string }; summary: Summary }[]; totals: { entered7: number; active: number; practices: number; exams_passed: number } | null; truncated: boolean };
+type Summary = { sessions: number; last_seen: string | null; practice: { count: number; avg: number | null }; training: { modules: string[]; examBest: number | null; examPassed: boolean }; apps?: { sent: number; responded: number } | null; streak: { current: number } };
+type Overview = { students: Row[]; days: number; activity_available: boolean; applications_available?: boolean; activity: { student: { id: string }; summary: Summary }[]; totals: { entered7: number; active: number; practices: number; exams_passed: number } | null; truncated: boolean };
 const PERIODS = [7, 30, 90] as const;
 const when = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' });
 const LABEL = { invited: 'Invitada', active: 'Activa', paused: 'Pausada' } as const;
@@ -48,7 +48,7 @@ export default function StudentsTab({ owner, onSessionLost }: { owner: boolean; 
     <div className="training-chips" role="group" aria-label="Periodo de actividad">{PERIODS.map(p => <button key={p} aria-pressed={days === p} onClick={() => setDays(p)}>Últimos {p} días</button>)}</div>
     {overview && !live && <div className="alert" role="status"><span>La actividad de las alumnas no se pudo leer ahora mismo (la tabla puede no estar creada todavía). Se muestra «—» en vez de ceros; la lista de acceso funciona igual.</span></div>}
     {overview && live && overview.totals && <div className="stat-strip" aria-label={`Actividad de los últimos ${overview.days} días`}><span><strong>{overview.totals.entered7}</strong>entraron en 7 días</span><span><strong>{overview.totals.active}</strong>con actividad en {overview.days} días</span><span><strong>{overview.totals.practices}</strong>prácticas</span><span><strong>{overview.totals.exams_passed}</strong>con examen superado</span></div>}
-    {overview && live && <StudentActivityDashboard students={rows} summaries={summaries} days={overview.days} />}
+    {overview && live && <StudentActivityDashboard students={rows} summaries={summaries} days={overview.days} appsAvailable={overview.applications_available !== false} />}
     {overview?.truncated && <p className="card-meta" role="status">Hay más de 5.000 movimientos en el periodo: los totales pueden quedarse cortos.</p>}
     {busy ? <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p> : !rows.length ? <div className="empty"><h3>Aún no hay alumnas invitadas.</h3></div> : <div className="table-wrap"><table className="data-table">
       <thead><tr><th>Alumna</th><th>Estado</th><th>Alta</th><th>Última entrada</th><th className="num">Prácticas</th><th className="num">Formación</th><th>Examen</th><th /></tr></thead>

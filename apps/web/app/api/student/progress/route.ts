@@ -2,7 +2,9 @@ import { NextRequest } from 'next/server';
 import { withCookies } from '../../../../lib/adminAuth';
 import { authenticateStudent } from '../../../../lib/studentAuth';
 import { studentByEmail } from '../../../../lib/students';
+import { listApplications } from '../../../../lib/applications';
 import { periodDays, readActivity, summarize } from '../../../../lib/studentActivity';
+import { applicationFunnel, masteryByScenario, xpAndLevel } from '../../../../lib/studentMetrics';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,5 +20,11 @@ export async function GET(request: NextRequest) {
   const read = await readActivity({ studentId: row.id });
   // Sin lectura no se inventan ceros: la vista dice que no se pudo cargar.
   if (!read) return reply({ detail: 'No se pudo cargar tu progreso ahora mismo.' }, 503);
-  return reply({ progress: summarize(read.rows, days, new Date(), read.truncated) });
+  // Candidaturas: si no se pueden leer se declara (`applications: null`), no se cuentan como cero.
+  const apps = await listApplications(auth.student.user_id).catch(() => null);
+  const statuses = apps ? apps.map(app => app.status) : null;
+  return reply({
+    progress: summarize(read.rows, days, new Date(), read.truncated),
+    metrics: { xp: xpAndLevel(read.rows, statuses), mastery: masteryByScenario(read.rows), applications: statuses ? applicationFunnel(statuses) : null },
+  });
 }
