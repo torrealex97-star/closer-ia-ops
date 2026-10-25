@@ -7,4 +7,5 @@ export const legalEntity = () => ({
   address: process.env.LEGAL_ENTITY_ADDRESS?.trim() || pending,
   email: process.env.LEGAL_PRIVACY_EMAIL?.trim() || pending,
 });
-export const POLICY_VERSION = 'v2-borrador', POLICY_DATE = '2026-10-18';
+export const POLICY_VERSION = 'v3-borrador', POLICY_DATE = '2026-10-25';
+export const TERMS_VERSION = 'v1-borrador', TERMS_DATE = '2026-10-25';

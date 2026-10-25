@@ -23,10 +23,10 @@ const dash = (value: number | null, suffix = '') => value === null ? '—' : `${
 
 // Barras verticales con base en 0; una semana sin prácticas se queda sin barra y con «—» (no es un cero).
 function WeeklyBars({ weekly }: { weekly: Progress['weekly'] }) {
-  const W = 520, H = 120, PAD = 24, slot = W / weekly.length, bar = Math.min(48, slot - 14);
+  const W = 300, H = 120, PAD = 24, slot = W / weekly.length, bar = Math.min(30, slot - 12); // viewBox estrecho: en una tarjeta de ~300 px el texto se ve a su tamaño real
   const filled = weekly.filter(w => w.avg !== null);
   const summary = filled.length ? `Nota media semanal de prácticas, últimas 6 semanas: ${filled.map(w => `${weekLabel(w.week)} ${w.avg}`).join(', ')}.` : 'Sin prácticas puntuadas en las últimas 6 semanas.';
-  return <svg viewBox={`0 0 ${W} ${H + PAD}`} role="img" aria-label={summary} width="100%" style={{ maxWidth: W, display: 'block' }}>
+  return <svg viewBox={`0 0 ${W} ${H + PAD}`} role="img" aria-label={summary} width="100%" style={{ maxWidth: 380, display: 'block' }}>
     <line x1="0" y1={H} x2={W} y2={H} stroke="var(--line)" strokeWidth="1" />
     <text x="0" y="10" fontSize="11" fill="var(--secondary)">100</text>
     {weekly.map((w, i) => { const h = w.avg === null ? 0 : Math.max(2, (w.avg / 100) * (H - 18)); const x = i * slot + (slot - bar) / 2; return <g key={w.week}>

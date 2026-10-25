@@ -15,7 +15,7 @@ function Bars({ rows, label }: { rows: { id: string; label: string; count: numbe
       <div className="meter" aria-hidden="true"><span style={{ width: `${row.pct ?? 0}%` }} /></div>
       <b>{row.count}{row.pct !== null ? ` · ${row.pct} %` : ''}</b>
     </div>)}</div>
-    <details><summary>Ver como tabla</summary><div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Paso</th><th scope="col" className="num">Alumnas</th></tr></thead>
+    <details data-testid="alt-table"><summary>Ver como tabla</summary><div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Paso</th><th scope="col" className="num">Alumnas</th></tr></thead>
       <tbody>{rows.map(row => <tr key={row.id}><th scope="row">{row.label}</th><td className="num">{row.count} ({row.pct === null ? '—' : `${row.pct} %`})</td></tr>)}</tbody></table></div></details>
   </>;
 }
@@ -35,11 +35,12 @@ export default function StudentActivityDashboard({ students, summaries, days, ap
   if (!students.length) return null; // la tabla ya dice que aún no hay alumnas
   if (!base) return <div className="coordinator" data-testid="coordinator"><p className="card-meta">— Ninguna alumna tiene el acceso activo (todas están pausadas), así que no hay actividad que resumir.</p></div>;
   return <div className="coordinator" data-testid="coordinator">
-    <p className="card-meta">Resumen de los últimos {days} días de las {base} alumnas con acceso (las pausadas no cuentan). Son recuentos reales de su actividad en el portal, no una evaluación.</p>
+    <details className="coordinator-fold" open><summary>Resumen de actividad · últimos {days} días</summary>
+    <p className="card-meta">De las {base} alumnas con acceso (las pausadas no cuentan). Recuentos reales de su actividad en el portal, no una evaluación.</p>
     <div className="progress-grid">
-      <article className="progress-card"><h2>{data.steps[2].count} de {base} han practicado</h2><p className="card-meta">Qué ha hecho cada alumna en los últimos {days} días. Una misma alumna puede contar en varias barras (no es un embudo en orden: puede repasar un módulo sin haber practicado). Porcentajes sobre las {base} con acceso.</p>
+      <article className="progress-card"><h2>{data.steps[2].count} de {base} han practicado</h2><p className="card-meta">Qué ha hecho cada alumna. Una misma alumna puede contar en varias barras: no es un embudo en orden.</p>
         <Bars rows={data.steps} label={`Actividad de las alumnas en ${days} días: ${data.steps.map(step => `${step.label} ${step.count}${step.pct === null ? '' : ` (${step.pct} %)`}`).join(', ')}.`} /></article>
-      <article className="progress-card"><h2>Formación por módulo</h2><p className="card-meta">Alumnas que han repasado cada módulo (cualquier fecha dentro del periodo).</p>
+      <article className="progress-card"><h2>Formación por módulo</h2><p className="card-meta">Alumnas que han repasado cada módulo en el periodo.</p>
         <Bars rows={data.modules.map(item => ({ id: item.ref, label: MODULE_LABELS[item.ref] ?? item.ref, count: item.count, pct: item.pct }))} label={`Alumnas por módulo repasado, sobre ${base} con acceso: ${data.modules.map(item => `${MODULE_LABELS[item.ref] ?? item.ref} ${item.count}${item.pct === null ? '' : ` (${item.pct} %)`}`).join(', ')}.`} /></article>
       <article className="progress-card"><h2>Nota media de práctica</h2>
         {data.buckets ? <><p className="card-meta">Alumnas según su nota media (estimación del modelo, no una evaluación). Porcentajes sobre las que han practicado, no sobre todas.</p>
@@ -62,5 +63,6 @@ export default function StudentActivityDashboard({ students, summaries, days, ap
         {data.refer.length ? <ul className="plain-list">{data.refer.slice(0, NUDGE_LIMIT).map(item => <li key={item.id}><strong>{item.email}</strong><br /><small>{item.reasons.join(' · ')}</small></li>)}</ul>
           : <p className="card-meta">{appsAvailable ? 'Ninguna cumple todavía todas las reglas.' : '— Sin poder leer las candidaturas no se puede proponer a nadie.'}</p>}</article>
     </div>
+    </details>
   </div>;
 }
