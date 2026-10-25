@@ -6,6 +6,7 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 
 - **Hecho (tested, servicios simulados)**: la lista de ofertas externas del panel marca cada oferta con señales como **«Oferta peligrosa»** (bloqueada) o **«Con avisos»**, y muestra el motivo en texto (no solo color ni tooltip). Una oferta normal no lleva marca. La evaluación se hace en el servidor con [offerRisk.ts](../apps/web/lib/offerRisk.ts) al listar; no se guarda nada ni se oculta nada a las alumnas por esto (eso sigue siendo la decisión de quien aprueba).
 - **Verificado (tested)**: paso de flujo nuevo (ingesta de una oferta con pago previo → `BLOCKED` con su motivo; una normal → sin marca) y suite completa en verde.
+- **Prueba inestable corregida** (*verified* en CI, falló una vez): el paso «Alumnas» de `ui.mjs` buscaba `getByText('TU PERFIL')`, que en modo estricto coincide con 3 elementos si el panel de candidaturas ya se ha pintado; ahora usa texto exacto.
 - **Límites**: reglas sin calibrar con ofertas reales; no comprueba CIF, dominio ni LinkedIn. Una oferta ya aprobada a mano antes de este cambio sigue visible a las alumnas.
 
 ## Migración de resultados de candidaturas aplicada; relevo reescrito (sesión 102) — 2026-10-25
