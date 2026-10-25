@@ -245,7 +245,7 @@ export default function StudentPractice() {
         <button type="button" onClick={() => scenario && begin(scenario)}><RotateCcw size={16} />Repetir esta situación</button>
         <button className="primary" type="button" onClick={() => { setView('scenarios'); setScenario(null); setDebrief(null); }}>Elegir otra situación<ArrowRight size={16} /></button>
       </div>
-      <p className="practice-note">El feedback y la puntuación los estima un modelo de IA a partir de tu conversación; la puntuación no es una nota oficial. Es un simulacro: no evalúa tu candidatura ni decide nada sobre ningún proceso.</p>
+      <p className="practice-note">El feedback y la puntuación los estima un modelo de IA a partir de tu conversación; la puntuación no es una nota oficial. Es un simulacro: no evalúa tu candidatura ni decide nada sobre ningún proceso. Tu texto se envía a un proveedor de IA: no escribas datos personales de terceros (<a href="/privacidad">Privacidad</a> · <a href="/terminos">Términos</a>).</p>
     </section>;
   }
 
@@ -277,6 +277,6 @@ export default function StudentPractice() {
         <button type="button" onClick={() => { setScenario(scenarioById(entry.scenarioId)); setDebrief(entry.debrief); setView('debrief'); }}>Ver feedback</button>
       </li>)}</ul>
     </div>}
-    <p className="practice-note">La sala de práctica es un simulacro formativo. No se envía nada a empresas y no sustituye a una entrevista real.</p>
+    <p className="practice-note">La sala de práctica es un simulacro formativo. No se envía nada a empresas y no sustituye a una entrevista real. Lo que escribes (o dices) se envía a un proveedor de inteligencia artificial para simular la conversación: no escribas datos personales de terceros. Más en <a href="/privacidad">Privacidad</a> y <a href="/terminos">Términos</a>.</p>
   </section>;
 }

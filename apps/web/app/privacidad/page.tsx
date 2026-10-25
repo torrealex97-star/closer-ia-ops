@@ -30,9 +30,10 @@ export default function Page() {
     <ul>
       <li>Darte acceso a tu espacio y mostrarte ofertas que encajan con tu perfil: <strong>ejecución del servicio que solicitas</strong> y, para el perfil, <strong>tu consentimiento</strong>.</li>
       <li>Ayudarte a preparar candidaturas (mensaje borrador y lista de datos para copiar): <strong>tu consentimiento</strong>. <strong>La app no envía nada por ti</strong>: copias y envías tú.</li>
+      <li><strong>Seguir tu progreso</strong> (tu actividad, tus notas y tus candidaturas): para mostrártelo a ti y para que el <strong>equipo de coordinación de WDC</strong> te acompañe y vea cómo va la comunidad: <strong>ejecución del servicio que solicitas</strong>. <em>Pendiente de confirmar por el responsable: base legal y plazos.</em></li>
       <li>Permiso de «autorrelleno futuro»: <strong>hoy no hace nada</strong>. Si lo marcas, solo queda registrado que lo autorizas; puedes retirarlo cuando quieras y se pedirá un permiso nuevo antes de usarlo.</li>
     </ul>
-    <p>Las recomendaciones, el nivel y las estadísticas se calculan con reglas fijas y explicables. <strong>No enviamos tu perfil, tu CV ni tus datos de contacto a modelos de inteligencia artificial</strong> ni tomamos decisiones automatizadas sobre ti. La excepción es lo que tú escribes o dices en la sala de práctica (ver apartado 4), y las notas que da son <strong>estimaciones</strong>, no evaluaciones oficiales.</p>
+    <p>Las recomendaciones, el nivel y las estadísticas se calculan con reglas fijas y explicables. <strong>No enviamos tu perfil, tu CV ni tus datos de contacto a modelos de inteligencia artificial</strong> ni tomamos decisiones automatizadas sobre ti. La coordinación puede ver una <strong>sugerencia</strong> de alumnas candidatas a un proyecto, calculada con reglas visibles (examen superado, prácticas con buena nota media y candidaturas enviadas); <strong>la decide una persona</strong> y no afecta a tu acceso. La excepción es lo que tú escribes o dices en la sala de práctica (ver apartado 4), y las notas que da son <strong>estimaciones</strong>, no evaluaciones oficiales.</p>
 
     <h2>4. Con quién se comparten</h2>
     <ul>
@@ -40,6 +41,7 @@ export default function Page() {
       <li><strong>Proveedor de inteligencia artificial para la sala de práctica</strong> (Groq): recibe el <em>texto</em> de la conversación de práctica, sin tu nombre, correo ni perfil, para generar las respuestas del interlocutor y el feedback. <em>Pendiente de confirmar por el responsable: acuerdo de tratamiento y retención cero con el proveedor antes de abrir la sala a las alumnas.</em></li>
       <li><strong>Reconocimiento y síntesis de voz del navegador</strong> (dictado y lectura en voz alta): lo ofrece tu navegador y, según cuál uses, puede enviar el audio a su propio proveedor (por ejemplo Google en Chrome); consulta sus condiciones. Nosotras no recibimos ni guardamos el audio.</li>
       <li><strong>Empresas de las ofertas:</strong> solo reciben tus datos cuando <strong>tú</strong> envías una candidatura por tu cuenta. Nosotras no se los enviamos.</li>
+      <li><strong>Equipo de coordinación de WDC</strong> (las personas con acceso al panel de administración): ve tu actividad, tus notas, el estado de tus candidaturas y tu perfil para acompañarte. No ve tus conversaciones de la sala (no las guardamos).</li>
       <li>No vendemos ni cedemos tus datos a terceros con fines comerciales.</li>
     </ul>
     <p><em>Transferencias internacionales: el alojamiento puede implicar tratamiento fuera del Espacio Económico Europeo. Las garantías aplicables (cláusulas contractuales tipo u otras) están pendientes de confirmar por el responsable.</em></p>

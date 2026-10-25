@@ -17,7 +17,8 @@ export default function Page() {
 
     <h2>2. Tu cuenta</h2>
     <ul>
-      <li>El acceso es <strong>por invitación</strong>, personal e intransferible. Debes ser mayor de edad.</li>
+      <li>El acceso a tu espacio (perfil, candidaturas, progreso) es <strong>por invitación</strong>, personal e intransferible. Debes ser mayor de edad. Algunas partes, como la sala de práctica, pueden estar abiertas sin cuenta mientras el acceso esté abierto: estas condiciones te aplican igualmente.</li>
+      <li><strong>Aceptación:</strong> al guardar tu perfil marcas que has leído estos términos y la política de privacidad, y queda anotada la versión. Si cambian de forma relevante te lo pediremos de nuevo.</li>
       <li>Mantén tu contraseña en secreto y avísanos si crees que alguien más accede a tu cuenta.</li>
       <li>Podemos pausar o retirar el acceso si se incumplen estas normas. Puedes pedir tu baja cuando quieras; se elimina tu cuenta con sus datos, según la política de privacidad.</li>
     </ul>
