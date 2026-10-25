@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, LoaderCircle, LogOut, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/vocabulary';
 import { ApplicationForm, Applications } from './StudentApplications';
+import StudentProgress from './StudentProgress';
 
 // Portal de alumnas: acceso por invitación (email + contraseña de Supabase Auth) y perfil propio. Los vídeos NO se suben
 // aquí: cada alumna los guarda en su propio Drive y solo pega el enlace (por si algún formulario futuro lo pide).
@@ -74,15 +75,19 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
   const toggle = (key: 'target_roles' | 'languages', v: string) => setP(old => ({ ...old, [key]: old[key].includes(v) ? old[key].filter(x => x !== v) : [...old[key], v] }));
   async function save(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try { await api('profile', { method: 'PUT', body: JSON.stringify({ ...p, consent }) }); setNotice('Perfil guardado.'); setSaves(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
+    try { await api('profile', { method: 'PUT', body: JSON.stringify({ ...p, consent }) }); setNotice('Perfil guardado.'); setP(old => ({ ...old, consent_at: old.consent_at ?? new Date().toISOString() })); setSaves(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
   }
   async function erase() {
     if (!window.confirm('¿Borrar tu perfil y el enlace a tu vídeo? No se puede deshacer.')) return;
     setBusy(true); setError(''); setNotice('');
     try { await api('profile', { method: 'DELETE' }); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil, tu formulario y tus candidaturas se han borrado.'); setSaves(n => n + 1); setApps(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
   }
-  return <div className="auth-wrap"><div className="auth-card" style={{ maxWidth: 640 }}><Brand />
+  return <div className="auth-wrap"><div className="auth-card" style={{ width: 'min(760px, 100%)' }}><Brand />
     <div><span className="eyebrow">TU PERFIL</span><h1>Hola, {p.full_name || email}</h1><p>Esta información nos ayuda a elegir ofertas para ti. Puedes cambiarla o borrarla cuando quieras.</p></div>
+    {/* Para quien acaba de entrar, el perfil va primero: de él salen las ofertas.
+        El progreso solo abre la página cuando ya hay historial que enseñar. */}
+    {p.consent_at && <StudentProgress />}
+    <p className="card-meta">Sigue practicando: <a href="/?tab=formacion">formación</a> · <a href="/?tab=practica">sala de práctica</a>.</p>
     <form onSubmit={save}>
       <label htmlFor="sp-name">Nombre<input id="sp-name" maxLength={120} value={p.full_name ?? ''} onChange={e => setP({ ...p, full_name: e.target.value })} autoComplete="name" /></label>
       <label htmlFor="sp-city">Ciudad<input id="sp-city" maxLength={80} value={p.city ?? ''} onChange={e => setP({ ...p, city: e.target.value })} /></label>
@@ -96,6 +101,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
       {notice && <div className="auth-note" role="status">{notice}</div>}
       <button className="primary" disabled={busy || (!p.consent_at && !consent)}>{busy ? <LoaderCircle size={16} className="spin" /> : <Save size={16} />} Guardar perfil</button>
     </form>
+    {!p.consent_at && <StudentProgress />}
     <ApplicationForm onLost={onLost} onSaved={() => setApps(n => n + 1)} />
     <Matches refreshKey={saves} onPrepared={() => setApps(n => n + 1)} onLost={onLost} />
     <Applications refreshKey={apps} onLost={onLost} />

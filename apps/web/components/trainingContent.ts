@@ -3,7 +3,7 @@
 // se revisan con reglas sobre el texto (trainingCheck) y el examen es determinista.
 // Las cifras del ejercicio de Venta Lógica son ficticias y se rotulan como tales.
 
-export type TrainingId = 'precall' | 'logica' | 'freezing' | 'yellows' | 'star' | 'certificacion';
+export type TrainingId = 'precall' | 'logica' | 'descubrimiento' | 'freezing' | 'yellows' | 'star' | 'cierres' | 'certificacion';
 
 export type TrainingModule = {
   id: TrainingId;
@@ -48,6 +48,20 @@ export const TRAINING_MODULES: TrainingModule[] = [
     summary: 'Situación, timing, autoridad y recursos antes de cerrar. Sin los cuatro, la objeción no es de cierre.',
     tag: 'Antes de cerrar',
     minutes: 6,
+  },
+  {
+    id: 'descubrimiento',
+    title: 'Los nueve pasos de descubrimiento',
+    summary: 'La secuencia para llegar al dolor real antes de hablar de la solución: situación, deseo, obstáculo, razón, detalle, resumen, etiqueta, confirmación y repetición.',
+    tag: 'Conversación',
+    minutes: 12,
+  },
+  {
+    id: 'cierres',
+    title: 'Los diez cierres exactos',
+    summary: 'Qué decir cuando la decisión está cerca: diez cierres con su fórmula, cuándo usarlos y el concepto que los sostiene.',
+    tag: 'Repertorio',
+    minutes: 12,
   },
   {
     id: 'certificacion',
@@ -251,7 +265,264 @@ export const STAR_CRITERIA = [
 export const STAR_RULE =
   'Sin STAR, la objeción es un problema de calificación, no de cierre. Si intentas cerrar a un lead sin calificar, la objeción que recibas no será la real: será el síntoma de que preguntaste tarde.';
 
-// ---- Módulo 6: ruta y examen -----------------------------------------------
+// ---- Módulo 6: descubrimiento ----------------------------------------------
+
+// Los nueve pasos del descubrimiento, en orden. Son una secuencia de preguntas,
+// no un guion para recitar: cada paso existe para que el siguiente tenga sentido.
+export type DiscoveryStep = {
+  step: number;
+  name: string;
+  description: string;
+  technique: string;
+  example: string;
+};
+
+export const DISCOVERY_STEPS: DiscoveryStep[] = [
+  {
+    step: 1,
+    name: 'Situación',
+    description: 'Entender dónde está la clienta hoy, con sus palabras.',
+    technique: 'Pregunta abierta sobre su contexto actual; nada de supuestos.',
+    example: '«¿Cómo está tu negocio ahora mismo?»',
+  },
+  {
+    step: 2,
+    name: 'Deseo',
+    description: 'Descubrir qué quiere lograr, en su medida y su plazo.',
+    technique: 'Pregunta por la meta ideal, sin sugerirla tú.',
+    example: '«¿A dónde quieres llegar en los próximos doce meses?»',
+  },
+  {
+    step: 3,
+    name: 'Obstáculo',
+    description: 'Identificar qué le impide llegar, no qué te conviene que diga.',
+    technique: 'Preguntar directamente por la barrera.',
+    example: '«¿Qué crees que te impide llegar ahí hoy?»',
+  },
+  {
+    step: 4,
+    name: 'Razón',
+    description: 'Entender por qué eso importa: el motivo real, no el de la web.',
+    technique: 'Profundizar en la motivación emocional sin forzarla.',
+    example: '«¿Por qué es importante para ti lograr eso?»',
+  },
+  {
+    step: 5,
+    name: 'Detalle',
+    description: 'Hacer que la clienta articule el dolor con un caso concreto.',
+    technique: 'Pedir un ejemplo: lo específico se puede trabajar, lo genérico no.',
+    example: '«¿Puedes darme un ejemplo concreto de cuándo te pasó?»',
+  },
+  {
+    step: 6,
+    name: 'Resumen',
+    description: 'Devolver lo escuchado con tus palabras, sin adornarlo.',
+    technique: 'Repetir meta, obstáculo y consecuencia en una frase.',
+    example: '«Déjame ver si lo entiendo: quieres X, pero Y te lo impide, y si no lo resuelves, Z sigue igual.»',
+  },
+  {
+    step: 7,
+    name: 'Etiqueta',
+    description: 'Nombrar lo que siente, sin psicoanalizar ni consolar.',
+    technique: 'Etiquetar la emoción con una frase corta y comprobarla.',
+    example: '«Suena como que te sientes frustrada con tu situación actual.»',
+  },
+  {
+    step: 8,
+    name: 'Confirmación',
+    description: 'Confirmar que el resumen es correcto antes de avanzar.',
+    technique: 'Preguntar si falta algo; dejar que corrija.',
+    example: '«¿Es eso correcto? ¿Me dejo algo?»',
+  },
+  {
+    step: 9,
+    name: 'Repetición',
+    description: 'Si aparece una capa nueva de dolor, volver a empezar con ella.',
+    technique: 'No dar por cerrado el descubrimiento por haber hecho las preguntas.',
+    example: '«¿Hay algo más que no has mencionado todavía?»',
+  },
+];
+
+// Banco de preguntas: un ejemplo por paso, con cuatro opciones. Se corrige por
+// clave, igual que el examen, sin modelo de lenguaje.
+export type TrainingQuizItem = { id: string; prompt: string; answer: string; options: string[] };
+
+export const DISCOVERY_QUIZ: TrainingQuizItem[] = [
+  {
+    id: 'situacion',
+    prompt: '«¿Cómo está tu negocio ahora mismo?»   ¿Qué paso es?',
+    answer: '1',
+    options: ['1', '2', '3', '4'],
+  },
+  {
+    id: 'obstaculo',
+    prompt: '«¿Qué crees que te impide llegar ahí hoy?»   ¿Qué paso es?',
+    answer: '3',
+    options: ['2', '3', '4', '5'],
+  },
+  {
+    id: 'resumen',
+    prompt: '«Déjame ver si lo entiendo: quieres X, pero Y te lo impide, y si no lo resuelves, Z sigue igual.»   ¿Qué paso es?',
+    answer: '6',
+    options: ['4', '5', '6', '7'],
+  },
+  {
+    id: 'etiqueta',
+    prompt: '«Suena como que te sientes frustrada con tu situación.»   ¿Qué paso es?',
+    answer: '7',
+    options: ['5', '6', '7', '8'],
+  },
+  {
+    id: 'repeticion',
+    prompt: 'Ya resumiste y ella lo confirmó, pero aparece una capa nueva de dolor. ¿Qué toca?',
+    answer: '9',
+    options: ['8', '9', '6', '1'],
+  },
+];
+
+// ---- Módulo 7: los diez cierres exactos -----------------------------------
+
+// Cierres con nombre propio. Los ejemplos llevan [importe] y [plazo] en lugar de
+// cifras: se dice el precio real de la oferta, nunca uno inventado por la app.
+export type ExactClose = {
+  id: string;
+  name: string;
+  gloss: string;
+  when: string;
+  formula: string;
+  example: string;
+  concept: string;
+};
+
+export const EXACT_CLOSES: ExactClose[] = [
+  {
+    id: 'decadere',
+    name: 'Decadere',
+    gloss: 'decidir es cortar opciones',
+    when: 'Cuando la clienta ya superó las tres capas de objeciones y todo está claro.',
+    formula: 'Presentar el precio como algo ya decidido, nunca como una pregunta.',
+    example: '«El programa son [importe]. El proceso de inscripción te lo envío ahora mismo.»',
+    concept: 'El precio se afirma; no se pide permiso. La certeza de quien vende se transfiere a quien compra.',
+  },
+  {
+    id: 'closer-or-further',
+    name: 'Closer or Further',
+    gloss: '¿nos acerca o nos aleja?',
+    when: 'Cuando la conversación da vueltas y evita la decisión.',
+    formula: 'Preguntar si lo hablado acerca o aleja de decidir.',
+    example: '«¿Esta conversación nos acerca a que empieces hoy, o nos aleja?»',
+    concept: 'Obliga a reconocer si se avanza o se escapa, sin acusar a nadie.',
+  },
+  {
+    id: 'six-inches',
+    name: 'Six Inches From Gold',
+    gloss: 'a un paso del oro',
+    when: 'Cuando duda justo en el último momento.',
+    formula: 'Recordar que está más cerca de lo que cree.',
+    example: '«Estás a un paso de lo que querías. Lo único que falta es decidirlo.»',
+    concept: 'La distancia percibida frena más que la distancia real.',
+  },
+  {
+    id: 'support-not-permission',
+    name: 'Support, Not Permission',
+    gloss: 'apoyo, no permiso',
+    when: 'Cuando invoca a la pareja, a un socio o a su equipo.',
+    formula: 'Reencuadrar «necesito permiso» como «necesito apoyo».',
+    example: '«No necesitas permiso de tu pareja: necesitas su apoyo. Y para tenerlo, primero necesitas estar segura tú.»',
+    concept: 'Cambiar el marco devuelve la decisión a quien la está tomando.',
+  },
+  {
+    id: 'good-its-a-lot',
+    name: "It's Good That It's a Lot",
+    gloss: 'que sea mucho es buena señal',
+    when: 'Cuando dice «es mucho dinero».',
+    formula: 'Reencuadrar el precio alto como prueba de valor.',
+    example: '«Es bueno que sea mucho: si costara una décima parte, no te daría este resultado. El precio refleja el valor.»',
+    concept: 'El precio alto es una característica del servicio, no un defecto que haya que disculpar.',
+  },
+  {
+    id: 'some-now-more-later',
+    name: 'Some Now or More Later',
+    gloss: 'empezar hoy o pagar más tarde',
+    when: 'Cuando no puede pagar todo de golpe.',
+    formula: 'Ofrecer empezar con una parte ahora y el resto después.',
+    example: '«Puedes empezar ahora con el primer módulo y sumar el resto el próximo mes, o pagar todo ahora y ahorrar. ¿Cuál prefieres?»',
+    concept: 'Dos caminos que llevan a empezar; ninguno lleva a desaparecer.',
+  },
+  {
+    id: 'dont-burn-twice',
+    name: "Don't Let It Burn You Twice",
+    gloss: 'no te quemes dos veces',
+    when: 'Cuando ya lo intentó antes y le fue mal.',
+    formula: 'Usar el dolor de la experiencia pasada como razón para no repetirla.',
+    example: '«Ya te quemaste una vez sin acompañamiento. No dejes que te queme dos veces: esta vez vas a tener soporte real.»',
+    concept: 'El dolor pasado no se ignora ni se dramatiza: se usa para decidir distinto.',
+  },
+  {
+    id: '1-10-close',
+    name: '1-10 Close',
+    gloss: 'del 1 al 10',
+    when: 'Para medir el interés real antes de seguir invirtiendo tiempo.',
+    formula: 'Pedir una nota del 1 al 10 y trabajar el número.',
+    example: '«Del 1 al 10, ¿dónde estás ahora mismo con esto? Si estás por debajo de 7, te digo que no es para ti.»',
+    concept: 'El número revela la objeción escondida: un 5 es una duda, un 8 es una decisión.',
+  },
+  {
+    id: 'nervousness-close',
+    name: 'Nervousness Close',
+    gloss: 'los nervios son señal de importancia',
+    when: 'Cuando confiesa nervios o miedo a decidir.',
+    formula: 'Normalizar los nervios como señal de que la decisión importa.',
+    example: '«Es normal estar nerviosa: significa que esto te importa de verdad. Lo que no importa no da nervios.»',
+    concept: 'Los nervios no piden parar; piden acompañamiento.',
+  },
+  {
+    id: 'mechanic-close',
+    name: 'Mechanic / Surgeon Secretary Close',
+    gloss: 'enseñar el mecanismo',
+    when: 'Cuando la clienta es analítica y necesita entender el sistema antes de pagar.',
+    formula: 'Explicar el mecanismo exacto, paso por paso.',
+    example: '«Te explico el mecanismo exacto: [plazo] hacemos X, después Y, y medimos Z. Es un sistema, no improvisación.»',
+    concept: 'Quien compra con datos no compra promesas: compra un mecanismo que puede seguir.',
+  },
+];
+
+// Cuatro situaciones reales de llamada y cuatro cierres posibles. Se corrige por
+// clave: cada situación admite un cierre del método, no una respuesta «bonita».
+export const CLOSE_QUIZ: TrainingQuizItem[] = [
+  {
+    id: 'decidida',
+    prompt: 'La clienta ya pasó las tres capas de objeciones y todo está claro. ¿Qué cierre pide la situación?',
+    answer: 'decadere',
+    options: ['decadere', 'six-inches', '1-10-close', 'nervousness-close'],
+  },
+  {
+    id: 'pareja',
+    prompt: 'Dice que necesita hablarlo con su pareja antes de decidir. ¿Qué cierre pide la situación?',
+    answer: 'support-not-permission',
+    options: ['support-not-permission', 'good-its-a-lot', 'closer-or-further', 'mechanic-close'],
+  },
+  {
+    id: 'divaga',
+    prompt: 'Lleva veinte minutos dando vueltas y no pide el siguiente paso. ¿Qué cierre pide la situación?',
+    answer: 'closer-or-further',
+    options: ['closer-or-further', 'dont-burn-twice', 'some-now-more-later', 'six-inches'],
+  },
+  {
+    id: 'nervios',
+    prompt: 'Se le nota el miedo a equivocarse justo antes de decidir. ¿Qué cierre pide la situación?',
+    answer: 'nervousness-close',
+    options: ['nervousness-close', 'good-its-a-lot', 'decadere', '1-10-close'],
+  },
+  {
+    id: 'analitica',
+    prompt: 'Quiere entender el sistema exacto antes de pagar y no compra promesas. ¿Qué cierre pide la situación?',
+    answer: 'mechanic-close',
+    options: ['mechanic-close', 'support-not-permission', 'some-now-more-later', 'dont-burn-twice'],
+  },
+];
+
+// ---- Módulo 8: ruta y examen -----------------------------------------------
 
 export const CERTIFICATION_WEEKS = [
   {

@@ -1,4 +1,7 @@
+import type { NextRequest } from 'next/server';
 import { scenarioById } from '../../../components/practiceScenarios';
+import { authenticateStudent } from '../../../lib/studentAuth';
+import { recordActivity } from '../../../lib/studentActivity';
 import { buildPersonaPrompt, debriefInstructions, debriefSchema } from './prompts';
 import { cleanDebrief } from './debrief';
 import { analyzeSignals } from './signals';
@@ -80,7 +83,7 @@ async function askGroq(payload: unknown): Promise<GroqResult> {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin');
   const host = request.headers.get('host') ?? '';
   if (origin && origin !== `https://${host}` && origin !== `http://${host}`) {
@@ -117,6 +120,23 @@ export async function POST(request: Request) {
     if (!result.ok) return failure(result.error);
     const debrief = cleanDebrief(result.content, turns, scenario);
     if (!debrief) return Response.json({ detail: 'El proveedor devolvió un feedback que no se puede verificar. No se muestra nada inventado.' }, { status: 502 });
+    // Si hay sesión de alumna, la práctica terminada cuenta para su panel y el de
+    // la coordinadora. Sin sesión, la sala sigue abierta pero no se atribuye a nadie.
+    const auth = await authenticateStudent(request).catch(() => null);
+    if (auth?.ok) {
+      // Se guarda la nota de cada eje (sin notas cualitativas ni citas) para que
+      // el panel de progreso pueda mostrar competencias y evolución. Sin texto.
+      await recordActivity(auth.student.id, 'practice', {
+        ref: scenario.id,
+        score: debrief.score,
+        detail: {
+          turns: studentTurns,
+          axes: debrief.axes.length,
+          kind: scenario.kind,
+          scores: Object.fromEntries(debrief.axes.map(axis => [axis.id, axis.score])),
+        },
+      }).catch(() => undefined);
+    }
     // Las señales son deterministas y no dependen del modelo: se calculan aquí y
     // viajan con el feedback (también al historial local).
     return Response.json({ debrief: { ...debrief, signals: analyzeSignals(turns, scenario.kind) } });

@@ -357,7 +357,7 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .practice-history-score[data-band="bajo"]{color:var(--warning)}
 @media(max-width:900px){.practice-score{grid-template-columns:1fr;gap:18px}.practice-score-total{flex-direction:row;align-items:baseline;gap:6px;border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px}.practice-score-total b{font-size:48px}.practice-score-total small{margin:0 0 0 auto}.practice-score-head{flex-direction:column;gap:4px}.practice-score-head small{text-align:left}}
 
-/* Formación comercial: seis módulos de método sobre el mismo papel que la sala de
+/* Formación comercial: ocho módulos de método sobre el mismo papel que la sala de
    práctica. Lo que se corrige se dice cómo se corrige; nada se presenta como nota. */
 .training{display:grid;gap:26px}
 .training-head{display:flex;align-items:center;justify-content:space-between;gap:24px}
@@ -522,3 +522,104 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:1100px){.training-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:980px){.training-examples{grid-template-columns:1fr}.training-star{grid-template-columns:1fr}.training-figures{grid-template-columns:1fr 1fr}.training-grid-3{grid-template-columns:1fr}.training-head h1{font-size:36px}}
 @media(max-width:700px){.training-grid{grid-template-columns:1fr}.training-head{flex-direction:column;align-items:flex-start}.training-icon{display:none}.training-card{padding:20px}.training-composer{flex-direction:column;align-items:stretch}.training-composer button{width:100%}.training-moral{flex-wrap:wrap}.training-moral-count{border-left:0;padding-left:0;text-align:left}.training-step{font-size:10.5px}.training-actions button{flex:1}}
+
+.progress-modules{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.progress-modules li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--secondary)}
+.progress-modules li>span{width:14px;text-align:center}
+.progress-modules li em{margin-left:auto;font-style:normal;font-size:10px;color:var(--secondary)}
+.progress-modules li[data-done="true"]{color:var(--ink)}
+.progress-modules li[data-done="true"]>span,.progress-modules li[data-done="true"] em{color:var(--sage)}
+
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions button{font-size:11px;white-space:nowrap}
+
+/* Seguimiento de alumnas: quién tiene acceso, quién entra y quién practica.
+   El panel de la alumna y el de la coordinadora comparten barras: la nota va
+   escrita y el color solo la acompaña (salvia ≥70, terracota 40-69, ámbar <40). */
+.filter-chips{display:flex;flex-wrap:wrap;gap:6px}
+.filter-chips button{min-height:34px;padding:5px 12px;border-radius:999px;font-size:11px;font-weight:550;background:var(--sheet);color:var(--secondary)}
+.filter-chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.progress-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 4px}
+.progress-toolbar small{font-size:10.5px;max-width:44ch;line-height:1.6}
+.progress-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}
+.progress-card{background:var(--sheet);border:1px solid var(--line);border-radius:var(--radius);padding:20px;min-width:0}
+.progress-card .card-head{margin-bottom:10px}
+.progress-card h3{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.progress-card .card-head svg{color:var(--accent)}
+.progress-axes{list-style:none;display:grid;gap:14px;margin:14px 0 0;padding:0}
+.progress-axis-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12.5px;font-weight:550}
+.progress-axis-top b{font-family:'Libre Caslon Display',Georgia,serif;font-size:19px;font-weight:400;font-variant-numeric:tabular-nums;color:var(--ink)}
+.progress-axis-top b small{font-family:'DM Sans',Arial,sans-serif;font-size:9px;color:var(--secondary);font-weight:400}
+.progress-axis-top b[data-band="alto"]{color:var(--sage)}
+.progress-axis-top b[data-band="medio"]{color:var(--accent)}
+.progress-axis-top b[data-band="bajo"]{color:var(--warning)}
+.progress-bar{height:6px;border-radius:99px;background:var(--inset);overflow:hidden;margin:6px 0}
+.progress-bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.progress-bar i[data-band="alto"]{background:var(--sage)}
+.progress-bar i[data-band="bajo"]{background:var(--warning)}
+.progress-axes small{font-size:10px;color:var(--secondary)}
+.progress-weeks{list-style:none;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin:16px 0 0;padding:0;align-items:end}
+.progress-week{display:grid;gap:4px;justify-items:center;text-align:center;font-size:10px;color:var(--secondary);min-width:0}
+.progress-week-bar{width:100%;height:84px;background:var(--inset);border-radius:6px;display:flex;align-items:flex-end;overflow:hidden}
+.progress-week-bar i{display:block;width:100%;border-radius:6px;background:var(--accent);min-height:2px}
+.progress-week-bar i[data-band="alto"]{background:var(--sage)}
+.progress-week-bar i[data-band="bajo"]{background:var(--warning)}
+.progress-week b{font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
+.progress-week span{font-size:9.5px;white-space:nowrap}
+.progress-week small{font-size:9px}
+.progress-radar{margin:14px 0 4px;display:grid;gap:4px;justify-items:center}
+.progress-radar svg{width:100%;max-width:300px;height:auto;overflow:visible}
+.progress-radar-ring{fill:none;stroke:var(--line);stroke-width:1}
+.progress-radar-area{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round}
+.progress-radar-dot{fill:var(--accent)}
+.progress-radar-label{font-family:'DM Sans',Arial,sans-serif;font-size:9.5px;fill:var(--secondary)}
+.progress-radar-value{font-family:'DM Sans',Arial,sans-serif;font-size:9px;font-weight:600;fill:var(--ink);font-variant-numeric:tabular-nums}
+.progress-radar figcaption{text-align:center;max-width:320px}
+.team-strip{margin-top:-4px}
+.progress-goal{display:grid;gap:8px;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:var(--inset);margin:14px 0}
+.progress-goal-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--secondary)}
+.progress-goal-top strong{font-family:'Libre Caslon Display',Georgia,serif;font-size:20px;font-weight:400;color:var(--ink);font-variant-numeric:tabular-nums}
+.progress-goal-bar{height:6px;border-radius:99px;background:var(--sheet);overflow:hidden;border:1px solid var(--line)}
+.progress-goal-bar i{display:block;height:100%;background:var(--sage);border-radius:99px}
+.progress-next{display:grid;gap:4px;padding:16px 18px;border-left:2px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;margin:0 0 8px}
+.progress-next p{font-size:13.5px;line-height:1.6}
+.progress-focus{display:grid;gap:6px;padding:20px;background:var(--accent-soft);border-radius:12px;margin-bottom:8px}
+.progress-focus p{font-size:14px;line-height:1.65}
+.progress-achievements{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 8px;padding:0}
+.progress-achievements li{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:3px;background:var(--sheet);color:var(--secondary)}
+.progress-achievements li>span{font-size:11px;color:var(--secondary)}
+.progress-achievements strong{font-size:12.5px;color:var(--ink);font-weight:600}
+.progress-achievements small{font-size:10.5px;line-height:1.5}
+.progress-achievements li[data-done="true"]{border-color:var(--sage);background:var(--sage-soft);color:var(--sage)}
+.progress-achievements li[data-done="true"]>span,.progress-achievements li[data-done="true"] strong{color:var(--sage)}
+.status[data-band="alto"]{background:var(--sage-soft);color:var(--sage)}
+.status[data-band="medio"]{background:var(--accent-soft);color:var(--accent)}
+.status[data-band="bajo"]{background:var(--warning-soft);color:var(--warning)}
+.roster-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.roster-search{flex-direction:column;gap:6px;font-size:11px;min-width:200px;flex:1 1 200px;max-width:300px}
+.roster-search-input{position:relative;display:flex;align-items:center}
+.roster-search-input svg{position:absolute;left:12px;color:var(--secondary)}
+.roster-search-input input{padding-left:34px;min-height:40px}
+.roster-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.roster-actions>button{min-height:40px}
+@media(max-width:900px){.progress-columns{grid-template-columns:1fr}}
+@media(max-width:700px){.progress-toolbar{flex-direction:column;align-items:flex-start}.progress-toolbar small{max-width:none}.progress-weeks{grid-auto-columns:minmax(44px,1fr)}.roster-search{max-width:none}.roster-actions{width:100%;justify-content:space-between}}
+
+/* La lista de alumnas cabe en escritorio sin perder acciones y se convierte en
+   tarjetas en móvil: cada dato conserva su etiqueta, no se oculta ninguno. */
+.progress-card .card-head{flex-wrap:wrap;gap:6px 12px}
+.progress-card .card-head h3{white-space:nowrap}
+.progress-table{min-width:480px}
+@media(max-width:760px){
+  .roster-wrap{border:0;background:transparent;overflow:visible}
+  .roster-table{min-width:0;border-collapse:separate;border-spacing:0}
+  .roster-table thead{display:none}
+  .roster-table,.roster-table tbody,.roster-table tr,.roster-table td{display:block;width:100%}
+  .roster-table tr{border:1px solid var(--line);border-radius:10px;background:var(--sheet);padding:14px 16px;margin-bottom:12px}
+  .roster-table td{border:0;padding:4px 0;display:flex;justify-content:space-between;align-items:baseline;gap:14px}
+  .roster-table td::before{content:attr(data-label);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--secondary);font-weight:650;flex-shrink:0}
+  .roster-table td.primary-cell{padding-bottom:8px}
+  .roster-table td.primary-cell::before,.roster-table td[data-label="Acciones"]::before{display:none}
+  .roster-table td[data-label="Acciones"]{padding-top:10px;border-top:1px solid var(--line)}
+  .roster-table .row-actions{justify-content:flex-start}
+}

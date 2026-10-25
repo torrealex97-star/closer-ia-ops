@@ -9,7 +9,7 @@ export const STUDENT_ACCESS = 'wdc_student_at';
 export const STUDENT_REFRESH = 'wdc_student_rt';
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 7;
 
-export type Student = { user_id: string; email: string };
+export type Student = { id: string; user_id: string; email: string };
 export type StudentAuth = { ok: true; student: Student; setCookies: string[] } | { ok: false; status: 401 | 403 | 503; detail: string };
 
 const secure = () => (process.env.NODE_ENV === 'production' ? '; Secure' : '');
@@ -27,7 +27,7 @@ async function authorize(user: { id: string; email: string }): Promise<Student |
   const row = await studentByEmail(user.email);
   if (!row || row.status === 'paused') return { status: 403, detail: 'Tu cuenta no tiene acceso al portal de alumnas.' };
   await linkStudent(row, user.id).catch(() => undefined);
-  return { user_id: user.id, email: user.email };
+  return { id: row.id, user_id: user.id, email: user.email };
 }
 
 // Interruptor del dueño: con STUDENT_LOGIN_REQUIRED=true la vista de oportunidades (`/` y su búsqueda) exige sesión de alumna.

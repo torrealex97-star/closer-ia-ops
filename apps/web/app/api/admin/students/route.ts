@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, publicBaseUrl, withCookies } from '../../../../lib/adminAuth';
-import { inviteStudent, listStudents, removeStudent, setStudentStatus } from '../../../../lib/students';
+import { inviteStudent, removeStudent, setStudentStatus } from '../../../../lib/students';
+import { activityWindow, orgProgress } from '../../../../lib/studentActivity';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,8 +19,23 @@ const reply = (auth: { setCookies: string[] }, body: unknown, status = 200) => w
 export async function GET(request: NextRequest) {
   const { auth, error } = await gate(request, false);
   if (error) return error;
-  const students = await listStudents();
-  return students ? reply(auth!, { students }) : Response.json({ detail: 'No se pudo leer la lista de alumnas.' }, { status: 503 });
+  // Lista + actividad de la ventana pedida (7, 30 o 90 días; 30 por defecto):
+  // entradas, práctica con sus ejes, formación y examen. Una alumna sin señales
+  // llega con `lastSeen: null`: el panel lo pinta como «sin actividad», nunca
+  // como un cero.
+  const data = await orgProgress(activityWindow(request.nextUrl.searchParams.get('days')));
+  if (!data) return Response.json({ detail: 'No se pudo leer la lista de alumnas.' }, { status: 503 });
+  return reply(auth!, {
+    students: data.progress.map(row => row.student),
+    activity: data.progress,
+    totals: data.totals,
+    // Lectura de equipo: media ponderada, criterio más débil y evolución semanal.
+    team: data.team,
+    window_days: data.windowDays,
+    // Si la actividad no se pudo leer, el panel lo dice en vez de pintar ceros.
+    activity_available: data.activityAvailable,
+    truncated: data.truncated,
+  });
 }
 export async function POST(request: NextRequest) {
   const { auth, error } = await gate(request, true);

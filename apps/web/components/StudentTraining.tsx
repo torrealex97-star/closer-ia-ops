@@ -1,23 +1,31 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type FormEvent } from 'react';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Award, Brain, Calculator, Check, CheckCircle2,
   CircleAlert, Clock3, Flag, GraduationCap, Heart, MessageSquare, RotateCcw, ShieldAlert,
   Sparkles, Target, TrendingUp, X, Zap,
 } from 'lucide-react';
 import {
-  BELIEF_LADDER, CERTIFICATION_WEEKS, FINAL_EXAM, FREEZING, IDENTITY_FRAMES, LOGICA,
-  PRE_CALL_STEPS, SHOW_RATE_RULES, STAR_CRITERIA, STAR_RULE, TRAINING_MODULES,
-  YELLOW_LEADS, YELLOW_RULE,
+  BELIEF_LADDER, CERTIFICATION_WEEKS, CLOSE_QUIZ, DISCOVERY_QUIZ, DISCOVERY_STEPS, EXACT_CLOSES,
+  FINAL_EXAM, FREEZING, IDENTITY_FRAMES, LOGICA, PRE_CALL_STEPS, SHOW_RATE_RULES,
+  STAR_CRITERIA, STAR_RULE, TRAINING_MODULES, YELLOW_LEADS, YELLOW_RULE,
 } from './trainingContent';
-import type { TrainingId } from './trainingContent';
+import type { TrainingId, TrainingQuizItem } from './trainingContent';
 import {
   EXAM_PASS, YELLOW_BLOCK, freezingFalls, gradeExam, moralFor, reviewCloseLine,
-  reviewFreezing, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
+  reviewCloseQuiz, reviewDiscoveryQuiz, reviewFreezing, reviewLogica, reviewPreCall,
+  reviewYellows, yellowMistakes,
 } from './trainingCheck';
 import type { Review } from './trainingCheck';
 
+// Progreso en la cuenta: solo se guarda si hay sesión de alumna; sin sesión el
+// ejercicio funciona igual y la petición se ignora. Nunca envía el texto escrito.
+async function reportActivity(kind: 'training_review' | 'training_exam', ref: string, body: Record<string, unknown>) {
+  try {
+    await fetch('/api/student/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, ref, ...body }) });
+  } catch { /* sin red o sin sesión: no interrumpe el ejercicio */ }
+}
 const PRECALL_KEY = 'wdc_training_precall';
 const EXAM_KEY = 'wdc_training_exam';
 type ExamStored = { score: number; total: number; passed: boolean; at: number };
@@ -88,6 +96,7 @@ function PreCall() {
   function check() {
     const result = reviewPreCall(step.id, draft);
     setReviews(current => current.map((item, i) => i === index ? result : item));
+    void reportActivity('training_review', 'precall', { detail: { met: result.met, total: result.total } });
   }
   const review = reviews[index];
   const done = reviews.filter(complete).length;
@@ -164,7 +173,7 @@ function Logica() {
         {field('meses', 'Meses de ahorro para igualar un mes de brecha', 'Brecha ÷ ahorro')}
       </div>
       <div className="training-actions">
-        <button type="button" className="primary" onClick={() => setReview(reviewLogica(inputs))} disabled={!inputs.brecha.trim() && !inputs.coste.trim() && !inputs.meses.trim()}><Check size={15} />Comprobar el cálculo</button>
+        <button type="button" className="primary" onClick={() => { const result = reviewLogica(inputs); setReview(result); void reportActivity('training_review', 'logica', { detail: { met: result.met, total: result.total } }); }} disabled={!inputs.brecha.trim() && !inputs.coste.trim() && !inputs.meses.trim()}><Check size={15} />Comprobar el cálculo</button>
       </div>
       {review && <Outcome review={review} title="Cálculo" note="Si las tres cuentas están bien, ya tienes la frase. El resto es no estropearla hablando." />}
       {all && <div className="training-script">
@@ -199,6 +208,12 @@ function Freezing() {
   const falls = freezingFalls(answers);
   const moral = moralFor(falls);
   const review = useMemo(() => reviewFreezing(answers), [answers]);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!done || reported.current) return;
+    reported.current = true;
+    void reportActivity('training_review', 'freezing', { detail: { met: review.met, total: review.total } });
+  }, [done, review.met, review.total]);
 
   function reset() {
     setMessages([{ role: 'them', text: FREEZING.attacks[0] }]);
@@ -269,6 +284,12 @@ function Yellows() {
   const mistakes = yellowMistakes(answers);
   const blocked = mistakes >= YELLOW_BLOCK;
   const review = reviewYellows(answers);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!done || reported.current) return;
+    reported.current = true;
+    void reportActivity('training_review', 'yellows', { detail: { met: review.met, total: review.total } });
+  }, [done, review.met, review.total]);
 
   function pick(id: string) {
     const next = YELLOW_LEADS.find(item => item.id === id) ?? YELLOW_LEADS[0];
@@ -350,7 +371,7 @@ function Star() {
       <p>{STAR_RULE}</p>
     </div>
     <div className="training-actions">
-      <button type="button" className={all ? 'primary' : ''} onClick={() => setTried(true)}>{all ? <><CheckCircle2 size={15} />Lead calificado: puedes cerrar</> : <>Intentar cerrar con este lead</>}</button>
+      <button type="button" className={all ? 'primary' : ''} onClick={() => { setTried(true); void reportActivity('training_review', 'star', { detail: { met: STAR_CRITERIA.filter(item => checked[item.letter]).length, total: STAR_CRITERIA.length } }); }}>{all ? <><CheckCircle2 size={15} />Lead calificado: puedes cerrar</> : <>Intentar cerrar con este lead</>}</button>
     </div>
     {tried && all && <p className="training-emphasis">Los cuatro criterios están verificados. Ahora el cierre es una decisión, no una sorpresa.</p>}
     {tried && !all && <div className="training-warning" role="status"><AlertTriangle size={16} /><div><strong>Intento de cierre sin calificar</strong><p>La objeción que recibas no será la real: será el síntoma de que preguntaste tarde. Vuelve a la conversación y verifica lo que falta.</p></div></div>}
@@ -373,6 +394,7 @@ function Certification() {
     const saved: ExamStored = { score: graded.score, total: graded.total, passed: graded.passed, at: Date.now() };
     setStored(saved);
     try { window.localStorage.setItem(EXAM_KEY, JSON.stringify(saved)); } catch { /* sin almacenamiento */ }
+    void reportActivity('training_exam', 'final', { score: graded.score, detail: { correct: graded.correct, total: graded.total } });
   }
   function retry() { setAnswers({}); setResult(null); setCheckedOpen(false); }
   const openQuestions = FINAL_EXAM.filter(question => question.type === 'open');
@@ -449,16 +471,116 @@ function Certification() {
   </div>;
 }
 
+// ---- Módulos 6 y 7: descubrimiento y cierres ------------------------------
+
+// Banco de preguntas con clave para los dos módulos de repertorio: se responde,
+// se corrige con reglas y se guarda solo el número de aciertos.
+function QuizBlock({ items, answers, setAnswers, review, onReview, labelFor }: {
+  items: TrainingQuizItem[];
+  answers: Record<string, string>;
+  setAnswers: (update: (current: Record<string, string>) => Record<string, string>) => void;
+  review: Review | null;
+  onReview: () => void;
+  labelFor: (option: string) => string;
+}) {
+  const complete = items.every(item => Boolean(answers[item.id]));
+  return <>
+    <ol className="training-exam">{items.map((item, i) => <li key={item.id} className="training-question">
+      <p><span>{i + 1}</span>{item.prompt}</p>
+      <fieldset className="training-options"><legend className="sr-only">{item.prompt}</legend>
+        {item.options.map(option => <label key={option} data-selected={answers[item.id] === option}>
+          <input type="radio" name={`${item.id}-answer`} value={option} checked={answers[item.id] === option} onChange={() => setAnswers(current => ({ ...current, [item.id]: option }))} />
+          {labelFor(option)}
+        </label>)}
+      </fieldset>
+    </li>)}</ol>
+    <div className="training-actions"><button type="button" className="primary" onClick={onReview} disabled={!complete}><Flag size={15} />Revisar mis respuestas</button></div>
+    <p className="training-note">Hacen falta todas las respuestas para revisar. Se corrige por clave, sin IA y sin guardar el texto.</p>
+    {review && <Outcome review={review} title="Revisión por criterios" note="Cada respuesta se compara con el método: un fallo señala el punto que toca repasar, no una nota." />}
+  </>;
+}
+
+function Discovery() {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [review, setReview] = useState<Review | null>(null);
+  function check() {
+    const result = reviewDiscoveryQuiz(answers);
+    setReview(result);
+    void reportActivity('training_review', 'descubrimiento', { detail: { met: result.met, total: result.total } });
+  }
+  return <div className="training-module">
+    <div className="training-intro">
+      <MessageSquare size={18} />
+      <div><h2>Los nueve pasos de descubrimiento</h2><p>La secuencia para llegar al dolor real antes de hablar de la solución. No es un guion: cada paso prepara el siguiente.</p></div>
+    </div>
+    <ol className="training-ladder">{DISCOVERY_STEPS.map(step => <li key={step.step}>
+      <strong>{step.step}. {step.name}</strong>
+      <em>{step.technique}</em>
+      <blockquote>{step.example}</blockquote>
+      <p>{step.description}</p>
+    </li>)}</ol>
+    <div className="training-rules">
+      <h3><AlertTriangle size={15} />La regla del descubrimiento</h3>
+      <p>Si no puedes repetir con tus palabras lo que le duele, todavía no has descubierto nada. El resumen y la confirmación son el paso que casi todo el mundo se salta.</p>
+    </div>
+    <div className="training-card">
+      <h3>Reconoce el paso</h3>
+      <p>Cinco frases del método: elige a qué paso pertenece cada una.</p>
+      <QuizBlock items={DISCOVERY_QUIZ} answers={answers} setAnswers={setAnswers} review={review} onReview={check} labelFor={option => {
+        const step = DISCOVERY_STEPS.find(item => String(item.step) === option);
+        return step ? `${step.step}. ${step.name}` : option;
+      }} />
+    </div>
+  </div>;
+}
+
+function Closes() {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [review, setReview] = useState<Review | null>(null);
+  function check() {
+    const result = reviewCloseQuiz(answers);
+    setReview(result);
+    void reportActivity('training_review', 'cierres', { detail: { met: result.met, total: result.total } });
+  }
+  return <div className="training-module">
+    <div className="training-intro">
+      <Award size={18} />
+      <div><h2>Los diez cierres exactos</h2><p>Qué decir cuando la decisión está cerca. Cada cierre tiene su momento; usarlo fuera de sitio suena a presión.</p></div>
+    </div>
+    <ol className="training-ladder">{EXACT_CLOSES.map(close => <li key={close.id}>
+      <strong>{close.name} <em>{close.gloss}</em></strong>
+      <p><b>Cuándo:</b> {close.when}</p>
+      <p><b>Fórmula:</b> {close.formula}</p>
+      <blockquote>{close.example}</blockquote>
+      <p className="training-emphasis">{close.concept}</p>
+    </li>)}</ol>
+    <div className="training-rules">
+      <h3><AlertTriangle size={15} />Antes de usarlos</h3>
+      <p>Los ejemplos llevan [importe] y [plazo] donde irían el precio y el calendario reales: esta app no inventa cifras. Un cierre no arregla una venta mal descubierta; sirve cuando el trabajo previo está hecho.</p>
+    </div>
+    <div className="training-card">
+      <h3>Elige el cierre</h3>
+      <p>Cinco situaciones de llamada. ¿Qué cierre pide cada una?</p>
+      <QuizBlock items={CLOSE_QUIZ} answers={answers} setAnswers={setAnswers} review={review} onReview={check} labelFor={option => {
+        const close = EXACT_CLOSES.find(item => item.id === option);
+        return close ? `${close.name} · ${close.gloss}` : option;
+      }} />
+    </div>
+  </div>;
+}
+
 const BODIES: Record<TrainingId, ComponentType> = {
   precall: PreCall,
   logica: Logica,
+  descubrimiento: Discovery,
   freezing: Freezing,
   yellows: Yellows,
   star: Star,
+  cierres: Closes,
   certificacion: Certification,
 };
 
-// Formación comercial: seis módulos de método y un examen. Todo se corrige en el
+// Formación comercial: ocho módulos de método y un examen. Todo se corrige en el
 // navegador con reglas; nada se envía a un proveedor ni evalúa a la alumna.
 export default function StudentTraining() {
   const [open, setOpen] = useState<TrainingId | null>(null);
@@ -479,7 +601,7 @@ export default function StudentTraining() {
       <div>
         <span className="eyebrow">FORMACIÓN COMERCIAL</span>
         <h1>Aprende el método antes de improvisar.</h1>
-        <p>Seis módulos para practicar las partes de la conversación que se pueden entrenar: antes de la llamada, la brecha, la presión, los leads difíciles, la calificación y el examen final.</p>
+        <p>Ocho módulos para practicar las partes de la conversación que se pueden entrenar: antes de la llamada, la brecha, el descubrimiento, la presión, los leads difíciles, la calificación, el repertorio de cierres y el examen final.</p>
       </div>
       <span className="training-icon"><GraduationCap size={28} strokeWidth={1.4} /></span>
     </div>
@@ -497,7 +619,7 @@ export default function StudentTraining() {
     <div className="training-rules">
       <h3><Sparkles size={15} />Cómo se corrige</h3>
       <p>Los ejercicios comprueban criterios del método sobre lo que escribes: si mencionas el momento, si pides una confirmación, si usas «pero» al validar, si haces la cuenta bien. No hay modelo de lenguaje, no se envía tu texto a ningún sitio y no se guarda en el servidor.</p>
-      <p className="training-note">El progreso del examen se guarda en este navegador. Borrar los datos del sitio lo borra también.</p>
+      <p className="training-note">El progreso del examen se guarda en este navegador. Borrar los datos del sitio lo borra también. Si has entrado con tu cuenta, tu práctica y tu examen aparecen en «Mi progreso», dentro de tu espacio.</p>
     </div>
   </section>;
 }

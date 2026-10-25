@@ -2,7 +2,8 @@
 // criterio es una regla explicable sobre el texto de la alumna. Un criterio no
 // cumple no es «suspenso»: la UI lo presenta como algo que falta, con su motivo.
 
-import { FINAL_EXAM, LOGICA } from './trainingContent';
+import { CLOSE_QUIZ, DISCOVERY_QUIZ, FINAL_EXAM, LOGICA } from './trainingContent';
+import type { TrainingQuizItem } from './trainingContent';
 
 export type Criterion = { id: string; label: string; ok: boolean; detail: string };
 export type Review = { criteria: Criterion[]; met: number; total: number; ratio: number };
@@ -237,6 +238,18 @@ export const yellowMistakes = (answers: string[]) => answers.filter(text => text
 export const YELLOW_BLOCK = 3;
 
 // ---- Examen -----------------------------------------------------------------
+
+// ---- Cierres y descubrimiento ---------------------------------------------
+
+// Banco de preguntas con clave: cada situación admite un único cierre o paso del
+// método. No hay modelo ni texto libre que corregir: se compara con la clave.
+const reviewQuiz = (items: TrainingQuizItem[], answers: Record<string, string>): Review => review(items.map(item => {
+  const ok = answers[item.id] === item.answer;
+  return { id: item.id, label: item.prompt, ok, detail: ok ? 'Correcto.' : 'No es este punto del método: vuelve a la lista y compara.' };
+}));
+
+export const reviewCloseQuiz = (answers: Record<string, string>) => reviewQuiz(CLOSE_QUIZ, answers);
+export const reviewDiscoveryQuiz = (answers: Record<string, string>) => reviewQuiz(DISCOVERY_QUIZ, answers);
 
 export type ExamResult = { correct: number; total: number; score: number; passed: boolean; wrong: string[] };
 

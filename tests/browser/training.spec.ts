@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { FINAL_EXAM, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
+import { CLOSE_QUIZ, DISCOVERY_QUIZ, DISCOVERY_STEPS, EXACT_CLOSES, FINAL_EXAM, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
+
+// Nombre accesible de una opción del banco, escapado para RegExp.
+const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // La vista de alumna carga oportunidades al montar: se neutraliza para aislar formación.
 const emptyCatalog = (route: import('@playwright/test').Route) => route.fulfill({ json: { items: [], total: 0 } });
@@ -8,12 +11,14 @@ const open = async (page: import('@playwright/test').Page, title: string) => {
   await page.locator('.training-grid .training-card').filter({ hasText: title }).getByRole('button', { name: 'Abrir módulo' }).click();
 };
 
-test('la formación ofrece los seis módulos y revisa la secuencia de pre-llamada', async ({ page }) => {
+test('la formación ofrece los ocho módulos y revisa la secuencia de pre-llamada', async ({ page }) => {
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.goto('/');
   await page.getByRole('button', { name: 'Formación' }).click();
   await expect(page.getByRole('heading', { name: 'Aprende el método antes de improvisar.' })).toBeVisible();
-  await expect(page.locator('.training-grid .training-card')).toHaveCount(6);
+  await expect(page.locator('.training-grid .training-card')).toHaveCount(8);
+  await expect(page.locator('.training-grid .training-card').filter({ hasText: 'Los diez cierres exactos' })).toHaveCount(1);
+  await expect(page.locator('.training-grid .training-card').filter({ hasText: 'Los nueve pasos de descubrimiento' })).toHaveCount(1);
   await expect(page.locator('.training-grid .training-card').first()).toContainText('Ejercicio sin nota');
 
   await page.locator('.training-grid .training-card').first().getByRole('button', { name: 'Abrir módulo' }).click();
@@ -31,6 +36,43 @@ test('la formación ofrece los seis módulos y revisa la secuencia de pre-llamad
   await expect(page.locator('.training-outcome')).toHaveAttribute('data-done', 'true');
   await expect(page.locator('.training-outcome-head b')).toHaveText('6/6');
   await expect(page.locator('.training-step').first()).toHaveAttribute('data-done', 'true');
+});
+
+test('los cierres y el descubrimiento traen su contenido y se corrigen por clave', async ({ page }) => {
+  await page.route('**/api/backend/opportunities/search', emptyCatalog);
+  await page.goto('/');
+  await open(page, 'Los diez cierres exactos');
+  await expect(page.getByRole('heading', { name: 'Los diez cierres exactos' })).toBeVisible();
+  await expect(page.locator('.training-ladder > li')).toHaveCount(10);
+  // Los ejemplos no traen precios inventados: el importe va como hueco.
+  await expect(page.locator('.training-ladder').getByText(/\[importe\]/).first()).toBeVisible();
+  // El cierre más largo («Mechanic / Surgeon Secretary Close») tampoco abre scroll.
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const closeQuestions = page.locator('.training-question');
+  await expect(closeQuestions).toHaveCount(CLOSE_QUIZ.length);
+  for (const [index, item] of CLOSE_QUIZ.entries()) {
+    const name = EXACT_CLOSES.find(close => close.id === item.answer)?.name ?? item.answer;
+    await closeQuestions.nth(index).getByRole('radio', { name: new RegExp(escape(name)) }).check();
+  }
+  await page.getByRole('button', { name: 'Revisar mis respuestas' }).click();
+  await expect(page.locator('.training-outcome-head b')).toHaveText('5/5');
+
+  await page.getByRole('button', { name: 'Todos los módulos' }).click();
+  await open(page, 'Los nueve pasos de descubrimiento');
+  await expect(page.getByRole('heading', { name: 'Los nueve pasos de descubrimiento' })).toBeVisible();
+  await expect(page.locator('.training-ladder > li')).toHaveCount(9);
+  const stepQuestions = page.locator('.training-question');
+  await expect(stepQuestions).toHaveCount(DISCOVERY_QUIZ.length);
+  for (const [index, item] of DISCOVERY_QUIZ.entries()) {
+    const step = DISCOVERY_STEPS.find(entry => String(entry.step) === item.answer);
+    await stepQuestions.nth(index).getByRole('radio', { name: new RegExp(`${item.answer}\\. ${escape(step?.name ?? '')}`) }).check();
+  }
+  await page.getByRole('button', { name: 'Revisar mis respuestas' }).click();
+  await expect(page.locator('.training-outcome-head b')).toHaveText('5/5');
+  // Móvil: los diez cierres y sus ejemplos no deben abrir scroll horizontal.
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('venta lógica comprueba las tres cuentas y la frase no pide aprobación', async ({ page }) => {

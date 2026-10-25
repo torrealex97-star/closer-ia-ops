@@ -1,10 +1,13 @@
 // Corrección determinista de la formación: node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/training.mjs
 import assert from 'node:assert/strict';
 import {
-  freezingFalls, gradeExam, moralFor, parseAmount, reviewCloseLine, reviewFreezing,
-  reviewFreezingReply, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
+  freezingFalls, gradeExam, moralFor, parseAmount, reviewCloseLine, reviewCloseQuiz,
+  reviewDiscoveryQuiz, reviewFreezing, reviewFreezingReply, reviewLogica, reviewPreCall,
+  reviewYellows, yellowMistakes,
 } from '../../apps/web/components/trainingCheck';
-import { FINAL_EXAM, LOGICA, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
+import {
+  CLOSE_QUIZ, DISCOVERY_QUIZ, DISCOVERY_STEPS, EXACT_CLOSES, FINAL_EXAM, LOGICA, PRE_CALL_STEPS,
+} from '../../apps/web/components/trainingContent';
 
 // Formato español: el punto es de miles y la coma decimal.
 assert.equal(parseAmount('3.200'), 3200);
@@ -74,6 +77,45 @@ assert.match(noQuestion.criteria.find(item => item.id === 'pregunta').detail, /1
 assert.equal(reviewYellows([`${'palabra '.repeat(60)}¿qué tal?`]).criteria.find(item => item.id === 'monologo').ok, false);
 assert.equal(yellowMistakes(['Te cuento.', '¿Y eso?', 'Vale.']), 2);
 
+// Cierres: diez, con nombre único y todos sus campos. Los ejemplos no inventan
+// precios: el importe y el plazo van como huecos a rellenar con los reales.
+assert.equal(EXACT_CLOSES.length, 10, 'la biblioteca tiene los diez cierres');
+assert.equal(new Set(EXACT_CLOSES.map(close => close.id)).size, 10, 'sin ids repetidos');
+for (const close of EXACT_CLOSES) {
+  for (const field of ['name', 'gloss', 'when', 'formula', 'example', 'concept']) {
+    assert.ok(close[field].trim().length > (field === 'gloss' ? 3 : 5), `${close.id}: «${field}» no puede quedar vacío`);
+  }
+  assert.ok(!/\d[\d.,]*\s*€/.test(close.example), `${close.id}: el ejemplo no debe inventar un precio`);
+}
+// El banco de situaciones: cinco, con la clave entre las opciones y sin repetir.
+assert.equal(CLOSE_QUIZ.length, 5);
+for (const item of CLOSE_QUIZ) {
+  assert.ok(EXACT_CLOSES.some(close => close.id === item.answer), `${item.id}: la clave tiene que ser un cierre real`);
+  assert.ok(item.options.includes(item.answer), `${item.id}: la respuesta correcta debe estar entre las opciones`);
+  assert.equal(item.options.length, 4);
+}
+assert.equal(reviewCloseQuiz(Object.fromEntries(CLOSE_QUIZ.map(item => [item.id, item.answer]))).met, 5);
+const wrongClose = Object.fromEntries(CLOSE_QUIZ.map(item => [item.id, item.answer]));
+wrongClose[CLOSE_QUIZ[0].id] = CLOSE_QUIZ[0].options.find(option => option !== CLOSE_QUIZ[0].answer);
+assert.equal(reviewCloseQuiz(wrongClose).met, 4);
+assert.equal(reviewCloseQuiz(wrongClose).criteria.find(item => item.id === CLOSE_QUIZ[0].id).ok, false);
+assert.match(reviewCloseQuiz(wrongClose).criteria.find(item => item.id === CLOSE_QUIZ[0].id).detail, /vuelve a la lista/);
+
+// Descubrimiento: los nueve pasos en orden, con técnica y ejemplo, y su banco.
+assert.deepEqual(DISCOVERY_STEPS.map(step => step.step), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+for (const step of DISCOVERY_STEPS) {
+  for (const field of ['name', 'description', 'technique', 'example']) {
+    assert.ok(step[field].trim().length > (field === 'name' ? 3 : 5), `${step.step}: «${field}» no puede quedar vacío`);
+  }
+}
+assert.equal(DISCOVERY_QUIZ.length, 5);
+for (const item of DISCOVERY_QUIZ) {
+  assert.ok(DISCOVERY_STEPS.some(step => String(step.step) === item.answer), `${item.id}: la clave debe ser un paso existente`);
+  assert.ok(item.options.includes(item.answer), `${item.id}: la respuesta correcta debe estar entre las opciones`);
+}
+assert.equal(reviewDiscoveryQuiz(Object.fromEntries(DISCOVERY_QUIZ.map(item => [item.id, item.answer]))).met, 5);
+assert.equal(reviewDiscoveryQuiz({}).ratio, 0, 'sin respuestas no hay aciertos inventados');
+
 // Examen: 85 % con seis respuestas únicas exige acertarlas todas.
 const multiple = FINAL_EXAM.filter(question => question.type === 'multiple');
 assert.equal(multiple.length, 6);
@@ -87,4 +129,4 @@ assert.deepEqual(graded.wrong, [multiple[0].id]);
 assert.equal(gradeExam({}).passed, false);
 assert.equal(gradeExam({}).score, 0);
 
-console.log('PASS  formación: formato de cifras, criterios de los seis ejercicios, moral y examen 85 %');
+console.log('PASS  formación: cifras, criterios de los siete ejercicios, diez cierres, nueve pasos, moral y examen 85 %');

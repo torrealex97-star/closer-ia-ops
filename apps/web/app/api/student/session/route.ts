@@ -3,6 +3,7 @@ import { originBlocked, withCookies } from '../../../../lib/adminAuth';
 import { authenticateStudent, clearStudentCookies, STUDENT_ACCESS, studentCookies, studentSessionAvailable } from '../../../../lib/studentAuth';
 import { normalizeEmail, passwordLogin, signOut } from '../../../../lib/supabaseAuth';
 import { linkStudent, studentByEmail } from '../../../../lib/students';
+import { recordActivity, touchSession } from '../../../../lib/studentActivity';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,6 +12,8 @@ const noStore = { 'Cache-Control': 'no-store' };
 export async function GET(request: NextRequest) {
   if (!studentSessionAvailable()) return Response.json({ configured: false, authenticated: false }, { headers: noStore });
   const auth = await authenticateStudent(request);
+  // «Está dentro» para el panel: una entrada cada 10 minutos como máximo.
+  if (auth.ok) await touchSession(auth.student.id).catch(() => undefined);
   return withCookies(Response.json(auth.ok ? { configured: true, authenticated: true, email: auth.student.email } : { configured: true, authenticated: false }, { headers: noStore }), auth.ok ? auth.setCookies : []);
 }
 
@@ -27,6 +30,7 @@ export async function POST(request: NextRequest) {
   const row = await studentByEmail(session.user.email);
   if (!row || row.status === 'paused') return Response.json({ detail: 'Tu cuenta no tiene acceso al portal de alumnas.' }, { status: 403 });
   await linkStudent(row, session.user.id).catch(() => undefined);
+  await recordActivity(row.id, 'session').catch(() => undefined);
   return withCookies(Response.json({ authenticated: true, email: session.user.email }), studentCookies(session.tokens));
 }
 
