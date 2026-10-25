@@ -6,11 +6,13 @@ import { TRAINING_MODULES } from './trainingContent';
 import { scenarioById } from './practiceScenarios';
 import type { Progress } from '../lib/studentActivity';
 import type { AppFunnel, Mastery, XpResult } from '../lib/studentMetrics';
+import type { DirectReview, Goal, IdleNudge } from '../lib/studentRetention';
 
 // Progreso de la alumna (adaptado del panel «Mis métricas» de closer-ai-coach): solo datos reales de su actividad.
 // Un periodo sin datos es «—», nunca 0; una carga fallida no se pinta como vacío; cada gráfico trae su tabla.
 type Metrics = { xp: XpResult; mastery: Mastery[]; applications: AppFunnel | null };
-type State = { kind: 'loading' } | { kind: 'login' } | { kind: 'error'; message: string } | { kind: 'ready'; progress: Progress; metrics: Metrics | null };
+type Retention = { nudge: IdleNudge; review: DirectReview; goals: Goal[] };
+type State = { kind: 'loading' } | { kind: 'login' } | { kind: 'error'; message: string } | { kind: 'ready'; progress: Progress; metrics: Metrics | null; retention: Retention | null };
 const PERIODS = [7, 30, 90] as const;
 const REVIEW_LABELS: Record<string, string> = Object.fromEntries(TRAINING_MODULES.map(m => [m.id, m.title]));
 const KIND_LABELS: Record<string, string> = { session: 'Entrada', training_review: 'Formación', training_exam: 'Examen de egreso', practice: 'Sala de práctica' };
@@ -44,11 +46,11 @@ export default function StudentProgress() {
   const load = useCallback((period: number) => {
     const mine = ++seq.current; setState({ kind: 'loading' });
     fetch(`/api/student/progress?days=${period}`, { cache: 'no-store' }).then(async response => {
-      const data = await response.json().catch(() => ({})) as { progress?: Progress; metrics?: Metrics; detail?: string };
+      const data = await response.json().catch(() => ({})) as { progress?: Progress; metrics?: Metrics; retention?: Retention; detail?: string };
       if (mine !== seq.current) return; // respuesta vieja de otro periodo
       if (response.status === 401 || response.status === 503 && data.detail?.includes('no está configurado')) setState({ kind: 'login' });
       else if (!response.ok || !data.progress) setState({ kind: 'error', message: data.detail ?? 'No se pudo cargar tu progreso.' });
-      else setState({ kind: 'ready', progress: data.progress, metrics: data.metrics ?? null });
+      else setState({ kind: 'ready', progress: data.progress, metrics: data.metrics ?? null, retention: data.retention ?? null });
     }).catch(() => { if (mine === seq.current) setState({ kind: 'error', message: 'No se pudo conectar. Revisa tu conexión.' }); });
   }, []);
   useEffect(() => { load(days); }, [days, load]);
@@ -59,11 +61,22 @@ export default function StudentProgress() {
     {state.kind === 'loading' && <p className="card-meta" role="status"><LoaderCircle size={14} className="spin" /> Cargando tu progreso…</p>}
     {state.kind === 'login' && <div className="empty"><h3>Entra con tu cuenta para guardar tu progreso.</h3><p>Puedes practicar y estudiar igualmente, pero solo queda registrado si has iniciado sesión.</p><a className="primary" href="/alumna">Iniciar sesión</a></div>}
     {state.kind === 'error' && <div className="alert error" role="alert"><span>{state.message}</span><button onClick={() => load(days)}><RotateCw size={14} /> Reintentar</button></div>}
-    {state.kind === 'ready' && <Ready progress={state.progress} metrics={state.metrics} />}
+    {state.kind === 'ready' && <Ready progress={state.progress} metrics={state.metrics} retention={state.retention} />}
   </section>;
 }
 
-function Ready({ progress: p, metrics }: { progress: Progress; metrics: Metrics | null }) {
+// Objetivos de la semana (lunes a domingo, Madrid) y avisos amables. Un dato que no se pudo leer es «—», no 0.
+function ThisWeek({ retention: r }: { retention: Retention }) {
+  const idle = r.nudge.level !== 'none' && r.nudge.idleDays !== null;
+  return <article className="progress-card" data-testid="this-week"><h2>Esta semana</h2>
+    {idle && <p className="card-meta" role="status">{r.nudge.streakAtRisk ? `Tu racha de ${r.nudge.streakAtRisk} ${r.nudge.streakAtRisk === 1 ? 'día' : 'días'} está en juego: ` : ''}llevas {r.nudge.idleDays} días sin practicar. Con 5 minutos en la sala vuelves a la rutina.</p>}
+    {r.review.eligible && <p className="card-meta" role="status"><strong>Tus tres últimas prácticas han quedado por debajo de 60.</strong> Es normal al principio: pide a tu coordinadora que te revise una práctica directamente.</p>}
+    <ul className="plain-list">{r.goals.map(g => <li key={g.id}><span className={g.done ? 'status ok' : 'status'}>{g.done ? 'Hecho' : 'Pendiente'}</span> {g.label} · <strong>{g.current === null ? '—' : `${Math.min(g.current, g.target)}/${g.target}`}</strong>
+      {g.current !== null && <div className="meter" role="progressbar" aria-label={g.label} aria-valuemin={0} aria-valuemax={g.target} aria-valuenow={Math.min(g.current, g.target)}><span style={{ width: `${Math.min(100, Math.round((g.current / g.target) * 100))}%` }} /></div>}</li>)}</ul>
+    <p className="card-meta">Los objetivos son una guía para coger ritmo, no una evaluación.</p></article>;
+}
+
+function Ready({ progress: p, metrics, retention }: { progress: Progress; metrics: Metrics | null; retention: Retention | null }) {
   const empty = !p.lifetime.practice.count && !p.lifetime.training.modules.length && !p.lifetime.training.examBest;
   return <>
     {p.truncated && <p className="card-meta" role="status">Tienes tanta actividad que solo se han leído los últimos 5.000 movimientos: los totales pueden quedarse cortos.</p>}
@@ -77,6 +90,7 @@ function Ready({ progress: p, metrics }: { progress: Progress; metrics: Metrics 
     {metrics && <Level xp={metrics.xp} />}
     {empty && <div className="empty"><h3>Aún no hay actividad.</h3><p>Haz tu primera práctica en la sala o repasa un módulo de Formación y aquí verás tu evolución.</p></div>}
     <div className="progress-grid">
+      {retention && <ThisWeek retention={retention} />}
       <article className="progress-card"><h2>Evolución semanal</h2><p className="card-meta">Nota media de tus prácticas por semana (de lunes a domingo, hora de Madrid). Una semana sin prácticas se queda en «—».</p>
         <WeeklyBars weekly={p.weekly} />
         <details><summary>Ver como tabla</summary><div className="table-wrap"><table className="data-table"><thead><tr><th scope="col">Semana del</th><th scope="col" className="num">Prácticas</th><th scope="col" className="num">Nota media</th></tr></thead><tbody>{p.weekly.map(w => <tr key={w.week}><th scope="row">{weekLabel(w.week)}</th><td className="num">{w.count}</td><td className="num">{dash(w.avg)}</td></tr>)}</tbody></table></div></details></article>
