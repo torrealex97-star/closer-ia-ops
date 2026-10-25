@@ -111,7 +111,7 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:900px){.card-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.auth-card{padding:28px 20px}.admin-toolbar label{flex-basis:100%}.sidebar .local-user{display:flex;padding:12px 0 0;border-top:0}.sidebar .local-user button{width:auto;margin-top:0}}
 .data-table .primary-cell strong .source-tag{display:inline-block;margin:0 0 0 8px;font-size:10px;font-weight:600}
-.data-table tbody th[scope=row]{text-transform:none;letter-spacing:0;font-size:inherit;font-weight:400;color:var(--ink);text-align:left}
+.data-table tbody th[scope=row]{text-transform:none;letter-spacing:0;font-size:inherit;font-weight:400;color:var(--ink);text-align:left;white-space:normal;min-width:0}
 @media(max-width:760px){.sidebar nav{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin-top:12px;padding-bottom:4px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}.sidebar nav .nav{width:auto;flex:0 0 auto;white-space:nowrap}.sidebar .local-user{display:flex;padding:10px 0 0;margin-top:8px;font-size:11px}}
 .legal{max-width:720px;margin:0 auto;padding:40px 20px 72px;line-height:1.65}.legal h1{font-size:34px;margin:6px 0 16px}.legal h2{font-size:16px;font-weight:650;margin:28px 0 8px}.legal p,.legal li{font-size:14px;color:var(--ink)}.legal ul{padding-left:20px;display:grid;gap:6px;margin:8px 0}.legal-draft{background:var(--warning-soft);color:var(--warning);border-radius:8px;padding:14px 16px;margin:0 0 8px}.legal-meta{margin-top:32px;font-size:12px;color:var(--secondary)}
 /* El puesto que anuncia la empresa es el titular de la tarjeta; la familia de rol
@@ -536,3 +536,4 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 @media(max-width:560px){.funnel-row{grid-template-columns:1fr auto}.funnel-row .meter{grid-column:1 / -1;order:3}}
 .level-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--sheet);padding:16px 20px;margin:0 0 20px;display:grid;gap:8px;font-size:13px}.level-card .meter{margin:0}.level-card details{font-size:12px}.level-card summary{cursor:pointer;color:var(--accent)}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0 0}.kv div{background:var(--inset);border-radius:8px;padding:10px 12px}.kv dt{font-size:11px;color:var(--secondary)}.kv dd{margin:2px 0 0;font-weight:650;font-variant-numeric:tabular-nums}
+.coordinator-fold>summary{cursor:pointer;font-weight:650;font-size:15px;margin:4px 0 8px}.coordinator-fold:not([open])>summary{margin-bottom:20px}

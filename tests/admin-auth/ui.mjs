@@ -202,7 +202,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await Promise.all([page.waitForResponse(r => r.url().includes('/api/admin/students?days=7') && r.ok()), page.getByRole('button', { name: 'Últimos 7 días' }).click()]);
   const board = page.getByTestId('coordinator'); await board.waitFor();
   assert.match(await board.innerText(), /Han practicado\s*\d+ · \d+ %/); assert.ok(await board.getByRole('img', { name: /Actividad de las alumnas en 7 días/ }).isVisible());
-  await board.getByText('Ver como tabla').first().click(); assert.equal(await board.locator('details').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
+  await board.getByText('Ver como tabla').first().click(); assert.equal(await board.getByTestId('alt-table').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
   assert.match(await board.innerText(), /Hace falta que al menos 5 alumnas/, 'con una sola alumna no hay distribución de notas');
   assert.match(await board.getByTestId('retention').innerText(), /Elige 30 o 90 días/, 'con 7 días no se mide la retención');
   assert.match(await board.innerText(), /Respuesta de las empresas[\s\S]*Tasa de respuesta\s*100 %/); await board.getByTestId('refer').waitFor();
