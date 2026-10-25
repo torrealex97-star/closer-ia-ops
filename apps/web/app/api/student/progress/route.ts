@@ -4,6 +4,7 @@ import { authenticateStudent } from '../../../../lib/studentAuth';
 import { studentByEmail } from '../../../../lib/students';
 import { listApplications } from '../../../../lib/applications';
 import { periodDays, readActivity, summarize } from '../../../../lib/studentActivity';
+import { directReview, idleNudge, sentThisWeek, weeklyGoals } from '../../../../lib/studentRetention';
 import { applicationFunnel, masteryByScenario, xpAndLevel } from '../../../../lib/studentMetrics';
 
 export const dynamic = 'force-dynamic';
@@ -26,5 +27,6 @@ export async function GET(request: NextRequest) {
   return reply({
     progress: summarize(read.rows, days, new Date(), read.truncated),
     metrics: { xp: xpAndLevel(read.rows, statuses), mastery: masteryByScenario(read.rows), applications: statuses ? applicationFunnel(statuses) : null },
+    retention: { nudge: idleNudge(read.rows), review: directReview(read.rows), goals: weeklyGoals(read.rows, apps ? sentThisWeek(apps) : null) },
   });
 }

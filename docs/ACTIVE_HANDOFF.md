@@ -1,65 +1,64 @@
 # Relevo activo
 
 > **Lee esto primero** al retomar el trabajo, junto con `AGENTS.md`, `docs/STATUS.md` y el último commit de `main`.
-> Documento corto a propósito (≤ ~150 líneas). Histórico → `docs/handoff/archive/`. Trabajos vivos → `docs/handoff/claims/` (`npm run handoff`). Reglas → `docs/handoff/README.md`.
-> Última actualización: 2026-10-24 (tarde).
+> Documento corto a propósito (≤ ~150 líneas). Histórico → `docs/handoff/archive/`. Trabajos vivos → `docs/handoff/claims/` (`npm run handoff`). Reglas → `docs/handoff/README.md`. Diseño y estado pieza a pieza de los módulos IA Winner → [docs/plans/IA_WINNER_MODULOS.md](plans/IA_WINNER_MODULOS.md).
+> Última actualización: 2026-10-25.
+
+Leyenda: ✅ hecho y probado · 🟡 parcial · ⬜ pendiente (construible) · ⛔ bloqueado por el dueño o por una decisión. **Lo pendiente o bloqueado NO está hecho.**
 
 ## 1. Tablero (trabajos vivos)
 
-Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude, Codex u otros): todos siguen este protocolo (ficha propia, `touches` sin solapes, una rama en curso cada uno). Hoy solo hay fichas de `claude-cloud`; los demás agentes aún no han registrado ninguna. Carriles por defecto propuestos (confirmar con el dueño): *captación/ingesta*, *alumnas/matching/candidaturas*, *infra/CI/BD*.
+Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude, Codex u otros): ficha propia, `touches` sin solapes, un trabajo en curso cada uno. Carriles propuestos (confirmar con el dueño): *captación/ingesta*, *alumnas/matching/candidaturas*, *infra/CI/BD*. claude-cloud = alumnas, formación, progreso, seguridad de ofertas y paneles.
 
-| Rama | PR | Estado |
-| --- | --- | --- |
-| _(ninguno: no hay trabajos vivos)_ | — | — |
-
-Todo lo anterior (PRs #1-#27 y los commits directos de las sesiones 76-89) está fusionado en `main`. Al fusionar una PR, su ficha de `docs/handoff/claims/` se borra en la PR siguiente.
+Al escribir esto, abiertas: **#39** reglas de retención (cálculo y panel) y **#40** clave de Resend en Panel → APIs. Al fusionar una PR, su ficha se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
-- **Fusionado hoy** (PRs #1-#18, con CI de GitHub en verde antes de cada fusión): revisor IA shadow, métricas, ingesta robusta, niveles de fuentes + leads B2B + grants, presupuesto de tiempo del cron, login de alumnas + perfil + RLS, recomendaciones, candidaturas asistidas, interruptor `STUDENT_LOGIN_REQUIRED`, informe de acuerdo IA/humano, baseline de esquema, ADR-013 (voz), contraste `--muted`, skills y relevo entre agentes. Detalle: `docs/handoff/archive/2026-10.md`.
-- **Sesiones 76-89 (otra rama, ya en `main`, 2026-10-24):** formación (6 módulos + examen determinista), Google Jobs con 7 búsquedas, agrupación de republicaciones, modo degradado si el motor cae, gazetteer de 8.132 municipios (también en el worker, desplegado), cualificación automática (reglas; tope 100/día; mercado por moneda; migración `apply_url/company_url/contact/market_basis/auto_review` aplicada), respaldo SerpApi para portales sin API oficial (tope 4 búsquedas/día, ≈0,275 USD/día en el peor caso). Detalle: `docs/STATUS.md` sesiones 76-89.
-- **Sesiones 90-94 (claude-cloud, PRs #29-#33, ya en `main`):** actividad y progreso de alumnas reconstruidos (API, panel «Mi progreso», columnas en el panel); Formación con «Los diez cierres» y «Los nueve pasos de descubrimiento» (7 módulos en el progreso); la sala de práctica registra nota y ejes; chequeo `tests/orphan-refs.mjs` (rutas y ficheros de prueba que no existen) dentro de `run.sh`; panel de coordinación en «Alumnas». **Migraciones:** `student_activity` **ya está aplicada** en Supabase (comprobado leyendo la base el 25-oct: columnas, comprobaciones, RLS sin políticas y sin acceso de `anon`/`authenticated`; su prueba de comportamiento **no se ha podido ejecutar** porque Supabase pidió una confirmación sin respuesta). `20261025_application_outcomes.sql` (estados de respuesta de la candidatura) **sigue sin aplicar**: orden dada por el dueño (25-oct), pendiente de ejecutar con su prueba y los avisos de seguridad.
-- **Carriles** (para no duplicar trabajo entre agentes): claude-cloud = alumnas, formación, progreso y paneles; captación/ingesta (Apify, Google Jobs, SerpApi) e infra/CI/BD quedan para otros agentes: cada uno sube su ficha antes de tocar código.
-- **Pendiente de esa rama:** confirmar que el respaldo SerpApi (sesión 89) está desplegado; InfoJobs/Adzuna/Jooble sin clave (~767 anuncios fuera); Apify `aakash19/jobspy` devuelve 0 ítems (hay que mirar su dataset con la clave del panel); el motor repite tarjetas («Conquista Tu Maternidad» ×9); paso «Progreso» de `ui.mjs` inestable.
-- **Migraciones aplicadas y versionadas** (`supabase/migrations/`): `revoke_public_grants_b2b_weekly`, `student_auth_foundation`. `student_application_profile` (3.2). Las 9 tablas previas siguen sin migraciones originales: hay un snapshot de referencia en `supabase/schema/` (hace falta `supabase db pull` para lo definitivo).
-- **Evidencia (inspeccionado / probado / verificado):**
-  - *Verificado en GitHub:* el workflow `Quality` (jobs `verify` y `web-admin`) pasa en verde en las PRs #5-#10.
-  - *Verificado en BD real:* RLS de alumnas (`tests/db/student_rls.sql`, 12/12 con rollback) y grants.
-  - *Probado (servicios simulados):* panel, ingesta, revisor, alumnas, matching, presupuesto del cron.
-  - *No probado en real:* Apify, Groq, InfoJobs/Adzuna/Jooble, Jev, correos y login contra Supabase Auth, el cron en Vercel.
+- **Hecho en sesiones 76-101** (detalle en `docs/STATUS.md`): formación (7 módulos + examen determinista, cierres y descubrimiento), progreso de alumnas (actividad, XP y niveles derivados, maestría, embudo de candidaturas con resultado), panel de coordinación, cualificación automática por reglas (tope 100/día), Google Jobs + SerpApi, términos y privacidad en borrador, **detector de ofertas peligrosas** (reglas; una oferta con señales nunca se aprueba sola).
+- **Migraciones aplicadas en Supabase real**: `student_auth_foundation`, `student_application_profile`, `student_activity`, `auto_qualify_offers` y **`application_outcomes`** (aplicada y verificada el 2026-10-25: el `CHECK` de estado ya admite `responded/interview/offer/rejected`). Los asesores de seguridad solo avisan de lo esperado (tablas solo para la clave de servicio, sin políticas) y de la protección de contraseñas filtradas (tarea 1).
+- **Escritas y NO aplicadas**: `20261026_integration_resend.sql` (ampliar el `CHECK` de proveedores; en #40). Hasta aplicarla, guardar la clave de Resend falla con un mensaje claro.
+- **Evidencia**: *verificado en GitHub* (`verify` y `web-admin` en verde antes de cada fusión) · *verificado en BD real* (RLS de alumnas, estructura de `student_activity`, `CHECK` de candidaturas) · *probado con servicios simulados* (panel, ingesta, revisor, alumnas, matching, retención, detector) · *no probado en real*: Apify, Groq, InfoJobs/Adzuna/Jooble, Jev, Resend, correo y login contra Supabase Auth, cron en Vercel, WhatsApp.
 
 ## 3. Tareas del dueño (lo que solo tú puedes hacer)
 
-1. **Supabase → Authentication:** URL Configuration → permitir `https://app.womendigitalclosers.com/alumna/reset`; activar *Leaked password protection*; SMTP propio.
-2. **Incremento 0.1 (Apify):** Panel → Apify, `max_items=10`; pasar ofertas, coste real, campos del actor y errores. Opcional: comparar con `harvestapi/linkedin-job-search`.
-3. **Pegar el tarball `closer-offers-engine`** y ejecutar `supabase db pull`.
-4. **Vercel:** `INGEST_TOKEN` (y en GitHub secrets); claves InfoJobs/Adzuna/Jooble en Panel → APIs; **redeploy tras cambiar variables**; pasar a **Pro** antes de abrir a alumnas. Primera semana: mirar `truncated`/`spent_ms` del cron en los logs.
-5. **Revisor IA:** 5-7 días en shadow comparando con tus decisiones; el paso a `live` es tuyo.
-6. **Legal:** el agente redactó un borrador (`/privacidad` + textos de consentimiento `v2-borrador` + `docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md`). Te toca: rellenar en Vercel `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_TAX_ID`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL` (+ redeploy) y pasarlo a un profesional (RGPD/LOPDGDD) con la lista de puntos abiertos.
-7. **Activar el login para las alumnas** (decisión tuya): ya existe el interruptor `STUDENT_LOGIN_REQUIRED=true` en Vercel (+ redeploy); apagado = `/` abierta. Antes: invitar a las alumnas y probar el correo real.
-8. **Revisor IA → live:** confirmar o ajustar la puerta propuesta (≥ 30 pares comparados y ≤ 5 % de falsas aprobaciones; informe en Fuentes externas).
-9. **Voz (futuro):** antes de construir roleplays/entrevistas, acuerdo de tratamiento o retención cero con el proveedor (o modelos autoalojados) y texto legal del consentimiento de audio (ADR-013).
+1. **Supabase → Authentication**: permitir `https://app.womendigitalclosers.com/alumna/reset`; activar *Leaked password protection*; SMTP propio. **Aplicar `20261026_integration_resend.sql`** (o dar la orden) para poder guardar la clave de Resend.
+2. **Muestra de ofertas reales** (o permiso para tomarla del inventario) para calibrar el detector de ofertas peligrosas: hoy sus reglas están sin calibrar.
+3. **Resend**: comprobar en su documentación si ofrece recepción de correo con webhook y su precio; verificar el dominio; pegar la clave en Panel → APIs. Sin esto no se construye el correo entrante.
+4. **Acreditación**: URL y token de tu app de certificados; mentoras que etiqueten un conjunto de calibración (llamadas buenas/malas); revisión legal de llamarlo «certificado oficial».
+5. **Voz y datos**: acuerdo de tratamiento / retención cero con **Groq** (hoy el texto de la sala de práctica ya va a Groq) y con el proveedor de voz que elijas; WhatsApp Business si quieres avisos por ahí.
+6. **Legal**: `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_TAX_ID`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL` en Vercel (+ redeploy) y pasar `/privacidad` y `/terminos` (borradores) a un profesional (puntos en `docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md`).
+7. **Decisiones de producto**: pesos de XP y nombres de niveles (los míos difieren de tu propuesta, un solo sitio: `studentMetrics.ts`); ranking público entre alumnas (consentimiento; puede desmotivar); cuándo se da una alumna por «contratada» (siempre con confirmación humana).
+8. **Pruebas reales pendientes**: Apify (Panel → Apify, `max_items=10`, pasar ofertas y coste); claves InfoJobs/Adzuna/Jooble en Panel → APIs; redeploy tras cambiar variables; **Vercel Pro** antes de abrir a alumnas; `INGEST_TOKEN`.
+9. **Activaciones (tuyas, nunca mías)**: `STUDENT_LOGIN_REQUIRED=true`; revisor IA a `live` tras 5-7 días en shadow (puerta propuesta: ≥ 30 pares y ≤ 5 % de falsas aprobaciones); cualquier envío automático (WhatsApp/correo) y la fase 4 de candidaturas (ADR-012, autorización escrita).
+10. Pegar el tarball `closer-offers-engine` y ejecutar `supabase db pull` (las 9 tablas previas no tienen migraciones originales).
 
 ## 4. Decisiones ya tomadas
 
 - Los vídeos NO se guardan: cada alumna guarda el suyo en su Drive y solo se guarda el enlace.
-- 3.2 candidaturas: **asistidas** ahora (ella revisa y envía); el diseño deja preparada la automatización futura (ver ADR-012) sin activarla.
-- Skills de marketing importadas (para cuando haga falta).
-- Candidaturas: formulario base con consentimiento de autorrelleno futuro aparte (ADR-012).
-- Futuro: roleplays de ventas por voz y simulaciones de entrevista con personalidades de IA; solo licencias MIT/Apache/BSD; base y privacidad en ADR-013 (nada implementado).
-- **Fusión de PRs: autorización PERMANENTE** (dueño, 2026-10-18): los agentes fusionan sus PRs con CI verde, sin conflictos y con merge commit. Siguen exigiendo orden expresa: DDL/secretos reales, activar login de alumnas o revisor IA en `live`, automatización de candidaturas, gasto de pago nuevo (ver `AGENTS.md`).
-- **Spike de voz autorizado** (dueño, 2026-10-18), acotado: sin audio real ni datos de alumnas (ADR-013).
+- Candidaturas **asistidas** (ella revisa y envía); automatizar exige autorización escrita (ADR-012). **No se usa Camoufox** (anti-detección) ni operadores humanos de envío.
+- Correo: proveedor **Resend** (decisión del dueño), solo diseño en ADR-014 hasta verificar sus capacidades.
+- Métricas de alumnas derivadas, sin tabla que inflar (ADR-014). «+2.000 €/mes en 90 días» **no** se muestra como garantía.
+- **Fusión de PRs: autorización PERMANENTE** (2026-10-18): los agentes fusionan sus PRs con `verify` y `web-admin` en verde, sin conflictos y con merge commit. Siguen exigiendo orden expresa: DDL/secretos reales, login de alumnas o revisor IA en `live`, automatización de candidaturas, gasto de pago nuevo (ver `AGENTS.md`).
+- Spike de voz autorizado (2026-10-18), acotado: sin audio real ni datos de alumnas (ADR-013).
 
-## 5. Siguiente acción exacta
+## 5. Próximas fases (sin hacer; orden sugerido)
 
-1. Candidatos para el siguiente incremento (agente): menú del panel en móvil y lista de Fuentes paginada en móvil; métricas sin ceros falsos (coste Apify ilegible, decisiones fuera de ventana); guarda SSRF con IP fijada contra DNS rebinding; spike acotado de voz (Pipecat) cuando el dueño lo autorice.
-2. Con datos reales: calibrar matching y revisar el revisor IA con el informe de acuerdo.
-3. Fase 4 (automatización) NO empieza sin autorización escrita: ver ADR-012.
+| # | Fase | Estado | Qué falta / quién |
+| --- | --- | --- | --- |
+| 1 | Banderas de riesgo visibles en la revisión de ofertas | ⬜ | Mostrar nivel y códigos de `offerRisk.ts` en `ExternalTab`. Agente. |
+| 2 | **Voz** (orden del dueño): consentimiento de audio + interruptor `VOICE_ROLEPLAY` apagado, catálogo (5 nichos × 2-3 ofertas ficticias, 4 arquetipos de cliente, 4 entrevistadores), rúbrica de 5 criterios con citas literales, bucle manos libres en el navegador, ADR-015 (WebRTC < 500 ms, Pipecat) y su sección en `/privacidad` y `/terminos` | ⬜ | Agente (migración de consentimiento escrita, aplicarla es tuya). Audio real con alumnas: ⛔ hasta tarea 5. |
+| 3 | Revisión directa de mentora como petición guardada (botón) | ⬜ | Tabla nueva (migración). Hoy es solo un aviso. |
+| 4 | Detector: CIF, dominio < 30 días, LinkedIn; calibración con ofertas reales | ⛔ | Tarea 2; consultas externas. |
+| 5 | Graduación con mentora humana + conjunto de calibración + webhook de certificados | ⛔ | Tareas 4. Webhook apagado hasta tener URL/token. |
+| 6 | Correo entrante (Resend) + clasificación propuesta por IA + «CONTRATADA» con 1 clic humano + atribución por cohorte | ⛔ | Tarea 3 y consentimiento; la IA solo propone. |
+| 7 | Etiquetado de nicho/comisión/ticket y filtros; detector de ofertas ya publicadas | ⬜ | Agente. |
+| 8 | Perfil de alumna compartible con consentimiento (para empresas) | ⬜/⛔ | Consentimiento y revisión legal. |
+| 9 | Créditos de IA por alumna y práctica entre compañeras | ⛔ | Login de alumnas activo; moderación y consentimiento. |
+| 10 | Avisos reales por WhatsApp/correo (los cálculos ya existen en #39) | ⛔ | Tarea 9 (orden expresa) + cuenta. |
+| 11 | Auto-apply con Playwright/Camoufox y operadores | ⛔ | **No se construye** (ADR-012). |
 
-## 7. Módulos IA Winner (voz, entrevistas, adquisición): qué falta
-
-Diseño y estado de cada pieza, en [docs/plans/IA_WINNER_MODULOS.md](plans/IA_WINNER_MODULOS.md) (✅ hecho · 🟡 parcial · ⬜ pendiente · ⛔ bloqueado). **Lo que figura como pendiente o bloqueado NO está hecho**, aunque se hable de ello. Decisiones del dueño (2026-10-25): construir los módulos de voz y sus páginas legales; correo entrante con **Resend**; candidaturas **asistidas** (el auto-apply masivo con Playwright/Camoufox y operadores queda fuera hasta autorización escrita, ADR-012).
+Otros candidatos del agente: guarda SSRF con IP fijada contra DNS rebinding; métricas sin ceros falsos (coste Apify ilegible); el motor repite tarjetas («Conquista Tu Maternidad» ×9); Apify `aakash19/jobspy` devuelve 0 ítems (mirar su dataset con la clave del panel); confirmar el despliegue del respaldo SerpApi.
 
 ## 6. No declarar PASS en
 
-Apify, Groq, Jev, fuentes oficiales, correos y login reales, cron en Vercel, ni el revisor en `live`.
+Apify, Groq, Jev, fuentes oficiales, Resend, correos y login reales, cron en Vercel, WhatsApp, el revisor en `live`, ni la calibración del detector de ofertas.

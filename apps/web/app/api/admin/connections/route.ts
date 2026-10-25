@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest) {
   const secret = typeof body.secret === 'string' ? body.secret.trim() : '';
   if (!isProvider(body.provider)) return Response.json({ detail: 'Proveedor no válido.' }, { status: 422 });
   if (secret.length < 8 || secret.length > 400 || /\s/.test(secret)) return Response.json({ detail: 'La clave no parece válida.' }, { status: 422 });
-  if (!await saveConnection(body.provider, secret, auth!.admin.email)) return Response.json({ detail: 'No se pudo guardar la clave.' }, { status: 503 });
+  if (!await saveConnection(body.provider, secret, auth!.admin.email)) return Response.json({ detail: body.provider === 'resend' ? 'No se pudo guardar la clave de Resend. Si es la primera vez, falta aplicar la migración 20261026_integration_resend.sql (la aplica el propietario).' : 'No se pudo guardar la clave.' }, { status: 503 });
   return reply(auth!, { ok: true, last4: secret.slice(-4) });
 }
 

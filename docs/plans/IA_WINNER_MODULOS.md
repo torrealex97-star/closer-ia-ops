@@ -34,7 +34,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente · ⛔ bloqueado (necesita d
 | Captación diaria multifuente | ✅/🟡 | Google Jobs (7 búsquedas), SerpApi de respaldo, InfoJobs/Adzuna/Jooble (**sin clave**), Apify (**sin resultados reales aún**) |
 | Inventario y purga a 10 días, filtros por país/perfil | ✅ | Ventana de 10 días; tope de 60 al día |
 | Filtros por nicho y por tipo de comisión | ⬜ | Requieren etiquetar nicho/comisión al clasificar |
-| Pipeline de la alumna (borrador → abierta → enviada → respuesta → entrevista → oferta) | ✅/🟡 | Hecho en código (PR #35); los estados de respuesta necesitan aplicar la migración `application_outcomes` |
+| Pipeline de la alumna (borrador → abierta → enviada → respuesta → entrevista → oferta) | ✅ | Hecho (PR #35). La migración `20261025_application_outcomes` está **aplicada y verificada** en Supabase (2026-10-25): los estados de respuesta ya se guardan. Las respuestas las anota la alumna; el correo entrante lo automatizaría (⛔). |
 | «Preparar aplicación» con un clic | ✅ | Borrador determinista y datos para copiar (ADR-012) |
 | Asistente de copy conectado a la oferta | ⛔ | Igual que Módulo 2 (datos de la alumna a un LLM) |
 | **Auto-apply con Playwright/Camoufox y operadores** | ⛔ | **No se construye.** ADR-012 prohíbe automatizar sin autorización escrita y sin cumplir sus condiciones; Camoufox es un navegador anti-detección y saltarse captchas/antibots no se hará; un equipo ejecutando candidaturas por la alumna necesita su consentimiento expreso |
@@ -57,12 +57,12 @@ Leyenda como arriba. Las métricas derivadas ya están definidas en [ADR-014](..
 ## Módulo 5 — Seguridad, acreditación, cohortes y retención (spec del dueño, 2026-10-25)
 | Pieza | Estado | Nota |
 | --- | --- | --- |
-| 1. Detector de ofertas peligrosas (reglas, puntuación 0-100, SAFE/WARNING/BLOCKED) | 🟡 en construcción | Reglas deterministas sobre texto; enganchado a `red_flags`/`judgeOffer`. **No incluye** verificar CIF, dominio <30 días ni LinkedIn (consultas externas): ⬜. |
+| 1. Detector de ofertas peligrosas (reglas, puntuación 0-100, SAFE/WARNING/BLOCKED) | 🟡 hecho (PR #38); falta calibrar | Reglas deterministas sobre texto; enganchado a `red_flags`/`judgeOffer`. **No incluye** verificar CIF, dominio <30 días ni LinkedIn (consultas externas): ⬜. |
 | 2. Graduación con mentora humana y calibración | ⬜ | Diseño en ADR; hace falta un conjunto de calibración etiquetado por tus mentoras. |
 | 2. Webhook de certificados | ⛔ | Apagado hasta tener URL y token de tu app de certificados; un certificado «oficial» necesita revisión legal. |
 | 3. Correo entrante (Resend) y clasificación | ⛔ | Comprobar en la documentación de Resend que ofrece recepción con webhook. La IA solo **propondría** la fase; `CONTRATADA` solo con confirmación humana. |
 | 3. Atribución por cohorte y recalibrar recomendaciones | ⬜ | Necesita contrataciones reales y consentimiento. |
-| 4. Avisos a los 2 y 4 días sin practicar; vía rápida a mentora (<60 en 3 prácticas seguidas); objetivos semanales | 🟡/⬜ | El cálculo y el panel sí; envíos reales (WhatsApp/correo) apagados hasta orden expresa. «Práctica con una compañera» queda fuera. |
+| 4. Avisos a los 2 y 4 días sin practicar; vía rápida a mentora (<60 en 3 prácticas seguidas); objetivos semanales | 🟡 (PR #39) | El cálculo y el panel sí; envíos reales (WhatsApp/correo) apagados hasta orden expresa. «Práctica con una compañera» queda fuera. |
 | 4. Retención cero con el proveedor de voz | ⛔ | Acuerdo tuyo con el proveedor (ADR-013). |
 
 ## Legal (necesario para todo lo anterior)

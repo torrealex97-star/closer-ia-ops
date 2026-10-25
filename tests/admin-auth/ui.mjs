@@ -193,6 +193,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.locator('.stat-strip').waitFor();
   const strip = await alumna.locator('.stat-strip').innerText(); assert.match(strip, /1\s*prácticas/); assert.match(strip, /72\s*nota media/);
   assert.match(await alumna.locator('.student-progress').innerText(), /1 de 7 módulos repasados/);
+  await alumna.getByTestId('this-week').waitFor(); const week = await alumna.getByTestId('this-week').innerText(); assert.match(week, /Completar 3 prácticas en la sala · \d\/3/); assert.match(week, /Enviar 5 candidaturas · \d\/5/); assert.ok(!/sin practicar/.test(week), 'una práctica de hoy no avisa de inactividad');
   await alumna.getByTestId('level').waitFor(); assert.match(await alumna.getByTestId('level').innerText(), /Nivel \d+ · \d+ XP/);
   assert.match(await alumna.locator('.student-progress').innerText(), /Tasa de respuesta\s*100 %/, 'una enviada y respondida = 100 %');
   assert.match(await alumna.locator('.student-progress').innerText(), /Maestría por escenario/);
@@ -204,6 +205,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   assert.match(await board.innerText(), /Han practicado\s*\d+ · \d+ %/); assert.ok(await board.getByRole('img', { name: /Actividad de las alumnas en 7 días/ }).isVisible());
   await board.getByText('Ver como tabla').first().click(); assert.equal(await board.getByTestId('alt-table').first().locator('tbody tr').count(), 5, 'cinco pasos en la tabla alternativa');
   assert.match(await board.innerText(), /Hace falta que al menos 5 alumnas/, 'con una sola alumna no hay distribución de notas');
+  await board.getByTestId('followup').waitFor(); assert.match(await board.getByTestId('followup').innerText(), /Pendientes de acompañar|por acompañar/, 'la tarjeta de acompañamiento existe');
   assert.match(await board.getByTestId('retention').innerText(), /Elige 30 o 90 días/, 'con 7 días no se mide la retención');
   assert.match(await board.innerText(), /Respuesta de las empresas[\s\S]*Tasa de respuesta\s*100 %/); await board.getByTestId('refer').waitFor();
   if (process.env.SHOT3) await board.screenshot({ path: process.env.SHOT3 });

@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { MIN_GROUP, NUDGE_LIMIT, REFER, funnel, moduleCoverage, needsNudge, readyToRefer, retention, scoreBuckets } from '../lib/studentDashboard';
+import { MIN_GROUP, NUDGE_LIMIT, REFER, funnel, moduleCoverage, needsFollowUp, needsNudge, readyToRefer, retention, scoreBuckets } from '../lib/studentDashboard';
 import type { DashStudent, DashSummary } from '../lib/studentDashboard';
 import { TRAINING_MODULES } from './trainingContent';
 
@@ -26,6 +26,7 @@ export default function StudentActivityDashboard({ students, summaries, days, ap
     modules: moduleCoverage(students, summaries),
     buckets: scoreBuckets(students, summaries),
     nudges: needsNudge(students, summaries),
+    follow: needsFollowUp(students, summaries),
     refer: readyToRefer(students, summaries),
     r30: retention(students, summaries, 30), r90: retention(students, summaries, 90),
     sent: students.filter(student => student.status !== 'paused').reduce((n, student) => n + (summaries.get(student.id)?.apps?.sent ?? 0), 0),
@@ -50,6 +51,11 @@ export default function StudentActivityDashboard({ students, summaries, days, ap
         {data.nudges.length ? <><ul className="plain-list" data-testid="nudges">{data.nudges.slice(0, NUDGE_LIMIT).map(item => <li key={item.id}><strong>{item.email}</strong><br /><small>{item.reason}</small></li>)}</ul>
           {data.nudges.length > NUDGE_LIMIT && <p className="card-meta">Y {data.nudges.length - NUDGE_LIMIT} más: están en la tabla de abajo.</p>}</>
           : <p className="card-meta">Todas las alumnas con acceso han entrado y hecho algo en este periodo.</p>}</article>
+      <article className="progress-card" data-testid="followup"><h2>{data.follow.length ? `${data.follow.length} ${data.follow.length === 1 ? 'alumna' : 'alumnas'} por acompañar` : 'Pendientes de acompañar'}</h2>
+        {data.follow.length ? <><p className="card-meta">Sin practicar desde hace 2 días o más, o con tres prácticas seguidas por debajo de 60. Es una lista para decidir tú a quién escribir; no se envía nada solo. Solo cuenta la actividad del periodo cargado.</p>
+          <ul className="plain-list">{data.follow.slice(0, NUDGE_LIMIT).map(item => <li key={item.id}><strong>{item.email}</strong><br /><small>{item.reasons.join(' · ')}</small></li>)}</ul>
+          {data.follow.length > NUDGE_LIMIT && <p className="card-meta">Y {data.follow.length - NUDGE_LIMIT} más.</p>}</>
+          : <p className="card-meta">Ninguna alumna con actividad en el periodo lleva 2 días o más sin practicar ni tiene tres prácticas seguidas por debajo de 60.</p>}</article>
       <article className="progress-card"><h2>Respuesta de las empresas</h2>
         {appsAvailable ? <><p className="card-meta">Candidaturas enviadas y respuestas que han anotado las propias alumnas (la app no recibe esos correos).</p>
           <dl className="kv"><div><dt>Enviadas</dt><dd>{data.sent}</dd></div><div><dt>Con respuesta</dt><dd>{data.responded}</dd></div><div><dt>Tasa de respuesta</dt><dd>{data.sent ? `${Math.round((data.responded / data.sent) * 100)} %` : '— (nada enviado)'}</dd></div></dl></>
