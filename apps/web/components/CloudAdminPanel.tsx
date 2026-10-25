@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { draftFromDetail, sendable, type VersionPayload } from '../lib/reviewPayload';
-import { Check, ChevronRight, ExternalLink, Eye, LoaderCircle, RefreshCcw, Send, X } from 'lucide-react';
+import { Check, ChevronRight, ExternalLink, Eye, LoaderCircle, RefreshCcw, Send, Sparkles, X } from 'lucide-react';
 
 // Panel de administración contra el ENGINE CLOUD (port fase 4). El navegador solo
 // habla con /api/admin/* y /api/admin/session (cookie HttpOnly del operador); el
@@ -38,7 +38,8 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
   const [items, setItems] = useState<Item[]>([]);
   const [counts, setCounts] = useState<Counts>({});
   const [total, setTotal] = useState(0);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('');
+  // La cola humana son las excepciones: los borradores los clasifica la máquina.
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('needs_review');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -47,6 +48,8 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
   const [saving, setSaving] = useState(false);
   const [verification, setVerification] = useState<Verification | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [progress, setProgress] = useState('');
 
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(t); }, [notice]);
 
@@ -81,6 +84,35 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
     } catch (err) { setError((err as Error).message); }
   }
 
+  // Clasificación automática del pool: deriva perfil y payload con reglas deterministas, verifica el
+  // enlace y publica lo abierto. Lo que no encaja se retira con su motivo; solo los casos dudosos
+  // quedan en la cola humana. Varias pasadas porque cada una escribe un lote acotado y el motor dice
+  // si cortó; se para en cuanto deja de cortar o deja de publicar y retirar.
+  async function autoClassify() {
+    if (!window.confirm('¿Clasificar y publicar solas las ofertas que cumplan las reglas? Lo que no encaje se retira con su motivo; lo dudoso queda en tu cola. Se puede deshacer una por una.')) return;
+    setActivating(true); setError(''); setNotice(''); setProgress('');
+    const total = { published: 0, withdrawn: 0, needs_review: 0 };
+    const started = Date.now();
+    try {
+      for (let pass = 1; pass <= 12 && Date.now() - started < 150_000; pass++) {
+        const r = await admin<{ counts?: Record<string, number>; scan?: { truncated?: boolean } }>('opportunities/activate', {
+          method: 'POST', body: JSON.stringify({ dry_run: false, verify: true, market: 'any' }),
+        });
+        total.published += r.counts?.published ?? 0;
+        total.withdrawn += r.counts?.withdrawn ?? 0;
+        total.needs_review += r.counts?.needs_review ?? 0;
+        setProgress(`Pasada ${pass}: ${total.published} publicadas · ${total.withdrawn} retiradas · ${total.needs_review} a revisar.`);
+        if (!r.scan?.truncated) break;
+        if ((r.counts?.published ?? 0) + (r.counts?.withdrawn ?? 0) === 0) break;
+      }
+      setNotice(`Clasificación terminada: ${total.published} publicadas solas · ${total.withdrawn} retiradas por no encajar · ${total.needs_review} quedan en tu cola.`);
+      refresh('needs_review');
+    } catch (err) {
+      if ((err as Error).message.includes('Sesión')) onSessionLost();
+      setError((err as Error).message);
+    } finally { setActivating(false); setProgress(''); }
+  }
+
   async function submit(status: string) {
     if (!detail || !draft) return;
     setSaving(true); setError('');
@@ -105,9 +137,13 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
         <label htmlFor="review-filter" style={{ minWidth: 200 }}><select id="review-filter" aria-label="Filtrar por estado editorial" value={filter} onChange={e => setFilter(e.target.value as typeof filter)}>
           {FILTERS.map(f => <option key={f} value={f}>{f ? EDITORIAL[f] : 'Todos los estados'}</option>)}
         </select></label>
-        <button disabled={busy} onClick={() => refresh()}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
+        <button className="primary" disabled={activating || busy} onClick={() => void autoClassify()} title="Reglas deterministas: perfil, español, mercado, frescura y enlace vivo. Publica lo verificado y retira lo que no encaja; solo lo dudoso llega a tu cola.">
+          {activating ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />} Clasificar y publicar solas
+        </button>
+        <button disabled={busy || activating} onClick={() => refresh()}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
       </div>
     </div>
+    {progress && <p className="muted" role="status"><LoaderCircle size={14} className="spin" /> {progress}</p>}
     {busy && <p className="muted"><LoaderCircle size={14} className="spin" /> Cargando…</p>}
     {!busy && !items.length ? <div className="empty"><Eye size={32} strokeWidth={1.3} /><h3>Nada que revisar con este filtro.</h3><p>El catálogo del engine llega aquí como borrador literal; sin textos inventados.</p></div> :
       !busy && <div className="job-list">{items.map(item => <article className="job-row" key={item.id}>

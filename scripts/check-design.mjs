@@ -28,7 +28,9 @@ export function findMutedText(css) {
   return hits;
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const root = new URL('../apps/web/', import.meta.url).pathname;
+  // fileURLToPath y no `.pathname`: en una ruta con espacios (`VIBE APPS`) el pathname llega
+  // escapado (`%20`) y el recorrido fallaba con ENOENT antes de mirar un solo archivo.
+  const root = fileURLToPath(new URL('../apps/web/', import.meta.url));
   const bad = [];
   for (const dir of ['components', 'app']) for (const file of walk(join(root, dir))) for (const h of findHex(readFileSync(file, 'utf8'))) bad.push(`${file.replace(root, '')}:${h.line} ${h.color}`);
   for (const sel of findMutedText(readFileSync(join(root, 'app/globals.css'), 'utf8'))) bad.push(`app/globals.css: ${sel} usa --muted en texto (usa var(--secondary))`);
