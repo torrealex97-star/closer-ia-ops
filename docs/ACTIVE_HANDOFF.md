@@ -56,6 +56,10 @@ Todo lo anterior (PRs #1-#27 y los commits directos de las sesiones 76-89) está
 2. Con datos reales: calibrar matching y revisar el revisor IA con el informe de acuerdo.
 3. Fase 4 (automatización) NO empieza sin autorización escrita: ver ADR-012.
 
+## 7. Módulos IA Winner (voz, entrevistas, adquisición): qué falta
+
+Diseño y estado de cada pieza, en [docs/plans/IA_WINNER_MODULOS.md](plans/IA_WINNER_MODULOS.md) (✅ hecho · 🟡 parcial · ⬜ pendiente · ⛔ bloqueado). **Lo que figura como pendiente o bloqueado NO está hecho**, aunque se hable de ello. Decisiones del dueño (2026-10-25): construir los módulos de voz y sus páginas legales; correo entrante con **Resend**; candidaturas **asistidas** (el auto-apply masivo con Playwright/Camoufox y operadores queda fuera hasta autorización escrita, ADR-012).
+
 ## 6. No declarar PASS en
 
 Apify, Groq, Jev, fuentes oficiales, correos y login reales, cron en Vercel, ni el revisor en `live`.
