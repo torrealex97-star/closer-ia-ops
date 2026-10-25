@@ -1,4 +1,4 @@
-# IA Winner · Women Digital Closers — Módulos 1, 2 y 3: diseño del dueño y estado real
+# IA Winner · Women Digital Closers — Módulos 1 a 5: diseño del dueño y estado real
 
 > Fuente: diseño que aporta el dueño (2026-10-25). Este documento **no es una promesa de entrega**: cada fila dice si está **hecho**, **parcial**, **pendiente** o **bloqueado** y quién lo desbloquea. Lo que falte se anota aquí y en `docs/ACTIVE_HANDOFF.md`; nada se da por hecho sin una entrada en `docs/STATUS.md` con su evidencia (*inspected / tested / verified*).
 > Reglas que mandan sobre este diseño: `AGENTS.md`, ADR-007 (Groq), ADR-012 (candidaturas asistidas), ADR-013 (voz), ADR-014 (métricas). Objetivo del programa (no una garantía que mostrar en la app): llevar a las closers de nivel cero a proyectos de alto ticket en 90 días.
@@ -40,6 +40,30 @@ Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente · ⛔ bloqueado (necesita d
 | **Auto-apply con Playwright/Camoufox y operadores** | ⛔ | **No se construye.** ADR-012 prohíbe automatizar sin autorización escrita y sin cumplir sus condiciones; Camoufox es un navegador anti-detección y saltarse captchas/antibots no se hará; un equipo ejecutando candidaturas por la alumna necesita su consentimiento expreso |
 | **Email proxy** (alias por alumna, webhook, clasificación) | ⛔ | Proveedor: **Resend** (decisión del dueño). Diseñado en ADR-014; comprobar en la documentación de Resend que ofrece correo entrante con webhook firmado, precio, dominio y DNS; consentimiento propio. Clasificación **determinista** al principio (palabras clave) y con confirmación de la alumna |
 | Offboarding por éxito (estado «Contratada», ranking) | ⬜ | Necesita estado nuevo (migración) y regla de cuándo se da por contratada |
+
+## Módulo 4 — Dashboards, gamificación, gestión y créditos
+Leyenda como arriba. Las métricas derivadas ya están definidas en [ADR-014](../decisions/ADR-014-metricas-alumnas-y-gamificacion.md).
+
+| Pieza | Estado | Nota |
+| --- | --- | --- |
+| Panel de alumna (nivel, XP, racha, maestría, candidaturas) | ✅ | «Mi progreso». Los **pesos de XP y los nombres de nivel difieren de los de tu propuesta**: decídelo y se ajusta en un solo sitio (`studentMetrics.ts`). |
+| Panel de coordinación (embudo, módulos, notas, empujones, retención, candidatas a derivar) | ✅ | Solo sugerencias; la derivación la decide una persona. |
+| Insignias / ranking entre alumnas | 🟡/⬜ | Logros ya existen; ranking público necesita consentimiento y puede desmotivar: pendiente de tu decisión. |
+| Alertas por inactividad (>5 días) | 🟡 | Se detecta («empujones»); **el envío automático por WhatsApp/correo está apagado** hasta orden expresa. |
+| Ocultar ofertas a la alumna contratada mediante correo proxy | ⛔ | Necesita consentimiento y revisión legal; la contratación la confirma una persona. |
+| Offboarding automático | ⛔ | Siempre con confirmación humana. |
+| Créditos de IA y práctica entre compañeras | ⛔ | Requieren login de alumnas activo y, para lo segundo, moderación y consentimiento. |
+
+## Módulo 5 — Seguridad, acreditación, cohortes y retención (spec del dueño, 2026-10-25)
+| Pieza | Estado | Nota |
+| --- | --- | --- |
+| 1. Detector de ofertas peligrosas (reglas, puntuación 0-100, SAFE/WARNING/BLOCKED) | 🟡 en construcción | Reglas deterministas sobre texto; enganchado a `red_flags`/`judgeOffer`. **No incluye** verificar CIF, dominio <30 días ni LinkedIn (consultas externas): ⬜. |
+| 2. Graduación con mentora humana y calibración | ⬜ | Diseño en ADR; hace falta un conjunto de calibración etiquetado por tus mentoras. |
+| 2. Webhook de certificados | ⛔ | Apagado hasta tener URL y token de tu app de certificados; un certificado «oficial» necesita revisión legal. |
+| 3. Correo entrante (Resend) y clasificación | ⛔ | Comprobar en la documentación de Resend que ofrece recepción con webhook. La IA solo **propondría** la fase; `CONTRATADA` solo con confirmación humana. |
+| 3. Atribución por cohorte y recalibrar recomendaciones | ⬜ | Necesita contrataciones reales y consentimiento. |
+| 4. Avisos a los 2 y 4 días sin practicar; vía rápida a mentora (<60 en 3 prácticas seguidas); objetivos semanales | 🟡/⬜ | El cálculo y el panel sí; envíos reales (WhatsApp/correo) apagados hasta orden expresa. «Práctica con una compañera» queda fuera. |
+| 4. Retención cero con el proveedor de voz | ⛔ | Acuerdo tuyo con el proveedor (ADR-013). |
 
 ## Legal (necesario para todo lo anterior)
 - Términos y condiciones, privacidad y consentimientos de audio/transcripción: **borrador** en la app; los revisa el dueño o su asesor antes de usar audio real de alumnas (ADR-013).
