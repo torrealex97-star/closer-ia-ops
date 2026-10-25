@@ -18,6 +18,7 @@ export const PROVIDERS = {
   adzuna: { name: 'Adzuna', hint: 'app_id:app_key (separados por dos puntos)', probe: (k: string) => { const p = pair(k); return p ? get(`${process.env.ADZUNA_API_BASE ?? 'https://api.adzuna.com'}/v1/api/jobs/es/search/1?app_id=${encodeURIComponent(p[0])}&app_key=${encodeURIComponent(p[1])}&results_per_page=1`) : Promise.resolve(new Response(null, { status: 400 })); } },
   jooble: { name: 'Jooble', hint: 'Clave de es.jooble.org (España)', probe: (k: string) => fetch(`${process.env.JOOBLE_API_BASE ?? 'https://es.jooble.org'}/api/${encodeURIComponent(k)}`, { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(15000), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: 'closer', location: 'España', page: 1 }) }) },
   infojobs: { name: 'InfoJobs', hint: 'client_id:client_secret (separados por dos puntos)', probe: (k: string) => { const p = pair(k); return p ? get(`${process.env.INFOJOBS_API_BASE ?? 'https://api.infojobs.net'}/api/9/offer?maxResults=1`, basic(p[0], p[1])) : Promise.resolve(new Response(null, { status: 400 })); } },
+  resend: { name: 'Resend', hint: 'API key (empieza por re_)', probe: (k: string) => get(`${process.env.RESEND_API_BASE ?? 'https://api.resend.com'}/domains`, bearer(k)) },
 } as const;
 export type Provider = keyof typeof PROVIDERS;
 export const isProvider = (v: unknown): v is Provider => typeof v === 'string' && v in PROVIDERS;

@@ -99,7 +99,7 @@ await step('baja: no puedes quitarte a ti ni al último propietario; quitar cort
 });
 await step('APIs: sin clave al principio; guardar cifrada; nunca se devuelve en claro; probar válida/ inválida', async () => {
   let r = await call('/api/admin/connections'); assert.equal(r.status, 200);
-  assert.equal(r.json.connections.length, 7); assert.ok(r.json.connections.every(c => !c.configured));
+  assert.equal(r.json.connections.length, 8); assert.ok(r.json.connections.every(c => !c.configured));
   assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'nope', secret: 'good-key-1234' } })).status, 422);
   assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'groq', secret: 'corta' } })).status, 422);
   assert.equal((await call('/api/admin/connections', { method: 'POST', body: { provider: 'groq' } })).status, 404); // sin clave guardada
@@ -111,6 +111,8 @@ await step('APIs: sin clave al principio; guardar cifrada; nunca se devuelve en 
   assert.equal(groq.configured, true); assert.equal(groq.last4, '1234');
   assert.ok(!JSON.stringify(r.json).includes('good-key') && !JSON.stringify(r.json).includes('ciphertext'));
   assert.deepEqual((await call('/api/admin/connections', { method: 'POST', body: { provider: 'groq' } })).json, { ok: true, detail: 'Clave válida' });
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'resend', secret: 'good-key-1234' } })).status, 200);
+  assert.deepEqual((await call('/api/admin/connections', { method: 'POST', body: { provider: 'resend' } })).json, { ok: true, detail: 'Clave válida' });
   const bad = await call('/api/admin/connections', { method: 'POST', body: { provider: 'serpapi' } });
   assert.equal(bad.json.ok, false); assert.match(bad.json.detail, /rechazada/);
   const o = (await call('/api/admin/overview')).json.paid;
