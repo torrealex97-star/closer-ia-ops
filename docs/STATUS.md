@@ -17,6 +17,13 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Verificado (tested)**: `retention.mjs` 7/7, `dashboard.mjs` con acompañamiento, pasos de interfaz nuevos, suite completa en verde.
 - **Límites**: la vía rápida es un **aviso** a la alumna («pide a tu coordinadora…»); no hay botón que cree una petición porque eso necesita una tabla nueva (migración, ⬜ sin escribir). En el panel solo cuenta la actividad del **periodo cargado** (7/30/90 días): quien lleva más tiempo parada que el periodo aparece sin actividad en la tabla, no aquí.
 
+## Clave de Resend en Panel → APIs (sesión 100) — 2026-10-25
+
+- **Petición del operador**: «asegúrate que la API la pueda añadir» (Resend como proveedor de correo).
+- **Hecho (tested, servicios simulados)**: `resend` es un proveedor más de [integrations.ts](../apps/web/lib/integrations.ts): clave cifrada, solo se muestran los últimos 4 caracteres, el propietario guarda y borra, cualquier operador la prueba (sondeo gratuito `GET /domains`). Flujo: ahora hay 8 conexiones y la de Resend se guarda y se comprueba. **No se conecta a nada**: no envía ni recibe correo.
+- **Hallazgo**: la tabla `integration_connections` tiene un `CHECK` con la lista de proveedores, así que **guardar la clave de Resend fallará hasta aplicar** [20261026_integration_resend.sql](../supabase/migrations/20261026_integration_resend.sql) (solo amplía el `CHECK`; **sin aplicar**: DDL exige orden expresa). Hasta entonces el panel dice exactamente eso en vez de un error genérico.
+- **Límites**: no se ha probado contra la API real de Resend; sigue sin verificarse que ofrezca recepción de correo con webhook ni su precio (tarea del dueño).
+
 ## Detector de ofertas peligrosas (sesión 99) — 2026-10-25
 
 - **Petición del operador** (spec de seguridad, acreditación, cohortes y retención, módulo 5 de [IA_WINNER_MODULOS](plans/IA_WINNER_MODULOS.md)): primer subsistema.
