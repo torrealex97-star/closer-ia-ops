@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import { authenticate, originBlocked, publicBaseUrl, withCookies } from '../../../../lib/adminAuth';
 import { inviteStudent, listStudents, removeStudent, setStudentStatus } from '../../../../lib/students';
 import { periodDays, readActivity, summarize, type ActivityRow } from '../../../../lib/studentActivity';
+import { ORG } from '../../../../lib/external';
+import { serviceRest } from '../../../../lib/supabaseAuth';
+import { applicationFunnel } from '../../../../lib/studentMetrics';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,16 +30,23 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const read = await readActivity({ sinceIso: new Date(now.getTime() - days * 86_400_000).toISOString() });
   if (!read) return reply(auth!, { students, days, activity_available: false, activity: [], totals: null, truncated: false });
+  // Candidaturas por alumna (solo recuentos por estado). Si no se leen, `applications_available: false` y `apps: null`.
+  const appRes = await serviceRest(`student_applications?org_id=eq.${ORG}&select=user_id,status&limit=5000`).catch(() => null);
+  const appRows = appRes?.ok ? await appRes.json().catch(() => null) as { user_id: string; status: string }[] | null : null;
+  const statusesByUser = new Map<string, string[]>();
+  for (const row of Array.isArray(appRows) ? appRows : []) statusesByUser.set(row.user_id, [...(statusesByUser.get(row.user_id) ?? []), row.status]);
   const byStudent = new Map<string, ActivityRow[]>();
   for (const row of read.rows) if (row.student_id) byStudent.set(row.student_id, [...(byStudent.get(row.student_id) ?? []), row]);
-  const activity = students.filter(student => byStudent.has(student.id)).map(student => {
-    const summary = summarize(byStudent.get(student.id)!, days, now);
-    return { student: { id: student.id, email: student.email, status: student.status }, summary: { sessions: summary.sessions, last_seen: summary.last_seen, practice: summary.practice, training: summary.training, streak: summary.streak } };
+  // Una alumna con candidaturas pero sin actividad en el periodo también aparece (si no, sus candidaturas no se verían).
+  const activity = students.filter(student => byStudent.has(student.id) || (student.user_id && statusesByUser.has(student.user_id))).map(student => {
+    const summary = summarize(byStudent.get(student.id) ?? [], days, now);
+    const funnel = Array.isArray(appRows) ? applicationFunnel(student.user_id ? statusesByUser.get(student.user_id) ?? [] : []) : null;
+    return { student: { id: student.id, email: student.email, status: student.status }, summary: { sessions: summary.sessions, last_seen: summary.last_seen, practice: summary.practice, training: summary.training, streak: summary.streak, apps: funnel ? { sent: funnel.sent, responded: funnel.responded } : null } };
   });
   const sevenDaysAgo = now.getTime() - 7 * 86_400_000;
   const entered7 = new Set(read.rows.filter(row => row.kind === 'session' && new Date(row.created_at).getTime() >= sevenDaysAgo).map(row => row.student_id)).size;
-  const totals = { entered7, active: activity.length, practices: activity.reduce((n, a) => n + a.summary.practice.count, 0), exams_passed: activity.filter(a => a.summary.training.examPassed).length };
-  return reply(auth!, { students, days, activity_available: true, activity, totals, truncated: read.truncated });
+  const totals = { entered7, active: students.filter(student => byStudent.has(student.id)).length, practices: activity.reduce((n, a) => n + a.summary.practice.count, 0), exams_passed: activity.filter(a => a.summary.training.examPassed).length };
+  return reply(auth!, { students, days, activity_available: true, applications_available: Array.isArray(appRows), activity, totals, truncated: read.truncated });
 }
 export async function POST(request: NextRequest) {
   const { auth, error } = await gate(request, true);

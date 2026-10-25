@@ -302,6 +302,16 @@ await step('candidaturas asistidas: formulario base, borrador, copia, seguimient
   const opened = await call('/api/student/applications', { ...A, method: 'PATCH', body: { id: app.id, status: 'opened' } }); assert.equal(opened.json.application.status, 'opened'); assert.equal(opened.json.application.applied_at, null);
   const applied = await call('/api/student/applications', { ...A, method: 'PATCH', body: { id: app.id, status: 'applied' } }); assert.equal(applied.json.application.status, 'applied'); assert.ok(applied.json.application.applied_at);
   assert.equal((await call('/api/student/applications', { ...A, method: 'PATCH', body: { id: app.id, status: 'draft' } })).status, 409, 'una enviada no vuelve a borrador');
+  // Resultado declarado por la alumna: enviada → respondida → entrevista; no retrocede y un estado inventado se rechaza.
+  const patchApp = status => call('/api/student/applications', { ...A, method: 'PATCH', body: { id: app.id, status } });
+  assert.equal((await patchApp('contratada')).status, 422);
+  assert.equal((await patchApp('responded')).json.application.status, 'responded');
+  assert.equal((await patchApp('applied')).status, 409, 'una respondida no vuelve a enviada');
+  assert.equal((await patchApp('interview')).json.application.status, 'interview');
+  const mine = await call('/api/student/progress', A); assert.equal(mine.status, 200);
+  assert.deepEqual([mine.json.metrics.applications.sent, mine.json.metrics.applications.responded, mine.json.metrics.applications.interviews, mine.json.metrics.applications.responseRate], [1, 1, 1, 100]);
+  assert.ok(mine.json.metrics.xp.xp >= 90 && mine.json.metrics.xp.level >= 1, 'la entrevista suma XP');
+  assert.equal((await call('/api/student/progress', { cookies: false })).status, 401);
   // Aislamiento: otra alumna ni la ve ni la toca ni la borra
   assert.equal((await call('/api/student/applications', B)).json.applications.length, 0);
   assert.equal((await call('/api/student/applications', { ...B, method: 'PATCH', body: { id: app.id, status: 'discarded' } })).status, 404);
