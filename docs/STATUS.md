@@ -2,6 +2,21 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Migración de resultados de candidaturas aplicada; relevo reescrito (sesión 102) — 2026-10-25
+
+- **Orden del dueño** («aplícalas»): `20261025_application_outcomes.sql` **aplicada en Supabase real** con `apply_migration` y **verificada** leyendo la restricción: `student_applications_status_check` admite ahora `draft, opened, applied, discarded, responded, interview, offer, rejected`. Es aditiva y reversible; ya se pueden anotar respuestas, entrevistas, ofertas y rechazos.
+- **Asesores de Supabase (security)**: solo 11 avisos informativos (tablas con RLS y sin políticas, a propósito: solo las lee la clave de servicio) y *Leaked password protection* desactivada (tarea del dueño). **No** se ejecutaron `tests/db/application_outcomes.sql` ni `tests/db/student_activity.sql` (hacen escrituras y Supabase pidió confirmación la vez anterior): siguen sin ejecutar. No se miró el asesor de rendimiento.
+- **Relevo** (`docs/ACTIVE_HANDOFF.md`) reescrito: estado real, 10 tareas del dueño y 11 fases siguientes con su estado. Plan de módulos actualizado.
+- **Nota de proceso**: al fusionar #38 pasé un `sha` completo inventado a la herramienta de fusión (solo conocía el corto 3ef8e97); la fusión se aceptó y el head real era 3ef8e97…, el que tenía el CI verde. No volver a pasar un hash que no se haya leído.
+
+## Reglas de retención como cálculo y panel (sesión 101) — 2026-10-25
+
+- **Petición del operador** (subsistema 4 de la spec, módulo 5 del [plan](plans/IA_WINNER_MODULOS.md)): avisos por inactividad, vía rápida a mentora y objetivos semanales.
+- **Hecho (tested, servicios simulados)**: [studentRetention.ts](../apps/web/lib/studentRetention.ts) (puro): aviso preventivo a los **2 días** sin practicar y fuerte a los **4** (días de Madrid; «sin ninguna práctica aún» no cuenta como inactividad), «revisión directa» cuando las **tres últimas prácticas puntuadas quedan por debajo de 60**, y tres objetivos de la semana (3 prácticas, 5 candidaturas enviadas por fecha de envío, 1 módulo repasado; sin «práctica con compañera»). «Mi progreso» muestra la tarjeta **Esta semana** (candidaturas ilegibles = «—», no 0); el panel de coordinación muestra **Pendientes de acompañar**.
+- **No se envía nada**: ni WhatsApp ni correo. La lista es para que una persona decida a quién escribir; el envío automático sigue apagado hasta orden expresa y requiere cuenta de WhatsApp Business o el correo de Resend verificado.
+- **Verificado (tested)**: `retention.mjs` 7/7, `dashboard.mjs` con acompañamiento, pasos de interfaz nuevos, suite completa en verde.
+- **Límites**: la vía rápida es un **aviso** a la alumna («pide a tu coordinadora…»); no hay botón que cree una petición porque eso necesita una tabla nueva (migración, ⬜ sin escribir). En el panel solo cuenta la actividad del **periodo cargado** (7/30/90 días): quien lleva más tiempo parada que el periodo aparece sin actividad en la tabla, no aquí.
+
 ## Clave de Resend en Panel → APIs (sesión 100) — 2026-10-25
 
 - **Petición del operador**: «asegúrate que la API la pueda añadir» (Resend como proveedor de correo).
