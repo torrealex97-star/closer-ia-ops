@@ -9,6 +9,14 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Relevo** (`docs/ACTIVE_HANDOFF.md`) reescrito: estado real, 10 tareas del dueño y 11 fases siguientes con su estado. Plan de módulos actualizado.
 - **Nota de proceso**: al fusionar #38 pasé un `sha` completo inventado a la herramienta de fusión (solo conocía el corto 3ef8e97); la fusión se aceptó y el head real era 3ef8e97…, el que tenía el CI verde. No volver a pasar un hash que no se haya leído.
 
+## Reglas de retención como cálculo y panel (sesión 101) — 2026-10-25
+
+- **Petición del operador** (subsistema 4 de la spec, módulo 5 del [plan](plans/IA_WINNER_MODULOS.md)): avisos por inactividad, vía rápida a mentora y objetivos semanales.
+- **Hecho (tested, servicios simulados)**: [studentRetention.ts](../apps/web/lib/studentRetention.ts) (puro): aviso preventivo a los **2 días** sin practicar y fuerte a los **4** (días de Madrid; «sin ninguna práctica aún» no cuenta como inactividad), «revisión directa» cuando las **tres últimas prácticas puntuadas quedan por debajo de 60**, y tres objetivos de la semana (3 prácticas, 5 candidaturas enviadas por fecha de envío, 1 módulo repasado; sin «práctica con compañera»). «Mi progreso» muestra la tarjeta **Esta semana** (candidaturas ilegibles = «—», no 0); el panel de coordinación muestra **Pendientes de acompañar**.
+- **No se envía nada**: ni WhatsApp ni correo. La lista es para que una persona decida a quién escribir; el envío automático sigue apagado hasta orden expresa y requiere cuenta de WhatsApp Business o el correo de Resend verificado.
+- **Verificado (tested)**: `retention.mjs` 7/7, `dashboard.mjs` con acompañamiento, pasos de interfaz nuevos, suite completa en verde.
+- **Límites**: la vía rápida es un **aviso** a la alumna («pide a tu coordinadora…»); no hay botón que cree una petición porque eso necesita una tabla nueva (migración, ⬜ sin escribir). En el panel solo cuenta la actividad del **periodo cargado** (7/30/90 días): quien lleva más tiempo parada que el periodo aparece sin actividad en la tabla, no aquí.
+
 ## Detector de ofertas peligrosas (sesión 99) — 2026-10-25
 
 - **Petición del operador** (spec de seguridad, acreditación, cohortes y retención, módulo 5 de [IA_WINNER_MODULOS](plans/IA_WINNER_MODULOS.md)): primer subsistema.

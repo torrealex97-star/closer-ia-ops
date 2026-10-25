@@ -5,7 +5,7 @@ import { REVIEW_REFS } from '../components/trainingRefs';
 export const MIN_GROUP = 5;
 export type DashStudent = { id: string; email: string; status: 'invited' | 'active' | 'paused'; created_at?: string };
 // `apps`: candidaturas de la alumna por estado (`null` = no se pudieron leer, distinto de «ninguna»).
-export type DashSummary = { sessions: number; last_seen: string | null; practice: { count: number; avg: number | null }; training: { modules: string[]; examBest: number | null; examPassed: boolean }; apps?: { sent: number; responded: number } | null };
+export type DashSummary = { sessions: number; last_seen: string | null; practice: { count: number; avg: number | null }; training: { modules: string[]; examBest: number | null; examPassed: boolean }; apps?: { sent: number; responded: number } | null; idle?: { level: 'none' | 'soft' | 'strong'; idleDays: number | null }; review?: boolean };
 
 export type FunnelStep = { id: string; label: string; count: number; pct: number | null };
 // Embudo sobre las alumnas no pausadas: invitadas → han entrado → han practicado → han repasado un módulo → examen superado.
@@ -54,6 +54,22 @@ export function needsNudge(students: DashStudent[], summaries: Map<string, DashS
     else if (s.practice.count === 0 && s.training.modules.length === 0) out.push({ id: student.id, email: student.email, reason: 'Ha entrado, pero no ha practicado ni repasado nada' });
   }
   return out;
+}
+
+export type Follow = { id: string; email: string; reasons: string[]; strong: boolean };
+// Quién merece acompañamiento por inactividad en la sala (2 y 4 días sin practicar, dentro del periodo cargado) o por tres prácticas seguidas por debajo de 60.
+// Es una lista para que una persona decida: no envía nada. Las pausadas no cuentan.
+export function needsFollowUp(students: DashStudent[], summaries: Map<string, DashSummary>): Follow[] {
+  const out: Follow[] = [];
+  for (const student of students) {
+    if (student.status === 'paused') continue;
+    const s = summaries.get(student.id); if (!s) continue;
+    const reasons: string[] = [];
+    if (s.idle && s.idle.level !== 'none' && s.idle.idleDays !== null) reasons.push(`${s.idle.idleDays} días sin practicar`);
+    if (s.review) reasons.push('Tres prácticas seguidas por debajo de 60: revisión directa');
+    if (reasons.length) out.push({ id: student.id, email: student.email, reasons, strong: s.idle?.level === 'strong' || Boolean(s.review) });
+  }
+  return out.sort((a, b) => Number(b.strong) - Number(a.strong));
 }
 
 export type Retention = { minAgeDays: number; eligible: number; retained: number; pct: number | null };

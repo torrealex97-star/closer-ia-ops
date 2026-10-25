@@ -1,6 +1,6 @@
 // Panel de coordinación: node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/dashboard.mjs
 import assert from 'node:assert/strict';
-import { MIN_GROUP, funnel, moduleCoverage, needsNudge, scoreBuckets } from '../../apps/web/lib/studentDashboard';
+import { MIN_GROUP, funnel, moduleCoverage, needsFollowUp, needsNudge, scoreBuckets } from '../../apps/web/lib/studentDashboard';
 import { REVIEW_REFS } from '../../apps/web/components/trainingRefs';
 
 const student = (id, status = 'active') => ({ id, email: `${id}@t.dev`, status });
@@ -46,4 +46,12 @@ assert.deepEqual(nudges.map(x => [x.id, x.reason]), [['c', 'Ha entrado, pero no 
 assert.ok(!nudges.some(x => x.id === 'p'), 'una pausada no necesita empujón');
 assert.deepEqual(needsNudge([student('z')], new Map()).map(x => x.reason), ['No ha entrado en este periodo']);
 ok('quién necesita un empujón: sin entrada, sin nada hecho, pausadas excluidas');
+const fu = needsFollowUp([student('u1'), student('u2'), student('u3'), student('u4'), student('u5', 'paused')], new Map([
+  ['u1', sum({ idle: { level: 'soft', idleDays: 2 } })],
+  ['u2', sum({ idle: { level: 'strong', idleDays: 5 }, review: true })],
+  ['u3', sum({ idle: { level: 'none', idleDays: 0 } })],
+  ['u4', sum({ idle: { level: 'none', idleDays: null } })],
+  ['u5', sum({ idle: { level: 'strong', idleDays: 9 } })]]));
+assert.deepEqual(fu.map(x => [x.id, x.reasons]), [['u2', ['5 días sin practicar', 'Tres prácticas seguidas por debajo de 60: revisión directa']], ['u1', ['2 días sin practicar']]], 'las urgentes primero; sin práctica nunca ≠ inactividad; pausadas fuera');
+ok('acompañamiento: 2 y 4 días sin practicar y revisión directa, sin pausadas');
 console.log(`\n${n}/${n} pasos OK`);
