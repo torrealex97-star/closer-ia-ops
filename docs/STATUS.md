@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Términos y condiciones y revisión de la privacidad (sesión 98) — 2026-10-25
+
+- **Petición del operador**: construir los módulos de voz **y sus páginas de términos y condiciones**; todo lo que falte, al relevo.
+- **Hecho (tested, servicios simulados)**: página pública `/terminos` (v1-borrador): cuenta, qué es y qué no es el portal (**sin garantía de resultados, ingresos ni plazos**; el examen **no** es una certificación), IA y notas como estimaciones, práctica por voz (hoy inactiva), candidaturas (envía ella), normas, propiedad intelectual y responsabilidad con los puntos legales marcados como pendientes. Enlazada desde la privacidad y el portal.
+- **Corrección importante en `/privacidad` (v3-borrador)**: decía «no enviamos tus datos personales a modelos de IA», pero el **texto de la sala de práctica sí se envía a Groq**. Ahora lo declara (junto a la actividad que se guarda, el dictado del navegador y una sección de voz «cuando se active»), mantiene que el perfil, el CV y los datos de contacto no van a un modelo, y deja marcado como pendiente el acuerdo de tratamiento y retención cero con Groq. [PRIVACIDAD_Y_CONSENTIMIENTOS.md](legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md) actualizado con los cuatro puntos nuevos para el asesor.
+- **Verificado**: pasos de flujo nuevos (términos visibles, sin promesas de ingresos ni plazos, sin valores vacíos, cabeceras de seguridad, enlace desde la privacidad; la privacidad ya no afirma lo falso). `typecheck` OK. `build` y `run.sh` completo: ver más abajo si constan.
+- **Límites**: **no es asesoramiento legal**; los datos del responsable siguen en «[pendiente de completar]» hasta que se rellenen las variables `LEGAL_*` en Vercel; el consentimiento de audio propio aún no existe (va con la función de voz).
+
 ## Métricas de alumnas y gamificación derivadas; correo entrante con Resend en diseño (sesión 96) — 2026-10-25
 
 - **Petición del operador**: propuesta de arquitectura «IA Winner» (voz, entrevistas, scraper y candidaturas, correo entrante, créditos y gamificación). Se contrastó con lo existente y con ADR-007/012/013 ([ADR-014](decisions/ADR-014-metricas-alumnas-y-gamificacion.md)). Decisiones del dueño: **primero el esquema de métricas**, **candidaturas asistidas** (no se usará Camoufox ni envíos masivos) y **Resend** para el correo entrante.

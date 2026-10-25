@@ -100,7 +100,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
     <Matches refreshKey={saves} onPrepared={() => setApps(n => n + 1)} onLost={onLost} />
     <Applications refreshKey={apps} onLost={onLost} />
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
-      <a href="/">Ver oportunidades</a> · <a href="/privacidad">Privacidad</a>
+      <a href="/">Ver oportunidades</a> · <a href="/privacidad">Privacidad</a> · <a href="/terminos">Términos</a>
       <span><button type="button" onClick={() => void erase()} disabled={busy}><Trash2 size={14} /> Borrar mi perfil</button> <button type="button" onClick={onLogout}><LogOut size={14} /> Salir</button></span>
     </div>
   </div></div>;
