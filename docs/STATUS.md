@@ -2,6 +2,13 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Clave de Resend en Panel → APIs (sesión 100) — 2026-10-25
+
+- **Petición del operador**: «asegúrate que la API la pueda añadir» (Resend como proveedor de correo).
+- **Hecho (tested, servicios simulados)**: `resend` es un proveedor más de [integrations.ts](../apps/web/lib/integrations.ts): clave cifrada, solo se muestran los últimos 4 caracteres, el propietario guarda y borra, cualquier operador la prueba (sondeo gratuito `GET /domains`). Flujo: ahora hay 8 conexiones y la de Resend se guarda y se comprueba. **No se conecta a nada**: no envía ni recibe correo.
+- **Hallazgo**: la tabla `integration_connections` tiene un `CHECK` con la lista de proveedores, así que **guardar la clave de Resend fallará hasta aplicar** [20261026_integration_resend.sql](../supabase/migrations/20261026_integration_resend.sql) (solo amplía el `CHECK`; **sin aplicar**: DDL exige orden expresa). Hasta entonces el panel dice exactamente eso en vez de un error genérico.
+- **Límites**: no se ha probado contra la API real de Resend; sigue sin verificarse que ofrezca recepción de correo con webhook ni su precio (tarea del dueño).
+
 ## Términos y condiciones y revisión de la privacidad (sesión 98) — 2026-10-25
 
 - **Petición del operador**: construir los módulos de voz **y sus páginas de términos y condiciones**; todo lo que falte, al relevo.
