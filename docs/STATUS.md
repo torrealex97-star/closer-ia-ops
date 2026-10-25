@@ -2,6 +2,13 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Migración de resultados de candidaturas aplicada; relevo reescrito (sesión 102) — 2026-10-25
+
+- **Orden del dueño** («aplícalas»): `20261025_application_outcomes.sql` **aplicada en Supabase real** con `apply_migration` y **verificada** leyendo la restricción: `student_applications_status_check` admite ahora `draft, opened, applied, discarded, responded, interview, offer, rejected`. Es aditiva y reversible; ya se pueden anotar respuestas, entrevistas, ofertas y rechazos.
+- **Asesores de Supabase (security)**: solo 11 avisos informativos (tablas con RLS y sin políticas, a propósito: solo las lee la clave de servicio) y *Leaked password protection* desactivada (tarea del dueño). **No** se ejecutaron `tests/db/application_outcomes.sql` ni `tests/db/student_activity.sql` (hacen escrituras y Supabase pidió confirmación la vez anterior): siguen sin ejecutar. No se miró el asesor de rendimiento.
+- **Relevo** (`docs/ACTIVE_HANDOFF.md`) reescrito: estado real, 10 tareas del dueño y 11 fases siguientes con su estado. Plan de módulos actualizado.
+- **Nota de proceso**: al fusionar #38 pasé un `sha` completo inventado a la herramienta de fusión (solo conocía el corto 3ef8e97); la fusión se aceptó y el head real era 3ef8e97…, el que tenía el CI verde. No volver a pasar un hash que no se haya leído.
+
 ## Detector de ofertas peligrosas (sesión 99) — 2026-10-25
 
 - **Petición del operador** (spec de seguridad, acreditación, cohortes y retención, módulo 5 de [IA_WINNER_MODULOS](plans/IA_WINNER_MODULOS.md)): primer subsistema.
