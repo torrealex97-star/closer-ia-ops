@@ -138,7 +138,7 @@ await step('ingest: cerrado sin token; valida el cuerpo; limpia datos personales
   assert.equal((await ingest({ source: 'MAL SOURCE', candidates: [] })).status, 422);
   assert.equal((await ingest({ source: 'indeed' })).status, 422);
   const r = await ingest({ source: 'indeed', via: 'jobspy', candidates: [
-    { external_id: 'a1', title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'https://es.indeed.com/viewjob?jk=a1', posted_at: '2026-10-15', description: 'Buscamos closer con experiencia en ventas para el equipo comercial. Escribe a rrhh@acme.com o llama al +34 600 123 456 <b>ya</b>.', raw: { site: 'indeed', emails: 'x@y.com', secreto: 'no' } },
+    { external_id: 'a1', title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'https://es.indeed.com/viewjob?jk=a1', posted_at: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), /* relativo: con una fecha fija la oferta caducaba de la ventana de 10 días con el paso del tiempo */ description: 'Buscamos closer con experiencia en ventas para el equipo comercial. Escribe a rrhh@acme.com o llama al +34 600 123 456 <b>ya</b>.', raw: { site: 'indeed', emails: 'x@y.com', secreto: 'no' } },
     { external_id: 'a2', title: 'Closer', url: 'javascript:alert(1)' },
     { external_id: 'a3', title: 'Sin url' },
     { external_id: 'a4', title: 'Closer ok', url: 'https://www.ejemplo.es/o/4', location: 'Texas, USA' },
