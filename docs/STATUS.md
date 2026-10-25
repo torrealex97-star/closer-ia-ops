@@ -9,6 +9,14 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Hallazgo**: la tabla `integration_connections` tiene un `CHECK` con la lista de proveedores, así que **guardar la clave de Resend fallará hasta aplicar** [20261026_integration_resend.sql](../supabase/migrations/20261026_integration_resend.sql) (solo amplía el `CHECK`; **sin aplicar**: DDL exige orden expresa). Hasta entonces el panel dice exactamente eso en vez de un error genérico.
 - **Límites**: no se ha probado contra la API real de Resend; sigue sin verificarse que ofrezca recepción de correo con webhook ni su precio (tarea del dueño).
 
+## Detector de ofertas peligrosas (sesión 99) — 2026-10-25
+
+- **Petición del operador** (spec de seguridad, acreditación, cohortes y retención, módulo 5 de [IA_WINNER_MODULOS](plans/IA_WINNER_MODULOS.md)): primer subsistema.
+- **Hecho (tested, sin red)**: [offerRisk.ts](../apps/web/lib/offerRisk.ts) evalúa título, descripción y sueldo con reglas deterministas y devuelve `risk_score` 0-100, `risk_level` (`SAFE`/`WARNING`/`BLOCKED`), banderas con código y `visibility`. **Críticas (bloquean)**: pago o compra previa, multinivel/pirámide, ingresos irreales sin experiencia. **Avisos**: cifra mensual muy alta, solo comisión, publicidad a cargo de la closer, sin entrevista, contacto solo por WhatsApp/Telegram. `judgeOffer` ya no aprueba sola ninguna oferta con señales (`oferta_peligrosa` / `oferta_con_avisos` → cola de excepciones de una persona).
+- **Diferencia con el spec**: el nivel no depende solo de la puntuación (>60/>85); una bandera crítica bloquea directamente y cualquier aviso deja la oferta en `WARNING`. Los pesos están en un solo sitio y se ajustan con ejemplos reales.
+- **Verificado**: `offerrisk.mjs` 8/8 y `market.mjs` 6/6 (el sueldo anual `30.000 €/año` no cuenta como promesa mensual: lo cazó la prueba existente). `typecheck` OK.
+- **Límites / pendiente**: solo ve el texto del anuncio; **no** comprueba CIF, antigüedad del dominio ni LinkedIn (consultas externas, ⬜). Reglas escritas por el agente **sin calibrar con ofertas reales**: pasar una muestra del inventario y ajustar. La lista visible a la alumna no oculta por riesgo las ofertas ya aprobadas a mano (decisión del operador); falta mostrar las banderas en el panel de revisión (⬜).
+
 ## Términos y condiciones y revisión de la privacidad (sesión 98) — 2026-10-25
 
 - **Petición del operador**: construir los módulos de voz **y sus páginas de términos y condiciones**; todo lo que falte, al relevo.
