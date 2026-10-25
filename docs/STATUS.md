@@ -2,6 +2,21 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## El motor clasifica su pool y retira lo que descarta; el panel publica solo (sesión 103) — 2026-10-25
+
+- **Petición del operador** (anotación sobre el panel de admin): «todas estas ofertas no deben estar a revisar por un humano; la IA debe clasificarlas y añadirlas sola, y dejar a revisión solo los casos más complejos».
+- **Qué entra en el código** (la conducta del motor ya estaba sirviendo en producción; esta rama publica su fuente y añade el disparador del panel):
+  - [worker.js](../sites/engine/worker.js): lo que la puerta determinista descarta (sin perfil comercial, sin señal de España, anuncio no español, fuera de la ventana de 10 días) pasa de `skipped` a **retirada en bloque con su razón**, agrupada por motivo —una escritura por motivo, en tandas de 80— y con `WHERE editorial_status='draft'`, así que nunca pisa lo que una persona ya movió. Reversible: la fila se conserva y un PATCH puede devolverla a revisión.
+  - [engineActivate.ts](../apps/web/lib/engineActivate.ts) (nuevo): repite pasadas contra `POST /v1/admin/opportunities/activate` con el reloj del cron, y se para cuando el motor deja de cortar o de publicar/retirar.
+  - [cron/collect](../apps/web/app/api/cron/collect/route.ts): la clasificación del pool del motor entra al final del presupuesto (12 s, con `budget.cut` si no hay tiempo) y su resultado viaja en la respuesta como `motor`.
+  - [CloudAdminPanel](../apps/web/components/CloudAdminPanel.tsx): botón **«Clasificar y publicar solas»**, con progreso por pasada y confirmación; la cola abre por defecto en **A revisar** (las excepciones), no en borradores.
+  - [SummaryTab](../apps/web/components/SummaryTab.tsx): «Por revisar» se parte en **Excepciones para ti** (`needs_review`) y **Por clasificar (automático)** (`draft`). Sumarlas hacía parecer que miles de borradores esperaban a una persona.
+  - El proxy admin admite ahora `maxDuration = 60` y 55 s de espera en POST: una pasada real del motor tarda decenas de segundos y la función se cortaba a mitad.
+- **Prueba nueva**: [activate.mjs](../tests/engine/activate.mjs) ejecuta el worker desde el repo con D1 simulado (3 escenarios): `dry_run` no escribe nada y ya dice qué retiraría; la ejecución real publica lo abierto y retira los descartes **una escritura por motivo** (3 motivos, 4 ofertas), solo con `editorial_status='draft'` y sin `DELETE`; 81 rechazos del mismo motivo se retiran en dos escrituras (80 + 1). Entra en `npm run test:web` (CI).
+- **Verificado (tested)**: `npm run typecheck` OK · `npm run build` OK · `npm run design` OK · `npm run handoff` OK · `tests/admin-auth/run.sh`: **163 comprobaciones de API en verde** · `ui.mjs` **10/10** con el Chrome del sistema · Playwright relevante **39 pasaron, 5 omitidas** (`admin-cloud` exige motor y `WDC_CLOUD_ADMIN=1`).
+- **Arreglo de la verificación de diseño**: [check-design.mjs](../scripts/check-design.mjs) usaba `URL.pathname`, que en una ruta con espacios llega escapado (`%20`) y rompía el recorrido con ENOENT; ahora usa `fileURLToPath`. En CI no se veía porque su ruta no tiene espacios.
+- **Límites**: (1) el despliegue del worker **no se ha repetido** en esta sesión: la versión con retirada ya está sirviendo desde la sesión 91; (2) el botón del panel y los contadores nuevos **no están desplegados** hasta que esta rama llegue a `main` (Vercel publica desde el repo); (3) la cuota mensual de escrituras de D1 del motor seguía en **94.177/100.000** con reinicio el 1 de noviembre, y la pasada de clasificación añade ~400 al día; (4) la retirada es por reglas deterministas, no por IA: un anuncio ambiguo sigue yendo a `needs_review`.
+
 ## Migración de resultados de candidaturas aplicada; relevo reescrito (sesión 102) — 2026-10-25
 
 - **Orden del dueño** («aplícalas»): `20261025_application_outcomes.sql` **aplicada en Supabase real** con `apply_migration` y **verificada** leyendo la restricción: `student_applications_status_check` admite ahora `draft, opened, applied, discarded, responded, interview, offer, rejected`. Es aditiva y reversible; ya se pueden anotar respuestas, entrevistas, ofertas y rechazos.
