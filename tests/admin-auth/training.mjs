@@ -5,7 +5,8 @@ import {
   reviewFreezingReply, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
 } from '../../apps/web/components/trainingCheck';
 import { CLOSE_BANK, DISCOVERY_BANK, DISCOVERY_STEPS, EXACT_CLOSES, FINAL_EXAM, LOGICA, PRE_CALL_STEPS } from '../../apps/web/components/trainingContent';
-import { gradeBank } from '../../apps/web/components/trainingCheck';
+import { gradeBank, reviewInterviewAnswer } from '../../apps/web/components/trainingCheck';
+import { INTERVIEW_FLAGS, INTERVIEW_QUESTIONS } from '../../apps/web/components/trainingContent';
 
 // Formato español: el punto es de miles y la coma decimal.
 assert.equal(parseAmount('3.200'), 3200);
@@ -110,3 +111,44 @@ for (const bank of [CLOSE_BANK, DISCOVERY_BANK]) {
   assert.equal(gradeBank(bank, {}).correct, 0, 'sin respuestas no hay aciertos inventados');
 }
 console.log('PASS  formación: diez cierres, nueve pasos y bancos corregibles por clave');
+
+// Banco de preguntas de entrevista: diez preguntas completas y corrección por banderas rojas explicables.
+{
+  assert.equal(INTERVIEW_QUESTIONS.length, 10);
+  assert.equal(new Set(INTERVIEW_QUESTIONS.map(q => q.id)).size, 10, 'ids únicos');
+  for (const q of INTERVIEW_QUESTIONS) {
+    assert.ok(q.question && q.intent && q.formula && q.example, q.id);
+    for (const flag of q.flags) assert.ok(INTERVIEW_FLAGS[flag], `${q.id}: bandera desconocida ${flag}`);
+    // Los ejemplos van con huecos: ninguna cifra ni resultado que alguien pueda copiar como propio.
+    assert.ok(/\[[^\]]+\]/.test(q.example), `${q.id}: el ejemplo debe llevar huecos [así]`);
+    assert.ok(!/\d/.test(q.example), `${q.id}: el ejemplo no inventa cifras`);
+  }
+  const ok = (id, text) => reviewInterviewAnswer(id, text);
+  const empty = ok('experiencia', '   ');
+  assert.equal(empty.met, 0, 'una respuesta vacía no cumple nada');
+  // Respuesta concreta con cifra propia: cumple todo
+  const good = ok('experiencia', 'Llevo dos años vendiendo software de gestión a clínicas. Mi trabajo era abrir y cerrar llamadas; en 2025 conseguí un ratio de cierre del 22 % sobre 140 llamadas. Me interesa este puesto porque quiero trabajar con ticket alto.');
+  assert.equal(good.met, good.total, JSON.stringify(good.criteria.filter(c => !c.ok)));
+  // Tópicos sin caso, sin cifra
+  const vague = ok('experiencia', 'Me apasiona vender y soy muy resolutiva, trabajo bien en equipo y siempre doy el cien por cien en todo lo que hago con ganas.');
+  assert.equal(vague.criteria.find(c => c.id === 'concreto').ok, false);
+  assert.equal(vague.criteria.find(c => c.id === 'numero').ok, false);
+  // Hablar mal de la empresa anterior y defenderse
+  const bad = ok('objecion', 'Mi jefe era un incompetente y la empresa anterior era un desastre, así que eso no es mi culpa.');
+  assert.equal(bad.criteria.find(c => c.id === 'mala').ok, false);
+  assert.equal(bad.criteria.find(c => c.id === 'defensivo').ok, false);
+  // Solo dinero
+  const money = ok('remuneracion', 'Quiero un buen sueldo, más comisión y bastante dinero, es lo que busco.');
+  assert.equal(money.criteria.find(c => c.id === 'dinero').ok, false);
+  const better = ok('remuneracion', 'Antes de dar un número, ¿cómo se compone el pago: fijo, variable y de dónde vienen los leads? Con eso mi rango sería razonable.');
+  assert.equal(better.criteria.find(c => c.id === 'dinero').ok, true, 'preguntar cómo se paga no es solo hablar de dinero');
+  // Longitud
+  assert.equal(ok('metodologia', 'Hago llamadas.').criteria.find(c => c.id === 'larga').ok, true);
+  assert.equal(ok('metodologia', 'palabra '.repeat(140)).criteria.find(c => c.id === 'larga').ok, false);
+  // La pregunta inversa pide devolver una pregunta
+  assert.equal(ok('pregunta-inversa', 'No, está todo claro, gracias por la entrevista y por vuestro tiempo.').criteria.find(c => c.id === 'sinpregunta').ok, false);
+  assert.equal(ok('pregunta-inversa', '¿Cómo se mide el éxito en los tres primeros meses? ¿De dónde vienen los leads?').criteria.find(c => c.id === 'sinpregunta').ok, true);
+  // Cifras sospechosas
+  assert.equal(ok('porque-tu', 'Cierro todo lo que me ponen delante, soy la mejor y siempre cierro el 100 % de las llamadas en las que entro.').criteria.find(c => c.id === 'inflada').ok, false);
+}
+console.log('PASS  formación: banco de preguntas de entrevista con banderas rojas corregibles');

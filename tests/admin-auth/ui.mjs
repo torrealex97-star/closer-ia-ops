@@ -213,7 +213,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.goto(BASE + '/'); await alumna.getByRole('button', { name: 'Mi progreso' }).click(); await alumna.getByRole('heading', { name: 'Tu progreso.' }).waitFor();
   await alumna.locator('.stat-strip').waitFor();
   const strip = await alumna.locator('.stat-strip').innerText(); assert.match(strip, /1\s*prácticas/); assert.match(strip, /72\s*nota media/);
-  assert.match(await alumna.locator('.student-progress').innerText(), /1 de 7 módulos repasados/);
+  assert.match(await alumna.locator('.student-progress').innerText(), /1 de 8 módulos repasados/);
   await alumna.getByTestId('this-week').waitFor(); const week = await alumna.getByTestId('this-week').innerText(); assert.match(week, /Completar 3 prácticas en la sala · \d\/3/); assert.match(week, /Enviar 5 candidaturas · \d\/5/); assert.ok(!/sin practicar/.test(week), 'una práctica de hoy no avisa de inactividad');
   await alumna.getByTestId('level').waitFor(); assert.match(await alumna.getByTestId('level').innerText(), /Nivel \d+ · \d+ XP/);
   assert.match(await alumna.locator('.student-progress').innerText(), /Tasa de respuesta\s*100 %/, 'una enviada y respondida = 100 %');
@@ -236,7 +236,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   assert.ok(await board.locator('.funnel-row').first().isVisible());
   if (process.env.SHOT4) await board.screenshot({ path: process.env.SHOT4 });
   await page.setViewportSize({ width: 1280, height: 900 });
-  const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/7/);
+  const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/8/);
   await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL', { exact: true }).waitFor();
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
 });
