@@ -2,6 +2,12 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Guía del dueño con herramientas, enlaces y prompts (sesión 112) — 2026-10-26
+
+- **Petición del operador**: dejar el paso a paso con las herramientas, lo necesario, enlaces y prompts.
+- **Hecho**: [OWNER_GUIDE.md](OWNER_GUIDE.md) reescrita: tabla resumen (tarea, herramienta, qué tener a mano, tiempo), y por tarea herramientas, requisitos, enlaces y pasos; más **11 prompts/mensajes listos para pegar** (email al asesor legal, solicitud de DPA y retención cero a Groq, instrucciones de etiquetado para mentoras, y prompts para retomar conmigo cada construcción que se desbloquea).
+- **Límites (inspected)**: los enlaces a documentación oficial salen de mi conocimiento y de resultados de búsqueda; no se han abierto todos. Los enlaces profundos al panel de Supabase/Vercel y los menús de terceros están marcados ⚠️ donde dudo. El correo de soporte de Groq no lo conozco: la guía manda a su consola/web.
+
 ## La máquina no cuenta como persona en las métricas (sesión 113) — 2026-10-26
 
 - **Revisión** (inspected) de [collectors](../apps/web/lib/collectors.ts), [googleJobs](../apps/web/lib/googleJobs.ts), la ruta del [cron](../apps/web/app/api/cron/collect/route.ts), [metrics](../apps/web/lib/metrics.ts), [aiAgreement](../apps/web/lib/aiAgreement.ts), [studentDashboard](../apps/web/lib/studentDashboard.ts) y [studentRetention](../apps/web/lib/studentRetention.ts): un defecto corregido. El resto del repaso no encontró plazos sin reloj, totales truncados nuevos ni divisiones sin guarda (las distribuciones ya exigen `MIN_GROUP`).
@@ -9,6 +15,7 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Arreglo**: `MACHINE_REVIEWERS` + `isHumanReviewer()` en [external.ts](../apps/web/lib/external.ts) como única fuente de verdad; ambas lecturas lo usan y `aiAgreement` deja de duplicar el `ORG`.
 - **Probado** (tested): [agreement.mjs](../tests/admin-auth/agreement.mjs) pasa a 9 propuestas / 5 pares / 4 pendientes (las filas de `auto-reglas` y `auto-excepcion` quedan fuera del contraste) y [metrics.mjs](../tests/admin-auth/metrics.mjs) comprueba que esas decisiones no cuentan como humanas. `npm run test:web` con Chrome real: **199 PASS, 0 FAIL, 11/11 pasos**; `typecheck`, `build` y `design` en verde.
 - **Limpieza**: `apps/web/.next` tenía copias de conflicto del sincronizador (`routes.d 2.ts`, `cache-life.d 2.ts`…) que rompían `tsc` con identificadores duplicados; eliminadas (artefactos de build, no versionados).
+
 
 ## Revisión de código y correcciones (sesión 111) — 2026-10-26
 
