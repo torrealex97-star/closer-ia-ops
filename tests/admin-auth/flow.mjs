@@ -711,7 +711,11 @@ await step('cualificación automática: aprueba lo claro por reglas, deja lo dud
   assert.equal(state.external.get('au|ok1').editorial_status, 'approved');
   assert.equal(state.external.get('au|ok1').reviewed_by, 'auto-reglas');
   assert.equal(state.external.get('au|ok1').auto_review.why, 'cumple_reglas');
-  assert.equal(state.external.get('au|dudoso').editorial_status, 'draft', 'lo dudoso no se aprueba solo');
+  // Lo dudoso no se aprueba solo y tampoco se queda en borrador: va a la cola humana con su motivo.
+  assert.equal(state.external.get('au|dudoso').editorial_status, 'needs_review', 'lo dudoso no se aprueba solo');
+  assert.equal(state.external.get('au|dudoso').reviewed_by, 'auto-excepcion');
+  assert.equal(state.external.get('au|dudoso').auto_review.why, 'sin_perfil');
+  assert.ok((r.json.moved ?? 0) >= 1, `la base confirma ${r.json.moved} fila(s) movidas a la cola`);
   const listed = await call('/api/admin/external?status=draft');
   assert.equal(listed.status, 200); assert.equal(typeof listed.json.auto.cap, 'number');
 });
