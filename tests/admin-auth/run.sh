@@ -24,6 +24,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 # Cualificación automática: lo claro se aprueba y lo dudoso ACABA en la cola humana (no en borrador).
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/autoreview.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/metrics.mjs
+# Cifras por fuente: las cuenta la base (count=exact), sin traer la tabla ni cortarse en 5.000.
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/sources.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/agreement.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/hardening.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/ingest.mjs

@@ -70,7 +70,7 @@ const CONN: Record<string, string> = { ok: 'Conectado', error: 'Con fallo', not_
 const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida' };
 const statusClass = (s: string | null) => s === 'ok' || s === 'completed' ? 'status ok' : s === 'error' || s === 'failed' ? 'status bad' : 'status';
 
-type ExtSource = { source: string; total: number; live: number; approved: number; last_seen: string | null };
+type ExtSource = { source: string; live: number; approved: number; last_seen: string | null };
 type CatalogEntry = { code: string; name: string; category: string | null; website: string | null; acquisition_method: string | null; validation_status: string | null; requires: string | null; note: string | null };
 const CATALOG = sourceCatalog as CatalogEntry[];
 type CloudSource = Overview['sources'][number];
