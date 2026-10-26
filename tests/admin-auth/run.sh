@@ -44,6 +44,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/fallback.mjs
 # Workana como portal de Apify: plantilla propia, sin país ISO roto y presupuesto que no es salario.
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/workana.mjs
+# Panel: los conectores del motor se cruzan con el catálogo por portal (Himalayas no es «fuera del cloud»).
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/families.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/surface.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/market.mjs
 # El motor retira en bloque lo que descarta (no lo deja en la cola humana): prueba de conducta con D1 simulado.
