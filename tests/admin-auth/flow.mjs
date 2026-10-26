@@ -113,6 +113,10 @@ await step('APIs: sin clave al principio; guardar cifrada; nunca se devuelve en 
   assert.deepEqual((await call('/api/admin/connections', { method: 'POST', body: { provider: 'groq' } })).json, { ok: true, detail: 'Clave válida' });
   assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'resend', secret: 'good-key-1234' } })).status, 200);
   assert.deepEqual((await call('/api/admin/connections', { method: 'POST', body: { provider: 'resend' } })).json, { ok: true, detail: 'Clave válida' });
+  // Una clave de Resend restringida a solo envío no puede listar dominios (401 restricted_api_key) y aun así es válida.
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'resend', secret: 'restricted-key-1234' } })).status, 200);
+  assert.deepEqual((await call('/api/admin/connections', { method: 'POST', body: { provider: 'resend' } })).json, { ok: true, detail: 'Clave válida (permiso solo de envío)' });
+  assert.equal((await call('/api/admin/connections', { method: 'PUT', body: { provider: 'resend', secret: 'good-key-1234' } })).status, 200);
   const bad = await call('/api/admin/connections', { method: 'POST', body: { provider: 'serpapi' } });
   assert.equal(bad.json.ok, false); assert.match(bad.json.detail, /rechazada/);
   const o = (await call('/api/admin/overview')).json.paid;

@@ -1,4 +1,4 @@
--- NO EJECUTADA. Prueba de comportamiento de student_voice_consent (con rollback). Ejecutar solo tras aplicar 20261027_voice_consent.sql.
+-- NO EJECUTADA (la migración ya está aplicada desde el 2026-10-26). Prueba de comportamiento de student_voice_consent (con rollback). Ejecutar solo tras aplicar 20261027_voice_consent.sql.
 begin;
   -- RLS activada y sin acceso para anon/authenticated
   do $$ begin

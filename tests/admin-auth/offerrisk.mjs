@@ -18,6 +18,12 @@ await step('pago previo → bloqueada, con su código', () => {
     assert.ok(codes(r).includes('ADVANCE_PAYMENT_DETECTED'), text); assert.equal(r.risk_level, 'BLOCKED', text); assert.equal(r.visibility, false);
   }
 });
+await step('negar el pago previo («no es necesario pagar», «sin inversión inicial») no es una bandera', () => {
+  for (const text of ['No es necesario pagar ni invertir nada', 'Sin inversión inicial. Formación a cargo de la empresa.', 'Incorporación sin cuota de entrada: no hay que comprar ningún kit']) {
+    assert.ok(!codes(assessOffer({ title: 'Closer', description: text })).includes('ADVANCE_PAYMENT_DETECTED'), text);
+  }
+  assert.ok(codes(assessOffer({ description: 'Sin experiencia previa. Debes pagar una licencia de 300 €' })).includes('ADVANCE_PAYMENT_DETECTED')); // la negación de otra frase no la tapa
+});
 await step('multinivel y pirámide → bloqueada; vender no es reclutar', () => {
   assert.ok(codes(assessOffer({ description: 'Negocio de network marketing, construye tu línea descendente' })).includes('MLM_OR_PYRAMID'));
   assert.ok(codes(assessOffer({ description: 'Reclutarás gente: comisiones por cada persona que se una a tu equipo' })).includes('MLM_OR_PYRAMID'));
@@ -38,6 +44,11 @@ await step('solo comisión, publicidad a su cargo, sin entrevista y solo WhatsAp
   assert.ok(codes(assessOffer({ description: 'Escribe por WhatsApp al 600 000 000' })).includes('MESSAGING_ONLY_CONTACT'));
   assert.equal(assessOffer({ description: 'Escribe por WhatsApp o a jobs@empresa.com' }).detected_flags.length, 0);
   assert.equal(assessOffer({ description: 'Solo comisiones' }).risk_level, 'WARNING');
+});
+await step('publicidad: la que asume la empresa o la negada no es una carga para la closer', () => {
+  assert.ok(codes(assessOffer({ description: 'La closer asumirá la inversión en publicidad' })).includes('AD_SPEND_ON_CLOSER'));
+  assert.ok(!codes(assessOffer({ description: 'La empresa asume la inversión en publicidad y tú solo cierras.' })).includes('AD_SPEND_ON_CLOSER'));
+  assert.ok(!codes(assessOffer({ description: 'Sin inversión en publicidad por tu parte.' })).includes('AD_SPEND_ON_CLOSER'));
 });
 await step('varios avisos suman y pueden llegar a bloquear (≥ 85); la puntuación no pasa de 100', () => {
   const r = assessOffer({ description: 'Solo comisión, sin entrevista, inversión en publicidad a tu cargo, libertad financiera' });
