@@ -10,18 +10,18 @@ Leyenda: ✅ hecho y probado · 🟡 parcial · ⬜ pendiente (construible) · �
 
 Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude, Codex u otros): ficha propia, `touches` sin solapes, un trabajo en curso cada uno. Carriles propuestos (confirmar con el dueño): *captación/ingesta*, *alumnas/matching/candidaturas*, *infra/CI/BD*. claude-cloud = alumnas, formación, progreso, seguridad de ofertas y paneles.
 
-Al escribir esto, abiertas: **#39** reglas de retención (cálculo y panel) y **#40** clave de Resend en Panel → APIs. Al fusionar una PR, su ficha se borra en la PR siguiente.
+Al escribir esto, abierta: **#46** bases de la voz (interruptor, consentimiento, ADR-015). Fusionadas en `main`: #38 detector de ofertas, #39 retención, #40 clave de Resend, #41 relevo, #42 banderas de riesgo en la revisión, #43 catálogo de la sala (19 situaciones). Al fusionar una PR, su ficha se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
-- **Hecho en sesiones 76-101** (detalle en `docs/STATUS.md`): formación (7 módulos + examen determinista, cierres y descubrimiento), progreso de alumnas (actividad, XP y niveles derivados, maestría, embudo de candidaturas con resultado), panel de coordinación, cualificación automática por reglas (tope 100/día), Google Jobs + SerpApi, términos y privacidad en borrador, **detector de ofertas peligrosas** (reglas; una oferta con señales nunca se aprueba sola).
+- **Hecho en sesiones 76-105** (detalle en `docs/STATUS.md`): formación (7 módulos + examen determinista, cierres y descubrimiento), progreso de alumnas (actividad, XP y niveles derivados, maestría, embudo de candidaturas con resultado), panel de coordinación, cualificación automática por reglas (tope 100/día), Google Jobs + SerpApi, términos y privacidad en borrador, **detector de ofertas peligrosas** (reglas; una oferta con señales nunca se aprueba sola, y la revisión muestra el nivel y el motivo), reglas de retención como cálculo y panel (sin envíos), clave de Resend guardable en Panel → APIs, sala de práctica con 19 situaciones (5 ofertas ficticias por nicho y entrevistadores de RR. HH. y dirección de ventas).
 - **Migraciones aplicadas en Supabase real**: `student_auth_foundation`, `student_application_profile`, `student_activity`, `auto_qualify_offers` y **`application_outcomes`** (aplicada y verificada el 2026-10-25: el `CHECK` de estado ya admite `responded/interview/offer/rejected`). Los asesores de seguridad solo avisan de lo esperado (tablas solo para la clave de servicio, sin políticas) y de la protección de contraseñas filtradas (tarea 1).
-- **Escritas y NO aplicadas**: `20261026_integration_resend.sql` (ampliar el `CHECK` de proveedores; en #40). Hasta aplicarla, guardar la clave de Resend falla con un mensaje claro.
+- **Escritas y NO aplicadas**: `20261026_integration_resend.sql` (ampliar el `CHECK` de proveedores; hasta aplicarla, guardar la clave de Resend falla con un mensaje claro) y `20261027_voice_consent.sql` (consentimiento de voz; sin ella la voz no puede abrirse). Sus pruebas de BD (`tests/db/`) tampoco se han ejecutado.
 - **Evidencia**: *verificado en GitHub* (`verify` y `web-admin` en verde antes de cada fusión) · *verificado en BD real* (RLS de alumnas, estructura de `student_activity`, `CHECK` de candidaturas) · *probado con servicios simulados* (panel, ingesta, revisor, alumnas, matching, retención, detector) · *no probado en real*: Apify, Groq, InfoJobs/Adzuna/Jooble, Jev, Resend, correo y login contra Supabase Auth, cron en Vercel, WhatsApp.
 
 ## 3. Tareas del dueño (lo que solo tú puedes hacer)
 
-1. **Supabase → Authentication**: permitir `https://app.womendigitalclosers.com/alumna/reset`; activar *Leaked password protection*; SMTP propio. **Aplicar `20261026_integration_resend.sql`** (o dar la orden) para poder guardar la clave de Resend.
+1. **Supabase → Authentication**: permitir `https://app.womendigitalclosers.com/alumna/reset`; activar *Leaked password protection*; SMTP propio. **Aplicar `20261026_integration_resend.sql`** (o dar la orden) para poder guardar la clave de Resend, y `20261027_voice_consent.sql` cuando quieras abrir la voz.
 2. **Muestra de ofertas reales** (o permiso para tomarla del inventario) para calibrar el detector de ofertas peligrosas: hoy sus reglas están sin calibrar.
 3. **Resend**: comprobar en su documentación si ofrece recepción de correo con webhook y su precio; verificar el dominio; pegar la clave en Panel → APIs. Sin esto no se construye el correo entrante.
 4. **Acreditación**: URL y token de tu app de certificados; mentoras que etiqueten un conjunto de calibración (llamadas buenas/malas); revisión legal de llamarlo «certificado oficial».
@@ -45,8 +45,8 @@ Al escribir esto, abiertas: **#39** reglas de retención (cálculo y panel) y **
 
 | # | Fase | Estado | Qué falta / quién |
 | --- | --- | --- | --- |
-| 1 | Banderas de riesgo visibles en la revisión de ofertas | ⬜ | Mostrar nivel y códigos de `offerRisk.ts` en `ExternalTab`. Agente. |
-| 2 | **Voz** (orden del dueño): consentimiento de audio + interruptor `VOICE_ROLEPLAY` apagado, catálogo (5 nichos × 2-3 ofertas ficticias, 4 arquetipos de cliente, 4 entrevistadores), rúbrica de 5 criterios con citas literales, bucle manos libres en el navegador, ADR-015 (WebRTC < 500 ms, Pipecat) y su sección en `/privacidad` y `/terminos` | ⬜ | Agente (migración de consentimiento escrita, aplicarla es tuya). Audio real con alumnas: ⛔ hasta tarea 5. |
+| 1 | Banderas de riesgo visibles en la revisión de ofertas | ✅ | Hecho (#42). Falta calibrar con ofertas reales (tarea 2). |
+| 2 | **Voz** (orden del dueño) | 🟡 | Hecho: catálogo de 19 situaciones (#43), ADR-015, interruptor `VOICE_ROLEPLAY` apagado y estado de consentimiento (#46). **Falta**: texto y pantalla de consentimiento de audio, bucle manos libres con *barge-in* en el navegador (Fase A), rúbrica de tono/ritmo solo en Fase B (WebRTC < 500 ms, Pipecat, retención cero), topes de minutos por alumna, y su sección en `/privacidad` y `/terminos`. Audio real con alumnas: ⛔ hasta tarea 5 y la migración de consentimiento. |
 | 3 | Revisión directa de mentora como petición guardada (botón) | ⬜ | Tabla nueva (migración). Hoy es solo un aviso. |
 | 4 | Detector: CIF, dominio < 30 días, LinkedIn; calibración con ofertas reales | ⛔ | Tarea 2; consultas externas. |
 | 5 | Graduación con mentora humana + conjunto de calibración + webhook de certificados | ⛔ | Tareas 4. Webhook apagado hasta tener URL/token. |
