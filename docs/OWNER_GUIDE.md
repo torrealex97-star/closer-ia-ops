@@ -1,24 +1,51 @@
 # Guía paso a paso: lo que solo puedes hacer tú
 
-Escrita el 2026-10-26. Cada bloque dice qué consigues, cuánto tarda y los pasos. Los nombres de menús de Supabase, GitHub, Vercel, Cloudflare y Resend **pueden haber cambiado**: si un botón no está donde digo, busca el nombre entre comillas. Marcado ⚠️ lo que no he podido comprobar.
+Actualizada el 2026-10-26. Cada bloque trae: **qué consigues**, **herramientas**, **lo que necesitas a mano**, **enlaces**, **pasos** y, cuando te toca hablar con una persona o conmigo, un **prompt/mensaje listo para copiar y pegar**.
 
-Orden recomendado: 1 → 3 (GitHub, 15 min) · 4 → 5 (Supabase, 20 min) · 6 (D1, 5 min) · 7 → 8 (correo y variables, 35 min) · el resto cuando toque.
+Los menús de terceros **cambian**: si un botón no está donde digo, búscalo por el nombre entre comillas. ⚠️ = no lo he podido comprobar. Los enlaces profundos de Supabase/Vercel usan tu proyecto (`jzchuizybyubtkownhlw`, `app-b1af/closer-ia-ops`); si alguno falla, entra por el menú.
+
+## Resumen: qué, con qué y cuánto
+
+| # | Tarea | Herramienta | Necesitas a mano | Tiempo |
+| --- | --- | --- | --- | --- |
+| 1 | Proteger el repo público | GitHub (web) + Docker (opcional) | Ser propietario del repo | 10 min |
+| 2 | Licencia | GitHub (web) | Decidir cuál | 3 min |
+| 3 | Borrar ramas viejas | Terminal con git | Repo clonado | 5 min |
+| 4 | Pruebas de BD | Supabase SQL Editor | Cuenta Supabase | 10 min |
+| 5 | Supabase Auth | Supabase (web) | Datos SMTP de Resend | 10 min |
+| 6 | Cuota de D1 | Cloudflare (web) | Cuenta Cloudflare | 5 min |
+| 7 | Resend | Resend (web) + tu DNS | Acceso al DNS del dominio | 20 min |
+| 8 | Variables de Vercel | Vercel (web) | Datos legales de la entidad | 15 min |
+| 9 | Revisión legal | Asesor RGPD (persona) | Prompt 1 + enlaces de abajo | 1 reunión |
+| 10 | Groq / voz: retención cero | Groq console + correo | Prompt 2 | 30 min |
+| 11 | Certificados y mentoras | Tu app de certificados + mentoras | Prompt 3 | cuando quieras |
+| 12 | Proveedores de ofertas | Apify, InfoJobs, Adzuna, Jooble | Cuentas en cada uno | 20 min |
+| 13 | Activaciones | Vercel + panel | Todo lo anterior hecho | variable |
+| 14 | Motor y esquema | Supabase CLI | Tarball del motor | 15 min |
+| 15 | Decisiones de producto | Este chat | Prompt 10 | 10 min |
+
+Orden recomendado: 1 → 3 → 4 → 5 → 6 → 7 → 8 → resto.
 
 ---
 
-## 1. Proteger el repositorio público (GitHub) · 10 min
-1. Entra en `github.com/torrealex97-star/closer-ia-ops` → **Settings** → **Code security** (a veces «Advanced Security»).
+## 1. Proteger el repositorio público · 10 min
+**Herramientas**: GitHub web; opcional Docker Desktop (para gitleaks).
+**Enlaces**: [repo](https://github.com/torrealex97-star/closer-ia-ops) · [Settings → Code security](https://github.com/torrealex97-star/closer-ia-ops/settings/security_analysis) · [Qué es Secret scanning](https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning) · [Push protection](https://docs.github.com/en/code-security/secret-scanning/introduction/about-push-protection) · [gitleaks](https://github.com/gitleaks/gitleaks) · [trufflehog](https://github.com/trufflesecurity/trufflehog)
+**Pasos**
+1. Abre *Settings → Code security* (enlace de arriba; a veces se llama «Advanced Security»).
 2. Activa **Secret scanning** y, justo debajo, **Push protection** (bloquea un `git push` que lleve una clave).
-3. Activa **Private vulnerability reporting** (para que te avisen en privado, como dice `SECURITY.md`).
-4. Recomendable: **Dependabot alerts** y **Dependabot security updates**.
-5. Revisión extra del historial en tu ordenador (con Docker): `docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --log-opts="--all"`. Si sale un hallazgo real: **rota esa clave** en su proveedor (borrarla del repositorio no basta).
+3. Activa **Private vulnerability reporting** (para que te avisen en privado, como dice `SECURITY.md`) y **Dependabot alerts**.
+4. Revisión del historial en tu ordenador: `docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --log-opts="--all"`.
+5. Si sale un hallazgo real: **rota esa clave en su proveedor** (borrarla del repositorio no basta) y pégame el hallazgo **sin la clave**.
 
 ## 2. Licencia · 3 min · decisión tuya
-Sin `LICENSE` el código es «todos los derechos reservados»: nadie puede reutilizarlo, aunque sea público. Si quieres que sea así, no hagas nada. Si quieres abrirlo: GitHub → **Add file → Create new file** → nombre `LICENSE` → botón **Choose a license template** (MIT es la más permisiva) → commit. O dime cuál prefieres y la añado yo.
+**Enlaces**: [elegir licencia](https://choosealicense.com/) · [licencias en GitHub](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributors/adding-a-license-to-a-repository)
+Sin `LICENSE` el código es «todos los derechos reservados»: nadie puede reutilizarlo aunque sea público. Si quieres eso, no hagas nada. Si quieres abrirlo: *Add file → Create new file → LICENSE → Choose a license template* (MIT = la más permisiva), o dime «pon la licencia X».
 
 ## 3. Borrar las ramas ya fusionadas · 5 min
-1. GitHub → **Settings → General** → bloque «Pull Requests» → marca **Automatically delete head branches** (así no se acumulan más).
-2. Para borrar las que ya hay: en tu ordenador con el repo clonado, pega esto. Son **49 ramas totalmente fusionadas en `main`**: su contenido sigue en `main` y cualquiera se puede restaurar desde su PR con «Restore branch».
+**Herramientas**: terminal con git y el repo clonado. **Enlaces**: [borrado automático de ramas](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-the-automatic-deletion-of-branches)
+1. [Settings → General](https://github.com/torrealex97-star/closer-ia-ops/settings) → «Pull Requests» → marca **Automatically delete head branches**.
+2. Pega esto en la terminal (ramas **totalmente fusionadas en `main`**: su contenido sigue en `main` y cualquiera se restaura desde su PR con «Restore branch»):
 ```
 git push origin --delete \
   claude/admin-auth \
@@ -71,80 +98,127 @@ git push origin --delete \
   fix/review-hardening \
   spike/voice-roleplay
 ```
-   (Yo lo intenté y mi entorno bloquea borrar ramas remotas; por eso lo haces tú. Dejé fuera las 6 del otro agente con menos de 12 h: `feat/cola-contador`, `feat/cola-excepciones-real`, `feat/ext-abre-excepciones`, `feat/ext-fuentes-donde-hay-trabajo`, `feat/motor-clasifica-solo`, `docs/produccion-verificada`.)
-3. **No borres a ciegas** `feat/formacion-progreso` ni `claude/cloud-student-view`: son versiones antiguas divergentes. `feat/formacion-progreso` guarda `tests/db/test_student_activity.sql` y `tests/browser/progress.spec.ts`; si no los quieres, bórralas: `git push origin --delete feat/formacion-progreso claude/cloud-student-view`.
+   Dejé fuera las 6 del otro agente con menos de 12 h (`feat/cola-contador`, `feat/cola-excepciones-real`, `feat/ext-abre-excepciones`, `feat/ext-fuentes-donde-hay-trabajo`, `feat/motor-clasifica-solo`, `docs/produccion-verificada`). Mi entorno bloquea borrar ramas remotas, por eso lo haces tú.
+3. **No borres a ciegas** `feat/formacion-progreso` ni `claude/cloud-student-view` (versiones antiguas divergentes; la primera guarda `tests/db/test_student_activity.sql` y `tests/browser/progress.spec.ts`). Si no los quieres: `git push origin --delete feat/formacion-progreso claude/cloud-student-view`.
 
-## 4. Ejecutar las pruebas de BD con escrituras · 10 min
-Qué consigues: confirmar con la base real que las restricciones y la RLS se comportan (todo se deshace solo).
-1. Supabase → tu proyecto → **SQL Editor** → **New query**.
-2. Abre en GitHub `tests/db/student_activity.sql`, copia **todo**, pégalo y pulsa **Run**. Debe terminar con un error que empieza por `ACTIVIDAD_OK:` (a propósito: así se deshace todo). Un error que empiece por `FALLO` significa que algo no se cumple: pégamelo.
-3. Repite con `tests/db/application_outcomes.sql` (debe acabar en `RESULTADOS_OK:`).
-4. `tests/db/voice_consent.sql` usa `begin … rollback`: pégalo entero; no debe dar error.
-5. Opcional: **Advisors** (menú izquierdo) → *Security* y *Performance*.
+## 4. Pruebas de BD con escrituras · 10 min
+**Qué consigues**: confirmar con la base real que restricciones y RLS funcionan (todo se deshace solo).
+**Herramientas**: Supabase SQL Editor. **Enlaces**: [SQL Editor](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/sql/new) · [Advisors](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/advisors/security) · ficheros: [student_activity.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/student_activity.sql), [application_outcomes.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/application_outcomes.sql), [voice_consent.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/voice_consent.sql), [integration_resend.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/integration_resend.sql)
+1. Abre el SQL Editor → **New query**.
+2. Abre cada fichero en GitHub (botón **Raw**), copia **todo**, pégalo y **Run**. Resultado esperado: `student_activity` acaba con error `ACTIVIDAD_OK:` y `application_outcomes` con `RESULTADOS_OK:` (a propósito, así se deshace todo); `voice_consent` e `integration_resend` no deben dar error. Un error que empiece por `FALLO` = algo no se cumple.
+3. **Prompt 8** (abajo) si algo falla.
 
 ## 5. Supabase Authentication · 10 min
-1. **Authentication → URL Configuration**: en **Redirect URLs** añade `https://app.womendigitalclosers.com/alumna/reset`. «Site URL» = `https://app.womendigitalclosers.com`.
-2. **Authentication → Sign In / Providers → Email** (o «Password security»): activa **Leaked password protection**. ⚠️ Puede requerir el plan Pro de Supabase; si no aparece, es eso.
-3. **Project Settings → Authentication → SMTP Settings**: «Enable custom SMTP» con los datos de tu proveedor de correo. Con Resend: host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = tu API key, remitente de tu dominio verificado. ⚠️ Estos datos SMTP son de memoria: confírmalos en la documentación de Resend.
-4. Prueba: invita a una alumna de prueba desde el panel y comprueba que le llega el correo.
+**Herramientas**: Supabase web. **Enlaces**: [URL Configuration](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/auth/url-configuration) ⚠️ · [SMTP propio](https://supabase.com/docs/guides/auth/auth-smtp) · [Contraseñas filtradas](https://supabase.com/docs/guides/auth/password-security) · [SMTP de Resend](https://resend.com/docs/send-with-smtp)
+1. **Authentication → URL Configuration**: «Site URL» = `https://app.womendigitalclosers.com`; en **Redirect URLs** añade `https://app.womendigitalclosers.com/alumna/reset`.
+2. Activa **Leaked password protection** (en *Authentication → Sign In / Providers → Email* o «Password security»). ⚠️ Puede requerir plan Pro.
+3. **Project Settings → Authentication → SMTP Settings** → «Enable custom SMTP». Con Resend: host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = tu API key, remitente de tu dominio verificado (haz antes el paso 7). ⚠️ Confirma estos datos en el enlace de Resend.
+4. Prueba: invita a una alumna de prueba desde el panel y comprueba que llega el correo.
 
 ## 6. Cuota de escrituras de D1 (Cloudflare) · 5 min
-Iba en 94.177 de 100.000 al mes, se reinicia el 1 de noviembre y la clasificación diaria añade unas 400 al día. Si se agota, el motor deja de escribir hasta el reinicio (no se rompe nada más).
-1. dash.cloudflare.com → **Workers & Pages → D1** → la base del motor → **Metrics** → «Rows written».
-2. Si quieres margen: **Workers & Pages → Plans** → plan de pago de Workers. ⚠️ Comprueba el precio y que D1 sube sus límites con él.
-3. Si no haces nada, con ~400 al día alcanza hasta el 1 de noviembre.
+**Qué pasa**: iba en 94.177 de 100.000 al mes, se reinicia el 1 de noviembre y la clasificación diaria añade ~400 al día. Si se agota, el motor deja de escribir hasta el reinicio (no se rompe nada más).
+**Enlaces**: [Cloudflare](https://dash.cloudflare.com/) · [Precios de D1](https://developers.cloudflare.com/d1/platform/pricing/) · [Límites de D1](https://developers.cloudflare.com/d1/platform/limits/)
+1. *Workers & Pages → D1* → la base del motor → **Metrics** → «Rows written».
+2. Si quieres margen: plan de pago de Workers. ⚠️ Comprueba precio y que D1 sube sus límites con él (enlace de precios).
+3. Si no haces nada, ~400/día alcanza hasta el 1 de noviembre.
 
 ## 7. Resend (correo) · 20 min
-1. Abre `resend.com/pricing`: gratuito = 3.000 correos/mes y 100/día; lo recibido cuenta igual que lo enviado (según su documentación). ⚠️ Confirma las cifras vigentes.
-2. **Domains → Add Domain**: `careers.womendigitalclosers.com` (o el subdominio que decidas). Resend te da registros DNS (SPF, DKIM y MX para recibir): añádelos en tu proveedor de DNS y pulsa **Verify** (minutos u horas).
-3. **API Keys → Create API Key**: permiso «Sending access» para empezar; cópiala (solo se muestra una vez).
-4. En la app: **Panel → APIs → Resend → pegar la clave → Guardar → Comprobar**. Debe decir «Clave válida». (Hoy no envía nada.)
-5. Dime cuando el dominio esté verificado y construyo el correo entrante (webhook `email.received`).
+**Herramientas**: Resend web + el panel de DNS de tu dominio (Cloudflare, GoDaddy…). **Necesitas**: acceso al DNS de `womendigitalclosers.com`.
+**Enlaces**: [Precios](https://resend.com/pricing) · [Dominios](https://resend.com/domains) · [API keys](https://resend.com/api-keys) · [Correo entrante](https://resend.com/docs/dashboard/receiving/introduction) · [Webhook email.received](https://resend.com/docs/webhooks/emails/received)
+1. Mira el plan: gratis = 3.000 correos/mes y 100/día, y lo **recibido cuenta igual** que lo enviado (según su documentación). ⚠️ Confirma cifras vigentes.
+2. **Domains → Add Domain**: `careers.womendigitalclosers.com` (o el subdominio que decidas). Copia los registros DNS (SPF, DKIM y MX para recibir) a tu proveedor de DNS y pulsa **Verify**.
+3. **API Keys → Create API Key**: «Sending access» para empezar; cópiala (se muestra una vez).
+4. En la app: **Panel → APIs → Resend → pegar → Guardar → Comprobar**. Esperado: «Clave válida» (o «Clave válida (permiso solo de envío)» si la creaste restringida; si dice «rechazada», dímelo).
+5. Cuando el dominio esté verificado: **Prompt 4** (abajo) para que construya el correo entrante.
 
-## 8. Variables de entorno de Vercel · 15 min
-1. vercel.com → proyecto **closer-ia-ops** → **Settings → Environment Variables**.
-2. Comprueba que existen (nombres exactos): `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (o `SUPABASE_SERVICE_ROLE_KEY`), `SUPABASE_PUBLISHABLE_KEY`, `ADMIN_SECRETS_KEY`, `ADMIN_PUBLIC_URL`, `INGEST_TOKEN`, `CRON_SECRET`, `CAREER_ENGINE_URL`, `GROQ_API_KEY`.
-3. Añade los datos legales (para `/privacidad` y `/terminos`): `LEGAL_ENTITY_NAME` (razón social), `LEGAL_ENTITY_TAX_ID` (NIF/CIF), `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL`.
-4. **No actives todavía**: `STUDENT_LOGIN_REQUIRED`, `VOICE_ROLEPLAY` ni `AI_REVIEW_MODE=live`. Están apagadas a propósito.
-5. Tras cambiar variables: **Deployments → ⋯ en el último → Redeploy** (sin redeploy no aplican).
-6. Antes de abrir a alumnas: **Settings → Billing** → plan **Pro**.
+## 8. Variables de Vercel · 15 min
+**Herramientas**: Vercel web. **Necesitas**: razón social, NIF/CIF, dirección y email de privacidad.
+**Enlaces**: [Variables del proyecto](https://vercel.com/app-b1af/closer-ia-ops/settings/environment-variables) ⚠️ · [Docs de variables](https://vercel.com/docs/environment-variables) · [Redeploy](https://vercel.com/docs/deployments/managing-deployments#redeploy-a-project) · [Planes](https://vercel.com/pricing)
+1. Comprueba que existen (nombres exactos): `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (o `SUPABASE_SERVICE_ROLE_KEY`), `SUPABASE_PUBLISHABLE_KEY`, `ADMIN_SECRETS_KEY`, `ADMIN_PUBLIC_URL`, `INGEST_TOKEN`, `CRON_SECRET`, `CAREER_ENGINE_URL`, `GROQ_API_KEY`.
+2. Añade los datos legales: `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_TAX_ID`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_PRIVACY_EMAIL`.
+3. Si el cron queda corto (cortes seguidos en su respuesta): `CRON_BUDGET_MS=50000`.
+4. **No actives todavía** `STUDENT_LOGIN_REQUIRED`, `VOICE_ROLEPLAY` ni `AI_REVIEW_MODE=live`.
+5. **Deployments → ⋯ → Redeploy** (sin redeploy las variables no aplican). Antes de abrir a alumnas: plan **Pro**.
 
 ## 9. Revisión legal · 1 reunión
-1. Reúne `/privacidad` y `/terminos` (en producción tras el paso 8), `docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md` (puntos abiertos para el asesor) y `docs/decisions/ADR-013` y `ADR-015` (voz).
-2. Pide a un profesional en RGPD/LOPDGDD que revise: base legal, encargados (Supabase, Vercel, Groq, Resend), plazos, derechos, el texto de consentimiento de audio y los términos (ley aplicable, responsabilidad, consumidoras).
-3. Con su visto bueno me pasas los cambios y subo las versiones (`POLICY_VERSION`, `TERMS_VERSION`, `CONSENT_VERSION`); las alumnas con consentimiento anterior deberán aceptar de nuevo.
+**Herramientas**: un asesor/abogado en protección de datos (RGPD/LOPDGDD). **Enlaces**: [AEPD](https://www.aepd.es/) · [Guía RGPD para responsables](https://www.aepd.es/guias) · tus páginas: [/privacidad](https://app.womendigitalclosers.com/privacidad), [/terminos](https://app.womendigitalclosers.com/terminos) · [puntos abiertos](https://github.com/torrealex97-star/closer-ia-ops/blob/main/docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md) · [ADR-013](https://github.com/torrealex97-star/closer-ia-ops/blob/main/docs/decisions/ADR-013-voice-roleplay-foundations.md) · [ADR-015](https://github.com/torrealex97-star/closer-ia-ops/blob/main/docs/decisions/ADR-015-voz-en-la-sala-de-practica.md)
+1. Envíale el **Prompt 1**.
+2. Con su visto bueno, me pasas los cambios (**Prompt 5**) y subo las versiones; las alumnas con consentimiento anterior deberán aceptar de nuevo.
 
 ## 10. Groq y el proveedor de voz: retención cero · 30 min
 Hoy el texto de la sala de práctica se envía a Groq (consta en `/privacidad`).
-1. En tu cuenta de Groq busca los ajustes de datos/privacidad («Data controls», «Zero data retention») y sus condiciones («DPA»). ⚠️ No sé cómo lo ofrece Groq; si no lo ves, escríbeles pidiendo (a) un acuerdo de tratamiento (DPA) y (b) retención cero para tu organización.
+**Enlaces**: [Consola de Groq](https://console.groq.com/) · [Política de privacidad de Groq](https://groq.com/privacy-policy) ⚠️ (busca allí «data retention», «DPA», «zero data retention»).
+1. En tu cuenta busca ajustes de datos/privacidad y condiciones (DPA). Si no los ves, envía el **Prompt 2** al soporte de Groq (chat de la consola o el correo de contacto de su web ⚠️).
 2. Guarda su respuesta; sin ella no conviene abrir la sala a muchas alumnas ni activar la voz.
-3. Para la voz: elige proveedor de STT/TTS, pídele lo mismo y dime cuál para ajustar el ADR-015.
+3. Para la voz: elige proveedor de STT/TTS, pídele lo mismo y dime cuál (**Prompt 6**).
 
 ## 11. Certificados y acreditación · cuando quieras
-1. Pásame la **URL** de la API de tu app de certificados y un ejemplo de lo que acepta. El **token** no lo pegues en el chat: lo guardamos cifrado en Panel → APIs.
-2. Etiquetado: 2-3 mentoras puntúan 20-30 prácticas o llamadas (buena/regular/mala + una frase de por qué). Con eso se calibra la nota antes de llamarla «evaluación».
-3. Decide con tu asesor si puede llamarse «certificado oficial» o «de aprovechamiento».
+**Necesitas**: URL de la API de tu app de certificados + ejemplo de lo que acepta; 2-3 mentoras. El **token no lo pegues en el chat**: va cifrado en Panel → APIs.
+1. Manda a las mentoras el **Prompt 3** con 20-30 prácticas/llamadas para puntuar.
+2. Decide con tu asesor si puede llamarse «certificado oficial» o «de aprovechamiento».
+3. Cuando lo tengas: **Prompt 7**.
 
-## 12. Pruebas reales con proveedores · 20 min
-- **Apify**: Panel → Apify → pega el token → «Probar con 10 ofertas» (`max_items=10`). Pásame cuántas ofertas salen, el coste y los errores.
-- **InfoJobs**: developer.infojobs.net → crea una app (necesita aprobación) → `client_id:client_secret` en Panel → APIs → InfoJobs.
-- **Adzuna**: developer.adzuna.com → regístrate → `app_id:app_key` en Panel → APIs → Adzuna.
-- **Jooble**: es.jooble.org/api/about → clave de España (la de jooble.org solo trae ofertas de EE. UU.) en Panel → APIs → Jooble.
-- Tras guardar cada clave: «Comprobar».
+## 12. Proveedores de ofertas · 20 min
+**Enlaces**: [Apify tokens](https://console.apify.com/account/integrations) · [InfoJobs developers](https://developer.infojobs.net/) · [Adzuna API](https://developer.adzuna.com/) · [Jooble API (España)](https://es.jooble.org/api/about)
+- **Apify**: Panel → Apify → pega el token → «Probar con 10 ofertas». Pasa el resultado con el **Prompt 9**.
+- **InfoJobs**: crea app (necesita aprobación) → `client_id:client_secret` → Panel → APIs → InfoJobs.
+- **Adzuna**: regístrate → `app_id:app_key` → Panel → APIs → Adzuna.
+- **Jooble**: clave de **España** (la de jooble.org solo trae EE. UU.) → Panel → APIs → Jooble.
+- Tras cada clave: «Comprobar».
 
 ## 13. Activaciones (cuando tú decidas)
-- **Login obligatorio para alumnas**: antes, invita a 2-3 alumnas de prueba y comprueba el correo real. Luego `STUDENT_LOGIN_REQUIRED=true` + redeploy. Apagar = quitar la variable.
-- **Revisor IA en vivo**: 5-7 días en «shadow» y mira el informe de acuerdo en Fuentes externas. Con ≥ 30 pares comparados y ≤ 5 % de falsas aprobaciones, `AI_REVIEW_MODE=live` + redeploy.
-- **Voz**: falta el texto legal, el proveedor y la pantalla de consentimiento (me lo pides y lo construyo) → después `VOICE_ROLEPLAY=on`.
-- **Avisos por WhatsApp/correo**: ordénamelo expresamente, con la cuenta (WhatsApp Business o Resend verificado).
+- **Login obligatorio**: invita a 2-3 alumnas de prueba, comprueba el correo real y pon `STUDENT_LOGIN_REQUIRED=true` + redeploy. Apagar = quitar la variable.
+- **Revisor IA en vivo**: 5-7 días en «shadow», mira el informe de acuerdo en Fuentes externas. Con ≥ 30 pares y ≤ 5 % de falsas aprobaciones: `AI_REVIEW_MODE=live` + redeploy.
+- **Voz**: tras el texto legal, el proveedor y la pantalla de consentimiento (**Prompt 6**) → `VOICE_ROLEPLAY=on`.
+- **Avisos por WhatsApp/correo**: ordénamelo expresamente (**Prompt 11**).
 - **Candidaturas automáticas**: requieren autorización escrita (ADR-012); no se construye Camoufox.
 
 ## 14. Motor y esquema · 15 min
-- **`closer-offers-engine` + `supabase db pull`**: pega el tarball del motor (o dime dónde) y, en tu ordenador con la CLI de Supabase: `supabase login`, `supabase link --project-ref jzchuizybyubtkownhlw`, `supabase db pull`. Sube el fichero que genera, así quedan versionadas las 9 tablas anteriores.
+**Herramientas**: Supabase CLI. **Enlaces**: [instalar la CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) · [`supabase db pull`](https://supabase.com/docs/reference/cli/supabase-db-pull)
+1. `supabase login` → `supabase link --project-ref jzchuizybyubtkownhlw` → `supabase db pull`.
+2. Sube el fichero generado (o pásamelo) y pega el tarball de `closer-offers-engine` donde te indique. Así quedan versionadas las 9 tablas anteriores.
 
-## 15. Decisiones de producto (respóndeme en el chat)
-1. **XP y niveles**: ¿mantengo mis pesos y los 8 niveles, o usas los de tu propuesta? (se cambia en un solo fichero).
-2. **Ranking entre alumnas**: ¿sí, no, o solo opt-in y agregado? (por defecto, no).
-3. **«Contratada»**: ¿cuándo se da por contratada una alumna? (propuesta: ella lo declara y una mentora lo confirma con un clic).
-4. **Copiloto «Jarvis»** con memoria: ¿lo quieres? Implica proveedor, presupuesto por alumna y decisión de coste.
-5. **Ofertas con aviso del detector**: ¿se ocultan a las alumnas o solo se marcan en la revisión?
+## 15. Decisiones de producto
+Respóndeme con el **Prompt 10** (pegado y rellenado).
+
+---
+
+# Prompts y mensajes listos para pegar
+
+**Prompt 1 — Para el asesor legal (email)**
+> Asunto: Revisión RGPD/LOPDGDD de una plataforma de formación para closers (borradores)
+> Hola [nombre]: estamos a punto de abrir a alumnas una plataforma web (app.womendigitalclosers.com) que ofrece formación en ventas, una sala de práctica con IA (el texto de las conversaciones se envía a Groq), seguimiento de su progreso y recomendación/asistencia de candidaturas a ofertas de trabajo. Tenemos borradores de política de privacidad (/privacidad), términos (/terminos) y textos de consentimiento. Necesito que revises: (1) base legal por finalidad; (2) encargados del tratamiento (Supabase, Vercel, Groq, Resend) y transferencias internacionales; (3) plazos de conservación y derechos; (4) el texto de consentimiento previsto para audio/voz (aún no activo, retención cero); (5) ley aplicable, límites de responsabilidad y régimen de consumidoras en los términos; (6) si llamar «certificado oficial» a la acreditación es posible. Adjunto el listado de puntos abiertos: https://github.com/torrealex97-star/closer-ia-ops/blob/main/docs/legal/PRIVACIDAD_Y_CONSENTIMIENTOS.md. ¿Presupuesto y plazo?
+
+**Prompt 2 — Para el soporte de Groq**
+> Subject: DPA and zero data retention request
+> Hello, we use the Groq API (key under organization [nombre]) to run a sales-training chat for students in the EU/Spain. The text students type is personal data. Could you (1) share your Data Processing Addendum (DPA) with SCCs, (2) confirm how to enable zero data retention for our organization, and (3) list your sub-processors and data locations? We will not enable voice or open the service to many users until this is in place. Thanks.
+
+**Prompt 3 — Instrucciones para las mentoras (etiquetado)**
+> Os paso [20–30] prácticas/llamadas. Para cada una rellenad: ID · nota global (buena / regular / mala) · una frase de por qué · lo MEJOR que hizo la alumna (cita literal) · lo que MÁS le frenó (cita literal). No miréis la nota automática antes de puntuar. Con esto calibramos el sistema antes de llamarlo «evaluación».
+
+**Prompt 4 — Para retomar el correo entrante (pégamelo a mí)**
+> Resend ya está verificado: dominio [careers.womendigitalclosers.com], clave guardada en Panel → APIs. Construye el correo entrante: dirección por alumna, webhook `email.received` con firma verificada, sin guardar el cuerpo del correo, la IA solo PROPONE la fase (entrevista/rechazo/oferta) y «contratada» solo con confirmación humana. Lee ADR-014 y docs/ACTIVE_HANDOFF.md primero. Dime qué DDL necesitas antes de aplicarlo.
+
+**Prompt 5 — Para aplicar los cambios del asesor**
+> Mi asesor legal pide estos cambios en /privacidad y /terminos: [pega aquí]. Aplícalos, sube POLICY_VERSION/TERMS_VERSION/CONSENT_VERSION y avísame de qué alumnas tendrán que volver a aceptar.
+
+**Prompt 6 — Para la voz**
+> Tengo el acuerdo de retención cero con [proveedor] y el texto de consentimiento de audio revisado por mi asesor: [pega el texto]. Construye la pantalla de consentimiento (revocable, versionada) sobre student_voice_consent y el bucle manos libres con interrupción de la Fase A de ADR-015. No actives VOICE_ROLEPLAY.
+
+**Prompt 7 — Para los certificados**
+> La API de certificados es [URL]; acepta [ejemplo de JSON]. La autenticación es [Bearer/otra] y guardé el token en Panel → APIs como «[nombre]». Implementa la graduación con mentora humana (1 clic), el webhook apagado por defecto y el conjunto de calibración con las etiquetas de las mentoras [pega o adjunta].
+
+**Prompt 8 — Si falla una prueba de BD**
+> Ejecuté tests/db/[fichero].sql y salió: [pega el mensaje EXACTO del error]. Diagnostica y arregla (migración nueva si hace falta; no apliques DDL sin decírmelo).
+
+**Prompt 9 — Resultado de Apify**
+> Probé Apify con max_items=10. Salieron [n] ofertas, coste [x] USD, errores: [pega]. Evalúa la calidad (campos, duplicados, ofertas útiles) y dime si merece activarlo.
+
+**Prompt 10 — Decisiones de producto**
+> 1) XP y niveles: [mantén los míos / usa los de mi propuesta: pega]. 2) Ranking entre alumnas: [no / sí opt-in agregado]. 3) «Contratada»: [ella declara + mentora confirma / otra regla]. 4) Copiloto Jarvis: [sí con presupuesto X por alumna / no]. 5) Ofertas con aviso del detector: [ocultar / solo marcar].
+
+**Prompt 11 — Para activar avisos reales**
+> Autorizo por escrito los avisos automáticos a alumnas por [correo con Resend / WhatsApp con la cuenta X]: a los 2 y 4 días sin practicar y la vía rápida a mentora. Máximo [n] mensajes por alumna y semana, con baja fácil. Constrúyelo con registro de envíos y botón de apagado, y pruébalo primero con [2-3 alumnas de prueba].
+
+**Prompt genérico para retomar cualquier cosa**
+> Lee AGENTS.md, docs/ACTIVE_HANDOFF.md y docs/OWNER_GUIDE.md. He hecho: [lista de pasos de la guía]. Continúa con lo que eso desbloquea y dime qué sigue siendo mío.
