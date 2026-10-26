@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## La máquina no cuenta como persona en las métricas (sesión 113) — 2026-10-26
+
+- **Revisión** (inspected) de [collectors](../apps/web/lib/collectors.ts), [googleJobs](../apps/web/lib/googleJobs.ts), la ruta del [cron](../apps/web/app/api/cron/collect/route.ts), [metrics](../apps/web/lib/metrics.ts), [aiAgreement](../apps/web/lib/aiAgreement.ts), [studentDashboard](../apps/web/lib/studentDashboard.ts) y [studentRetention](../apps/web/lib/studentRetention.ts): un defecto corregido. El resto del repaso no encontró plazos sin reloj, totales truncados nuevos ni divisiones sin guarda (las distribuciones ya exigen `MIN_GROUP`).
+- **Defecto — la máquina contaba como persona**: [metrics.ts](../apps/web/lib/metrics.ts) llamaba «decisiones humanas» a las de `auto-reglas` (aprobaciones automáticas) y `auto-excepcion` (enviadas a la cola), y [aiAgreement.ts](../apps/web/lib/aiAgreement.ts) las usaba como contraste humano del acuerdo IA↔persona. Efecto: el panel inflaba el trabajo humano —producción marcaba **186** antes del arreglo— y el veredicto de «listo para live» podía calcularse comparando la IA consigo misma.
+- **Arreglo**: `MACHINE_REVIEWERS` + `isHumanReviewer()` en [external.ts](../apps/web/lib/external.ts) como única fuente de verdad; ambas lecturas lo usan y `aiAgreement` deja de duplicar el `ORG`.
+- **Probado** (tested): [agreement.mjs](../tests/admin-auth/agreement.mjs) pasa a 9 propuestas / 5 pares / 4 pendientes (las filas de `auto-reglas` y `auto-excepcion` quedan fuera del contraste) y [metrics.mjs](../tests/admin-auth/metrics.mjs) comprueba que esas decisiones no cuentan como humanas. `npm run test:web` con Chrome real: **199 PASS, 0 FAIL, 11/11 pasos**; `typecheck`, `build` y `design` en verde.
+- **Limpieza**: `apps/web/.next` tenía copias de conflicto del sincronizador (`routes.d 2.ts`, `cache-life.d 2.ts`…) que rompían `tsc` con identificadores duplicados; eliminadas (artefactos de build, no versionados).
+
 ## Revisión de código y correcciones (sesión 111) — 2026-10-26
 
 - **Petición del operador**: «haz un code review y soluciona todo». Revisado el código añadido desde #37 (incluido lo que el otro agente fusionó en #45/#53, porque lo toca).
