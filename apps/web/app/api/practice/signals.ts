@@ -16,6 +16,12 @@ const FILLER = /\b(bueno|o sea|digamos|eh)\b|¿(verdad|no|qué te parece)\?/i;
 const PRICE = /(\d[\d.,]*\s*(€|euros?))|(inversi[oó]n[^.]{0,40}\d)|(cuesta\s+\d)/i;
 const NEXT_STEP = /\b(reuni[oó]n|llamada|agenda|empezar|empezamos|siguiente paso|te env[ií]o|te paso|jueves|viernes|lunes|martes|mi[eé]rcoles|mañana|prueba|demo)\b/i;
 
+// Apertura sumisa: pedir perdón por llamar o dar las gracias por el tiempo coloca a la alumna por debajo del interlocutor antes de empezar.
+// Solo en venta: en una entrevista «gracias por su tiempo» es cortesía normal.
+const SUBMISSIVE = /\b(gracias por (tu|su) tiempo|disculpa(me)?\b|perdona(me)?\b|perdone|no quiero molestar|siento molestar|ser[aá] solo un momento|te robo (un minuto|un momento|unos minutos))/i;
+// Entusiasmo de comisionista: elogiar en exceso lo que dice el interlocutor suena a venta y baja la confianza.
+const GUSHING = /(¡\s*(qu[eé] )?(genial|incre[ií]ble|fant[aá]stic[oa]|maravill\w+|espectacular|perfecto)\b[^.!?]*!?)|\b(me encanta(s)? (tanto|much\w+)|incre[ií]ble|fant[aá]stic[oa])\b/i;
+
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 // Divide en frases conservando el texto original: la cita debe poder buscarse
@@ -76,6 +82,28 @@ function fillerAfterPrice(turns: PracticeTurn[]): PracticeSignal | null {
     };
   }
   return null;
+}
+
+function submissiveOpening(turns: PracticeTurn[]): PracticeSignal | null {
+  const first = turns.find(turn => turn.role === 'user');
+  if (!first || !SUBMISSIVE.test(first.content)) return null;
+  return {
+    id: 'sumision',
+    label: 'Apertura sumisa',
+    detail: 'Pedir perdón o dar las gracias por el tiempo te pone por debajo antes de empezar. Abre con contexto y pide permiso para preguntar, sin disculparte.',
+    quote: quoteAround(first.content, SUBMISSIVE),
+  };
+}
+
+function gushing(turns: PracticeTurn[]): PracticeSignal | null {
+  const turn = turns.find(item => item.role === 'user' && GUSHING.test(item.content));
+  if (!turn) return null;
+  return {
+    id: 'entusiasmo',
+    label: 'Entusiasmo de más',
+    detail: 'Elogiar con exceso lo que dice la otra persona suena a venta. Un «entiendo» tranquilo y una pregunta concreta generan más confianza.',
+    quote: quoteAround(turn.content, GUSHING),
+  };
 }
 
 function noNextStep(turns: PracticeTurn[]): PracticeSignal | null {
@@ -144,6 +172,8 @@ export function analyzeSignals(turns: PracticeTurn[], kind: 'venta' | 'entrevist
   const candidates = [
     fillerAfterPrice(turns),
     contradictoryValidation(turns),
+    kind === 'venta' ? submissiveOpening(turns) : null,
+    kind === 'venta' ? gushing(turns) : null,
     kind === 'venta' ? noNextStep(turns) : null,
     noQuestions(turns, kind),
     longMessages(turns),

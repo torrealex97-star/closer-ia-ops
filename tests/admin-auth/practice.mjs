@@ -2,7 +2,8 @@
 // node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/practice.mjs
 import assert from 'node:assert/strict';
 import { PRACTICE_SCENARIOS, scenarioById } from '../../apps/web/components/practiceScenarios.ts';
-import { buildPersonaPrompt, axesFor, debriefSchema } from '../../apps/web/app/api/practice/prompts.ts';
+import { buildPersonaPrompt, axesFor, debriefInstructions, debriefSchema } from '../../apps/web/app/api/practice/prompts.ts';
+import { analyzeSignals } from '../../apps/web/app/api/practice/signals.ts';
 
 const results = [];
 const step = async (name, fn) => { try { await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message.split('\n')[0]]); } };
@@ -33,6 +34,24 @@ await step('el catálogo cubre los nichos y los entrevistadores pedidos, todo fi
 });
 await step('el servicio de la sala no promete resultados clínicos ni de ingresos en los textos visibles', () => {
   for (const s of PRACTICE_SCENARIOS) assert.ok(!/garantiz|100 % seguro|sin riesgo|ganar \d/i.test(`${s.summary} ${s.opening} ${s.objectives.join(' ')}`), s.id);
+});
+
+const say = content => ({ role: 'user', content });
+await step('señales: apertura sumisa y entusiasmo de más, con cita literal y solo en venta', () => {
+  const sumisa = analyzeSignals([say('Hola, disculpa que te moleste, gracias por tu tiempo. Te llamo por el software.')], 'venta');
+  assert.ok(sumisa.some(s => s.id === 'sumision' && /disculpa|gracias por tu tiempo/i.test(s.quote)));
+  const gushing = analyzeSignals([say('Hola Marta, ¿tienes dos minutos?'), say('¡Qué increíble lo que me cuentas! Me encanta tu proyecto.')], 'venta');
+  assert.ok(gushing.some(s => s.id === 'entusiasmo' && /increíble|encanta/i.test(s.quote)));
+  // En una entrevista «gracias por su tiempo» es cortesía normal, no una señal.
+  assert.ok(!analyzeSignals([say('Buenos días, gracias por su tiempo. Me llamo Ana.')], 'entrevista').some(s => s.id === 'sumision'));
+  // Una apertura firme no dispara ni una ni otra.
+  assert.ok(!analyzeSignals([say('Hola Marta, soy Ana. ¿Tienes dos minutos para que te cuente por qué te llamo?')], 'venta').some(s => ['sumision', 'entusiasmo'].includes(s.id)));
+  // Máximo tres señales por práctica, y todas con cita.
+  const many = analyzeSignals([say('Disculpa, gracias por tu tiempo, bueno, ¡qué increíble!'), say('ok'), say('vale')], 'venta');
+  assert.ok(many.length <= 3 && many.every(s => s.quote));
+});
+await step('el feedback pide una sola tarea de 24 horas, no varias prácticas', () => {
+  for (const s of PRACTICE_SCENARIOS) assert.match(debriefInstructions(s), /next: una sola tarea para las próximas 24 horas/, s.id);
 });
 
 for (const [s, n, m] of results) console.log(s, ' ', n, m ?? '');
