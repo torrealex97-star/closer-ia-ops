@@ -165,6 +165,19 @@ await step('ingest: rescata el salario literal del texto cuando la fuente no lo 
   const by = id => [...state.external.values()].find(o => o.external_id === id);
   assert.equal(by('s1').salary, '24.000 - 30.000 € brutos/año'); assert.equal(by('s2').salary, '1.500 € / mes'); assert.equal(by('s3').salary, null);
 });
+await step('ofertas peligrosas: la revisión muestra el nivel y el motivo; una oferta normal no lleva marca', async () => {
+  const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [
+    { external_id: 'risk1', title: 'Closer high ticket', url: 'https://es.indeed.com/risk1', company: 'Riesgo SL', location: 'Madrid, España', description: 'Debes pagar una licencia de 300 € para empezar a vender con nosotros.' },
+    { external_id: 'risk2', title: 'Closer high ticket', url: 'https://es.indeed.com/risk2', company: 'Normal SL', location: 'Madrid, España', description: 'Buscamos closer con experiencia para nuestro equipo comercial en Madrid. Sueldo fijo y comisiones.' },
+  ] } });
+  assert.equal(r.status, 200);
+  try {
+    const list = await call('/api/admin/external?status=draft&page_size=100'); assert.equal(list.status, 200);
+    const by = id => list.json.offers.find(o => o.external_id === id);
+    assert.equal(by('risk1').risk.level, 'BLOCKED'); assert.match(by('risk1').risk.flags.join(' '), /pago o una compra previa/);
+    assert.equal(by('risk2').risk, null);
+  } finally { for (const [key, o] of [...state.external.entries()]) if (o.external_id === 'risk1' || o.external_id === 'risk2') state.external.delete(key); }
+});
 await step('ingest: repetir una oferta no pisa su estado editorial', async () => {
   const offer = [...state.external.values()].find(o => o.external_id === 'a1'); offer.editorial_status = 'approved';
   const r = await call('/api/ingest', { method: 'POST', cookies: false, headers: { authorization: 'Bearer ingest-token-0123456789abcdef0123' }, body: { source: 'indeed', candidates: [{ external_id: 'a1', title: 'Closer de ventas (actualizada)', url: 'https://es.indeed.com/viewjob?jk=a1' }] } });
