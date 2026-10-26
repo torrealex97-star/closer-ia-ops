@@ -2,7 +2,7 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
-## El motor clasifica su pool y retira lo que descarta; el panel publica solo (sesión 105) — 2026-10-26
+## El motor clasifica su pool y retira lo que descarta; el panel publica solo (sesión 106) — 2026-10-26
 
 - **Petición del operador** (anotación sobre el panel de admin): «todas estas ofertas no deben estar a revisar por un humano; la IA debe clasificarlas y añadirlas sola, y dejar a revisión solo los casos más complejos».
 - **Qué entra en el código** (la conducta del motor ya estaba sirviendo en producción; esta rama publica su fuente y añade el disparador del panel):
@@ -17,6 +17,15 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Arreglo de la verificación de diseño**: [check-design.mjs](../scripts/check-design.mjs) usaba `URL.pathname`, que en una ruta con espacios llega escapado (`%20`) y rompía el recorrido con ENOENT; ahora usa `fileURLToPath`. En CI no se veía porque su ruta no tiene espacios.
 - **CI desbloqueado (verified en GitHub)**: los checks `verify` y `web-admin` estaban en rojo **sin arrancar** («recent account payments have failed…»). Por orden del operador el repositorio pasa a **público** (2026-10-26), donde los runners estándar son gratuitos: ambos checks corren y **pasan** sobre `51ef251` (`verify` 6m32s y 5m03s; `web-admin` 1m39s y 12m33s). Antes de abrirlo se barrió el árbol y el historial: solo `.env.example` con marcadores, `.env*` y `.local/` ignorados y ninguna clave en ningún commit. **Consecuencia**: el código deja de ser privado; nada de lo versionado aquí concede acceso (las claves viven en Vercel/Supabase/Sites → Secrets).
 - **Límites**: (1) el despliegue del worker **no se ha repetido** en esta sesión: la versión con retirada ya está sirviendo desde la sesión 91; (2) el botón del panel y los contadores nuevos **no están desplegados** hasta que esta rama llegue a `main` (Vercel publica desde el repo); (3) la cuota mensual de escrituras de D1 del motor seguía en **94.177/100.000** con reinicio el 1 de noviembre, y la pasada de clasificación añade ~400 al día; (4) la retirada es por reglas deterministas, no por IA: un anuncio ambiguo sigue yendo a `needs_review`.
+
+## Bases de la voz: interruptor, consentimiento y ADR-015 (sesión 105) — 2026-10-26
+
+- **Petición del operador**: construir los módulos de voz. Se hace por capas y **sin audio** hasta que se cumplan las condiciones de ADR-013.
+- **Hecho (tested, servicios simulados)**: [ADR-015](decisions/ADR-015-voz-en-la-sala-de-practica.md) (interruptor del propietario, consentimiento propio y revocable, Fase A navegador manos libres y Fase B WebRTC < 500 ms con retención cero, misma rúbrica con cita literal, topes); [voice.ts](../apps/web/lib/voice.ts): `VOICE_ROLEPLAY=on` es lo único que abre la voz (apagada por defecto) y además exige consentimiento vigente (no revocado y de la versión del texto); una lectura fallida se declara aparte de «sin consentimiento»; `GET /api/student/voice` informa a la interfaz y hoy responde «apagada». `voice.mjs` 5/5 y un paso de flujo (401 sin sesión; con sesión, `switch_off`).
+- **Migración sin aplicar**: [20261027_voice_consent.sql](../supabase/migrations/20261027_voice_consent.sql) (`student_voice_consent`, RLS sin políticas) y su prueba [tests/db/voice_consent.sql](../tests/db/voice_consent.sql), **sin ejecutar**. Aplicarla exige orden expresa.
+- **No hecho**: audio, proveedor de STT/TTS, bucle manos libres, pantalla de consentimiento y su texto legal, topes de minutos. Sin eso **no hay voz**; la interfaz no ha cambiado.
+- **Límites**: nada medido (latencia, coste, calidad en español); el texto de consentimiento de voz no existe aún y lo revisa el dueño o su asesor.
+
 ## Catálogo de la sala: ofertas por nicho y entrevistadores nuevos (sesión 104) — 2026-10-25
 
 - **Petición del operador** (módulo 1, voz): «catálogo por nicho» y entrevistadores con otro punto de vista. Se construye en **texto** (la sala ya existe); la voz reutilizará el mismo catálogo.
