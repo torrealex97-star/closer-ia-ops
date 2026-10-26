@@ -153,7 +153,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   await alumna.getByLabel('Contraseña nueva').fill('Contraseña-lucia-1'); await alumna.getByLabel('Repite la contraseña').fill('Contraseña-lucia-1');
   await alumna.getByRole('button', { name: 'Guardar contraseña' }).click(); await alumna.getByRole('heading', { name: 'Contraseña guardada' }).waitFor({ timeout: 8000 }).catch(async e => { throw new Error(`${e.message.split('\n')[0]} · pantalla: ${(await alumna.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300)}`); });
   await alumna.goto(BASE + '/alumna'); await alumna.getByLabel('Email').fill('lucia@alumna.dev'); await alumna.getByLabel('Contraseña').fill('Contraseña-lucia-1');
-  await alumna.getByRole('button', { name: 'Entrar' }).click(); await alumna.getByText('TU PERFIL').waitFor();
+  await alumna.getByRole('button', { name: 'Entrar' }).click(); await alumna.getByText('TU PERFIL', { exact: true }).waitFor();
   assert.ok(await alumna.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal en móvil');
   assert.equal(await alumna.getByRole('button', { name: 'Guardar perfil' }).isDisabled(), true, 'sin consentimiento no se puede guardar');
   await alumna.getByLabel('Nombre').fill('Lucía'); await alumna.getByRole('checkbox', { name: /closer/i }).first().check();
@@ -163,7 +163,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   state.external.set('ui|1', { id: '00000000-0000-4000-8000-000000000099', source: 'ui', external_id: '1', title: 'Closer de ventas remoto', company: 'Zeta', location: 'Madrid, España', url: 'https://jobs.example.com/ui1', salary: null, description: 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa en España.', posted_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), editorial_status: 'approved', role: 'closer', spain: true, score: 70, raw: { is_remote: true }, also_seen: [] });
   await alumna.reload(); await alumna.getByTestId('matches').getByText('Closer de ventas remoto').waitFor({ timeout: 8000 });
   assert.match(await alumna.getByTestId('matches').innerText(), /Remoto/); assert.match(await alumna.getByTestId('matches').innerText(), /No sabemos:/);
-  await alumna.reload(); await alumna.getByText('TU PERFIL').waitFor(); await alumna.waitForFunction(() => document.querySelector('#sp-name')?.value === 'Lucía', null, { timeout: 8000 });
+  await alumna.reload(); await alumna.getByText('TU PERFIL', { exact: true }).waitFor(); await alumna.waitForFunction(() => document.querySelector('#sp-name')?.value === 'Lucía', null, { timeout: 8000 });
   assert.equal(await alumna.getByLabel(/Enlace a tu vídeo/).inputValue(), 'https://drive.google.com/file/d/abc/view');
   assert.equal(await alumna.getByLabel('Nombre').inputValue(), 'Lucía');
   // Candidatura ASISTIDA: formulario base → preparar → revisar y copiar → abrir → «ya la he enviado». La app no envía nada.
@@ -216,7 +216,7 @@ await step('Alumnas: el panel invita; ella crea contraseña, entra, guarda su pe
   if (process.env.SHOT4) await board.screenshot({ path: process.env.SHOT4 });
   await page.setViewportSize({ width: 1280, height: 900 });
   const row = page.locator('tbody tr', { hasText: 'lucia@alumna.dev' }); await row.getByText('1 · media 72').waitFor(); assert.match(await row.innerText(), /1\/7/);
-  await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL').waitFor();
+  await alumna.goto(BASE + '/alumna'); await alumna.getByText('TU PERFIL', { exact: true }).waitFor();
   await alumna.getByRole('button', { name: 'Salir' }).click(); await alumna.getByRole('heading', { name: 'Tu espacio' }).waitFor();
 });
 await step('móvil: Resumen sin scroll horizontal', async () => {

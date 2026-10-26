@@ -10,6 +10,19 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **No hecho**: audio, proveedor de STT/TTS, bucle manos libres, pantalla de consentimiento y su texto legal, topes de minutos. Sin eso **no hay voz**; la interfaz no ha cambiado.
 - **Límites**: nada medido (latencia, coste, calidad en español); el texto de consentimiento de voz no existe aún y lo revisa el dueño o su asesor.
 
+## Catálogo de la sala: ofertas por nicho y entrevistadores nuevos (sesión 104) — 2026-10-25
+
+- **Petición del operador** (módulo 1, voz): «catálogo por nicho» y entrevistadores con otro punto de vista. Se construye en **texto** (la sala ya existe); la voz reutilizará el mismo catálogo.
+- **Hecho (tested)**: 5 situaciones de venta con **oferta ficticia por nicho**, cada una con su ticket y su modelo de comisión (formación high ticket 2.400 €/10 %, SaaS B2B 90 €/mes/20 %, estética dental 3.200 € con financiación, reformas 18.000 €/3 %, programa fitness 1.200 €/15 %) y 2 **entrevistadores** nuevos (**RR. HH.**: pregunta por el modelo de pago y de dónde salen los leads; **dirección de ventas**: números, cualificación y realismo). La sala pasa de 12 a **19** situaciones; cada una tiene su personaje con tres niveles de resistencia solo en el servidor. [practice.mjs](../tests/admin-auth/practice.mjs) 4/4 (ids únicos, personaje y rúbrica para todas, nichos pedidos, sin promesas de resultados ni de ingresos).
+- **Límites**: las 12 originales ya incluían 4 perfiles de cliente (directo, escéptico, amable, exigente); no se han añadido más. El `.practice-card` de `tests/browser/practice.spec.ts` pasa de 12 a 19: esa prueba **no se pudo ejecutar en local** (falla igual en `main` sin el backend completo); la comprueba el CI. Las personas ficticias están escritas por el agente y sin revisar por vuestras closers: conviene que las lean. **Sigue sin haber voz**: falta el consentimiento de audio, el interruptor y el proveedor (ADR-013).
+
+## Banderas de riesgo visibles en la revisión de ofertas (sesión 103) — 2026-10-25
+
+- **Hecho (tested, servicios simulados)**: la lista de ofertas externas del panel marca cada oferta con señales como **«Oferta peligrosa»** (bloqueada) o **«Con avisos»**, y muestra el motivo en texto (no solo color ni tooltip). Una oferta normal no lleva marca. La evaluación se hace en el servidor con [offerRisk.ts](../apps/web/lib/offerRisk.ts) al listar; no se guarda nada ni se oculta nada a las alumnas por esto (eso sigue siendo la decisión de quien aprueba).
+- **Verificado (tested)**: paso de flujo nuevo (ingesta de una oferta con pago previo → `BLOCKED` con su motivo; una normal → sin marca) y suite completa en verde.
+- **Prueba inestable corregida** (*verified* en CI, falló una vez): el paso «Alumnas» de `ui.mjs` buscaba `getByText('TU PERFIL')`, que en modo estricto coincide con 3 elementos si el panel de candidaturas ya se ha pintado; ahora usa texto exacto.
+- **Límites**: reglas sin calibrar con ofertas reales; no comprueba CIF, dominio ni LinkedIn. Una oferta ya aprobada a mano antes de este cambio sigue visible a las alumnas.
+
 ## Migración de resultados de candidaturas aplicada; relevo reescrito (sesión 102) — 2026-10-25
 
 - **Orden del dueño** («aplícalas»): `20261025_application_outcomes.sql` **aplicada en Supabase real** con `apply_migration` y **verificada** leyendo la restricción: `student_applications_status_check` admite ahora `draft, opened, applied, discarded, responded, interview, offer, rejected`. Es aditiva y reversible; ya se pueden anotar respuestas, entrevistas, ofertas y rechazos.
