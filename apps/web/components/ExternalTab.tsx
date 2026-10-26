@@ -30,11 +30,10 @@ async function call<T>(init?: RequestInit, query = ''): Promise<T> {
 
 export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; onSessionLost: () => void }) {
   const [data, setData] = useState<Data | null>(null);
-  // La cola humana abre en las excepciones si las hay: los borradores los cierra la pasada
-  // automática (reglas + IA). Si no hay ninguna, se abre en borradores en vez de en una lista
-  // vacía — un hueco no es un cero, pero tampoco es una pantalla en blanco sin explicación.
+  // La cola humana abre en las excepciones: los borradores los cierra la pasada automática
+  // (reglas + IA) y no hace falta que una persona los mire primero. Si hoy no hay ninguna,
+  // se dice cuántos borradores esperan y se ofrece el atajo, en vez de dejar la lista vacía.
   const [status, setStatus] = useState('needs_review');
-  const autoPicked = useRef(false);
   const [role, setRole] = useState<'' | RoleFamily | 'none'>('closer');
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
@@ -62,15 +61,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   const load = useCallback(() => {
     setBusy(true);
     const p = filters(); p.set('page', String(page));
-    call<Data>(undefined, `?${p}`).then(d => {
-      setData(d); setError(''); setPicked(new Set());
-      // Una sola vez, y solo si el operador no ha elegido filtro: sin excepciones, los
-      // borradores pendientes son lo único que hay que enseñar.
-      if (!autoPicked.current) {
-        autoPicked.current = true;
-        if (!(d.counts?.needs_review > 0) && d.counts?.draft > 0) setStatus('draft');
-      }
-    }).catch(lost).finally(() => setBusy(false));
+    call<Data>(undefined, `?${p}`).then(d => { setData(d); setError(''); setPicked(new Set()); }).catch(lost).finally(() => setBusy(false));
   }, [filters, page, lost]);
   useEffect(load, [load]);
   useEffect(() => { clearTimeout(timer.current); timer.current = setTimeout(() => { setQuery(text.trim()); setPage(1); }, 350); return () => clearTimeout(timer.current); }, [text]);
@@ -119,9 +110,9 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   async function autoReview() {
     setWorking('auto'); setError(''); setNotice('');
     try {
-      const r = await call<{ checked: number; approved: number; exceptions: number; cap: number; used_before: number | null; by_reason: Record<string, number>; ai?: { mode: string; applied: number; skipped?: string } | null }>({ method: 'POST', body: JSON.stringify({ action: 'auto_review' }) });
+      const r = await call<{ checked: number; approved: number; exceptions: number; moved?: number; cap: number; used_before: number | null; by_reason: Record<string, number>; ai?: { mode: string; applied: number; skipped?: string } | null }>({ method: 'POST', body: JSON.stringify({ action: 'auto_review' }) });
       const reasons = Object.entries(r.by_reason ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
-      setNotice(`Revisadas ${r.checked}: ${r.approved} aprobadas solas · ${r.exceptions} a tu cola${reasons ? ` (${reasons})` : ''}. Tope de hoy: ${r.used_before ?? 0}/${r.cap}.${r.ai?.skipped ? ` IA: ${r.ai.skipped}.` : r.ai ? ` IA ${r.ai.mode}: ${r.ai.applied} aplicadas.` : ''}`);
+      setNotice(`Revisadas ${r.checked}: ${r.approved} aprobadas solas · ${r.moved ?? r.exceptions} movidas a tu cola de excepciones${reasons ? ` (${reasons})` : ''}. Tope de hoy: ${r.used_before ?? 0}/${r.cap}.${r.ai?.skipped ? ` IA: ${r.ai.skipped}.` : r.ai ? ` IA ${r.ai.mode}: ${r.ai.applied} aplicadas.` : ''}`);
       load();
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
@@ -177,7 +168,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
         <td style={{ textAlign: 'right' }}>{owner && <button disabled={working !== ''} onClick={() => void toggle(code, !!off)} aria-label={`${off ? 'Reanudar' : 'Pausar'} ${name}`}>{off ? <Play size={14} /> : <Pause size={14} />} {off ? 'Reanudar' : 'Pausar'}</button>}</td></tr>; })}</tbody></table></div>
     {!!data?.runs.length && <p className="card-meta">Última entrada: {data.runs[0].source} vía {data.runs[0].via}, {data.runs[0].accepted} de {data.runs[0].received} guardadas · {fmt(data.runs[0].created_at)}</p>}
     <div className="search-panel admin-toolbar">
-      <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => { autoPicked.current = true; change(setStatus)(e.target.value); }}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => change(setStatus)(e.target.value)}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
       <label htmlFor="ex-role">Perfil (por el título)<select id="ex-role" value={role} onChange={e => change(setRole)(e.target.value as typeof role)}><option value="">Todos</option>{Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}<option value="none">Sin perfil claro</option></select></label>
       <label htmlFor="ex-source">Fuente<select id="ex-source" value={source} onChange={e => change(setSource)(e.target.value)}><option value="">Todas</option>{(data?.sources ?? []).map(s => <option key={s.source} value={s.source}>{s.source}</option>)}</select></label>
       <label htmlFor="ex-min">Puntuación mínima<select id="ex-min" value={minScore} onChange={e => change(setMinScore)(Number(e.target.value))}><option value={0}>Cualquiera</option><option value={45}>≥ 45 (decente)</option><option value={60}>≥ 60 (buena)</option><option value={75}>≥ 75 (muy buena)</option></select></label>
@@ -186,6 +177,10 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       <label className="grow" htmlFor="ex-q">Buscar<input id="ex-q" placeholder="Título o empresa" value={text} onChange={e => setText(e.target.value)} /></label>
       <button disabled={busy} onClick={load}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
     </div>
+    {status === 'needs_review' && data && data.total === 0 && (data.counts?.draft ?? 0) > 0 && <div className="alert" role="status" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+      <span>No hay excepciones ahora mismo: las <strong>{data.counts.draft}</strong> oferta(s) pendientes esperan a la pasada automática (reglas + IA).</span>
+      <button onClick={() => change(setStatus)('draft')}>Ver borradores</button>
+    </div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
       <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data?.total ?? '…'}</strong>cumplen los filtros</span><span><strong>{chosen.length}</strong>seleccionadas en esta página</span></div>
       <label className="check-label" style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" checked={onlySpain} onChange={e => change(setOnlySpain)(e.target.checked)} /> Solo con señal clara de España</label>

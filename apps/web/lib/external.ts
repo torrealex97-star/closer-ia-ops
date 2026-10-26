@@ -335,6 +335,21 @@ export async function approveByRule(ids: string[], review: Record<string, unknow
   return Array.isArray(rows) ? rows.length : null;
 }
 
+/**
+ * Mueve a la cola humana lo que las reglas no cierran, con su motivo. Solo toca borradores (si una
+ * persona ya la movió, no se pisa) y devuelve cuántas confirmó la base; `null` = no se pudo escribir.
+ * `reviewed_by` distinto de `auto-reglas` a propósito: estas filas no consumen el tope de aprobaciones.
+ */
+export async function markForReview(ids: string[], review: Record<string, unknown>): Promise<number | null> {
+  if (!ids.length || ids.length > 100 || ids.some(i => !/^[0-9a-f-]{36}$/.test(i))) return null;
+  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&id=in.(${ids.join(',')})&editorial_status=eq.draft`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ editorial_status: 'needs_review', reviewed_by: 'auto-excepcion', reviewed_at: new Date().toISOString(), auto_review: review }),
+  });
+  const rows = response.ok ? await response.json().catch(() => null) : null;
+  return Array.isArray(rows) ? rows.length : null;
+}
+
 /** Aprobadas hoy por la regla automática (UTC). `null` = no se pudo saber: sin dato no se gasta cuota. */
 export async function approvalsToday(by = 'auto-reglas'): Promise<number | null> {
   const start = new Date(); start.setUTCHours(0, 0, 0, 0);

@@ -1,4 +1,4 @@
-import { ORG, approvalsToday, approveByRule, type ExternalOffer } from './external';
+import { ORG, approvalsToday, approveByRule, markForReview, type ExternalOffer } from './external';
 import { marketFor, type Market } from './market';
 import { spanishWords } from './offerScore';
 import { assessOffer } from './offerRisk';
@@ -43,6 +43,8 @@ export type AutoSummary = {
   checked: number;
   approved: number;
   exceptions: number;
+  /** Filas que la base confirma movidas a la cola humana (no lo que se intentó). */
+  moved?: number;
   used_before: number | null;
   cap: number;
   by_reason: Record<string, number>;
@@ -70,14 +72,24 @@ export async function runAutoReview(deps: AutoDeps = {}): Promise<AutoSummary> {
   if (!Array.isArray(rows)) return { ...summary, truncated: true };
 
   const clear: string[] = [];
+  // Lo que las reglas no cierran se agrupa por motivo: una escritura por motivo, no una por oferta.
+  const human = new Map<string, string[]>();
   for (const row of rows as Array<Row & { id: string }>) {
     if (timeLeft(deps.deadline) < 1_500) { summary.truncated = true; break; }
     summary.checked++;
     const verdict = judgeOffer(row);
-    if (verdict.decision === 'approve' && clear.length + summary.approved < remaining) { clear.push(row.id); continue; }
+    if (verdict.decision === 'approve') {
+      if (clear.length + summary.approved < remaining) { clear.push(row.id); continue; }
+      // Cumple las reglas pero no cabe en el tope de hoy: se queda en borrador para mañana;
+      // mandarla a la cola humana sería pedirle a una persona trabajo que la máquina ya sabe hacer.
+      summary.exceptions++;
+      summary.by_reason.tope_diario = (summary.by_reason.tope_diario ?? 0) + 1;
+      continue;
+    }
     summary.exceptions++;
-    const key = verdict.decision === 'approve' ? 'tope_diario' : verdict.why;
-    summary.by_reason[key] = (summary.by_reason[key] ?? 0) + 1;
+    summary.by_reason[verdict.why] = (summary.by_reason[verdict.why] ?? 0) + 1;
+    const bucket = human.get(verdict.why) ?? [];
+    bucket.push(row.id); human.set(verdict.why, bucket);
   }
 
   // Una sola escritura con guarda de estado; se cuenta lo que la base confirma.
@@ -85,6 +97,17 @@ export async function runAutoReview(deps: AutoDeps = {}): Promise<AutoSummary> {
     const n = await approveByRule(clear.slice(i, i + 100), { decision: 'approve', why: 'cumple_reglas', rule: 'reglas_v1', at: now });
     if (n === null) summary.failed_writes = (summary.failed_writes ?? 0) + Math.min(100, clear.length - i);
     else summary.approved += n;
+  }
+
+  // La cola de excepciones se llena de verdad: hasta ahora solo se contaba y cada pasada dejaba todo
+  // en borradores, así que el panel mostraba «0 a revisar» con miles esperando a una persona.
+  for (const [reason, ids] of human) {
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      const n = await markForReview(batch, { decision: 'human', why: reason, rule: 'reglas_v1', at: now });
+      if (n === null) summary.failed_writes = (summary.failed_writes ?? 0) + batch.length;
+      else summary.moved = (summary.moved ?? 0) + n;
+    }
   }
 
   // Desempate: solo si hay hueco, la IA está en vivo y queda presupuesto. Sus aprobaciones también
