@@ -1,4 +1,4 @@
--- NO APLICADA en Supabase (aplicar DDL exige orden expresa del propietario). Aditiva y reversible (drop table).
+-- APLICADA en Supabase (2026-10-26, por orden del dueño). Aditiva y reversible (drop table).
 -- Consentimiento PROPIO de voz (ADR-015): separado del consentimiento del perfil y del de autorrelleno. Una fila por alumna;
 -- revocar rellena revoked_at (el historial queda en la fila; volver a aceptar crea versión nueva sobre la misma fila).
 -- Solo la clave de servicio accede: RLS activada y sin políticas, como el resto de tablas de alumnas del portal.
