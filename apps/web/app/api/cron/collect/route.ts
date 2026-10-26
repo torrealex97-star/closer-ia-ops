@@ -7,6 +7,7 @@ import { dailyAuto as dailyApify } from '../../../../lib/apifyAuto';
 import { publicBaseUrl } from '../../../../lib/adminAuth';
 import { weeklyAiReport } from '../../../../lib/aiReview';
 import { runAutoReview } from '../../../../lib/autoReview';
+import { activateEngine } from '../../../../lib/engineActivate';
 import { loadMetrics } from '../../../../lib/metrics';
 import { skipPaidTier } from '../../../../lib/sourceTiers';
 import { refreshVigencia } from '../../../../lib/external';
@@ -57,6 +58,14 @@ export async function GET(request: NextRequest) {
     ? await runAutoReview({ deadline: budget.end }).catch(() => ({ checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true }))
     : (budget.cut('auto'), { checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true });
   if (auto.truncated) budget.cut('auto');
+  // Pool del motor cloud (catálogo de la superficie de alumna): el mismo criterio, al final del
+  // presupuesto. Clasifica con reglas, verifica el enlace y publica lo abierto; lo que no encaja se
+  // retira con su motivo en vez de esperar a una persona. Sin motor configurado devuelve null y el
+  // panel ya lo declara; un fallo no tumba el resto de la recogida.
+  const motor = budget.remaining() >= MIN_STEP_MS
+    ? await activateEngine({ passes: 1, deadline: budget.deadline(12_000) }).catch(() => null)
+    : (budget.cut('motor'), null);
+  if (motor?.truncated) budget.cut('motor');
   const report = new Date().getUTCDay() === 1 && budget.remaining() >= MIN_STEP_MS ? await weeklyAiReport().catch(() => false) : null;
-  return Response.json({ outcomes, fallback, googleJobs, vigencia, apify, auto, aiReview: auto.ai, weeklyReport: report, paidTierSkipped: paid.skip ? ('reason' in paid ? paid.reason : 'sin tiempo') : null, truncated: budget.truncated, spent_ms: budget.spent() });
+  return Response.json({ outcomes, fallback, googleJobs, vigencia, apify, auto, aiReview: auto.ai, motor, weeklyReport: report, paidTierSkipped: paid.skip ? ('reason' in paid ? paid.reason : 'sin tiempo') : null, truncated: budget.truncated, spent_ms: budget.spent() });
 }

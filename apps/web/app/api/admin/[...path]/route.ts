@@ -3,6 +3,10 @@ import { authenticate, originBlocked, withCookies } from '../../../../lib/adminA
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// La clasificación en bloque del catálogo tarda decenas de segundos en el motor (25 escrituras con su
+// verificación cada una): con el tope por defecto la función se cortaría a mitad y el panel diría que
+// falló un trabajo que sí se hizo. 60 s es el máximo de la plataforma.
+export const maxDuration = 60;
 
 // Proxy admin hacia el engine cloud (/v1/admin/*). Datos de control:
 // - CAREER_ENGINE_URL: el engine cloud (Vercel). Sin esta env,modo local: el panel
@@ -25,7 +29,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       method: request.method,
       headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
       body: ['PATCH', 'POST'].includes(request.method) ? await request.text() : undefined,
-      cache: 'no-store', signal: AbortSignal.timeout(30000),
+      // POST incluye la activación en bloque (lenta a propósito: verifica cada enlace); el resto, corto.
+      cache: 'no-store', signal: AbortSignal.timeout(request.method === 'POST' ? 55_000 : 30_000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     const contentType = upstream.headers.get('content-type');
