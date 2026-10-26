@@ -2,6 +2,11 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Etiquetas de nicho y modelo de pago en la revisión de ofertas (sesión 106) — 2026-10-26
+
+- **Hecho (tested, sin red)**: [offerTags.ts](../apps/web/lib/offerTags.ts) lee el texto del anuncio y etiqueta el **modelo de pago** (solo comisión · fijo + comisión · fijo · no indicado) y el **nicho** (formación/infoproducto · software B2B · salud y estética · inmobiliaria y reformas · fitness y bienestar). Sin señal clara o con empate el nicho es `null`, no «otros». «Comisiones atractivas» sin fijo declarado es «pago no indicado», no «solo comisión». La revisión de ofertas muestra la etiqueta bajo el título. `offertags.mjs` 4/4 y un paso de flujo (la respuesta lleva las etiquetas).
+- **Límites**: palabras clave sin calibrar con ofertas reales; el **ticket** no se deriva (el anuncio rara vez lo dice). **Aún no hay filtros** por nicho o pago: filtrar en servidor exige guardar las etiquetas en columnas (migración, ⬜) o aproximarlas con búsquedas de texto; filtrar solo la página cargada engañaría con los totales.
+
 ## Bases de la voz: interruptor, consentimiento y ADR-015 (sesión 105) — 2026-10-26
 
 - **Petición del operador**: construir los módulos de voz. Se hace por capas y **sin audio** hasta que se cumplan las condiciones de ADR-013.

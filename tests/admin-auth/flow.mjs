@@ -176,6 +176,7 @@ await step('ofertas peligrosas: la revisión muestra el nivel y el motivo; una o
     const by = id => list.json.offers.find(o => o.external_id === id);
     assert.equal(by('risk1').risk.level, 'BLOCKED'); assert.match(by('risk1').risk.flags.join(' '), /pago o una compra previa/);
     assert.equal(by('risk2').risk, null);
+    assert.deepEqual(by('risk2').tags, { niche: 'formacion', pay: 'fijo_mas_comision' }, 'etiquetas de nicho y pago en la revisión');
   } finally { for (const [key, o] of [...state.external.entries()]) if (o.external_id === 'risk1' || o.external_id === 'risk2') state.external.delete(key); }
 });
 await step('ingest: repetir una oferta no pisa su estado editorial', async () => {
