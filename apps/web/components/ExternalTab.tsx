@@ -30,7 +30,9 @@ async function call<T>(init?: RequestInit, query = ''): Promise<T> {
 
 export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; onSessionLost: () => void }) {
   const [data, setData] = useState<Data | null>(null);
-  const [status, setStatus] = useState('draft');
+  // La cola humana abre en las excepciones: los borradores los cierra la pasada automática
+  // (reglas + IA) y pedirle a una persona que los mire primero era justo lo que sobraba.
+  const [status, setStatus] = useState('needs_review');
   const [role, setRole] = useState<'' | RoleFamily | 'none'>('closer');
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
@@ -89,7 +91,9 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     } catch (err) { lost(err as Error); } finally { setWorking(''); }
   }
   async function approveBest() {
-    const f = Object.fromEntries(filters());
+    // «Las mejores» son borradores pendientes de la pasada automática, no las excepciones
+    // (esas necesitan criterio humano y no se aprueban en bloque desde aquí).
+    const f = { ...Object.fromEntries(filters()), status: 'draft' };
     const label = `${topN} mejores borradores${role ? ` de ${role === 'none' ? 'sin perfil' : ROLE_LABELS[role as RoleFamily]}` : ''}${onlySpain ? ' en España' : ''}${minScore ? ` con puntuación ≥ ${minScore}` : ''}`;
     if (!window.confirm(`¿Aprobar las ${label}? (${data?.total ?? 0} cumplen los filtros). Las alumnas verán las que además pasen las reglas de la vista. Puedes deshacerlo.`)) return;
     setWorking('best'); setError(''); setNotice('');
