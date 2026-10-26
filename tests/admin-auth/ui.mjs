@@ -91,6 +91,9 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   // Error ≠ vacío: si falla la carga se dice y se puede reintentar; después vuelve el panel
   await page.route('**/api/admin/metrics', r => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'No se pudieron calcular las métricas.' }) }));
   await page.reload(); await page.getByRole('button', { name: 'Fuentes externas' }).click();
+  // Tras recargar vuelve a abrir en excepciones; este paso sigue sobre borradores.
+  assert.equal(await page.locator('#ex-status').inputValue(), 'needs_review');
+  await page.locator('#ex-status').selectOption('draft');
   await page.getByTestId('metrics-error').waitFor(); assert.match(await page.getByTestId('metrics-error').innerText(), /No se pudieron calcular las métricas/);
   await page.unroute('**/api/admin/metrics'); await page.getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('metrics').waitFor();
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'métricas sin scroll horizontal en móvil'); await page.setViewportSize({ width: 1280, height: 900 });
