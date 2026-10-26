@@ -204,19 +204,58 @@ export async function listOffers(opts: { status?: string; statuses?: string[]; s
   return Array.isArray(rows) ? rows : null;
 }
 
-export async function statsBySource(): Promise<Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }> | null> {
-  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&select=source,editorial_status,expires_at,last_seen_at&limit=5000`);
-  const rows = response.ok ? await response.json().catch(() => null) as Array<{ source: string; editorial_status: string; expires_at: string; last_seen_at: string }> | null : null;
-  if (!Array.isArray(rows)) return null;
-  const now = Date.now(); const map = new Map<string, { source: string; total: number; live: number; approved: number; last_seen: string | null }>();
-  for (const r of rows) {
-    const s = map.get(r.source) ?? { source: r.source, total: 0, live: 0, approved: 0, last_seen: null };
-    s.total++; if (Date.parse(r.expires_at) > now) s.live++;
-    if (r.editorial_status === 'approved' || r.editorial_status === 'published') s.approved++;
-    if (!s.last_seen || r.last_seen_at > s.last_seen) s.last_seen = r.last_seen_at;
-    map.set(r.source, s);
+export type SourceStat = { source: string; live: number; approved: number; last_seen: string | null };
+
+// Recuento exacto que hace la BASE: `count=exact` sin traer filas (la consulta pide una sola). Devuelve `null` si
+// la lectura falla: un fallo no se publica como 0.
+async function countExact(filters: string[]): Promise<number | null> {
+  const response = await serviceRest(`external_offers?${filters.join('&')}&select=id&limit=1`, { headers: { Prefer: 'count=exact' } });
+  if (!response.ok) return null;
+  const total = Number((response.headers.get('content-range') ?? '').split('/')[1]);
+  return Number.isFinite(total) ? total : null;
+}
+
+// Nombres de fuente sin leer la tabla entera: los que tienen ejecuciones de ingesta recientes, los pausados a
+// propósito y los de las ofertas más recientes. Una fuente que ni ingiere ni tiene ofertas recientes no aporta
+// nada a la tabla; si vuelve a recoger, aparece sola.
+async function sourceNames(): Promise<string[] | null> {
+  const json = (r: Response) => r.ok ? r.json().catch(() => null) : null;
+  const [runs, paused, recent] = await Promise.all([
+    serviceRest(`external_ingest_runs?org_id=eq.${ORG}&select=source&order=created_at.desc&limit=500`).then(json).catch(() => null),
+    pausedSources(),
+    serviceRest(`external_offers?org_id=eq.${ORG}&select=source&order=first_seen_at.desc&limit=200`).then(json).catch(() => null),
+  ]);
+  if (!Array.isArray(recent) || !Array.isArray(runs)) return null;
+  const names = new Set<string>(paused);
+  for (const row of [...runs, ...recent]) {
+    const source = (row as { source?: unknown } | null)?.source;
+    if (typeof source === 'string' && SOURCE_RE.test(source)) names.add(source);
   }
-  return [...map.values()].sort((a, b) => a.source.localeCompare(b.source));
+  return [...names].sort();
+}
+
+// Cifras por fuente para el panel («Activas» y «Aprobadas»), exactas aunque la tabla tenga miles de filas.
+// Antes se traían hasta 5.000 filas y se contaban en memoria: por encima de esa cifra el panel se quedaba corto
+// sin decirlo. Ahora son dos recuentos por fuente (filas vivas y de ellas las aprobadas/publicadas) más el último
+// avistamiento, que viaja en la misma respuesta del recuento de vivas.
+export async function statsBySource(): Promise<SourceStat[] | null> {
+  const names = await sourceNames();
+  if (!names) return null;
+  const now = encodeURIComponent(new Date().toISOString());
+  const stats = await Promise.all(names.map(async source => {
+    const base = [`org_id=eq.${ORG}`, `source=eq.${encodeURIComponent(source)}`];
+    const liveQuery = [...base, `expires_at=gt.${now}`].join('&');
+    const [liveResponse, approved] = await Promise.all([
+      serviceRest(`external_offers?${liveQuery}&select=last_seen_at&order=last_seen_at.desc&limit=1`, { headers: { Prefer: 'count=exact' } }),
+      countExact([...base, `expires_at=gt.${now}`, 'editorial_status=in.(approved,published)']),
+    ]);
+    const live = liveResponse.ok ? Number((liveResponse.headers.get('content-range') ?? '').split('/')[1]) : NaN;
+    if (!Number.isFinite(live) || approved === null) return null;
+    const rows = await liveResponse.json().catch(() => null) as Array<{ last_seen_at?: string }> | null;
+    return { source, live, approved, last_seen: Array.isArray(rows) && rows[0]?.last_seen_at ? rows[0].last_seen_at : null };
+  }));
+  // Si una fuente no se pudo contar, el resultado entero es desconocido: una suma incompleta se lee como total.
+  return stats.some(stat => stat === null) ? null : stats as SourceStat[];
 }
 
 export async function recentRuns(limit = 8): Promise<Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }> | null> {

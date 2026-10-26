@@ -15,6 +15,15 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Hecho**: [OWNER_GUIDE.md](OWNER_GUIDE.md) reescrita: tabla resumen (tarea, herramienta, qué tener a mano, tiempo), y por tarea herramientas, requisitos, enlaces y pasos; más **11 prompts/mensajes listos para pegar** (email al asesor legal, solicitud de DPA y retención cero a Groq, instrucciones de etiquetado para mentoras, y prompts para retomar conmigo cada construcción que se desbloquea).
 - **Límites (inspected)**: los enlaces a documentación oficial salen de mi conocimiento y de resultados de búsqueda; no se han abierto todos. Los enlaces profundos al panel de Supabase/Vercel y los menús de terceros están marcados ⚠️ donde dudo. El correo de soporte de Groq no lo conozco: la guía manda a su consola/web.
 
+## Las cifras por fuente las cuenta la base, no la memoria (sesión 114) — 2026-10-26
+
+- **Petición del operador**: «que las cifras por fuente del panel usen recuentos exactos en vez de agregar hasta 5.000 filas en memoria».
+- **Antes**: [statsBySource](../apps/web/lib/external.ts) traía `external_offers` con `limit=5000` y contaba las filas en memoria. Por encima de 5.000, «Activas/Aprobadas» por fuente se quedaban cortas **sin decirlo**, y se transferían miles de filas para pintar siete números.
+- **Ahora**: dos recuentos `count=exact` por fuente (vivas, y de ellas aprobadas/publicadas) más el último avistamiento, que viaja en la misma respuesta del recuento de vivas. Ninguna consulta trae más de 200 filas (solo para enumerar nombres). Las fuentes se enumeran por ejecuciones de ingesta (500), las pausadas a propósito y las ofertas más recientes (200).
+- **Fallos declarados**: si un recuento no responde, el resultado es `null` (desconocido) y el panel no pinta ceros; una suma incompleta no se publica como total. Se retira `total` del contrato porque no se mostraba y era otro recuento por fuente.
+- **Probado** (tested): [sources.mjs](../tests/admin-auth/sources.mjs), dentro de `run.sh` — con 6.001 ofertas da 6.000 vivas y 1.200 aprobadas (exacto más allá del tope anterior), una pausada sin datos aparece con ceros reales y `last_seen: null`, **7 consultas ninguna con más de 200 filas**, y un contador que falla devuelve `null`. `npm run test:web` con Chrome real: **202 PASS, 0 FAIL, 11/11 pasos de interfaz**; `typecheck`, `build` y `design` en verde.
+- **Límite**: una fuente que ni ingiere ni tiene ofertas recientes deja de aparecer en la tabla (sus ofertas estarían caducadas); vuelve sola en cuanto recoge.
+
 ## La máquina no cuenta como persona en las métricas (sesión 113) — 2026-10-26
 
 - **Revisión** (inspected) de [collectors](../apps/web/lib/collectors.ts), [googleJobs](../apps/web/lib/googleJobs.ts), la ruta del [cron](../apps/web/app/api/cron/collect/route.ts), [metrics](../apps/web/lib/metrics.ts), [aiAgreement](../apps/web/lib/aiAgreement.ts), [studentDashboard](../apps/web/lib/studentDashboard.ts) y [studentRetention](../apps/web/lib/studentRetention.ts): un defecto corregido. El resto del repaso no encontró plazos sin reloj, totales truncados nuevos ni divisiones sin guarda (las distribuciones ya exigen `MIN_GROUP`).
