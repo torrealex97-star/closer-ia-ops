@@ -57,7 +57,10 @@ export async function testConnection(provider: Provider): Promise<{ ok: boolean;
   try {
     const secret = decryptSecret(rows[0].secret_ciphertext);
     const response = await PROVIDERS[provider].probe(secret);
+    // Una clave de Resend restringida a «solo envío» es válida pero no puede listar dominios: responde 401 `restricted_api_key`.
+    const restricted = provider === 'resend' && response.status === 401 && (await response.clone().json().catch(() => null))?.name === 'restricted_api_key';
     outcome = response.status === 400 && (provider === 'adzuna' || provider === 'infojobs') ? { ok: false, detail: 'Formato de clave incorrecto (usa id:clave)' }
+      : restricted ? { ok: true, detail: 'Clave válida (permiso solo de envío)' }
       : response.ok ? { ok: true, detail: 'Clave válida' }
       : response.status === 401 || response.status === 403 ? { ok: false, detail: `Clave rechazada (HTTP ${response.status})` }
       : { ok: false, detail: `El proveedor respondió HTTP ${response.status}` };

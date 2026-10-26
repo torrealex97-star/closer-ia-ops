@@ -45,16 +45,19 @@ export async function activateEngine(init: {
       page = response.ok ? await response.json().catch(() => null) : null;
       if (!response.ok) error = `el motor respondió ${response.status}`;
     } catch (err) {
-      error = (err as Error)?.name === 'TimeoutError' ? 'el motor no respondió a tiempo' : 'error de red con el motor';
+      const timedOut = (err as Error)?.name === 'TimeoutError';
+      error = timedOut ? 'el motor no respondió a tiempo' : 'error de red con el motor';
+      if (timedOut) truncated = true; // quedó trabajo sin hacer: el cron lo anota como corte, no lo esconde
       break;
     }
     if (!page) break;
     passes += 1;
     for (const key of Object.keys(EMPTY) as Array<keyof ActivateCounts>) counts[key] += Number(page.counts?.[key] ?? 0);
     truncated = Boolean(page.scan?.truncated);
-    // Nada publicado ni retirado: el barrido no encontró nada accionable y repetir no cambia nada.
+    // Nada publicado, retirado ni movido a revisión: el barrido no encontró nada accionable y repetir no cambia nada.
+    // (Lo que pasa a `needs_review` también sale del pool de borradores: es progreso.)
     if (!truncated) break;
-    if ((page.counts?.published ?? 0) + (page.counts?.withdrawn ?? 0) === 0) break;
+    if ((page.counts?.published ?? 0) + (page.counts?.withdrawn ?? 0) + (page.counts?.needs_review ?? 0) === 0) break;
   }
   return { passes, counts, truncated, ...(error ? { error } : {}) };
 }

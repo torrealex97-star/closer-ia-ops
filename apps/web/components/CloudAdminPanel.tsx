@@ -103,10 +103,11 @@ export default function CloudAdminPanel({ onSessionLost }: { onSessionLost: () =
         total.needs_review += r.counts?.needs_review ?? 0;
         setProgress(`Pasada ${pass}: ${total.published} publicadas · ${total.withdrawn} retiradas · ${total.needs_review} a revisar.`);
         if (!r.scan?.truncated) break;
-        if ((r.counts?.published ?? 0) + (r.counts?.withdrawn ?? 0) === 0) break;
+        if ((r.counts?.published ?? 0) + (r.counts?.withdrawn ?? 0) + (r.counts?.needs_review ?? 0) === 0) break;
       }
       setNotice(`Clasificación terminada: ${total.published} publicadas solas · ${total.withdrawn} retiradas por no encajar · ${total.needs_review} quedan en tu cola.`);
-      refresh('needs_review');
+      // La lista muestra las excepciones: el selector debe decir lo mismo (cambiarlo recarga solo).
+      if (filter === 'needs_review') refresh('needs_review'); else setFilter('needs_review');
     } catch (err) {
       if ((err as Error).message.includes('Sesión')) onSessionLost();
       setError((err as Error).message);

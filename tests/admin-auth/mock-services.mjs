@@ -214,6 +214,7 @@ export function startMocks({ authPort, enginePort }) {
     }
     // Proveedores externos simulados: solo la clave «good-key» es válida.
     const key = bearer || url.searchParams.get('api_key');
+    if (url.pathname === '/domains' && key === 'restricted-key-1234') return send(res, 401, { name: 'restricted_api_key' }); // Resend: clave de solo envío
     if (['/v2/users/me', '/account.json', '/openai/v1/models', '/v1/models', '/domains'].includes(url.pathname)) { state.providerCalls = (state.providerCalls ?? 0) + 1; return send(res, key === 'good-key-1234' ? 200 : 401, {}); }
     send(res, 404, {});
   }).listen(authPort);

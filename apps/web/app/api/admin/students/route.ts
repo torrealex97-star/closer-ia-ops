@@ -40,9 +40,11 @@ export async function GET(request: NextRequest) {
   for (const row of read.rows) if (row.student_id) byStudent.set(row.student_id, [...(byStudent.get(row.student_id) ?? []), row]);
   // Una alumna con candidaturas pero sin actividad en el periodo también aparece (si no, sus candidaturas no se verían).
   const activity = students.filter(student => byStudent.has(student.id) || (student.user_id && statusesByUser.has(student.user_id))).map(student => {
-    const summary = summarize(byStudent.get(student.id) ?? [], days, now);
+    const rows = byStudent.get(student.id) ?? [];
+    const summary = summarize(rows, days, now);
+    const { level, idleDays } = idleNudge(rows, now);
     const funnel = Array.isArray(appRows) ? applicationFunnel(student.user_id ? statusesByUser.get(student.user_id) ?? [] : []) : null;
-    return { student: { id: student.id, email: student.email, status: student.status }, summary: { sessions: summary.sessions, last_seen: summary.last_seen, practice: summary.practice, training: summary.training, streak: summary.streak, idle: (({ level, idleDays }) => ({ level, idleDays }))(idleNudge(byStudent.get(student.id) ?? [], now)), review: directReview(byStudent.get(student.id) ?? []).eligible, apps: funnel ? { sent: funnel.sent, responded: funnel.responded } : null } };
+    return { student: { id: student.id, email: student.email, status: student.status }, summary: { sessions: summary.sessions, last_seen: summary.last_seen, practice: summary.practice, training: summary.training, streak: summary.streak, idle: { level, idleDays }, review: directReview(rows).eligible, apps: funnel ? { sent: funnel.sent, responded: funnel.responded } : null } };
   });
   const sevenDaysAgo = now.getTime() - 7 * 86_400_000;
   const entered7 = new Set(read.rows.filter(row => row.kind === 'session' && new Date(row.created_at).getTime() >= sevenDaysAgo).map(row => row.student_id)).size;

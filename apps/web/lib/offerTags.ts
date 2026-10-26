@@ -10,9 +10,9 @@ export const PAY_LABELS: Record<PayModel, string> = { solo_comision: 'Solo comis
 export const NICHE_LABELS: Record<Niche, string> = { formacion: 'Formación / infoproducto', saas_b2b: 'Software B2B', salud_estetica: 'Salud y estética', inmobiliaria_reformas: 'Inmobiliaria y reformas', fitness_bienestar: 'Fitness y bienestar' };
 
 const NICHES: [Niche, RegExp][] = [
-  ['formacion', /\b(?:infoproductos?|high.?ticket|alto ticket|formacion|cursos?|academia|mentoria|coaching|bootcamp|masterclass)\b/g],
+  ['formacion', /\b(?:infoproductos?|high.?ticket|alto ticket|cursos?|academia|mentoria|coaching|bootcamp|masterclass)\b/g], // «formación» sola NO: es un beneficio de casi cualquier anuncio
   ['saas_b2b', /\b(?:saas|software|b2b|crm|erp|licencias? de software|plataforma digital)\b/g],
-  ['salud_estetica', /\b(?:clinica|dental|ortodoncia|estetica|fisioterapia|nutricion|odontolog\w+|salud)\b/g],
+  ['salud_estetica', /\b(?:clinicas?|dental(?:es)?|ortodoncia|estetica|fisioterapia|nutricion|odontolog\w+|centro medico)\b/g], // «salud» sola NO: aparece en seguros y beneficios
   ['inmobiliaria_reformas', /\b(?:inmobiliari\w+|reformas?|construccion|viviendas?|hipotecas?)\b/g],
   ['fitness_bienestar', /\b(?:fitness|gimnasio|entrenador\w*|bienestar|yoga|pilates)\b/g],
 ];
@@ -24,9 +24,11 @@ export function offerTags(offer: { title?: string | null; description?: string |
   const scored = NICHES.map(([niche, re]) => [niche, (text.match(re)?.length ?? 0) + (title.match(re)?.length ?? 0)] as const).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
   const niche = scored.length && (scored.length === 1 || scored[0][1] > scored[1][1]) ? scored[0][0] : null; // un empate no elige
 
+  // «Ganarás hasta 3.000 € al mes» es una promesa de ingresos, no un fijo: se quita antes de buscar el sueldo.
+  const salaryText = text.replace(/\b(?:hasta|ganar\w*|gana|ingresos?(?: de)?|factur\w+|cobrar\w*|podras)\b[^.\n]{0,25}\d[\d.,]*\s*(?:€|eur|euros?)\s*(?:\/|al |por )?\s*(?:mes|mensuales?)\b/g, ' ');
   const commissionOnly = /\b(?:100\s*%\s*(?:a\s+)?comision|solo comision(?:es)?|unicamente comision(?:es)?|comision pura|sin (?:sueldo|salario) fijo|sin fijo)\b/.test(text);
   const commission = /\b(?:comision(?:es)?|variable|bonus|incentivos?)\b/.test(text);
-  const fixed = Boolean(offer.salary) || /\b(?:sueldo fijo|salario fijo|fijo mensual|fijo \+|\d[\d.,]*\s*(?:€|eur|euros?)\s*(?:brutos?|\/\s*(?:ano|mes)|al mes|mensuales?))\b/.test(text);
+  const fixed = Boolean(offer.salary) || /\b(?:sueldo fijo|salario fijo|fijo mensual|fijo \+|\d[\d.,]*\s*(?:€|eur|euros?)\s*(?:brutos?|\/\s*(?:ano|mes)|al mes|mensuales?))\b/.test(salaryText);
   const pay: PayModel = commissionOnly ? 'solo_comision' : fixed && commission ? 'fijo_mas_comision' : fixed ? 'fijo' : 'no_indicado';
   return { niche, pay };
 }

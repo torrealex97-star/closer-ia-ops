@@ -2,14 +2,38 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
-## Revisión del panel: la cola real y números exactos (sesión 110) — 2026-10-26
+## Revisión de código y correcciones (sesión 111) — 2026-10-26
+
+- **Petición del operador**: «haz un code review y soluciona todo». Revisado el código añadido desde #37 (incluido lo que el otro agente fusionó en #45/#53, porque lo toca).
+- **Corregido (tested)**:
+  - **Detector de ofertas** ([offerRisk.ts](../apps/web/lib/offerRisk.ts)): una frase negada («no es necesario pagar», «sin inversión inicial») ya no dispara `ADVANCE_PAYMENT_DETECTED` (antes bloqueaba ofertas honestas como «oferta peligrosa»); y «la empresa asume la inversión en publicidad» ya no avisa de `AD_SPEND_ON_CLOSER`.
+  - **Etiquetas** ([offerTags.ts](../apps/web/lib/offerTags.ts)): «Ganarás hasta 3.000 € al mes» ya no cuenta como sueldo fijo; «formación» y «salud» sueltas ya no inclinan el nicho (son beneficios de casi cualquier anuncio).
+  - **Motor** ([worker.js](../sites/engine/worker.js)): una oferta **sin descripción se salta**, ya no se retira en bloque con el motivo falso «el anuncio no está en español».
+  - **Clasificación automática** ([engineActivate.ts](../apps/web/lib/engineActivate.ts), [CloudAdminPanel.tsx](../apps/web/components/CloudAdminPanel.tsx)): lo que pasa a `needs_review` cuenta como progreso (el bucle cortaba con trabajo pendiente); una espera agotada se anota como **corte** (`truncated`), no queda escondida; y el cron da al paso del motor **hasta 40 s** (antes 12 s, menos de lo que tarda una pasada).
+  - **Resumen** ([SummaryTab.tsx](../apps/web/components/SummaryTab.tsx), [overview](../apps/web/app/api/admin/overview/route.ts)): «Excepciones para ti» suma también las `needs_review` de fuentes externas (antes decía 0 con la cola llena) y el paso lleva a la pestaña correcta.
+  - **Resend** ([integrations.ts](../apps/web/lib/integrations.ts)): una clave de **solo envío** devuelve 401 `restricted_api_key` en el sondeo `/domains` y se marcaba como inválida; ahora se acepta como «Clave válida (permiso solo de envío)». ⚠️ El nombre del error sale de la documentación de Resend recordada por el revisor, no comprobada.
+  - **Guarda de secretos** ([tests/secrets.mjs](../tests/secrets.mjs)): el patrón de JWT no podía casar con ningún JWT real (exigía 40 caracteres antes del primer punto) y el de asignación se saltaba nombres como `GROQ_API_KEY = "…"`; arreglados, con autopruebas.
+  - **Migraciones**: pruebas de BD para las dos aplicadas sin ellas ([tests/db/integration_resend.sql](../tests/db/integration_resend.sql), **sin ejecutar**), y se corrige la contradicción de la sesión 105 («sin aplicar»).
+- **Revisado y dejado como está**: el worker ya **no excluye** `account_executive` y `sdr` de la activación en bloque. Es intencionado: el commit de #45 lo dice («el motor clasifica el pool completo, incluidos AE y SDR»); la vista de alumna sigue ocultándolos por defecto (`include_extra_roles`).
+- **Límites**: no se ejecutaron las pruebas de BD con escrituras (confirmación del dueño pendiente) ni se ha probado el cron contra el motor real (el tope de 40 s depende del presupuesto total del cron, `CRON_BUDGET_MS`, 40 s por defecto: si los pasos anteriores consumen tiempo, el motor puede seguir quedándose corto y se anotará como corte).
+
+## Guarda de secretos para el repositorio público y guía del dueño (sesión 110) — 2026-10-26
+
+- **Petición del operador**: «haz todo lo que puedas del listado; lo que no, déjame el paso a paso».
+- **Hecho (tested)**: [tests/secrets.mjs](../tests/secrets.mjs) se ejecuta en `run.sh` (CI): rechaza claves reconocibles (Groq, OpenAI/`sk-`, Resend, Apify, Supabase, JWT, AWS, GitHub, Slack, claves privadas y asignaciones largas de `password/secret/token/api_key`) en los 456 ficheros versionados, con autoprueba y lista de valores de relleno de las pruebas. Red de seguridad por patrones: **no** sustituye a *Secret scanning* de GitHub ni a gitleaks. [SECURITY.md](../SECURITY.md) (cómo avisar en privado y que una clave expuesta se **rota**).
+- **Guía paso a paso** en [OWNER_GUIDE.md](OWNER_GUIDE.md): lo que solo puede hacer el dueño, con pasos de GitHub (Secret scanning, licencia, ramas), pruebas de BD, Supabase Auth, cuota de D1, Resend, variables de Vercel, revisión legal, Groq, certificados, proveedores y activaciones, más cinco decisiones de producto. Los nombres de menús de terceros están de memoria (marcados ⚠️ donde dudo).
+- **Intentado y denegado por el entorno**: borrar 49 ramas remotas ya fusionadas con `git push --delete` (clasificador de acciones destructivas). El comando exacto queda en la guía (paso 3) para que lo ejecute el dueño; no se buscó ningún rodeo.
+- **Límites**: no se han ejecutado las pruebas de BD con escrituras (Supabase pide la confirmación del dueño), no se ha tocado ninguna configuración de GitHub/Cloudflare/Vercel/Resend (sin acceso), y no se ha mirado el listado de variables de Vercel (puede mostrar valores).
+
+## Revisión del panel: la cola real y números exactos (sesión 112) — 2026-10-26
 
 - **Revisión** (inspected) de [SummaryTab](../apps/web/components/SummaryTab.tsx), [overview](../apps/web/app/api/admin/overview/route.ts), [external.ts](../apps/web/lib/external.ts), [students.ts](../apps/web/lib/students.ts) y la ruta de la [sala de práctica](../apps/web/app/api/practice/route.ts). Dos defectos corregidos; no se encontraron fallos de alcance por organización ni datos inventados en el resto.
 - **Defecto 1 — el Resumen no veía la cola externa**: la tarjeta «Excepciones para ti» contaba solo el catálogo del motor (decía 63 con 102 excepciones de fuentes externas esperando) y el aviso «Ver excepciones» abría siempre la cola del motor. Ahora suma las dos colas, las desglosa («X del motor · Y de fuentes externas») y el aviso lleva a la que tiene trabajo («Ver excepciones externas» / «… del motor»).
-- **Defecto 2 — el pendiente externo se cortaba en 500**: `/api/admin/overview` leía hasta 500 borradores y publicaba su longitud como total, así que el panel se quedaba clavado en 500 con miles en la base (además de traer 500 filas para contar). Ahora usa `countsByStatus()` (`count=exact`, solo ofertas vivas) y devuelve `external.counts` con `pending` y `exceptions` exactos.
+- **Defecto 2 — el pendiente externo se cortaba en 500** (la corrección de la sesión 111 contaba las `needs_review` externas leyendo también 500 filas): `/api/admin/overview` leía hasta 500 borradores y publicaba su longitud como total, así que el panel se quedaba clavado en 500 con miles en la base (además de traer 500 filas para contar). Ahora usa `countsByStatus()` (`count=exact`, solo ofertas vivas) y devuelve `external.counts` con `pending` y `exceptions` exactos.
 - **Desconocido ≠ cero**: si una de las dos colas no se puede leer, la tarjeta muestra «—» y dice cuál falta, en vez de un 0 falso (regla de diseño: un hueco no es un cero).
 - **Probado** (tested): `npm run test:web` con Chrome real (canal `chrome`, porque el binario de Playwright no se puede instalar en este equipo) — **194 PASS y 11/11 pasos de interfaz**, incluido un paso nuevo que siembra una excepción externa, comprueba que la tarjeta suma las dos colas y que el botón abre Fuentes externas en «A revisar». `typecheck`, `build` y `design` en verde.
 - **Límite**: [statsBySource](../apps/web/lib/external.ts) sigue agregando en memoria hasta 5.000 filas; por encima de esa cifra, «Activas/Aprobadas» por fuente se quedarían cortas (hoy hay 204 filas, así que no afecta a lo que se ve). Los números por estado ya son exactos.
+
 
 ## Migraciones aplicadas, Resend comprobado y detector contrastado con el inventario (sesión 109) — 2026-10-26
 
@@ -56,7 +80,7 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 
 - **Petición del operador**: construir los módulos de voz. Se hace por capas y **sin audio** hasta que se cumplan las condiciones de ADR-013.
 - **Hecho (tested, servicios simulados)**: [ADR-015](decisions/ADR-015-voz-en-la-sala-de-practica.md) (interruptor del propietario, consentimiento propio y revocable, Fase A navegador manos libres y Fase B WebRTC < 500 ms con retención cero, misma rúbrica con cita literal, topes); [voice.ts](../apps/web/lib/voice.ts): `VOICE_ROLEPLAY=on` es lo único que abre la voz (apagada por defecto) y además exige consentimiento vigente (no revocado y de la versión del texto); una lectura fallida se declara aparte de «sin consentimiento»; `GET /api/student/voice` informa a la interfaz y hoy responde «apagada». `voice.mjs` 5/5 y un paso de flujo (401 sin sesión; con sesión, `switch_off`).
-- **Migración sin aplicar**: [20261027_voice_consent.sql](../supabase/migrations/20261027_voice_consent.sql) (`student_voice_consent`, RLS sin políticas) y su prueba [tests/db/voice_consent.sql](../tests/db/voice_consent.sql), **sin ejecutar**. Aplicarla exige orden expresa.
+- **Migración** [20261027_voice_consent.sql](../supabase/migrations/20261027_voice_consent.sql) (`student_voice_consent`, RLS sin políticas): estaba escrita sin aplicar; **se aplicó el 2026-10-26** por orden del dueño (ver sesión 109). Su prueba [tests/db/voice_consent.sql](../tests/db/voice_consent.sql) **sigue sin ejecutar**.
 - **No hecho**: audio, proveedor de STT/TTS, bucle manos libres, pantalla de consentimiento y su texto legal, topes de minutos. Sin eso **no hay voz**; la interfaz no ha cambiado.
 - **Límites**: nada medido (latencia, coste, calidad en español); el texto de consentimiento de voz no existe aún y lo revisa el dueño o su asesor.
 
