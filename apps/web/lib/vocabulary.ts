@@ -91,10 +91,29 @@ export const ROLE_LABELS: Record<RoleFamily, string> = { closer: 'Closer', sette
 
 export const fold = (text: string | null | undefined) => (text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+// Coincidencia por palabra completa, igual que `hasWord` del motor (sites/engine/worker.js):
+// sin esto, «inventory closer to their customers» clasificaba una vacante de Java como closer.
+// Admite el plural ('closers', 'setters', 'agendadores').
+const isWordChar = (ch: string | undefined) => ch !== undefined && /[a-z0-9]/.test(ch);
+export function hasWord(text: string, keyword: string): boolean {
+  if (!text || !keyword) return false;
+  for (let from = 0; ;) {
+    const at = text.indexOf(keyword, from);
+    if (at < 0) return false;
+    let end = at + keyword.length;
+    if (text[end] === 's') end += 1;
+    else if (text[end] === 'e' && text[end + 1] === 's') end += 2;
+    if (!isWordChar(at === 0 ? undefined : text[at - 1]) && !isWordChar(text[end])) return true;
+    from = at + 1;
+  }
+}
+
 // Misma prioridad que el motor para el título: closer primero («Setter y Closer» es closer).
+// Solo el título: en el cuerpo, «closer» a secas suele ser el comparativo inglés (mismo criterio
+// que BODY_AMBIGUOUS_KEYWORDS en sites/engine/worker.js).
 export function roleFromTitle(title: string | null | undefined): RoleFamily | null {
   const t = fold(title);
-  return ROLE_EVAL_ORDER.find(role => ROLE_KEYWORDS[role].some(k => t.includes(k))) ?? null;
+  return ROLE_EVAL_ORDER.find(role => ROLE_KEYWORDS[role].some(k => hasWord(t, k))) ?? null;
 }
 
 // La señal de España vive en ./esPlaces: necesita el gazetteer de municipios y no

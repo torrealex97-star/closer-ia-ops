@@ -67,7 +67,9 @@ type Overview = {
   external?: { pending: number; sources: ExtSource[]; paused?: string[] };
 };
 const CONN: Record<string, string> = { ok: 'Conectado', error: 'Con fallo', not_configured: 'Sin configurar' };
-const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida' };
+// `deferred`: el motor aplazó la fuente porque se acabó el presupuesto de peticiones de esa
+// ejecución (no es un fallo ni una fuente apagada); entra en la siguiente pasada.
+const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida', deferred: 'Aplazada' };
 const statusClass = (s: string | null) => s === 'ok' || s === 'completed' ? 'status ok' : s === 'error' || s === 'failed' ? 'status bad' : 'status';
 
 type ExtSource = { source: string; live: number; approved: number; last_seen: string | null };

@@ -26,6 +26,14 @@ Cuando un portal del SOP no tiene API oficial conectada (sin clave, clave rechaz
 5. **Datos**: de una ficha de Google solo se toman título, enlace y el resumen publicado. **Empresa, ubicación y salario no se inventan**: quedan como «no indicado» salvo que el texto los mencione con una cifra literal. Entra como borrador, como todo lo demás.
 6. **Visibilidad**: el panel lo declara en cada recogida (`Computrabajo: 6 guardadas · 1 búsqueda (~0,025 USD)`) y un corte por tiempo se anota como `truncated`.
 
+## 1 quater. Búsquedas gratuitas de closer en el motor cloud (sin clave ni coste)
+El motor (`sites/engine/worker.js`, Sites) busca por término en las fuentes gratuitas que ya funcionan: **FreeHire España**, **FreeHire LATAM** y **Himalayas**.
+1. **Vocabulario** (`CLOSER_TERMS`, 20 términos): `closer`, `closer remoto`, `remote closer`, `closer de ventas`, `sales closer`, `cierre comercial`, `cierre de ventas`, `cierre de negocios`, `cerrador de ventas`, `high ticket`, `inside sales`, `setter`, `agendador`, `comercial remoto`, `asesor comercial remoto`, `agente comercial remoto`, `ejecutivo comercial remoto`, `ventas remotas`, `closing sales`, `televentas remoto`.
+2. **Rotación**: cada pasada usa 6 términos en FreeHire ES, 5 en FreeHire LATAM y 4 en Himalayas (1 petición por término), así el vocabulario completo se recorre en 4–5 días sin comerse el presupuesto de peticiones del resto de fuentes (34 peticiones de 40 por invocación).
+3. **Filtro de rol en el origen**: un candidato se ingiere solo si su familia (la misma que calcula el motor) es closer, setter, cold caller o sdr. Se descarta antes de escribir: cada candidato cuesta 6 escrituras de D1 (raw, posting, job, catálogo, oportunidad y versión) y el ruido (dependientes de tienda, ingeniería, becarios) nunca podría salir a la alumna. **La familia AE no entra por aquí**: ya llega por el barrido por categoría de FreeHire, que medía 278 candidatos por pasada, 851 en catálogo, 19 elegibles y 0 closers.
+4. **Honestidad de las cifras**: el estado de cada fuente en `/api/status` publica `fetched` y `filtered`; lo descartado no se disfraza de vacío.
+5. **Coste**: 0. La cuota que sí se gasta es la mensual de escrituras de D1 del motor; el filtro es lo que la mantiene bajo control.
+
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
 2. Vercel → proyecto → Settings → Environment Variables: `INGEST_TOKEN` = ese token (Production).
