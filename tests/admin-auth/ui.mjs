@@ -79,6 +79,8 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Ofertas de España y del mercado en dólares.' }).waitFor();
   // La cola externa abre en las excepciones (needs_review): los borradores los cierra la pasada automática.
   await page.locator('#ex-status').inputValue().then(v => assert.equal(v, 'needs_review', 'con excepciones, abre en A revisar y no en borradores'));
+  // La cola entera se ve aunque los filtros de perfil/España dejen menos: si no, «cumplen los filtros» la esconde.
+  await page.getByText(/en tu cola de excepciones \(sin filtros\)/).waitFor();
   await page.locator('#ex-status').selectOption('draft'); // el resto del paso trabaja sobre borradores
   await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Últimos 14 días: \d+ ofertas buenas/);
   // Contraste: el texto pequeño gris usa --secondary (≥ 4,5:1), no --muted (3,4:1)

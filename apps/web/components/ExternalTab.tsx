@@ -182,7 +182,9 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       <button onClick={() => change(setStatus)('draft')}>Ver borradores</button>
     </div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
-      <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data?.total ?? '…'}</strong>cumplen los filtros</span><span><strong>{chosen.length}</strong>seleccionadas en esta página</span></div>
+      <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data?.total ?? '…'}</strong>cumplen los filtros</span><span><strong>{chosen.length}</strong>seleccionadas en esta página</span>
+        {/* La cola entera, sin los filtros de perfil/España: si no, «cumplen los filtros» esconde el trabajo real. */}
+        {status === 'needs_review' && data && <span><strong>{data.counts.needs_review ?? 0}</strong>en tu cola de excepciones (sin filtros)</span>}</div>
       <label className="check-label" style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" checked={onlySpain} onChange={e => change(setOnlySpain)(e.target.checked)} /> Solo con señal clara de España</label>
     </div>
     {status === 'draft' && <div className="search-panel admin-toolbar" style={{ alignItems: 'center' }}>
