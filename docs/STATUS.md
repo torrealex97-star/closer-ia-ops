@@ -2,6 +2,13 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Señales de apertura sumisa y entusiasmo; feedback con tarea de 24 horas (sesión 108) — 2026-10-26
+
+- **Origen**: puntos 2 y 4 de [PORTING_REVIEW.md](PORTING_REVIEW.md) (revisión del otro agente de lo que falta de las aplicaciones anteriores). Sin IA y sin datos de alumnas.
+- **Hecho (tested)**: [signals.ts](../apps/web/app/api/practice/signals.ts) detecta, solo en **venta**, la **apertura sumisa** (disculpas, «gracias por tu tiempo», «no quiero molestar», «te robo un minuto») y el **entusiasmo de más** («¡qué increíble!», «me encanta…»), cada una con su frase literal; en una entrevista «gracias por su tiempo» es cortesía y no dispara nada. Siguen siendo como máximo 3 señales por práctica, por prioridad. El feedback del modelo ahora cierra con **una sola tarea para las próximas 24 horas**, comprobable y ligada a la habilidad que más le ha frenado, en vez de «una práctica esta semana». `practice.mjs` 6/6.
+- **Revisión de otros agentes y ramas (inspected)**: #45 (otro agente) está fusionada y sirve el motor que retira y clasifica; quedan dos ramas sin fusionar que no deben fusionarse tal cual (`feat/formacion-progreso`, versión anterior y divergente de lo que `main` ya tiene reconstruido, y `claude/cloud-student-view`, del 12-oct). Las tareas que requieren al dueño (cuota de D1, visibilidad del repositorio, ramas, pruebas de BD con confirmación) están en el relevo, tareas 11-13.
+- **Límites**: las frases clave son reglas léxicas sin calibrar con prácticas reales; la tarea de 24 horas depende de que el modelo cumpla la instrucción (no hay un comprobador). Quedan sin hacer de esa nota: capas de objeción, banco de preguntas de entrevista con banderas rojas y retos asignados (necesita tabla).
+
 ## El motor clasifica su pool y retira lo que descarta; el panel publica solo (sesión 107) — 2026-10-26
 
 - **Petición del operador** (anotación sobre el panel de admin): «todas estas ofertas no deben estar a revisar por un humano; la IA debe clasificarlas y añadirlas sola, y dejar a revisión solo los casos más complejos».

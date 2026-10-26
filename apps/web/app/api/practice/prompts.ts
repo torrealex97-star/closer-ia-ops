@@ -357,7 +357,7 @@ Reglas:
 - focus: la única habilidad que más le ha frenado hoy, en una frase.
 - strengths: hasta 3 cosas concretas que hizo bien. improvements: hasta 3 mejoras accionables.
 - model: una forma posible de decir mejor una de sus frases, con sus propias palabras y sin inventar datos. No es «la respuesta correcta».
-- next: una sola práctica siguiente, concreta y repetible esta semana.
+- next: una sola tarea para las próximas 24 horas, concreta y comprobable (qué hacer, cuántas veces y con qué situación de la sala), ligada a la habilidad de «focus». No propongas varias cosas a la vez.
 - Tono directo y respetuoso, sin elogios vacíos.
 
 Ejes (puntúa los ${count}, con el id exacto):
