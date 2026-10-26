@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Guarda de secretos para el repositorio público y guía del dueño (sesión 110) — 2026-10-26
+
+- **Petición del operador**: «haz todo lo que puedas del listado; lo que no, déjame el paso a paso».
+- **Hecho (tested)**: [tests/secrets.mjs](../tests/secrets.mjs) se ejecuta en `run.sh` (CI): rechaza claves reconocibles (Groq, OpenAI/`sk-`, Resend, Apify, Supabase, JWT, AWS, GitHub, Slack, claves privadas y asignaciones largas de `password/secret/token/api_key`) en los 456 ficheros versionados, con autoprueba y lista de valores de relleno de las pruebas. Red de seguridad por patrones: **no** sustituye a *Secret scanning* de GitHub ni a gitleaks. [SECURITY.md](../SECURITY.md) (cómo avisar en privado y que una clave expuesta se **rota**).
+- **Guía paso a paso** en [OWNER_GUIDE.md](OWNER_GUIDE.md): lo que solo puede hacer el dueño, con pasos de GitHub (Secret scanning, licencia, ramas), pruebas de BD, Supabase Auth, cuota de D1, Resend, variables de Vercel, revisión legal, Groq, certificados, proveedores y activaciones, más cinco decisiones de producto. Los nombres de menús de terceros están de memoria (marcados ⚠️ donde dudo).
+- **Intentado y denegado por el entorno**: borrar 49 ramas remotas ya fusionadas con `git push --delete` (clasificador de acciones destructivas). El comando exacto queda en la guía (paso 3) para que lo ejecute el dueño; no se buscó ningún rodeo.
+- **Límites**: no se han ejecutado las pruebas de BD con escrituras (Supabase pide la confirmación del dueño), no se ha tocado ninguna configuración de GitHub/Cloudflare/Vercel/Resend (sin acceso), y no se ha mirado el listado de variables de Vercel (puede mostrar valores).
+
 ## Migraciones aplicadas, Resend comprobado y detector contrastado con el inventario (sesión 109) — 2026-10-26
 
 - **Orden del dueño** («puedes hacer las acciones recomendadas del listado»):
