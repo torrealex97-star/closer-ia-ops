@@ -117,7 +117,8 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByRole('button', { name: 'Aprobar las mejores' }).click(); await page.getByText(/Aprobadas 1 de 1 que cumplían los filtros/).waitFor();
   assert.equal([...state.external.values()].filter(o => o.editorial_status === 'approved').length, 2);
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
-  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 4 activas/).waitFor();
+  // 5 activas: las cuatro de siempre más la excepción 'x0' que crea este paso.
+  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 5 activas/).waitFor();
 });
 await step('Apify: añadir el actor, guardar la clave, lanzar y recoger resultados con coste y presupuesto', async () => {
   await page.getByRole('button', { name: 'Búsqueda automática', exact: true }).click(); await page.getByRole('heading', { name: 'Buscar ofertas.' }).waitFor();
