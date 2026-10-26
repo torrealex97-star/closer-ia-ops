@@ -1,5 +1,7 @@
 // Tablero de relevo: node tests/handoff.mjs
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { parseClaim, check, board, load } from '../scripts/handoff.mjs';
 
 const doc = (o = {}) => `---\nagent: ${o.agent ?? 'a1'}\nstatus: ${o.status ?? 'in_progress'}\nbranch: ${o.branch ?? 'feat/x'}\ntouches: ${o.touches ?? 'apps/web/lib/a.ts'}\ndate: ${o.date ?? '2026-10-17'}\n${o.depends ? `depends_on: ${o.depends}\n` : ''}${o.pr ? `pr: ${o.pr}\n` : ''}---\ntexto`;
@@ -33,7 +35,10 @@ assert.ok(b.indexOf('2026-10-17') < b.indexOf('2026-10-18') && b.includes('#7'))
 
 assert.deepEqual(load('/ruta/que/no/existe'), [], 'sin carpeta de fichas = sin trabajos vivos, no un error');
 
-// Las fichas reales del repositorio deben pasar su propia comprobación
-const real = load(new URL('../docs/handoff/claims/', import.meta.url).pathname);
+// Las fichas reales del repositorio deben pasar su propia comprobación. La carpeta se resuelve con fileURLToPath:
+// con `URL.pathname` la ruta con espacios (%20) no existe y la comprobación pasaba sin leer NINGUNA ficha.
+const claimsDir = fileURLToPath(new URL('../docs/handoff/claims/', import.meta.url));
+assert.ok(existsSync(claimsDir), `no se encuentra la carpeta de fichas: ${claimsDir}`);
+const real = load(claimsDir);
 assert.deepEqual(check(real), [], 'fichas reales sin solapes ni errores');
-console.log('PASS  relevo: formato, solapes, un trabajo en curso por agente, cadenas y fichas reales');
+console.log(`PASS  relevo: formato, solapes, un trabajo en curso por agente, cadenas y ${real.length} ficha(s) real(es)`);

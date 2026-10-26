@@ -1,6 +1,6 @@
 import { ORG } from './external';
 import { externalForStudent } from './externalSurface';
-import { serviceRest } from './supabaseAuth';
+import { pagedRest, serviceRest, type PagedRows } from './supabaseAuth';
 import { ANSWER_KEYS, CONTRACTS, LEVELS, WORK_AUTH, getAppProfile, type AppProfile } from './applicationProfile';
 import { getProfile, type Profile } from './students';
 
@@ -61,11 +61,16 @@ export function buildCopyData(student: Pick<Profile, 'full_name' | 'city' | 'vid
 const uuid = /^[0-9a-f-]{36}$/;
 const message = (v: unknown, max: number) => typeof v === 'string' ? v.replace(/<[^>]+>/g, ' ').replace(/\r/g, '').trim().slice(0, max) : null; // su propio texto: se conservan sus datos de contacto
 
-export async function listApplications(userId: string): Promise<Application[] | null> {
+// Lectura por PÁGINAS (ver `pagedRest`): una sola petición se cortaba en `db-max-rows` sin decirlo, así que el XP,
+// el embudo y los recuentos por alumna del panel salían cortos y parecían exactos.
+export async function listApplications(userId: string): Promise<PagedRows<Application> | null> {
   if (!uuid.test(userId)) return null;
-  const r = await serviceRest(`student_applications?org_id=eq.${ORG}&user_id=eq.${userId}&select=${COLS}&order=updated_at.desc&limit=200`);
-  const rows = r.ok ? await r.json().catch(() => null) : null;
-  return Array.isArray(rows) ? rows : null;
+  return pagedRest<Application>(`student_applications?org_id=eq.${ORG}&user_id=eq.${userId}&select=${COLS}`, 'updated_at.desc,id.desc');
+}
+
+// Recuentos por alumna del panel: mismo paginado, solo `user_id` y `status` (sin textos ni borradores ajenos).
+export async function listOrgApplicationStatuses(): Promise<PagedRows<{ user_id: string; status: string }> | null> {
+  return pagedRest<{ user_id: string; status: string }>(`student_applications?org_id=eq.${ORG}&select=user_id,status`, 'id.asc');
 }
 
 export type PrepareResult = { ok: true; application: Application; created: boolean } | { ok: false; status: number; detail: string };
@@ -74,7 +79,7 @@ export async function prepareApplication(userId: string, offerRef: unknown, deps
   if (typeof offerRef !== 'string' || !/^ext-[0-9a-f-]{36}$/.test(offerRef) || !uuid.test(userId)) return { ok: false, status: 422, detail: 'Oferta no válida.' };
   const [student, app] = await Promise.all([getProfile(userId), getAppProfile(userId)]);
   if (!student?.consent_at) return { ok: false, status: 422, detail: 'Guarda antes tu perfil y acepta el tratamiento de tus datos.' };
-  const existing = (await listApplications(userId))?.find(a => a.offer_ref === offerRef);
+  const existing = (await listApplications(userId))?.rows.find(a => a.offer_ref === offerRef);
   if (existing) return { ok: true, application: existing, created: false };
   const visible = await (deps.load ?? externalForStudent)({ role: null, market: 'any', days: 30, include_bilingual: student.languages.includes('en'), starred_only: false }).catch(() => []);
   const opp = (visible as Array<{ id: string; original_title: string; company: string; source_url: string }>).find(o => o.id === offerRef);
@@ -84,7 +89,7 @@ export async function prepareApplication(userId: string, offerRef: unknown, deps
     body: JSON.stringify({ user_id: userId, org_id: ORG, offer_ref: offerRef, offer_title: opp.original_title.slice(0, 200), offer_company: /no indicada/i.test(opp.company) ? null : opp.company.slice(0, 200), offer_url: opp.source_url, cover_message: cover }) });
   const rows = r.ok ? await r.json().catch(() => null) : null;
   if (!Array.isArray(rows) || !rows[0]) {
-    const again = (await listApplications(userId))?.find(a => a.offer_ref === offerRef); // carrera: otra pestaña la creó antes
+    const again = (await listApplications(userId))?.rows.find(a => a.offer_ref === offerRef); // carrera: otra pestaña la creó antes
     return again ? { ok: true, application: again, created: false } : { ok: false, status: 503, detail: 'No se pudo preparar la candidatura.' };
   }
   return { ok: true, application: rows[0], created: true };
@@ -93,7 +98,7 @@ export async function prepareApplication(userId: string, offerRef: unknown, deps
 export type UpdateResult = { ok: true; application: Application } | { ok: false; status: number; detail: string };
 export async function updateApplication(userId: string, id: unknown, patch: { status?: unknown; cover_message?: unknown; notes?: unknown }): Promise<UpdateResult> {
   if (typeof id !== 'string' || !uuid.test(id) || !uuid.test(userId)) return { ok: false, status: 422, detail: 'Candidatura no válida.' };
-  const current = (await listApplications(userId))?.find(a => a.id === id);
+  const current = (await listApplications(userId))?.rows.find(a => a.id === id);
   if (!current) return { ok: false, status: 404, detail: 'Candidatura no encontrada.' };
   const body: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.status !== undefined) {

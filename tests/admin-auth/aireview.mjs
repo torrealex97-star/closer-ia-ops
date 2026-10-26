@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 // Base de datos simulada mínima (external_offers + integration_connections vacío: se inyecta el LLM).
-const rows = new Map(); const fault = {};
+const rows = new Map(); const fault = {}; const saved = [];
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x'); let body = '';
   req.on('data', c => body += c); req.on('end', () => {
     const send = (s, d) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(d)); };
+    if (url.pathname === '/rest/v1/weekly_reports') { saved.push(JSON.parse(body || '{}')); return send(201, {}); }
     if (url.pathname !== '/rest/v1/external_offers') return send(200, []);
     const q = Object.fromEntries(url.searchParams);
     let list = [...rows.values()];
@@ -26,7 +27,9 @@ const server = http.createServer((req, res) => {
     if (q.reviewed_by) list = list.filter(r => `eq.${r.reviewed_by}` === q.reviewed_by);
     if (q.id?.startsWith('in.(')) list = list.filter(r => q.id.slice(4, -1).split(',').includes(r.id));
     list.sort((a, b) => b.score - a.score);
-    send(200, list.slice(0, Number(q.limit) || 100));
+    // Paginado como PostgREST: `limit` + `offset` (sin `offset`, una lectura por páginas nunca avanzaría).
+    const offset = Number(q.offset) || 0;
+    send(200, list.slice(offset, offset + (Number(q.limit) || 100)));
   });
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -146,4 +149,17 @@ seed();
 const roomy = await ai.runAiReview({ ...base, env: {}, deadline: Date.now() + 60000 });
 assert.equal(roomy.truncated, undefined); assert.equal(roomy.reviewed, 6);
 console.log('PASS  escrituras: anotación fallida no cuenta, guarda de estado frente a personas, corte por presupuesto');
+
+// 7) Informe semanal: PostgREST corta en 1.000 filas, así que se lee por páginas y el informe da el total real.
+rows.clear(); saved.length = 0;
+for (let i = 0; i < 1500; i++) {
+  const rid = `33333333-3333-4333-8333-${String(i).padStart(12, '0')}`;
+  rows.set(rid, { id: rid, org_id: 'cloud-wdc', editorial_status: 'draft', score: 50, ai_review: { would_decide: i % 3 === 0 ? 'approve' : 'human', applied: i % 5 === 0, audit_sample: false, reviewed_at: '2026-10-25T10:00:00.000Z' } });
+}
+assert.equal(await ai.weeklyAiReport(new Date('2026-10-26T10:00:00Z')), true);
+const weekly = saved.at(-1).payload.ai_review;
+assert.equal(weekly.reviewed, 1500, 'no se corta en las 1.000 de una sola respuesta');
+assert.equal(weekly.would_approve, 500); assert.equal(weekly.applied, 300);
+assert.equal(weekly.truncated, false, 'sin llegar al tope no se marca parcial');
+console.log('PASS  informe semanal: 1.500 ofertas leídas por páginas y parcialidad declarada');
 server.close();

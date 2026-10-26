@@ -10,7 +10,7 @@ import type { DirectReview, Goal, IdleNudge } from '../lib/studentRetention';
 
 // Progreso de la alumna (adaptado del panel «Mis métricas» de closer-ai-coach): solo datos reales de su actividad.
 // Un periodo sin datos es «—», nunca 0; una carga fallida no se pinta como vacío; cada gráfico trae su tabla.
-type Metrics = { xp: XpResult; mastery: Mastery[]; applications: AppFunnel | null };
+type Metrics = { xp: XpResult; mastery: Mastery[]; applications: AppFunnel | null; applications_truncated?: boolean | null };
 type Retention = { nudge: IdleNudge; review: DirectReview; goals: Goal[] };
 type State = { kind: 'loading' } | { kind: 'login' } | { kind: 'error'; message: string } | { kind: 'ready'; progress: Progress; metrics: Metrics | null; retention: Retention | null };
 const PERIODS = [7, 30, 90] as const;
@@ -108,7 +108,8 @@ function Ready({ progress: p, metrics, retention }: { progress: Progress; metric
         {metrics.applications ? <><p className="card-meta">Lo que has anotado tú: la app no recibe las respuestas de las empresas.</p>
           <dl className="kv"><div><dt>Enviadas</dt><dd>{metrics.applications.sent}</dd></div><div><dt>Con respuesta</dt><dd>{metrics.applications.responded}</dd></div>
             <div><dt>Tasa de respuesta</dt><dd>{metrics.applications.responseRate === null ? '— (aún no has enviado ninguna)' : `${metrics.applications.responseRate} %`}</dd></div>
-            <div><dt>Entrevistas</dt><dd>{metrics.applications.interviews}</dd></div><div><dt>Ofertas</dt><dd>{metrics.applications.offers}</dd></div></dl></>
+            <div><dt>Entrevistas</dt><dd>{metrics.applications.interviews}</dd></div><div><dt>Ofertas</dt><dd>{metrics.applications.offers}</dd></div></dl>
+          {metrics.applications_truncated && <p className="card-meta" role="status">Tienes más de 10.000 candidaturas anotadas: estas cifras son parciales.</p>}</>
           : <p className="card-meta">— No se pudieron leer tus candidaturas ahora mismo.</p>}</article>}
       <article className="progress-card"><h2><Award size={16} aria-hidden="true" /> Logros</h2>
         <ul className="achievements">{p.lifetime.achievements.map(a => <li key={a.id} data-on={a.unlocked}><strong>{a.label}</strong><br /><small>{a.unlocked ? 'Conseguido' : 'Por conseguir'}</small></li>)}</ul></article>

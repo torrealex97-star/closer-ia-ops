@@ -21,12 +21,14 @@ export async function GET(request: NextRequest) {
   const read = await readActivity({ studentId: row.id });
   // Sin lectura no se inventan ceros: la vista dice que no se pudo cargar.
   if (!read) return reply({ detail: 'No se pudo cargar tu progreso ahora mismo.' }, 503);
-  // Candidaturas: si no se pueden leer se declara (`applications: null`), no se cuentan como cero.
-  const apps = await listApplications(auth.student.user_id).catch(() => null);
+  // Candidaturas: si no se pueden leer se declara (`applications: null`), no se cuentan como cero. Si la lectura
+  // llegó al tope se dice (`applications_truncated`) en vez de presentar cifras y XP cortos como exactos.
+  const appPage = await listApplications(auth.student.user_id).catch(() => null);
+  const apps = appPage?.rows ?? null;
   const statuses = apps ? apps.map(app => app.status) : null;
   return reply({
     progress: summarize(read.rows, days, new Date(), read.truncated),
-    metrics: { xp: xpAndLevel(read.rows, statuses), mastery: masteryByScenario(read.rows), applications: statuses ? applicationFunnel(statuses) : null },
-    retention: { nudge: idleNudge(read.rows), review: directReview(read.rows), goals: weeklyGoals(read.rows, apps ? sentThisWeek(apps) : null) },
+    metrics: { xp: xpAndLevel(read.rows, statuses), mastery: masteryByScenario(read.rows), applications: statuses ? applicationFunnel(statuses) : null, applications_truncated: appPage?.truncated ?? null },
+    retention: { nudge: idleNudge(read.rows), review: directReview(read.rows), goals: weeklyGoals(read.rows, apps && !appPage?.truncated ? sentThisWeek(apps) : null) },
   });
 }

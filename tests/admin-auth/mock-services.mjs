@@ -125,14 +125,23 @@ export function startMocks({ authPort, enginePort }) {
     }
     if (url.pathname === '/rest/v1/student_applications') {
       state.applications ??= []; const q = Object.fromEntries(url.searchParams); const eqv = k => q[k]?.startsWith('eq.') ? q[k].slice(3) : null;
-      const mine = () => state.applications.filter(a => (!eqv('user_id') || a.user_id === eqv('user_id')) && (!eqv('id') || a.id === eqv('id')) && (!eqv('status') || a.status === eqv('status')));
+      const inList = k => q[k]?.startsWith('in.(') ? q[k].slice(4, -1).split(',') : null;
+      const statusOk = a => { const list = inList('status'); return list ? list.includes(a.status) : (!eqv('status') || a.status === eqv('status')); };
+      const mine = () => state.applications.filter(a => (!eqv('user_id') || a.user_id === eqv('user_id')) && (!eqv('id') || a.id === eqv('id')) && statusOk(a));
+      // Paginado como PostgREST: `order` con varias columnas y dirección, `limit` + `offset`. Sin esto, la lectura por
+      // páginas del servidor no avanzaría (devolvía la misma página siempre) y el tope de filas quedaría sin probar.
+      const sorted = rows => {
+        const keys = (q.order ?? 'updated_at.desc').split(',').map(part => { const [k, dir] = part.split('.'); return [k, dir === 'desc' ? -1 : 1]; });
+        return rows.slice().sort((x, y) => { for (const [k, dir] of keys) { const a = String(x[k] ?? ''), b = String(y[k] ?? ''); if (a !== b) return a < b ? -dir : dir; } return 0; });
+      };
+      const slicePage = rows => { const offset = Number(q.offset) || 0; const limit = Number(q.limit); return limit ? rows.slice(offset, offset + limit) : rows.slice(offset); };
       if (req.method === 'POST') {
         if (state.applications.some(a => a.user_id === body.user_id && a.offer_ref === body.offer_ref)) return send(res, 201, []);
         const row = { id: crypto.randomUUID(), status: 'draft', notes: null, applied_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...body }; state.applications.push(row); return send(res, 201, [row]);
       }
       if (req.method === 'PATCH') { const hit = mine(); hit.forEach(a => Object.assign(a, body)); return send(res, 200, hit); }
       if (req.method === 'DELETE') { const hit = mine(); state.applications = state.applications.filter(a => !hit.includes(a)); return send(res, 200, hit); }
-      return send(res, 200, mine().sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+      return send(res, 200, slicePage(sorted(mine())));
     }
     if (url.pathname === '/rest/v1/student_profiles') {
       state.profiles ??= new Map(); const q = Object.fromEntries(url.searchParams); const uid = q.user_id?.slice(3);

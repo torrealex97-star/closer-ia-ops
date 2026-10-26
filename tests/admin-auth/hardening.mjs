@@ -33,6 +33,12 @@ await step('SSRF: URLs internas, IP literal y DNS a red privada no se piden', as
   assert.equal((await assertPublicUrl('https://interna.ejemplo.es/x', async () => ['10.0.0.5'])).reason, 'resuelve_a_red_interna');
   assert.equal((await assertPublicUrl('https://ok.ejemplo.es/x', async () => ['93.184.216.34'])).ok, true);
 });
+await step('SSRF: una IPv4 dentro de IPv6 (también en forma hexadecimal) no pasa por pública', async () => {
+  for (const ip of ['::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:10.0.0.1', '::ffff:0a00:0001', '::ffff:169.254.169.254', '::ffff:a9fe:a9fe', '198.18.0.10', '198.19.255.1']) {
+    assert.equal((await assertPublicUrl('https://mapeada.ejemplo.es/x', async () => [ip])).reason, 'resuelve_a_red_interna', ip);
+  }
+  assert.equal((await assertPublicUrl('https://publica.ejemplo.es/x', async () => ['::ffff:8.8.8.8'])).ok, true, 'una IPv4 pública mapeada sigue siendo pública');
+});
 await step('verifyOffer con URL interna: unknown, sin petición a la URL y razón explícita', async () => {
   mode = 'up'; offerUrl = 'http://169.254.169.254/latest/meta-data'; hits.length = 0;
   const r = await verifyOffer('11111111-1111-1111-1111-111111111111', 2000);
