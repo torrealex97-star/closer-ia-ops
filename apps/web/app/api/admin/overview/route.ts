@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticate, withCookies } from '../../../../lib/adminAuth';
 import { authHealthy, listAdmins } from '../../../../lib/supabaseAuth';
 import { listConnections, PROVIDERS } from '../../../../lib/integrations';
-import { listOffers, pausedSources, statsBySource } from '../../../../lib/external';
+import { countsByStatus, pausedSources, statsBySource } from '../../../../lib/external';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const engine = (process.env.CAREER_ENGINE_URL ?? '').replace(/\/$/, '');
   const env = (name: string) => Boolean(process.env[name]);
 
-  const [status, funnel, audit, authOk, admins, saved, extStats, extPending, extReview, extPaused] = await Promise.all([
+  const [status, funnel, audit, authOk, admins, saved, extStats, extCounts, extPaused] = await Promise.all([
     engine ? engineGet(engine, '/api/status').catch(() => null) : null,
     engine ? engineGet(engine, '/api/funnel').catch(() => null) : null,
     engine ? engineGet(engine, '/api/audit').catch(() => null) : null,
@@ -36,8 +36,7 @@ export async function GET(request: NextRequest) {
     listAdmins(),
     listConnections(),
     statsBySource(),
-    listOffers({ status: 'draft', onlyLive: true, limit: 500 }),
-    listOffers({ status: 'needs_review', onlyLive: true, limit: 500 }),
+    countsByStatus(),
     pausedSources(),
   ]);
 
@@ -64,7 +63,9 @@ export async function GET(request: NextRequest) {
     engine: status ? { catalog_active: status.catalog_active, raw_items: status.raw_items, last_run: status.latest_run ? { day: status.latest_run.day, status: status.latest_run.status, completed_at: status.latest_run.completed_at } : null } : null,
     sources: sources.map((s: Record<string, unknown>) => ({ code: s.code, name: s.name, run_status: s.run_status ?? null, fetched: s.revisadas ?? null, catalog: s.catalogo ?? 0, eligible: s.elegible ?? 0, selected: s.seleccionada ?? 0, roles: s.roles ?? {}, warning: s.fuente ?? null })),
     pool: { eligible: funnel?.totales?.elegible ?? null, by_role: sources.reduce((acc: Record<string, number>, s: { roles?: Record<string, number> }) => { for (const [k, n] of Object.entries(s.roles ?? {})) acc[k] = (acc[k] ?? 0) + Number(n); return acc; }, {}) },
-    external: { sources: extStats ?? [], pending: extPending?.length ?? 0, needs_review: extReview?.length ?? 0, paused: [...extPaused] },
+    // Recuentos exactos por estado (count=exact, solo ofertas vivas): antes se leían 500 filas y su longitud se
+    // presentaba como total, así que por encima de 500 el panel decía «500 pendientes» aunque hubiera miles.
+    external: { sources: extStats ?? [], counts: extCounts ?? null, pending: extCounts?.draft ?? 0, exceptions: extCounts?.needs_review ?? 0, paused: [...extPaused] },
     audit: audit && Array.isArray(audit.slugs) ? { day: audit.day, slugs: audit.slugs.map((s: Record<string, unknown>) => ({ source: s.source, slug: s.slug, status: s.status, http_status: s.http_status, canonical_url: s.canonical_url ?? null })) } : null,
     connections, paid,
   }, { headers: { 'Cache-Control': 'no-store' } }), auth.setCookies);

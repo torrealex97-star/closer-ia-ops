@@ -25,6 +25,16 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Intentado y denegado por el entorno**: borrar 49 ramas remotas ya fusionadas con `git push --delete` (clasificador de acciones destructivas). El comando exacto queda en la guía (paso 3) para que lo ejecute el dueño; no se buscó ningún rodeo.
 - **Límites**: no se han ejecutado las pruebas de BD con escrituras (Supabase pide la confirmación del dueño), no se ha tocado ninguna configuración de GitHub/Cloudflare/Vercel/Resend (sin acceso), y no se ha mirado el listado de variables de Vercel (puede mostrar valores).
 
+## Revisión del panel: la cola real y números exactos (sesión 112) — 2026-10-26
+
+- **Revisión** (inspected) de [SummaryTab](../apps/web/components/SummaryTab.tsx), [overview](../apps/web/app/api/admin/overview/route.ts), [external.ts](../apps/web/lib/external.ts), [students.ts](../apps/web/lib/students.ts) y la ruta de la [sala de práctica](../apps/web/app/api/practice/route.ts). Dos defectos corregidos; no se encontraron fallos de alcance por organización ni datos inventados en el resto.
+- **Defecto 1 — el Resumen no veía la cola externa**: la tarjeta «Excepciones para ti» contaba solo el catálogo del motor (decía 63 con 102 excepciones de fuentes externas esperando) y el aviso «Ver excepciones» abría siempre la cola del motor. Ahora suma las dos colas, las desglosa («X del motor · Y de fuentes externas») y el aviso lleva a la que tiene trabajo («Ver excepciones externas» / «… del motor»).
+- **Defecto 2 — el pendiente externo se cortaba en 500** (la corrección de la sesión 111 contaba las `needs_review` externas leyendo también 500 filas): `/api/admin/overview` leía hasta 500 borradores y publicaba su longitud como total, así que el panel se quedaba clavado en 500 con miles en la base (además de traer 500 filas para contar). Ahora usa `countsByStatus()` (`count=exact`, solo ofertas vivas) y devuelve `external.counts` con `pending` y `exceptions` exactos.
+- **Desconocido ≠ cero**: si una de las dos colas no se puede leer, la tarjeta muestra «—» y dice cuál falta, en vez de un 0 falso (regla de diseño: un hueco no es un cero).
+- **Probado** (tested): `npm run test:web` con Chrome real (canal `chrome`, porque el binario de Playwright no se puede instalar en este equipo) — **194 PASS y 11/11 pasos de interfaz**, incluido un paso nuevo que siembra una excepción externa, comprueba que la tarjeta suma las dos colas y que el botón abre Fuentes externas en «A revisar». `typecheck`, `build` y `design` en verde.
+- **Límite**: [statsBySource](../apps/web/lib/external.ts) sigue agregando en memoria hasta 5.000 filas; por encima de esa cifra, «Activas/Aprobadas» por fuente se quedarían cortas (hoy hay 204 filas, así que no afecta a lo que se ve). Los números por estado ya son exactos.
+
+
 ## Migraciones aplicadas, Resend comprobado y detector contrastado con el inventario (sesión 109) — 2026-10-26
 
 - **Orden del dueño** («puedes hacer las acciones recomendadas del listado»):

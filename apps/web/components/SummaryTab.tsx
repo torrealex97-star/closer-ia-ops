@@ -4,7 +4,7 @@ import { ArrowRight, LoaderCircle, RefreshCcw } from 'lucide-react';
 
 // Resumen: cuánto falta para el objetivo (ofertas de closer en España visibles para las alumnas) y qué hacer ahora.
 export const TARGET_CLOSERS_ES = 20;
-type Overview = { external?: { pending: number; needs_review?: number; sources: Array<{ source: string; live: number; approved: number }> }; engine: { catalog_active: number; last_run: { day: string; status: string } | null } | null; sources: Array<{ code: string; name: string; run_status: string | null }>; pool: { eligible: number | null; by_role: Record<string, number> } };
+type Overview = { external?: { pending: number; exceptions?: number; counts?: Record<string, number> | null; sources: Array<{ source: string; live: number; approved: number }> }; engine: { catalog_active: number; last_run: { day: string; status: string } | null } | null; sources: Array<{ code: string; name: string; run_status: string | null }>; pool: { eligible: number | null; by_role: Record<string, number> } };
 type Student = { items: Array<{ id: string }>; total: number };
 type Go = (tab: 'quick' | 'external' | 'apify' | 'review' | 'catalog' | 'sources' | 'apis') => void;
 
@@ -19,7 +19,8 @@ const search = (role: string | null) => get<Student>('/api/backend/opportunities
 export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLost: () => void }) {
   const [closers, setClosers] = useState<number | null>(null);
   const [allEs, setAllEs] = useState<number | null>(null);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  // null = no se pudo leer (se muestra «—», nunca 0): la cola del motor y la de fuentes externas son distintas.
+  const [engineCounts, setEngineCounts] = useState<Record<string, number> | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
@@ -32,7 +33,7 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
       .then(([c, a, o, ov]) => {
         if (c) setClosers(c.items.length);
         if (a) setAllEs(a.items.length);
-        if (o) setCounts(o.counts ?? {});
+        if (o) setEngineCounts(o.counts ?? {});
         if (ov) setOverview(ov);
         if (errors.some(m => m.includes('Sesión'))) onSessionLost();
         setError(errors[0] ?? '');
@@ -42,22 +43,30 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
 
   const visible = closers ?? 0;
   const pct = Math.min(100, Math.round((visible / TARGET_CLOSERS_ES) * 100));
-  // Dos colas distintas, nunca una suma: lo que la máquina clasifica sola y lo que de verdad
-  // necesita criterio humano. Sumarlas hacía parecer que miles de borradores esperaban a una persona.
-  const engineExceptions = counts.needs_review ?? 0;
-  const extExceptions = overview?.external?.needs_review ?? 0;
-  const exceptions = engineExceptions + extExceptions; // las del motor y las de fuentes externas: ambas esperan criterio humano
-  const drafts = counts.draft ?? 0;
+  // Las excepciones humanas viven en DOS sitios: el catálogo del motor y las fuentes externas. Contar solo
+  // el motor escondía la cola real (102 externas invisibles mientras la tarjeta decía 63).
+  const extCounts = overview?.external?.counts ?? null;
+  const engineExceptions = engineCounts ? engineCounts.needs_review ?? 0 : null;
+  const extExceptions = extCounts ? extCounts.needs_review ?? 0 : null;
+  const engineDrafts = engineCounts ? engineCounts.draft ?? 0 : null;
+  const extDrafts = extCounts ? extCounts.draft ?? 0 : null;
+  // Una suma con un sumando desconocido no es un total: si falta una cola, el número es «—» y se dice cuál falta.
+  const exceptions = engineExceptions !== null && extExceptions !== null ? engineExceptions + extExceptions : null;
+  const drafts = engineDrafts !== null && extDrafts !== null ? engineDrafts + extDrafts : null;
   const extPending = overview?.external?.pending ?? 0;
+  const missing = [engineCounts === null ? 'motor' : '', extCounts === null ? 'fuentes externas' : ''].filter(Boolean);
+  const gap = !busy && missing.length ? `sin datos: ${missing.join(' y ')}` : '';
+  const show = (v: number | null) => busy ? '…' : v === null ? '—' : v;
   const failed = overview?.sources.filter(s => s.run_status === 'failed') ?? [];
   const poolClosers = overview?.pool.by_role.closer ?? 0;
   const reached = visible >= TARGET_CLOSERS_ES;
   const steps: Array<{ text: string; action: string; tab: Parameters<Go>[0] }> = [];
-  if (engineExceptions > 0) steps.push({ text: `Hay ${engineExceptions} oferta(s) del motor que la clasificación automática no pudo cerrar. Revisa solo esas.`, action: 'Ver excepciones', tab: 'review' });
-  if (extExceptions > 0) steps.push({ text: `Hay ${extExceptions} oferta(s) de fuentes externas que las reglas no pudieron cerrar. Revisa solo esas.`, action: 'Ver excepciones', tab: 'external' });
+  // Cada aviso lleva a la cola que de verdad tiene trabajo; antes siempre abría la del motor.
+  if (extExceptions) steps.push({ text: `Hay ${extExceptions} oferta(s) de fuentes externas que la clasificación automática no pudo cerrar. Revisa solo esas.`, action: 'Ver excepciones externas', tab: 'external' });
+  if (engineExceptions) steps.push({ text: `Hay ${engineExceptions} oferta(s) del motor que esperan criterio humano.`, action: 'Ver excepciones del motor', tab: 'review' });
   if (extPending > 0) steps.push({ text: `Hay ${extPending} borrador(es) de fuentes externas esperando la pasada automática (reglas + IA). No hace falta que las revises a mano.`, action: 'Clasificar ahora', tab: 'external' });
   if (failed.length) steps.push({ text: `${failed.length} fuente(s) fallan en la última recogida: ${failed.slice(0, 3).map(f => f.name).join(', ')}${failed.length > 3 ? '…' : ''}.`, action: 'Ver fuentes', tab: 'sources' });
-  if (!reached && exceptions === 0 && extPending === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más: lanza un actor de Apify (scraping a escala sin proxies propios) o guarda las claves de InfoJobs, Adzuna y Jooble.', action: 'Abrir Apify', tab: 'apify' });
+  if (!reached && !exceptions && extPending === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más: lanza un actor de Apify (scraping a escala sin proxies propios) o guarda las claves de InfoJobs, Adzuna y Jooble.', action: 'Abrir Apify', tab: 'apify' });
   if (reached && !steps.length) steps.push({ text: 'Objetivo cumplido. Prueba la vista de alumna para comprobar cómo se ve.', action: 'Probar ofertas', tab: 'catalog' });
 
   return <section aria-label="Resumen">
@@ -73,8 +82,10 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
     </article>
     <div className="card-grid" style={{ marginBottom: 20 }}>
       <article className="source-card"><span className="eyebrow">VISIBLES EN ESPAÑA (TODOS LOS PERFILES)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{allEs ?? '…'}</strong>ofertas</span></div></article>
-      <article className="source-card"><span className="eyebrow">EXCEPCIONES PARA TI</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{busy ? '…' : exceptions}</strong>necesitan criterio humano</span></div></article>
-      <article className="source-card"><span className="eyebrow">POR CLASIFICAR (AUTOMÁTICO)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{busy ? '…' : drafts}</strong>reglas + IA, sin ti</span></div></article>
+      <article className="source-card"><span className="eyebrow">EXCEPCIONES PARA TI</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{show(exceptions)}</strong>necesitan criterio humano</span></div>
+        <p className="card-meta">{busy ? 'Leyendo las dos colas…' : `${engineExceptions ?? '—'} del motor · ${extExceptions ?? '—'} de fuentes externas${gap ? ` · ${gap}` : ''}`}</p></article>
+      <article className="source-card"><span className="eyebrow">POR CLASIFICAR (AUTOMÁTICO)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{show(drafts)}</strong>reglas + IA, sin ti</span></div>
+        <p className="card-meta">{busy ? 'Leyendo las dos colas…' : `${engineDrafts ?? '—'} del motor · ${extDrafts ?? '—'} de fuentes externas${gap ? ` · ${gap}` : ''}`}</p></article>
       <article className="source-card"><span className="eyebrow">LISTAS PARA APROBAR (CUALQUIER MERCADO)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{overview ? poolClosers : '…'}</strong>de perfil closer que ya cumplen las reglas</span></div></article>
       <article className="source-card"><span className="eyebrow">FUENTES CON FALLO</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{overview ? failed.length : '…'}</strong>de {overview?.sources.length ?? '…'} en el motor cloud</span></div></article>
     </div>
