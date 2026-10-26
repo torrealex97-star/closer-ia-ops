@@ -1,4 +1,4 @@
--- NO APLICADA en Supabase (aplicar DDL exige orden expresa del propietario). Aditiva y reversible.
+-- APLICADA en Supabase (2026-10-25, por orden del dueño) y verificada leyendo la restricción. Aditiva y reversible.
 -- Resultado de cada candidatura DECLARADO por la alumna (hoy no hay correo entrante que lo detecte): la candidatura enviada
 -- puede pasar a «responded» (la empresa ha contestado), «interview», «offer» o «rejected». Solo amplía el CHECK de estado;
 -- no añade columnas, así que las lecturas actuales no cambian. Reversión: volver al CHECK de cuatro estados tras pasar a

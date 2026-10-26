@@ -2,6 +2,15 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Migraciones aplicadas, Resend comprobado y detector contrastado con el inventario (sesión 109) — 2026-10-26
+
+- **Orden del dueño** («puedes hacer las acciones recomendadas del listado»):
+  - **Aplicadas en Supabase real y verificadas** leyendo la base: `20261026_integration_resend.sql` (el `CHECK` de proveedores admite `resend`; ya se puede guardar la clave en Panel → APIs) y `20261027_voice_consent.sql` (`student_voice_consent`: RLS activada, `anon` y `authenticated` sin acceso a `select`, columnas esperadas). Más `20261028_voice_consent_student_index.sql` (índice de cobertura que pidió el asesor de rendimiento). El asesor de rendimiento solo deja dos avisos informativos preexistentes (`apify_runs.actor_id` sin índice e índice `student_activity_org_time` sin uso); el de seguridad no cambia.
+  - **No se ejecutaron las pruebas de BD con escrituras** (`tests/db/student_activity.sql` y las demás): Supabase pidió de nuevo la confirmación del dueño y no llegó (60 s). Siguen pendientes; ver relevo, tarea 13.
+- **Resend (inspected, por búsqueda; no se pudo abrir resend.com desde el entorno)**: sí ofrece correo entrante con webhook `email.received`, y lo recibido cuenta en la misma cuota que lo enviado (gratis: 3.000 al mes y 100 al día). Anotado en ADR-014. Sin verificar: firma del webhook, tamaños y precio vigente.
+- **Detector de ofertas contrastado con el inventario real (204 ofertas vigentes, lectura con SQL aproximando las mismas reglas)**: **0** críticas (ni pago previo, ni multinivel, ni «sin entrevista», ni publicidad a cargo de la closer); **cinco** ofertas con aviso: tres con «100 % comisión» (freelance) y dos con «libertad financiera» (una gestora de capital). Es decir, hoy el detector no bloquearía nada y avisaría de ~2-3 %, que es lo esperado en este inventario; **no demuestra** que detecte estafas reales (no hay ejemplos reales de estafa en la muestra). Las empresas con aviso (Bastida&Farina, NAOLEAD, Monest Capital) merecen que una persona las mire.
+- **Historial de secretos (local, 283 commits de todas las ramas)**: sin coincidencias con claves de Groq/OpenAI/Apify/Resend/Supabase, JWT, claves privadas, tokens de GitHub/Slack ni asignaciones de `password/secret/token/api_key` largas. Es una revisión por patrones, **no** sustituye a gitleaks/trufflehog ni a *Secret scanning*.
+
 ## Señales de apertura sumisa y entusiasmo; feedback con tarea de 24 horas (sesión 108) — 2026-10-26
 
 - **Origen**: puntos 2 y 4 de [PORTING_REVIEW.md](PORTING_REVIEW.md) (revisión del otro agente de lo que falta de las aplicaciones anteriores). Sin IA y sin datos de alumnas.
