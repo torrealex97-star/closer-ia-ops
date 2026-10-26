@@ -35,6 +35,14 @@ El motor (`sites/engine/worker.js`, Sites) busca por término en las fuentes gra
 5. **Coste**: 0. La cuota que sí se gasta es la mensual de escrituras de D1 del motor; el filtro es lo que la mantiene bajo control.
 6. **Por qué no se pagina más** (medido 2026-10-26): las búsquedas vienen ordenadas por fecha y la segunda página de 100 filas trae 0–1 candidatos de perfil y **0 closers** (la mediana de antigüedad pasa de 4 días y en varios términos ya no queda nada dentro de la ventana de 10 días). El tope de 100 por término no recorta closers: recortar la ventana de términos sí los recortaría.
 
+## 1 quinquies. Workana (Apify, proyectos freelance de ventas)
+Workana publica proyectos de ventas en España y LatAm; su contrato no es el de un portal de empleo: el importe es un **presupuesto por proyecto**, no un sueldo.
+1. **Dónde está**: Panel → Búsqueda automática → «Workana». Actor principal `automation-lab/workana-freelance-projects-scraper` (desde 0,96 USD / 1.000 elementos), con dos repuestos si falla.
+2. **Plantilla propia** ([apifyCatalog.ts](../apps/web/lib/apifyCatalog.ts)): `{query, locale: 'es', maxItems, maxPages}`. No se le pasa `country` —el actor espera un código ISO de dos letras y «España» rompería el filtro— y por eso el portal no usa el adaptador genérico.
+3. **Primera pasada medida (2026-10-26)**: búsqueda `ventas` en español, tope 100 elementos, 5 páginas → **35 proyectos** (el actor devolvió todo lo que su buscador tenía de esa consulta), **0,0645 USD** reales, 35 guardados como borradores. Reparto: 4 closer + 3 setter + 4 ejecutivo comercial + 24 sin perfil claro (proyectos de marketing, e-commerce o desarrollo que mencionan «ventas»).
+4. **Presupuesto**: tope duro de 2 USD por ejecución (0,5 en las pruebas de 10) y 10 USD al mes para todo Apify; el panel muestra el gasto antes de lanzar.
+5. **Lo que no se inventa**: un presupuesto por proyecto no se guarda como salario (queda literal en `raw.budget_text`), y el país público del cliente se usa como ubicación cuando el actor lo trae.
+
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
 2. Vercel → proyecto → Settings → Environment Variables: `INGEST_TOKEN` = ese token (Production).

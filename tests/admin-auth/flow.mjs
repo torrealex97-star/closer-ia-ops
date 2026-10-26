@@ -581,7 +581,7 @@ await step('Apify sencillo: portales con buscadores de repuesto (arranque fallid
   settle();
   // vista: portales en lenguaje llano, sin nombres técnicos obligatorios
   const view = (await call('/api/admin/apify')).json.portals;
-  assert.deepEqual(view.map(p => p.id), ['indeed', 'infojobs', 'linkedin', 'multi']);
+  assert.deepEqual(view.map(p => p.id), ['indeed', 'infojobs', 'linkedin', 'workana', 'multi']);
   const ind0 = view.find(p => p.id === 'indeed'); assert.equal(ind0.state, 'off'); assert.match(ind0.headline, /Sin probar/); assert.equal(ind0.daily, false); assert.equal(ind0.recipes.length, 4);
   assert.equal((await post({ action: 'search_now', portal: 'no-existe' })).status, 422);
   const adm = jar; jar = {}; await call('/api/admin/session', { method: 'POST', body: { email: 'adm@test.dev', password: 'Admin-pass-12345' } });

@@ -28,7 +28,7 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'academic advisor', 'course advisor', 'bootcamp advisor',
     'patient advisor', 'patient coordinator', 'treatment coordinator',
     'treatment consultant', 'healthcare sales', 'medical sales advisor',
-    'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones',
+    'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones', 'cierre de ventas', 'cierre comercial', 'cierre de negocios',
   ],
   setter: [
     'setter', 'appointment setter', 'sales setter', 'high-ticket setter',
@@ -52,7 +52,7 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'account manager', 'sales executive', 'sales consultant', 'sales advisor',
     'sales specialist', 'sales representative', 'commercial advisor',
     'commercial executive', 'business development executive',
-    'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas',
+    'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas', 'ejecutivo(a) comercial', 'ejecutiva(o) comercial',
     'ejecutiva de ventas', 'asesor comercial', 'asesora comercial',
     'asesor/a comercial', 'asesor comercial senior', 'representante comercial',
     'representante de ventas', 'representante de ventas senior', 'agente comercial',

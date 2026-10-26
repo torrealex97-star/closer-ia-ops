@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { PORTALS, portalById, portalBySource } from '../../apps/web/lib/apifyCatalog.ts';
 import { adaptInput, fillTemplate, mapItem, RUN_CAP_USD, TEST_CAP_USD } from '../../apps/web/lib/apify.ts';
+import { roleFromTitle } from '../../apps/web/lib/vocabulary.ts';
 
 const results = [];
 const step = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message.split('\n')[0]]); } };
@@ -73,6 +74,19 @@ step('un proyecto de Workana entra como candidato con su enlace y sin sueldo inv
   assert.equal(candidate.raw.kind, 'freelance_project');
   assert.equal(candidate.company, null, 'el cliente suele venir enmascarado: no se inventa');
   assert.equal(candidate.location, 'España', 'el país público del cliente se conserva como ubicación');
+});
+
+step('los dos títulos reales que se perdían ya tienen perfil', () => {
+  // Medido en la primera pasada real de Workana (2026-10-26): se quedaban sin familia.
+  assert.equal(roleFromTitle('Especialista en Seguimiento y Cierre de Ventas por Whatsapp para Chocolates'), 'closer');
+  assert.equal(roleFromTitle('Ejecutivo(a) Comercial Freelance B2B/B2G para Venta de Capacitación Empresarial en México'), 'account_executive');
+  // Y los cuatro closers reales que sí acertaba el vocabulario anterior siguen acertando.
+  for (const title of [
+    'Buscamos Appointment Setter y Closer para Software de Fidelización B2B en Hostelería',
+    'Buscamos Closer de Ventas B2b | Leads proporcionados | Trabajo remoto',
+    'Buscamos Closer de Ventas para Startup de Asistentes de Ia y Crm',
+    'Closer Mujer-Horario Flexible-Producto High Tiket-Altas comisiones',
+  ]) assert.equal(roleFromTitle(title), 'closer', title);
 });
 
 step('lo que no trae título o enlace se descarta en vez de guardarse a medias', () => {

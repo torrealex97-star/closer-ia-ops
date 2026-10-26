@@ -1203,6 +1203,9 @@ const ROLE_KEYWORDS = {
     'patient advisor', 'patient coordinator', 'treatment coordinator',
     'treatment consultant', 'healthcare sales', 'medical sales advisor',
     'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones',
+    // Variantes con evidencia real (pasada de Workana 2026-10-26): un proyecto de
+    // «Seguimiento y Cierre de Ventas por WhatsApp» quedaba sin perfil.
+    'cierre de ventas', 'cierre comercial', 'cierre de negocios',
   ],
   setter: [
     'setter', 'appointment setter', 'sales setter', 'high-ticket setter',
@@ -1227,6 +1230,8 @@ const ROLE_KEYWORDS = {
     'sales specialist', 'sales representative', 'commercial advisor',
     'commercial executive', 'business development executive',
     'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas',
+    // «Ejecutivo(a) Comercial» (Workana 2026-10-26): la forma con (a) no estaba y se perdía.
+    'ejecutivo(a) comercial', 'ejecutiva(o) comercial',
     'ejecutiva de ventas', 'asesor comercial', 'asesora comercial',
     'asesor/a comercial', 'asesor comercial senior', 'representante comercial',
     'representante de ventas', 'representante de ventas senior', 'agente comercial',
