@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import {
   BELIEF_LADDER, CERTIFICATION_WEEKS, CLOSE_BANK, DISCOVERY_BANK, DISCOVERY_STEPS, EXACT_CLOSES, FINAL_EXAM, FREEZING, IDENTITY_FRAMES, LOGICA,
-  PRE_CALL_STEPS, SHOW_RATE_RULES, STAR_CRITERIA, STAR_RULE, TRAINING_MODULES,
+  INTERVIEW_QUESTIONS, PRE_CALL_STEPS, SHOW_RATE_RULES, STAR_CRITERIA, STAR_RULE, TRAINING_MODULES,
   YELLOW_LEADS, YELLOW_RULE,
 } from './trainingContent';
 import type { BankQuestion, TrainingId } from './trainingContent';
 import {
   EXAM_PASS, YELLOW_BLOCK, freezingFalls, gradeBank, gradeExam, moralFor, reviewCloseLine,
-  reviewFreezing, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
+  reviewFreezing, reviewInterviewAnswer, reviewLogica, reviewPreCall, reviewYellows, yellowMistakes,
 } from './trainingCheck';
 import type { Review } from './trainingCheck';
 
@@ -359,6 +359,64 @@ function Star() {
   </div>;
 }
 
+// ---- Módulo 9: banco de preguntas de entrevista ------------------------------
+
+function InterviewBank() {
+  const [index, setIndex] = useState(0);
+  // Las respuestas viven solo en esta visita: no se guardan ni se envían (pueden contar datos personales).
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [reviews, setReviews] = useState<Record<string, Review>>({});
+  const question = INTERVIEW_QUESTIONS[index];
+  const draft = drafts[question.id] ?? '';
+  const review = reviews[question.id] ?? null;
+  const done = INTERVIEW_QUESTIONS.filter(item => complete(reviews[item.id] ?? null)).length;
+
+  function edit(value: string) {
+    setDrafts(current => ({ ...current, [question.id]: value }));
+    setReviews(current => { const next = { ...current }; delete next[question.id]; return next; });
+  }
+  function check() {
+    const result = reviewInterviewAnswer(question.id, draft);
+    setReviews(current => ({ ...current, [question.id]: result }));
+    void logActivity({ kind: 'training_review', ref: 'entrevista', detail: { met: result.met, total: result.total } });
+  }
+
+  return <div className="training-module">
+    <div className="training-intro">
+      <MessageSquare size={18} />
+      <div><h2>Banco de preguntas de entrevista</h2><p>Diez preguntas que casi siempre salen. Lee qué evalúa quien pregunta, escribe tu respuesta con tus propios datos y comprueba las banderas rojas.</p></div>
+      <span className="training-count">{done} de {INTERVIEW_QUESTIONS.length} sin banderas</span>
+    </div>
+    <ol className="training-steps" aria-label="Preguntas de entrevista">
+      {INTERVIEW_QUESTIONS.map((item, i) => <li key={item.id}>
+        <button type="button" className="training-step" aria-current={i === index ? 'step' : undefined} data-done={complete(reviews[item.id] ?? null)} onClick={() => setIndex(i)}>
+          <span>{complete(reviews[item.id] ?? null) ? <Check size={12} /> : i + 1}</span>
+          Pregunta {i + 1}
+        </button>
+      </li>)}
+    </ol>
+    <div className="training-card">
+      <div className="training-card-head"><span className="training-tag">Pregunta {index + 1} de {INTERVIEW_QUESTIONS.length}</span></div>
+      <h3>{question.question}</h3>
+      <p><strong>Qué evalúa:</strong> {question.intent}</p>
+      <p><strong>Fórmula:</strong> {question.formula}</p>
+      <details><summary>Ver un ejemplo con huecos</summary>
+        <div className="training-example" data-tone="good"><span><Check size={13} />Ejemplo ilustrativo</span><p>{question.example}</p></div>
+        <p className="training-note">Los huecos [así] son para tus datos reales: no copies cifras ni resultados que no sean tuyos.</p>
+      </details>
+      <label htmlFor="interview-answer">Tu respuesta
+        <textarea id="interview-answer" value={draft} onChange={event => edit(event.target.value)} rows={6} maxLength={1500} placeholder="Escríbela como la dirías en voz alta, con un caso real tuyo…" />
+      </label>
+      <div className="training-actions">
+        <button type="button" className="primary" onClick={check} disabled={!draft.trim()}><Check size={15} />Comprobar banderas rojas</button>
+        {index > 0 && <button type="button" onClick={() => setIndex(index - 1)}><ArrowLeft size={15} />Anterior</button>}
+        {index < INTERVIEW_QUESTIONS.length - 1 && <button type="button" onClick={() => setIndex(index + 1)}>Siguiente<ArrowRight size={15} /></button>}
+      </div>
+      {review && <Outcome review={review} title="Banderas rojas de esta respuesta" note="Reglas sobre tu texto (ejemplo concreto, cifras, tono, longitud, preguntas). No puntúan tu candidatura ni sustituyen a una persona; tu respuesta no se guarda ni se envía." />}
+    </div>
+  </div>;
+}
+
 // ---- Módulo 6: certificación y examen --------------------------------------
 
 function Certification() {
@@ -523,10 +581,11 @@ const BODIES: Record<TrainingId, ComponentType> = {
   star: Star,
   cierres: Closes,
   descubrimiento: Discovery,
+  entrevista: InterviewBank,
   certificacion: Certification,
 };
 
-// Formación comercial: ocho módulos de método y un examen. Todo se corrige en el
+// Formación comercial: nueve módulos de método y un examen. Todo se corrige en el
 // navegador con reglas; nada se envía a un proveedor ni evalúa a la alumna.
 export default function StudentTraining() {
   const [open, setOpen] = useState<TrainingId | null>(null);
@@ -547,7 +606,7 @@ export default function StudentTraining() {
       <div>
         <span className="eyebrow">FORMACIÓN COMERCIAL</span>
         <h1>Aprende el método antes de improvisar.</h1>
-        <p>Ocho módulos para practicar las partes de la conversación que se pueden entrenar: antes de la llamada, la brecha, la presión, los leads difíciles, la calificación, los diez cierres, el descubrimiento y el examen final.</p>
+        <p>Nueve módulos para practicar las partes de la conversación que se pueden entrenar: antes de la llamada, la brecha, la presión, los leads difíciles, la calificación, los diez cierres, el descubrimiento, las preguntas de entrevista y el examen final.</p>
       </div>
       <span className="training-icon"><GraduationCap size={28} strokeWidth={1.4} /></span>
     </div>

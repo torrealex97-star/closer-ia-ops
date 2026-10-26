@@ -10,7 +10,7 @@ let n = 0; const ok = name => { n += 1; console.log(`PASS  ${name}`); };
 assert.equal(EXAM_TOTAL, 6);
 assert.equal(checkActivity(null).ok, false);
 assert.equal(checkActivity({ kind: 'session' }).ok, false, 'la entrada la crea el login, no el navegador');
-assert.equal(REVIEW_REFS.length, 7, 'cinco ejercicios, los diez cierres y los nueve pasos');
+assert.equal(REVIEW_REFS.length, 8, 'cinco ejercicios, los diez cierres, los nueve pasos y el banco de entrevista');
 assert.equal(checkActivity({ kind: 'training_review', ref: 'modulo-falso', detail: { met: 1, total: 1 } }).ok, false);
 assert.equal(checkActivity({ kind: 'training_review', ref: 'precall', detail: { met: 5, total: 4 } }).ok, false, 'más cumplidos que criterios');
 assert.equal(checkActivity({ kind: 'training_review', ref: 'descubrimiento', detail: { met: 4, total: 5 } }).ok, true);

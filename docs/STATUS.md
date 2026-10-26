@@ -2,6 +2,13 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Banco de preguntas de entrevista en Formación (sesión 113) — 2026-10-26
+
+- **Origen**: punto 3 de [PORTING_REVIEW.md](PORTING_REVIEW.md) (la pieza con más valor para aspirantes). Sin IA y sin datos de alumnas.
+- **Hecho (tested)**: noveno módulo de Formación, «Banco de preguntas de entrevista»: **10 preguntas** habituales (experiencia, metodología, objeción difícil, por qué tú, sin experiencia, motivación, presión, remuneración, venta en vivo, pregunta inversa), cada una con lo que evalúa quien pregunta, una fórmula de respuesta y un **ejemplo ilustrativo con huecos [así]** (la prueba exige que lleve huecos y **ninguna cifra**: no hay resultados inventados que copiar). La alumna escribe su respuesta y [reviewInterviewAnswer](../apps/web/components/trainingCheck.ts) comprueba **banderas rojas** explicables: tópicos sin caso, falta de cifra propia, tono defensivo, hablar mal de otros, solo dinero, cifras sospechosas («100 %», «cierro todo»), respuesta eterna o de una línea y no devolver ninguna pregunta. Su respuesta **no se guarda ni se envía** (solo la revisión cuenta como módulo repasado en «Mi progreso», que pasa a 8 módulos más el examen).
+- **Verificado (tested)**: `training.mjs` con el nuevo bloque, `ui.mjs` («1 de 8 módulos repasados»), `training.spec.ts` (9 tarjetas), suite completa.
+- **Límites**: las banderas son reglas léxicas sin calibrar con respuestas reales y no sustituyen a una persona; las fórmulas y ejemplos los escribió el agente: conviene que una closer los lea. La Playwright `training.spec.ts` no se ejecuta en local (la comprueba el CI).
+
 ## Guía del dueño con herramientas, enlaces y prompts (sesión 112) — 2026-10-26
 
 - **Petición del operador**: dejar el paso a paso con las herramientas, lo necesario, enlaces y prompts.

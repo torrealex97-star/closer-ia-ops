@@ -3,7 +3,7 @@
 // se revisan con reglas sobre el texto (trainingCheck) y el examen es determinista.
 // Las cifras del ejercicio de Venta Lógica son ficticias y se rotulan como tales.
 
-export type TrainingId = 'precall' | 'logica' | 'freezing' | 'yellows' | 'star' | 'cierres' | 'descubrimiento' | 'certificacion';
+export type TrainingId = 'precall' | 'logica' | 'freezing' | 'yellows' | 'star' | 'cierres' | 'descubrimiento' | 'entrevista' | 'certificacion';
 
 export type TrainingModule = {
   id: TrainingId;
@@ -62,6 +62,13 @@ export const TRAINING_MODULES: TrainingModule[] = [
     summary: 'De la situación a la repetición, en orden y con una frase de ejemplo. Después, cinco frases: ¿a qué paso pertenece cada una?',
     tag: 'Durante la llamada',
     minutes: 12,
+  },
+  {
+    id: 'entrevista',
+    title: 'Banco de preguntas de entrevista',
+    summary: 'Diez preguntas que casi siempre salen, con lo que evalúa quien pregunta, una fórmula para responder y un ejemplo con huecos. Escribe tu respuesta y comprueba las banderas rojas.',
+    tag: 'Antes de la entrevista',
+    minutes: 20,
   },
   {
     id: 'certificacion',
@@ -447,4 +454,75 @@ export const DISCOVERY_BANK: BankQuestion[] = [
   { id: 'd3', prompt: '«Déjame ver si lo entiendo: quieres llegar a X, pero Y te lo impide, y si no lo resuelves, Z pasará.»', options: [step(6), step(8), step(2), step(4)], answer: step(6) },
   { id: 'd4', prompt: '«Suena como que te sientes frustrado con tu situación actual.»', options: [step(7), step(6), step(3), step(9)], answer: step(7) },
   { id: 'd5', prompt: '«¿Es eso correcto? ¿Me dejo algo?»', options: [step(8), step(5), step(7), step(1)], answer: step(8) },
+];
+
+// ---- Módulo 9: banco de preguntas de entrevista ----------------------------
+// Diez preguntas que casi siempre aparecen en una entrevista comercial. Cada una trae qué evalúa quien pregunta,
+// una fórmula para responder, un ejemplo ILUSTRATIVO (con huecos [así], nunca cifras o resultados inventados que
+// alguien pueda copiar como propios) y las banderas rojas que la corrección comprueba en la respuesta de la alumna.
+export type RedFlag = { id: string; label: string; hint: string };
+export type InterviewQuestion = {
+  id: string;
+  question: string;
+  intent: string;
+  formula: string;
+  example: string;
+  /** Banderas rojas de esta pregunta (ids de INTERVIEW_FLAGS). */
+  flags: string[];
+  /** Si la respuesta debe llevar una cifra propia (resultado, ratio, tiempo). */
+  wantsNumber: boolean;
+};
+
+export const INTERVIEW_FLAGS: Record<string, RedFlag> = {
+  vago: { id: 'vago', label: 'Tópicos sin ejemplo', hint: '«Me apasiona», «soy muy resolutiva», «trabajo bien en equipo»: sin un caso concreto no dicen nada.' },
+  defensivo: { id: 'defensivo', label: 'Tono defensivo', hint: 'Justificarte o discutir la pregunta («eso no es verdad», «no es culpa mía») suena a conflicto futuro.' },
+  mala: { id: 'mala', label: 'Habla mal de otros', hint: 'Criticar a un jefe, equipo o empresa anteriores es la bandera roja más citada.' },
+  dinero: { id: 'dinero', label: 'Solo habla de dinero', hint: 'Empezar y acabar en el sueldo sin hablar de lo que aportas deja la conversación en un regateo.' },
+  inflada: { id: 'inflada', label: 'Cifras sospechosas', hint: 'Porcentajes redondos o “siempre/nunca” (100 %, «cierro todo») se desmontan con una repregunta.' },
+  larga: { id: 'larga', label: 'Respuesta eterna', hint: 'Más de unas 130 palabras: en una entrevista real pierdes a quien escucha.' },
+  corta: { id: 'corta', label: 'Respuesta de una línea', hint: 'Menos de 15 palabras: no hay ejemplo ni cierre.' },
+  sinpregunta: { id: 'sinpregunta', label: 'No devuelve ninguna pregunta', hint: 'En la pregunta inversa y al cerrar, una pregunta propia demuestra interés real por el puesto.' },
+};
+
+export const INTERVIEW_QUESTIONS: InterviewQuestion[] = [
+  { id: 'experiencia', question: 'Cuéntame tu experiencia en ventas.', wantsNumber: true, flags: ['vago', 'larga', 'corta'],
+    intent: 'Ver si puedes resumir tu trayectoria con foco en resultados, no repasar tu CV.',
+    formula: 'Rol → qué vendías y a quién → un resultado propio con número → por qué ese camino te trae aquí. Máximo un minuto.',
+    example: 'Llevo [tiempo] vendiendo [producto/servicio] a [tipo de cliente]. Mi trabajo era [qué hacías]; en [periodo] conseguí [resultado con tu cifra real]. Me interesa este puesto porque [motivo concreto].' },
+  { id: 'metodologia', question: '¿Cómo es tu proceso en una llamada de ventas?', wantsNumber: false, flags: ['vago', 'larga'],
+    intent: 'Comprobar que trabajas con método y no por intuición.',
+    formula: 'Nombra 3-4 fases (apertura y marco, descubrimiento, presentación/cierre, siguiente paso) y da una frase de lo que haces en cada una.',
+    example: 'Abro con contexto y pido permiso para preguntar; descubro el problema y lo que le cuesta seguir igual; presento solo lo que encaja; y cierro con un siguiente paso con día y hora. [Cambia cada fase por cómo lo haces tú.]' },
+  { id: 'objecion', question: '¿Cuál ha sido la objeción más difícil que has tenido y cómo la trataste?', wantsNumber: false, flags: ['vago', 'defensivo', 'mala'],
+    intent: 'Ver cómo piensas bajo presión y si aprendes de los errores.',
+    formula: 'Situación breve → la objeción real → qué preguntaste antes de rebatir → resultado → qué harías distinto.',
+    example: 'Un cliente decía que era caro. Antes de rebatir le pregunté [qué comparaba]; resultó que le preocupaba [riesgo real]. Lo traté con [qué hice] y [resultado]. Hoy empezaría aislando la objeción antes.' },
+  { id: 'porque-tu', question: '¿Por qué deberíamos contratarte a ti?', wantsNumber: false, flags: ['vago', 'dinero', 'inflada'],
+    intent: 'Escuchar una propuesta de valor concreta, no una lista de cualidades.',
+    formula: 'Una cosa que necesitan (del anuncio) → una prueba tuya que la demuestra → qué harás en las primeras semanas.',
+    example: 'Buscáis [lo que pide el anuncio]. En [situación] hice [acción] con [resultado]. En mis primeras semanas aprendería [producto] y llevaría [objetivo de actividad].' },
+  { id: 'sin-experiencia', question: 'No tienes experiencia en nuestro sector. ¿Por qué iba a funcionar?', wantsNumber: false, flags: ['defensivo', 'vago', 'corta'],
+    intent: 'Ver si reconoces el hueco sin disculparte y si tienes un plan de rampa.',
+    formula: 'Reconoce el hueco en una frase → transfiere una habilidad con ejemplo → plan concreto de las primeras semanas.',
+    example: 'Es cierto, no conozco [sector]. Lo que sí traigo es [habilidad] que usé en [caso]. Mis primeras [n] semanas serían [plan: formación, escuchar llamadas, primeras llamadas acompañadas].' },
+  { id: 'motivacion', question: '¿Por qué quieres trabajar en ventas y en esta empresa?', wantsNumber: false, flags: ['vago', 'dinero'],
+    intent: 'Detectar motivación genuina y si has investigado la empresa.',
+    formula: 'Lo que te atrae de ventas (con un ejemplo) → algo específico de la empresa (producto, cliente, modelo) → cómo encaja contigo.',
+    example: 'Me gusta [parte concreta de vender] porque [ejemplo]. De vuestra empresa me llamó la atención [dato concreto], y encaja con [tu experiencia o interés].' },
+  { id: 'presion', question: 'Cuéntame una situación de mucha presión o de rechazo y cómo la llevaste.', wantsNumber: false, flags: ['vago', 'mala', 'defensivo'],
+    intent: 'Medir resiliencia real: qué haces después de un “no”.',
+    formula: 'Situación → emoción en una frase → qué hiciste después (hábito concreto) → qué cambió.',
+    example: 'En [situación] recibí [rechazo]. Me afectó, y lo que hice fue [hábito: revisar la llamada, pedir feedback, siguiente llamada en X minutos]. Desde entonces [cambio].' },
+  { id: 'remuneracion', question: '¿Qué expectativas económicas tienes?', wantsNumber: false, flags: ['dinero', 'inflada', 'vago'],
+    intent: 'Ver si conoces el mercado y si preguntas cómo se paga el puesto.',
+    formula: 'Pregunta primero cómo se compone (fijo, variable, de dónde salen los leads) → da un rango razonado → muestra flexibilidad si el variable es realista.',
+    example: 'Antes de dar un número, ¿cómo se compone el pago: fijo, variable y de dónde vienen los leads? Con esa base, mi rango sería [rango razonado] y valoro [otra condición].' },
+  { id: 'llamada-en-vivo', question: 'Imagina que soy un cliente: véndeme este servicio ahora.', wantsNumber: false, flags: ['larga', 'sinpregunta', 'vago'],
+    intent: 'Ver si descubres antes de presentar, aunque sea un ejercicio rápido.',
+    formula: 'Empieza con una pregunta de descubrimiento, escucha, resume lo que te dice y propón un siguiente paso. No recites características.',
+    example: 'Antes de contarte nada, ¿qué es lo que más te ha costado con [problema]? … Entonces lo que me dices es [resumen]. ¿Te propongo [siguiente paso] el [día]?' },
+  { id: 'pregunta-inversa', question: '¿Tienes alguna pregunta para nosotros?', wantsNumber: false, flags: ['sinpregunta', 'dinero', 'corta'],
+    intent: 'Ver interés real y criterio: las preguntas dicen más que las respuestas.',
+    formula: 'Una pregunta sobre cómo se mide el éxito en los primeros meses, otra sobre el día a día o los leads, y una sobre el siguiente paso del proceso.',
+    example: '¿Cómo se mide el éxito en los tres primeros meses? ¿De dónde vienen los leads y cuántas llamadas al día suele haber? ¿Cuál es el siguiente paso del proceso? [Añade una pregunta tuya sobre el puesto.]' },
 ];

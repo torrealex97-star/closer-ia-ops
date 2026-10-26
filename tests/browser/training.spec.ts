@@ -8,12 +8,12 @@ const open = async (page: import('@playwright/test').Page, title: string) => {
   await page.locator('.training-grid .training-card').filter({ hasText: title }).getByRole('button', { name: 'Abrir módulo' }).click();
 };
 
-test('la formación ofrece los ocho módulos y revisa la secuencia de pre-llamada', async ({ page }) => {
+test('la formación ofrece los nueve módulos y revisa la secuencia de pre-llamada', async ({ page }) => {
   await page.route('**/api/backend/opportunities/search', emptyCatalog);
   await page.goto('/');
   await page.getByRole('button', { name: 'Formación' }).click();
   await expect(page.getByRole('heading', { name: 'Aprende el método antes de improvisar.' })).toBeVisible();
-  await expect(page.locator('.training-grid .training-card')).toHaveCount(8);
+  await expect(page.locator('.training-grid .training-card')).toHaveCount(9);
   await expect(page.locator('.training-grid .training-card').first()).toContainText('Ejercicio sin nota');
 
   await page.locator('.training-grid .training-card').first().getByRole('button', { name: 'Abrir módulo' }).click();

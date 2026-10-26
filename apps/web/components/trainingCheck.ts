@@ -2,7 +2,7 @@
 // criterio es una regla explicable sobre el texto de la alumna. Un criterio no
 // cumple no es «suspenso»: la UI lo presenta como algo que falta, con su motivo.
 
-import { FINAL_EXAM, LOGICA } from './trainingContent';
+import { FINAL_EXAM, INTERVIEW_FLAGS, INTERVIEW_QUESTIONS, LOGICA } from './trainingContent';
 import type { BankQuestion } from './trainingContent';
 
 export type Criterion = { id: string; label: string; ok: boolean; detail: string };
@@ -257,4 +257,46 @@ export type BankResult = { correct: number; total: number; wrong: string[] };
 export function gradeBank(bank: BankQuestion[], answers: Record<string, string>): BankResult {
   const wrong = bank.filter(question => answers[question.id] !== question.answer).map(question => question.id);
   return { correct: bank.length - wrong.length, total: bank.length, wrong };
+}
+
+// ---- Banco de preguntas de entrevista ---------------------------------------
+// Corrección por banderas rojas explicables. No evalúa a la alumna ni puntúa su candidatura: señala qué suele
+// restar en una respuesta de entrevista para que la reescriba. Una respuesta vacía no cumple nada.
+const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+const CONCRETE = /(\d|cuando |una vez|en (mi|el|la) (anterior|[uú]ltim[oa]|primer[oa])|consegu[ií]|logr[eé]|cerr[eé]|hice|pregunt[eé]|aprend[ií]|trabaj[eé]|vend[ií]|llev[eé])/i;
+const FLAG_TESTS: Record<string, (text: string) => boolean> = {
+  vago: text => /(me apasiona|soy (muy )?(resolutiv|proactiv|trabajador|din[aá]mic)|trabajo (muy )?bien en equipo|persona (muy )?(motivada|responsable)|hago lo que sea)/i.test(text) && !CONCRETE.test(text),
+  defensivo: text => DEFENSIVE.test(text) || /(eso no es (as[ií]|verdad)|no es (mi|culpa)|me parece injust|no entiendo por qu[eé])/i.test(text),
+  mala: text => /((mi|el|la) (ex[- ])?(jefe|jefa|empresa|equipo|compa[nñ]eros?)).{0,50}(fatal|inc[oó]mpetent|horrible|t[oó]xic|desastre|p[eé]sim|no (sab[ií]an|ten[ií]an|me dejaban))/i.test(text) || /(jefe|jefa|compa[nñ]eros?) (t[oó]xic|in[uú]til|inc[oó]mpetent)/i.test(text),
+  dinero: text => (text.match(/\b(sueldo|salario|cobrar|dinero|pagan|comisi[oó]n|euros)\b|€/gi) ?? []).length >= 2 && !/(aporto|aportar|resultado|cliente|aprender|equipo|producto|c[oó]mo se (paga|compone)|leads)/i.test(text),
+  inflada: text => /(\b100\s*%|cien por cien|siempre cierro|cierro todo|nunca (pierdo|fallo)|\bel mejor\b|imbatible)/i.test(text),
+  larga: text => wordsOf(text) > 130,
+  corta: text => wordsOf(text) > 0 && wordsOf(text) < 15,
+  sinpregunta: text => !isQuestion(text),
+};
+
+export function reviewInterviewAnswer(questionId: string, text: string): Review {
+  const question = INTERVIEW_QUESTIONS.find(item => item.id === questionId);
+  if (!question) return review([]);
+  const body = text.trim();
+  const hasText = Boolean(body);
+  const criteria: Criterion[] = [];
+  if (question.flags.includes('vago')) {
+    const ok = hasText && CONCRETE.test(body) && !FLAG_TESTS.vago(body);
+    criteria.push({ id: 'concreto', label: 'Incluye un caso o dato concreto', ok, detail: ok ? good('Incluye un caso o dato concreto') : hasText ? INTERVIEW_FLAGS.vago.hint : 'Falta: escribe tu respuesta con un caso concreto.' });
+  }
+  if (question.wantsNumber) {
+    const ok = hasText && /\d/.test(body);
+    criteria.push({ id: 'numero', label: 'Da una cifra propia', ok, detail: ok ? good('Da una cifra propia') : 'Falta: una cifra propia (resultado, ratio, tiempo). Si no la mides, dilo con honestidad en vez de inventarla.' });
+  }
+  for (const id of question.flags) {
+    if (id === 'vago') continue;
+    const flag = INTERVIEW_FLAGS[id];
+    const hit = hasText && FLAG_TESTS[id](body);
+    // «sinpregunta» es la única bandera que se cumple haciendo algo: devolver una pregunta.
+    const ok = hasText && !hit;
+    const label = id === 'sinpregunta' ? 'Devuelve al menos una pregunta' : `Evita: ${flag.label.toLowerCase()}`;
+    criteria.push({ id, label, ok, detail: ok ? good(label) : hasText ? flag.hint : `Falta: escribe tu respuesta.` });
+  }
+  return review(criteria);
 }
