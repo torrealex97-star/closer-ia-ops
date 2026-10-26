@@ -26,6 +26,9 @@ await step('login y Resumen: contador del objetivo, pendientes y siguiente paso'
   assert.equal(await exceptionsCard.locator('strong').innerText(), '0', 'en el mock no hay excepciones humanas');
   const draftsCard = page.locator('article.source-card', { hasText: 'POR CLASIFICAR' });
   assert.equal(await draftsCard.locator('strong').innerText(), '3', 'los tres borradores del motor son trabajo automático');
+  // Las dos colas se declaran por separado: el total esconde cuál tiene trabajo si no se desglosa.
+  assert.match(await exceptionsCard.innerText(), /0 del motor · 0 de fuentes externas/);
+  assert.match(await draftsCard.innerText(), /3 del motor · 0 de fuentes externas/);
   assert.ok(await page.getByText(/1 fuente\(s\) fallan/).isVisible());
   assert.equal(await page.getByText(/sin revisar/).count(), 0, 'el resumen ya no pide revisar borradores a mano');
 });
@@ -254,6 +257,30 @@ await step('móvil: menú en una sola franja desplazable (no ocupa la pantalla) 
   const before = await rows(); await more.click();
   assert.ok(await rows() > before, 'al pulsar «Mostrar más» aparecen más fuentes');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+});
+
+await step('Resumen: la cola humana suma el motor y las fuentes externas, y lleva a la que tiene trabajo', async () => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  // Estado conocido: ninguna fila externa en la cola salvo la que se siembra ahora.
+  for (const row of state.external.values()) row.editorial_status = 'draft';
+  state.external.set('res|1', { id: crypto.randomUUID(), source: 'indeed', external_id: 'res-1', title: 'Closer sin condiciones claras', company: 'Acme', location: 'Madrid, España', url: 'http://127.0.0.1:8792/page/ok', salary: null, description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa', posted_at: new Date().toISOString(), editorial_status: 'needs_review', role: 'closer', spain: true, score: 55, also_seen: [], verified_result: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString() });
+  const engineNeeds = state.opps.filter(o => o.editorial_status === 'needs_review').length;
+  const engineDrafts = state.opps.filter(o => o.editorial_status === 'draft').length;
+  const extDrafts = [...state.external.values()].filter(r => r.editorial_status === 'draft').length;
+  await page.getByRole('button', { name: 'Resumen', exact: true }).click(); await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
+  const exceptionsCard = page.locator('article.source-card', { hasText: 'EXCEPCIONES PARA TI' });
+  await exceptionsCard.locator('strong').waitFor();
+  // Mientras carga, la tarjeta dice «…»: el desglose solo se pinta con las dos colas ya leídas.
+  await page.getByText(new RegExp(`${engineNeeds} del motor · 1 de fuentes externas`)).waitFor();
+  // El total incluye la excepción externa: antes solo contaba el motor y la cola real quedaba invisible.
+  assert.equal(await exceptionsCard.locator('strong').innerText(), String(engineNeeds + 1), 'la tarjeta suma las dos colas');
+  const draftsCard = page.locator('article.source-card', { hasText: 'POR CLASIFICAR' });
+  await page.getByText(new RegExp(`${engineDrafts} del motor · ${extDrafts} de fuentes externas`)).waitFor();
+  assert.equal(await draftsCard.locator('strong').innerText(), String(engineDrafts + extDrafts));
+  // El aviso abre la cola externa (la que tiene trabajo), no la del motor.
+  await page.getByRole('button', { name: 'Ver excepciones externas' }).click();
+  await page.getByRole('heading', { name: 'Ofertas de España y del mercado en dólares.' }).waitFor();
+  assert.equal(await page.locator('#ex-status').inputValue(), 'needs_review');
 });
 
 await browser.close(); close();
