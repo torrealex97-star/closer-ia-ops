@@ -3,6 +3,7 @@ import { buildPersonaPrompt, debriefInstructions, debriefSchema } from './prompt
 import { cleanDebrief } from './debrief';
 import { analyzeSignals } from './signals';
 import type { PracticeTurn } from './signals';
+import { clientIp, createTurnBudget } from '../../../lib/practiceBudget';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,17 +30,10 @@ const IP_DAILY_TURNS = 60;
 
 type Body = { scenario?: unknown; messages?: unknown; mode?: unknown };
 
-// Topes por instancia: en serverless son best-effort, por eso además se limita
-// cada petición (turnos y caracteres) y el gasto por llamada (max_tokens).
-const usage = new Map<string, { day: string; count: number }>();
-function spend(key: string, limit: number) {
-  const day = new Date().toISOString().slice(0, 10);
-  const entry = usage.get(key);
-  const count = entry && entry.day === day ? entry.count : 0;
-  if (count >= limit) return null;
-  usage.set(key, { day, count: count + 1 });
-  return limit - count - 1;
-}
+// Topes por instancia (ver lib/practiceBudget): la IP no puede salir de un valor que elija quien llama y el mapa
+// tiene tope duro. En serverless son best-effort, por eso además se limita cada petición (turnos y caracteres) y el
+// gasto por llamada (max_tokens).
+const budget = createTurnBudget();
 
 function readTurns(value: unknown): PracticeTurn[] | null {
   if (!Array.isArray(value) || !value.length || value.length > MAX_TURNS) return null;
@@ -96,8 +90,8 @@ export async function POST(request: Request) {
   const turns = readTurns(body.messages);
   if (!turns) return Response.json({ detail: 'La conversación no es válida o es demasiado larga.' }, { status: 422 });
   const mode = body.mode === 'debrief' ? 'debrief' : 'reply';
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
-  if (spend(`ip:${ip}`, IP_DAILY_TURNS) === null || spend('global', DAILY_TURNS) === null) {
+  const ip = clientIp(request.headers);
+  if (budget.spend(`ip:${ip}`, IP_DAILY_TURNS) === null || budget.spend('global', DAILY_TURNS) === null) {
     return Response.json({ detail: 'La sala de práctica ha llegado a su límite de hoy. Vuelve mañana o pide a tu coordinadora que lo amplíe.' }, { status: 429 });
   }
   const studentTurns = turns.filter(turn => turn.role === 'user').length;

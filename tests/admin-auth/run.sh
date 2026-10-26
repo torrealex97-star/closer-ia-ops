@@ -31,6 +31,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/ingest.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/tiers_b2b.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/application.mjs
+# Candidaturas por páginas: PostgREST corta en 1.000 filas y el recuento salía corto sin decirlo.
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/applications-paging.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/matching.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/cronbudget.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/training.mjs
@@ -48,6 +50,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offertags.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/voice.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/practice.mjs
+# Topes de la sala: la IP del limitador no puede salir de una cabecera que elija el cliente.
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/practicebudget.mjs
 node tests/secrets.mjs
 node tests/admin-auth/gate.mjs
 node spikes/voice/tests/voice.mjs

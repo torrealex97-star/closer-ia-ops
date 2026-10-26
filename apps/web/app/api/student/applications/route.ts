@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
   const { auth, error } = await gate(request, false);
   if (error) return error;
   const uid = auth!.student.user_id;
-  const [applications, base, app] = await Promise.all([listApplications(uid), getProfile(uid), getAppProfile(uid)]);
-  if (!applications) return Response.json({ detail: 'No se pudieron leer tus candidaturas.' }, { status: 503 });
-  return reply(auth!, { applications, copy: buildCopyData(base, app), assisted_only: true });
+  const [page, base, app] = await Promise.all([listApplications(uid), getProfile(uid), getAppProfile(uid)]);
+  if (!page) return Response.json({ detail: 'No se pudieron leer tus candidaturas.' }, { status: 503 });
+  // `truncated`: se leyó hasta el tope. La vista lo dice en vez de dar una lista corta por completa.
+  return reply(auth!, { applications: page.rows, truncated: page.truncated, copy: buildCopyData(base, app), assisted_only: true });
 }
 
 export async function POST(request: NextRequest) {

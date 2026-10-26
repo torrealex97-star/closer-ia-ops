@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { ORG, scrub, type ExternalOffer } from './external';
 import { getSecret } from './integrations';
-import { serviceRest } from './supabaseAuth';
+import { pagedRest, serviceRest } from './supabaseAuth';
 import { jevAnnotate } from './jev';
 import { callTimeout, timeLeft } from './cronBudget';
 import { hostAllowed, pinnedGet, privateAddress } from './urlGuard';
@@ -15,6 +15,8 @@ export type LinkResult = 'open' | 'closed' | 'unknown' | 'skipped';
 export type Decision = 'approve' | 'withdraw' | 'human';
 export type Proposal = { verdict: Verdict; confidence: number; reasons: string[]; red_flags: string[]; signals: { market: string | null; pay_model: string | null; remote: boolean | null } };
 export type Link = { result: LinkResult; reason: string };
+// Lo que el revisor deja anotado en `external_offers.ai_review` (sin texto libre del anuncio).
+export type AiReviewNote = { would_decide?: string; applied?: boolean; mode?: string; audit_sample?: boolean; link?: { result?: string } };
 
 export const THRESHOLDS = { confidence: 85, score: 80, auditEvery: 10 } as const;
 export const config = (env: NodeJS.ProcessEnv = process.env) => ({
@@ -215,13 +217,14 @@ export async function undoAiDecisions(by: string, max = 200): Promise<number> {
 // Informe semanal en weekly_reports (clave org_id + week_start): resumen de lo que el revisor ha anotado en 7 días.
 export async function weeklyAiReport(now = new Date()): Promise<boolean> {
   const since = new Date(now.getTime() - 7 * 864e5).toISOString();
-  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&ai_review->>reviewed_at=gte.${encodeURIComponent(since)}&select=ai_review&limit=5000`);
-  const rows = response.ok ? await response.json().catch(() => null) as Array<{ ai_review: { would_decide?: string; applied?: boolean; mode?: string; audit_sample?: boolean; link?: { result?: string } } }> | null : null;
-  if (!Array.isArray(rows)) return false;
-  const list = rows;
-  const count = (f: (r: (typeof list)[number]['ai_review']) => boolean) => list.filter(r => r.ai_review && f(r.ai_review)).length;
+  // Por PÁGINAS: PostgREST corta en `db-max-rows` (1.000) aunque se pidan 5.000, así que el informe semanal salía
+  // corto y se guardaba como si fuera el total. Si la lectura no se puede completar, no se escribe informe.
+  const page = await pagedRest<{ ai_review: AiReviewNote | null }>(`external_offers?org_id=eq.${ORG}&ai_review->>reviewed_at=gte.${encodeURIComponent(since)}&select=ai_review`, 'id.asc');
+  if (!page) return false;
+  const list = page.rows;
+  const count = (f: (r: AiReviewNote) => boolean) => list.filter(r => r.ai_review && f(r.ai_review)).length;
   const monday = new Date(now); monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
-  const payload = { ai_review: { reviewed: list.length, would_approve: count(r => r.would_decide === 'approve'), would_withdraw: count(r => r.would_decide === 'withdraw'), human: count(r => r.would_decide === 'human'), applied: count(r => r.applied === true), audit_sample: count(r => r.audit_sample === true), links_closed: count(r => r.link?.result === 'closed'), mode: config().mode } };
+  const payload = { ai_review: { reviewed: list.length, would_approve: count(r => r.would_decide === 'approve'), would_withdraw: count(r => r.would_decide === 'withdraw'), human: count(r => r.would_decide === 'human'), applied: count(r => r.applied === true), audit_sample: count(r => r.audit_sample === true), links_closed: count(r => r.link?.result === 'closed'), mode: config().mode, truncated: page.truncated } };
   const saved = await serviceRest('weekly_reports?on_conflict=org_id,week_start', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ org_id: ORG, week_start: monday.toISOString().slice(0, 10), payload }) });
   return saved.ok;
 }

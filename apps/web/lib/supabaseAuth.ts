@@ -76,6 +76,24 @@ export async function authHealthy(): Promise<boolean> {
 const rest = (path: string, init: RequestInit = {}) =>
   call(`/rest/v1/${path}`, { key: serviceKey(), ...init });
 export const serviceRest = rest;
+
+// PostgREST corta CADA respuesta en `db-max-rows` (1.000 en Supabase) aunque se pida más: una sola petición devolvía
+// menos filas de las que hay SIN decirlo, así que los recuentos y los informes salían cortos y parecían exactos. Este
+// paginador pide con `offset` hasta que una página llega vacía (una corta no prueba que no haya más), declara
+// `truncated` si alcanza el tope y devuelve `null` si una página falla: nunca una lista parcial disfrazada de completa.
+export type PagedRows<T> = { rows: T[]; truncated: boolean };
+export async function pagedRest<T>(path: string, order: string, max = 10_000, page = 1000): Promise<PagedRows<T> | null> {
+  const rows: T[] = [];
+  for (;;) {
+    const response = await rest(`${path}&order=${order}&limit=${page}&offset=${rows.length}`).catch(() => null);
+    if (!response?.ok) return null;
+    const batch = await json(response);
+    if (!Array.isArray(batch)) return null;
+    if (!batch.length) return { rows, truncated: false };
+    if (rows.length + batch.length > max) return { rows: rows.concat(batch as T[]).slice(0, max), truncated: true };
+    rows.push(...(batch as T[]));
+  }
+}
 // Llamada a la API de Auth (admin) con la service role. Solo servidor.
 export const serviceAuth = (path: string, init: RequestInit = {}) => call(path, { key: serviceKey(), ...init });
 

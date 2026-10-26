@@ -57,7 +57,9 @@ export function load(dir) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const dir = new URL('../docs/handoff/claims/', import.meta.url).pathname;
+  // `fileURLToPath`, no `URL.pathname`: con espacios en la ruta (este checkout los tiene) `pathname` queda como
+  // `%20`, la carpeta no existe para `existsSync` y el control decía «0 trabajos vivos» con fichas en disco.
+  const dir = fileURLToPath(new URL('../docs/handoff/claims/', import.meta.url));
   const claims = load(dir);
   if (process.argv[2] === 'list') { console.log(board(claims)); }
   else if (process.argv[2] === 'check') {
