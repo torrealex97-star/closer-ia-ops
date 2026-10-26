@@ -9,7 +9,7 @@ import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 import MetricsPanel from './MetricsPanel';
 import AiAgreement from './AiAgreement';
 import SourceIdeas from './SourceIdeas';
-type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[]; ai_review?: AiReview | null };
+type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[]; ai_review?: AiReview | null; risk?: { level: 'WARNING' | 'BLOCKED'; flags: string[] } | null };
 type AiReview = { verdict: string; confidence: number; reasons: string[]; red_flags: string[]; would_decide: string; gate: string; mode: string; applied: boolean; audit_sample?: boolean; link?: { result: string; reason: string }; jev?: { verdict: string | null; score: number | null; note: string | null } };
 const WOULD: Record<string, string> = { approve: 'Aprobaría', withdraw: 'Retiraría', human: 'Cola humana' };
 type Data = { offers: Offer[]; total: number; page: number; page_size: number; counts: Record<string, number>; sources: Array<{ source: string; total: number; live: number; approved: number; last_seen: string | null }>; runs: Array<{ source: string; via: string; received: number; accepted: number; note: string | null; created_at: string }>; paused: string[]; auto?: { used_today: number | null; cap: number } };
@@ -194,7 +194,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
         <tbody>{rows.map(r => <tr key={r.id}>
           <td><input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={picked.has(r.id)} onChange={() => setPicked(old => { const n = new Set(old); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} /></td>
           <td className="num"><span className={tone(r.score)}>{r.score}</span></td>
-          <td className="primary-cell"><strong>{r.title}</strong><span>{r.company ?? 'Empresa no indicada'}{r.salary ? ` · ${r.salary}` : ''}</span></td>
+          <td className="primary-cell"><strong>{r.title}</strong><span>{r.company ?? 'Empresa no indicada'}{r.salary ? ` · ${r.salary}` : ''}</span>{r.risk && <span data-testid="risk"><span className={r.risk.level === 'BLOCKED' ? 'status bad' : 'status'}>{r.risk.level === 'BLOCKED' ? 'Oferta peligrosa' : 'Con avisos'}</span> {r.risk.flags.join(' ')}</span>}</td>
           <td>{r.role ? <span className="status ok">{ROLE_LABELS[r.role as RoleFamily] ?? r.role}</span> : <span className="status">Sin perfil claro</span>}</td>
           <td>{r.location ?? 'No indicada'}{r.spain !== null && <span className={r.spain ? 'status ok' : 'status bad'} style={{ marginLeft: 6 }}>{r.spain ? 'España' : 'Fuera'}</span>}</td>
           <td>{r.source}{r.also_seen?.length ? <span className="sub">también en {r.also_seen.join(', ')}</span> : null}</td>
