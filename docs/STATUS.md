@@ -2,6 +2,12 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Guía del dueño con herramientas, enlaces y prompts (sesión 112) — 2026-10-26
+
+- **Petición del operador**: dejar el paso a paso con las herramientas, lo necesario, enlaces y prompts.
+- **Hecho**: [OWNER_GUIDE.md](OWNER_GUIDE.md) reescrita: tabla resumen (tarea, herramienta, qué tener a mano, tiempo), y por tarea herramientas, requisitos, enlaces y pasos; más **11 prompts/mensajes listos para pegar** (email al asesor legal, solicitud de DPA y retención cero a Groq, instrucciones de etiquetado para mentoras, y prompts para retomar conmigo cada construcción que se desbloquea).
+- **Límites (inspected)**: los enlaces a documentación oficial salen de mi conocimiento y de resultados de búsqueda; no se han abierto todos. Los enlaces profundos al panel de Supabase/Vercel y los menús de terceros están marcados ⚠️ donde dudo. El correo de soporte de Groq no lo conozco: la guía manda a su consola/web.
+
 ## Revisión de código y correcciones (sesión 111) — 2026-10-26
 
 - **Petición del operador**: «haz un code review y soluciona todo». Revisado el código añadido desde #37 (incluido lo que el otro agente fusionó en #45/#53, porque lo toca).
