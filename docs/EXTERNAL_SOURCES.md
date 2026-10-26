@@ -33,6 +33,7 @@ El motor (`sites/engine/worker.js`, Sites) busca por término en las fuentes gra
 3. **Filtro de rol en el origen**: un candidato se ingiere solo si su familia (la misma que calcula el motor) es closer, setter, cold caller o sdr. Se descarta antes de escribir: cada candidato cuesta 6 escrituras de D1 (raw, posting, job, catálogo, oportunidad y versión) y el ruido (dependientes de tienda, ingeniería, becarios) nunca podría salir a la alumna. **La familia AE no entra por aquí**: ya llega por el barrido por categoría de FreeHire, que medía 278 candidatos por pasada, 851 en catálogo, 19 elegibles y 0 closers.
 4. **Honestidad de las cifras**: el estado de cada fuente en `/api/status` publica `fetched` y `filtered`; lo descartado no se disfraza de vacío.
 5. **Coste**: 0. La cuota que sí se gasta es la mensual de escrituras de D1 del motor; el filtro es lo que la mantiene bajo control.
+6. **Por qué no se pagina más** (medido 2026-10-26): las búsquedas vienen ordenadas por fecha y la segunda página de 100 filas trae 0–1 candidatos de perfil y **0 closers** (la mediana de antigüedad pasa de 4 días y en varios términos ya no queda nada dentro de la ventana de 10 días). El tope de 100 por término no recorta closers: recortar la ventana de términos sí los recortaría.
 
 ## 2. JobSpy (Indeed, LinkedIn, Glassdoor, Google Jobs) en GitHub Actions
 1. Genera un token: `openssl rand -hex 32`.
