@@ -41,6 +41,7 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 # El motor retira en bloque lo que descarta (no lo deja en la cola humana): prueba de conducta con D1 simulado.
 node --experimental-strip-types tests/engine/activate.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offerrisk.mjs
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offertags.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/voice.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/practice.mjs
 node tests/admin-auth/gate.mjs

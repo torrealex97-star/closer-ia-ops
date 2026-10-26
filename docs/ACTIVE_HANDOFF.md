@@ -10,7 +10,7 @@ Leyenda: ✅ hecho y probado · 🟡 parcial · ⬜ pendiente (construible) · �
 
 Fuente: `node scripts/handoff.mjs list`. **Trabajan todos los agentes** (Claude, Codex u otros): ficha propia, `touches` sin solapes, un trabajo en curso cada uno. Carriles propuestos (confirmar con el dueño): *captación/ingesta*, *alumnas/matching/candidaturas*, *infra/CI/BD*. claude-cloud = alumnas, formación, progreso, seguridad de ofertas y paneles.
 
-Al escribir esto, abierta: **#46** bases de la voz (interruptor, consentimiento, ADR-015). Fusionadas en `main`: #38 detector de ofertas, #39 retención, #40 clave de Resend, #41 relevo, #42 banderas de riesgo en la revisión, #43 catálogo de la sala (19 situaciones). Al fusionar una PR, su ficha se borra en la PR siguiente.
+Fusionadas en `main`: #46 bases de la voz, #38 detector de ofertas, #39 retención, #40 clave de Resend, #41 relevo, #42 banderas de riesgo en la revisión, #43 catálogo de la sala (19 situaciones). Al fusionar una PR, su ficha se borra en la PR siguiente.
 
 ## 2. Estado de `main`
 
@@ -51,7 +51,7 @@ Al escribir esto, abierta: **#46** bases de la voz (interruptor, consentimiento,
 | 4 | Detector: CIF, dominio < 30 días, LinkedIn; calibración con ofertas reales | ⛔ | Tarea 2; consultas externas. |
 | 5 | Graduación con mentora humana + conjunto de calibración + webhook de certificados | ⛔ | Tareas 4. Webhook apagado hasta tener URL/token. |
 | 6 | Correo entrante (Resend) + clasificación propuesta por IA + «CONTRATADA» con 1 clic humano + atribución por cohorte | ⛔ | Tarea 3 y consentimiento; la IA solo propone. |
-| 7 | Etiquetado de nicho/comisión/ticket y filtros; detector de ofertas ya publicadas | ⬜ | Agente. |
+| 7 | Etiquetado de nicho/comisión/ticket y filtros | 🟡 | Etiquetas de nicho y pago visibles en la revisión (hecho). Faltan **filtros** (columnas guardadas = migración) y el ticket. Agente. |
 | 8 | Perfil de alumna compartible con consentimiento (para empresas) | ⬜/⛔ | Consentimiento y revisión legal. |
 | 9 | Créditos de IA por alumna y práctica entre compañeras | ⛔ | Login de alumnas activo; moderación y consentimiento. |
 | 10 | Avisos reales por WhatsApp/correo (los cálculos ya existen en #39) | ⛔ | Tarea 9 (orden expresa) + cuenta. |

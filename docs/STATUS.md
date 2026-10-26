@@ -2,7 +2,7 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
-## El motor clasifica su pool y retira lo que descarta; el panel publica solo (sesión 106) — 2026-10-26
+## El motor clasifica su pool y retira lo que descarta; el panel publica solo (sesión 107) — 2026-10-26
 
 - **Petición del operador** (anotación sobre el panel de admin): «todas estas ofertas no deben estar a revisar por un humano; la IA debe clasificarlas y añadirlas sola, y dejar a revisión solo los casos más complejos».
 - **Qué entra en el código** (la conducta del motor ya estaba sirviendo en producción; esta rama publica su fuente y añade el disparador del panel):
@@ -17,6 +17,11 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Arreglo de la verificación de diseño**: [check-design.mjs](../scripts/check-design.mjs) usaba `URL.pathname`, que en una ruta con espacios llega escapado (`%20`) y rompía el recorrido con ENOENT; ahora usa `fileURLToPath`. En CI no se veía porque su ruta no tiene espacios.
 - **CI desbloqueado (verified en GitHub)**: los checks `verify` y `web-admin` estaban en rojo **sin arrancar** («recent account payments have failed…»). Por orden del operador el repositorio pasa a **público** (2026-10-26), donde los runners estándar son gratuitos: ambos checks corren y **pasan** sobre `51ef251` (`verify` 6m32s y 5m03s; `web-admin` 1m39s y 12m33s). Antes de abrirlo se barrió el árbol y el historial: solo `.env.example` con marcadores, `.env*` y `.local/` ignorados y ninguna clave en ningún commit. **Consecuencia**: el código deja de ser privado; nada de lo versionado aquí concede acceso (las claves viven en Vercel/Supabase/Sites → Secrets).
 - **Límites**: (1) el despliegue del worker **no se ha repetido** en esta sesión: la versión con retirada ya está sirviendo desde la sesión 91; (2) el botón del panel y los contadores nuevos **no están desplegados** hasta que esta rama llegue a `main` (Vercel publica desde el repo); (3) la cuota mensual de escrituras de D1 del motor seguía en **94.177/100.000** con reinicio el 1 de noviembre, y la pasada de clasificación añade ~400 al día; (4) la retirada es por reglas deterministas, no por IA: un anuncio ambiguo sigue yendo a `needs_review`.
+
+## Etiquetas de nicho y modelo de pago en la revisión de ofertas (sesión 106) — 2026-10-26
+
+- **Hecho (tested, sin red)**: [offerTags.ts](../apps/web/lib/offerTags.ts) lee el texto del anuncio y etiqueta el **modelo de pago** (solo comisión · fijo + comisión · fijo · no indicado) y el **nicho** (formación/infoproducto · software B2B · salud y estética · inmobiliaria y reformas · fitness y bienestar). Sin señal clara o con empate el nicho es `null`, no «otros». «Comisiones atractivas» sin fijo declarado es «pago no indicado», no «solo comisión». La revisión de ofertas muestra la etiqueta bajo el título. `offertags.mjs` 4/4 y un paso de flujo (la respuesta lleva las etiquetas).
+- **Límites**: palabras clave sin calibrar con ofertas reales; el **ticket** no se deriva (el anuncio rara vez lo dice). **Aún no hay filtros** por nicho o pago: filtrar en servidor exige guardar las etiquetas en columnas (migración, ⬜) o aproximarlas con búsquedas de texto; filtrar solo la página cargada engañaría con los totales.
 
 ## Bases de la voz: interruptor, consentimiento y ADR-015 (sesión 105) — 2026-10-26
 
