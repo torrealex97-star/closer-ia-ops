@@ -2,6 +2,14 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Bases de la voz: interruptor, consentimiento y ADR-015 (sesión 105) — 2026-10-26
+
+- **Petición del operador**: construir los módulos de voz. Se hace por capas y **sin audio** hasta que se cumplan las condiciones de ADR-013.
+- **Hecho (tested, servicios simulados)**: [ADR-015](decisions/ADR-015-voz-en-la-sala-de-practica.md) (interruptor del propietario, consentimiento propio y revocable, Fase A navegador manos libres y Fase B WebRTC < 500 ms con retención cero, misma rúbrica con cita literal, topes); [voice.ts](../apps/web/lib/voice.ts): `VOICE_ROLEPLAY=on` es lo único que abre la voz (apagada por defecto) y además exige consentimiento vigente (no revocado y de la versión del texto); una lectura fallida se declara aparte de «sin consentimiento»; `GET /api/student/voice` informa a la interfaz y hoy responde «apagada». `voice.mjs` 5/5 y un paso de flujo (401 sin sesión; con sesión, `switch_off`).
+- **Migración sin aplicar**: [20261027_voice_consent.sql](../supabase/migrations/20261027_voice_consent.sql) (`student_voice_consent`, RLS sin políticas) y su prueba [tests/db/voice_consent.sql](../tests/db/voice_consent.sql), **sin ejecutar**. Aplicarla exige orden expresa.
+- **No hecho**: audio, proveedor de STT/TTS, bucle manos libres, pantalla de consentimiento y su texto legal, topes de minutos. Sin eso **no hay voz**; la interfaz no ha cambiado.
+- **Límites**: nada medido (latencia, coste, calidad en español); el texto de consentimiento de voz no existe aún y lo revisa el dueño o su asesor.
+
 ## Catálogo de la sala: ofertas por nicho y entrevistadores nuevos (sesión 104) — 2026-10-25
 
 - **Petición del operador** (módulo 1, voz): «catálogo por nicho» y entrevistadores con otro punto de vista. Se construye en **texto** (la sala ya existe); la voz reutilizará el mismo catálogo.
