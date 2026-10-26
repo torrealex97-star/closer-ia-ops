@@ -193,6 +193,9 @@ await step('alumnas: invitación, recuperación, login, perfil con consentimient
   assert.equal(state.students.find(x => x.email === E).status, 'active'); assert.ok(state.students.find(x => x.email === E).user_id);
   // Progreso: la entrada ya cuenta; formación y examen solo se registran con sesión.
   const studentHeaders = { cookies: false, headers: { cookie: studentCookie() } };
+  assert.equal((await call('/api/student/voice', { cookies: false })).status, 401);
+  const voice = await call('/api/student/voice', studentHeaders); assert.equal(voice.status, 200);
+  assert.deepEqual(voice.json, { enabled: false, reason: 'switch_off', consent: null }, 'la voz sigue apagada sin VOICE_ROLEPLAY');
   const before = await call('/api/student/progress', studentHeaders);
   assert.equal(before.status, 200); assert.equal(before.json.progress.sessions, 1, 'el login cuenta como entrada');
   assert.equal(before.json.progress.practice.count, 0); assert.equal(before.json.progress.training.examBest, null, 'sin examen es null, no 0');
