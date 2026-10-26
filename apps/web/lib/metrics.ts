@@ -1,4 +1,4 @@
-import { ORG } from './external';
+import { isHumanReviewer, ORG } from './external';
 import { serviceRest } from './supabaseAuth';
 import { tierOf, type Tier } from './sourceTiers';
 
@@ -42,7 +42,8 @@ export function computeMetrics(offers: OfferRow[], runs: RunRow[] | null, now: D
     days, goodPerDay, perTier: (['official', 'scrape', 'paid', 'other'] as Tier[]).map(t => { const l = [...by.values()].filter(x => tierOf(x.source) === t); return { tier: t, total: l.reduce((a, x) => a + x.total, 0), good: l.reduce((a, x) => a + x.good, 0) }; }).filter(t => t.total),
     perSource: [...by.values()].sort((a, b) => b.good - a.good || a.source.localeCompare(b.source)),
     apify: runs === null ? { cost_usd: null, runs: null, good_offers: apifyGood, cost_per_good: null } : { cost_usd: Math.round(cost * 100) / 100, runs: runs.length, good_offers: apifyGood, cost_per_good: apifyGood ? Math.round((cost / apifyGood) * 1000) / 1000 : null },
-    review: { human_decisions: decided === null ? null : decided.filter(o => o.reviewed_by !== 'ai-review' && o.reviewed_by !== 'auto-vigencia').length, ai_decisions: decided === null ? null : decided.filter(o => o.reviewed_by === 'ai-review').length, minutes: null },
+    // Sólo cuenta como humana la decisión de una persona: las de las reglas y la cola automática también son de la máquina.
+    review: { human_decisions: decided === null ? null : decided.filter(o => isHumanReviewer(o.reviewed_by)).length, ai_decisions: decided === null ? null : decided.filter(o => o.reviewed_by === 'ai-review').length, minutes: null },
   };
 }
 

@@ -14,6 +14,11 @@ export type Candidate = { external_id: string; title: string; company?: string |
 export type ExternalOffer = { role?: string | null; spain?: boolean | null; score?: number; market?: string | null; market_basis?: string | null; currency?: string | null; apply_url?: string | null; company_url?: string | null; contact?: Contact | null; auto_review?: Record<string, unknown> | null; also_seen?: string[]; raw?: Record<string, unknown>; id: string; source: string; external_id: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; description: string | null; posted_at: string | null; first_seen_at: string; last_seen_at: string; expires_at: string; editorial_status: string; verified_at: string | null; verified_result: string | null; ai_review?: Record<string, unknown> | null };
 export const SOURCE_RE = /^[a-z0-9-]{2,40}$/;
 export const MAX_CANDIDATES = 300;
+// Revisores que NO son personas. Sus decisiones se cuentan aparte: si se confunden con las humanas, el panel
+// infla «decisiones humanas» y el acuerdo IA-persona compara a la IA consigo misma.
+export const MACHINE_REVIEWERS = ['ai-review', 'auto-vigencia', 'auto-reglas', 'auto-excepcion'] as const;
+/** ¿La decisión la tomó una persona? Sólo entonces cuenta como contraste humano. */
+export const isHumanReviewer = (by: string | null | undefined): boolean => Boolean(by) && !(MACHINE_REVIEWERS as readonly string[]).includes(by as string);
 const STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
 
 const clip = (v: unknown, max: number): string | null => {

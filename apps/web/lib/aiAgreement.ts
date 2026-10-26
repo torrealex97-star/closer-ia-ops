@@ -1,6 +1,5 @@
 import { serviceRest } from './supabaseAuth';
-
-const ORG = 'cloud-wdc';
+import { isHumanReviewer, ORG } from './external';
 // Puerta de salida propuesta de shadow → live (informativa: NO activa nada por sí sola).
 export const MIN_PAIRS = 30;
 export const MAX_FALSE_APPROVE_RATE = 0.05;
@@ -14,7 +13,8 @@ export type Agreement = {
 };
 
 const humanDecision = (r: AgreementRow): 'approve' | 'withdraw' | null => {
-  if (!r.reviewed_by || r.reviewed_by === 'ai-review' || r.reviewed_by === 'auto-vigencia') return null;
+  // Cualquier revisor automático (IA, reglas, vigencia, cola de excepciones) queda fuera: no es contraste humano.
+  if (!isHumanReviewer(r.reviewed_by)) return null;
   if (r.editorial_status === 'approved' || r.editorial_status === 'published') return 'approve';
   if (r.editorial_status === 'withdrawn') return 'withdraw';
   return null;
