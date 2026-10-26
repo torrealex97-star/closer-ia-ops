@@ -4,7 +4,7 @@ import { ArrowRight, LoaderCircle, RefreshCcw } from 'lucide-react';
 
 // Resumen: cuánto falta para el objetivo (ofertas de closer en España visibles para las alumnas) y qué hacer ahora.
 export const TARGET_CLOSERS_ES = 20;
-type Overview = { external?: { pending: number; sources: Array<{ source: string; live: number; approved: number }> }; engine: { catalog_active: number; last_run: { day: string; status: string } | null } | null; sources: Array<{ code: string; name: string; run_status: string | null }>; pool: { eligible: number | null; by_role: Record<string, number> } };
+type Overview = { external?: { pending: number; needs_review?: number; sources: Array<{ source: string; live: number; approved: number }> }; engine: { catalog_active: number; last_run: { day: string; status: string } | null } | null; sources: Array<{ code: string; name: string; run_status: string | null }>; pool: { eligible: number | null; by_role: Record<string, number> } };
 type Student = { items: Array<{ id: string }>; total: number };
 type Go = (tab: 'quick' | 'external' | 'apify' | 'review' | 'catalog' | 'sources' | 'apis') => void;
 
@@ -44,14 +44,17 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
   const pct = Math.min(100, Math.round((visible / TARGET_CLOSERS_ES) * 100));
   // Dos colas distintas, nunca una suma: lo que la máquina clasifica sola y lo que de verdad
   // necesita criterio humano. Sumarlas hacía parecer que miles de borradores esperaban a una persona.
-  const exceptions = counts.needs_review ?? 0;
+  const engineExceptions = counts.needs_review ?? 0;
+  const extExceptions = overview?.external?.needs_review ?? 0;
+  const exceptions = engineExceptions + extExceptions; // las del motor y las de fuentes externas: ambas esperan criterio humano
   const drafts = counts.draft ?? 0;
   const extPending = overview?.external?.pending ?? 0;
   const failed = overview?.sources.filter(s => s.run_status === 'failed') ?? [];
   const poolClosers = overview?.pool.by_role.closer ?? 0;
   const reached = visible >= TARGET_CLOSERS_ES;
   const steps: Array<{ text: string; action: string; tab: Parameters<Go>[0] }> = [];
-  if (exceptions > 0) steps.push({ text: `Hay ${exceptions} oferta(s) que la clasificación automática no pudo cerrar. Revisa solo esas.`, action: 'Ver excepciones', tab: 'review' });
+  if (engineExceptions > 0) steps.push({ text: `Hay ${engineExceptions} oferta(s) del motor que la clasificación automática no pudo cerrar. Revisa solo esas.`, action: 'Ver excepciones', tab: 'review' });
+  if (extExceptions > 0) steps.push({ text: `Hay ${extExceptions} oferta(s) de fuentes externas que las reglas no pudieron cerrar. Revisa solo esas.`, action: 'Ver excepciones', tab: 'external' });
   if (extPending > 0) steps.push({ text: `Hay ${extPending} borrador(es) de fuentes externas esperando la pasada automática (reglas + IA). No hace falta que las revises a mano.`, action: 'Clasificar ahora', tab: 'external' });
   if (failed.length) steps.push({ text: `${failed.length} fuente(s) fallan en la última recogida: ${failed.slice(0, 3).map(f => f.name).join(', ')}${failed.length > 3 ? '…' : ''}.`, action: 'Ver fuentes', tab: 'sources' });
   if (!reached && exceptions === 0 && extPending === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más: lanza un actor de Apify (scraping a escala sin proxies propios) o guarda las claves de InfoJobs, Adzuna y Jooble.', action: 'Abrir Apify', tab: 'apify' });

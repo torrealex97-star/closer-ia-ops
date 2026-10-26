@@ -2,6 +2,21 @@
 
 _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activación editorial, suministro, radar y sala de práctica) conservan su numeración original y no coinciden con las sesiones 33–66 de la pista principal; la 67 es la revisión y el push de hoy._
 
+## Revisión de código y correcciones (sesión 111) — 2026-10-26
+
+- **Petición del operador**: «haz un code review y soluciona todo». Revisado el código añadido desde #37 (incluido lo que el otro agente fusionó en #45/#53, porque lo toca).
+- **Corregido (tested)**:
+  - **Detector de ofertas** ([offerRisk.ts](../apps/web/lib/offerRisk.ts)): una frase negada («no es necesario pagar», «sin inversión inicial») ya no dispara `ADVANCE_PAYMENT_DETECTED` (antes bloqueaba ofertas honestas como «oferta peligrosa»); y «la empresa asume la inversión en publicidad» ya no avisa de `AD_SPEND_ON_CLOSER`.
+  - **Etiquetas** ([offerTags.ts](../apps/web/lib/offerTags.ts)): «Ganarás hasta 3.000 € al mes» ya no cuenta como sueldo fijo; «formación» y «salud» sueltas ya no inclinan el nicho (son beneficios de casi cualquier anuncio).
+  - **Motor** ([worker.js](../sites/engine/worker.js)): una oferta **sin descripción se salta**, ya no se retira en bloque con el motivo falso «el anuncio no está en español».
+  - **Clasificación automática** ([engineActivate.ts](../apps/web/lib/engineActivate.ts), [CloudAdminPanel.tsx](../apps/web/components/CloudAdminPanel.tsx)): lo que pasa a `needs_review` cuenta como progreso (el bucle cortaba con trabajo pendiente); una espera agotada se anota como **corte** (`truncated`), no queda escondida; y el cron da al paso del motor **hasta 40 s** (antes 12 s, menos de lo que tarda una pasada).
+  - **Resumen** ([SummaryTab.tsx](../apps/web/components/SummaryTab.tsx), [overview](../apps/web/app/api/admin/overview/route.ts)): «Excepciones para ti» suma también las `needs_review` de fuentes externas (antes decía 0 con la cola llena) y el paso lleva a la pestaña correcta.
+  - **Resend** ([integrations.ts](../apps/web/lib/integrations.ts)): una clave de **solo envío** devuelve 401 `restricted_api_key` en el sondeo `/domains` y se marcaba como inválida; ahora se acepta como «Clave válida (permiso solo de envío)». ⚠️ El nombre del error sale de la documentación de Resend recordada por el revisor, no comprobada.
+  - **Guarda de secretos** ([tests/secrets.mjs](../tests/secrets.mjs)): el patrón de JWT no podía casar con ningún JWT real (exigía 40 caracteres antes del primer punto) y el de asignación se saltaba nombres como `GROQ_API_KEY = "…"`; arreglados, con autopruebas.
+  - **Migraciones**: pruebas de BD para las dos aplicadas sin ellas ([tests/db/integration_resend.sql](../tests/db/integration_resend.sql), **sin ejecutar**), y se corrige la contradicción de la sesión 105 («sin aplicar»).
+- **Revisado y dejado como está**: el worker ya **no excluye** `account_executive` y `sdr` de la activación en bloque. Es intencionado: el commit de #45 lo dice («el motor clasifica el pool completo, incluidos AE y SDR»); la vista de alumna sigue ocultándolos por defecto (`include_extra_roles`).
+- **Límites**: no se ejecutaron las pruebas de BD con escrituras (confirmación del dueño pendiente) ni se ha probado el cron contra el motor real (el tope de 40 s depende del presupuesto total del cron, `CRON_BUDGET_MS`, 40 s por defecto: si los pasos anteriores consumen tiempo, el motor puede seguir quedándose corto y se anotará como corte).
+
 ## Guarda de secretos para el repositorio público y guía del dueño (sesión 110) — 2026-10-26
 
 - **Petición del operador**: «haz todo lo que puedas del listado; lo que no, déjame el paso a paso».
@@ -55,7 +70,7 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 
 - **Petición del operador**: construir los módulos de voz. Se hace por capas y **sin audio** hasta que se cumplan las condiciones de ADR-013.
 - **Hecho (tested, servicios simulados)**: [ADR-015](decisions/ADR-015-voz-en-la-sala-de-practica.md) (interruptor del propietario, consentimiento propio y revocable, Fase A navegador manos libres y Fase B WebRTC < 500 ms con retención cero, misma rúbrica con cita literal, topes); [voice.ts](../apps/web/lib/voice.ts): `VOICE_ROLEPLAY=on` es lo único que abre la voz (apagada por defecto) y además exige consentimiento vigente (no revocado y de la versión del texto); una lectura fallida se declara aparte de «sin consentimiento»; `GET /api/student/voice` informa a la interfaz y hoy responde «apagada». `voice.mjs` 5/5 y un paso de flujo (401 sin sesión; con sesión, `switch_off`).
-- **Migración sin aplicar**: [20261027_voice_consent.sql](../supabase/migrations/20261027_voice_consent.sql) (`student_voice_consent`, RLS sin políticas) y su prueba [tests/db/voice_consent.sql](../tests/db/voice_consent.sql), **sin ejecutar**. Aplicarla exige orden expresa.
+- **Migración** [20261027_voice_consent.sql](../supabase/migrations/20261027_voice_consent.sql) (`student_voice_consent`, RLS sin políticas): estaba escrita sin aplicar; **se aplicó el 2026-10-26** por orden del dueño (ver sesión 109). Su prueba [tests/db/voice_consent.sql](../tests/db/voice_consent.sql) **sigue sin ejecutar**.
 - **No hecho**: audio, proveedor de STT/TTS, bucle manos libres, pantalla de consentimiento y su texto legal, topes de minutos. Sin eso **no hay voz**; la interfaz no ha cambiado.
 - **Límites**: nada medido (latencia, coste, calidad en español); el texto de consentimiento de voz no existe aún y lo revisa el dueño o su asesor.
 

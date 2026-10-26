@@ -859,6 +859,9 @@ async function handleAdminActivate(request, env) {
     if (!derivedRole) { reject(row.opportunity_id, 'sin perfil comercial reconocible'); continue; }
     if (role && derivedRole !== role) { skip(`perfil ${derivedRole} distinto del pedido (${role})`); continue; }
     if (market === 'ES' && (nonSpain(p) || !spainSignal(p))) { reject(row.opportunity_id, 'sin señal de mercado España'); continue; }
+    // Sin texto no hay evidencia de idioma: no es «no está en español». Se deja en borrador (como antes)
+    // en vez de retirar en bloque, con un motivo falso, todo lo que llega sin descripción.
+    if (!description.trim()) { skip('sin descripción: no se puede comprobar el idioma'); continue; }
     if (!spanishBodyGate(description, false).ok) { reject(row.opportunity_id, 'el anuncio no está en español'); continue; }
     const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
     if (ages !== null && Number.isFinite(ages) && ages > days) { reject(row.opportunity_id, `publicado hace más de ${days} días`); continue; }

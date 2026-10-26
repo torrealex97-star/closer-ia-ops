@@ -153,4 +153,18 @@ const withdrawals = db => writes(db).filter(entry => /SET editorial_status='with
   assert.equal(retiradas[1].args.length - 3, 1);
 }
 
+// 4) Una oferta sin descripción (la fuente no trajo cuerpo) NO se retira por «no está en español»: se salta y sigue como estaba.
+{
+  const pool = [
+    row('opp-sin-cuerpo', offer('Closer de ventas', 'Madrid, España', '')),
+    row('opp-closer', offer('Closer de ventas', 'Madrid, España', SPAIN_TEXT)),
+  ];
+  const db = fakeDb(pool);
+  const { status, body } = await activate(db, { dry_run: false, verify: false, market: 'any' });
+  assert.equal(status, 200);
+  assert.equal(body.counts.withdrawn, 0, 'sin cuerpo no hay evidencia de idioma: no se retira');
+  assert.equal(withdrawals(db).length, 0);
+  assert.equal(body.counts.published, 1, 'la que sí tiene cuerpo en español se publica');
+}
+
 console.log('PASS  motor: retira lo descartado en bloque, con motivo, y solo toca borradores');

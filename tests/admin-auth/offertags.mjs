@@ -15,6 +15,11 @@ await step('modelo de pago: solo comisión, fijo + comisión, fijo y no indicado
   assert.equal(offerTags({ title: 'Closer', description: 'Buscamos closer con experiencia' }).pay, 'no_indicado');
   assert.equal(offerTags({ title: 'Closer', description: 'Comisiones atractivas' }).pay, 'no_indicado'); // comisión sin fijo declarado ≠ «solo comisión»
 });
+await step('pago: la promesa de ingresos no es un fijo; el nicho no se deja llevar por «formación» o «salud» genéricas', () => {
+  assert.equal(offerTags({ title: 'Closer', description: 'Ganarás hasta 3.000 € al mes con comisiones' }).pay, 'no_indicado');
+  assert.equal(offerTags({ title: 'Closer', description: 'Sueldo fijo 1.400 € al mes más comisiones' }).pay, 'fijo_mas_comision');
+  assert.equal(offerTags({ title: 'Comercial', description: 'Ofrecemos formación continua y seguro de salud' }).niche, null);
+});
 await step('nicho: por palabras del anuncio, con el título pesando doble', () => {
   assert.equal(offerTags({ title: 'Closer high ticket', description: 'Programa de mentoría para agencias' }).niche, 'formacion');
   assert.equal(offerTags({ title: 'Closer SaaS B2B', description: 'Vendemos software de facturación' }).niche, 'saas_b2b');
