@@ -91,10 +91,40 @@ step('las tres búsquedas nuevas están declaradas sobre las fuentes que ya func
   assert.equal(byCode.get('freehire').terms, undefined, 'la búsqueda por categoría se conserva');
 });
 
-step('el coste total cabe en el presupuesto por invocación (ninguna fuente aplaza a otra)', () => {
+step('el presupuesto por invocación reserva el gasto D1: lo que no cabe se aplaza, no se cae', () => {
   const total = t.SOURCES.reduce((n, s) => n + t.fetchCost(s), 0);
-  // 40 = presupuesto por defecto del run cuando el entorno no dice otra cosa (prod soporta ~50).
-  assert.ok(total <= 40, `coste total ${total} por encima del presupuesto 40`);
+  assert.ok(total > 20, 'el catálogo de fuentes no cabe en una sola pasada: repartir es la norma');
+  const plan = t.planRun(t.SOURCES, null, '2026-10-26', undefined);
+  // Presupuesto real de fetch = techo del Worker menos el colchón de D1. Medido en producción el
+  // 2026-10-26: con el presupuesto puesto a 40 «peticiones» la invocación murió tras 25 fetch y las
+  // dos búsquedas de closer de LATAM/Himalayas y el ATS quedaron CAÍDAS («Too many subrequests»).
+  assert.equal(plan.budget, t.PLATFORM_SUBREQUEST_LIMIT - t.D1_RESERVED_SUBREQUESTS);
+  assert.ok(plan.budget + t.D1_RESERVED_SUBREQUESTS <= t.PLATFORM_SUBREQUEST_LIMIT, 'fetch + D1 cabe en el techo');
+  assert.ok(plan.budget < 25, `presupuesto ${plan.budget}: por debajo de la pasada que murió en producción`);
+  // Ninguna fuente desaparece del plan: se aplaza (declarada) o se recoge.
+  assert.equal(plan.ordered.length, t.SOURCES.length);
+  assert.equal(new Set(plan.ordered.map(s => s.code)).size, t.SOURCES.length, 'sin duplicados ni olvidos');
+  let spent = 0, fits = 0;
+  for (const s of plan.ordered) { if (spent + t.fetchCost(s) > plan.budget) continue; spent += t.fetchCost(s); fits += 1; }
+  assert.ok(fits < t.SOURCES.length, `caben ${fits} de ${t.SOURCES.length}: el resto se aplaza`);
+  assert.ok(fits >= 3, 'y caben varias: la pasada no queda vacía');
+  // La pasada siguiente ABRE por lo aplazado o caído. El orden de cabecera sigue la rotación del día,
+  // así que se compara el CONJUNTO y que ninguna completada se cuele por delante.
+  const last = t.SOURCES.map(s => ({ code: s.code, status: 'completed' }));
+  const cut = ['himalayas-closer', 'freehire-latam-closer', 'ats-teamtailor-monestcapital'];
+  for (const code of cut) last.find(s => s.code === code).status = 'deferred';
+  const next = t.planRun(t.SOURCES, JSON.stringify(last), '2026-10-27', undefined);
+  assert.deepEqual([...next.resumed].sort(), [...cut].sort());
+  assert.deepEqual([...next.ordered.slice(0, cut.length).map(s => s.code)].sort(), [...cut].sort(), 'lo cortado abre la siguiente');
+  assert.equal(next.ordered.slice(cut.length).some(s => cut.includes(s.code)), false, 'nada reanudado se repite detrás');
+  // Un fallo de verdad también se reanuda: si no, la fuente caída esperaría a su turno de rotación.
+  const failed = t.planRun(t.SOURCES, JSON.stringify([{ code: 'himalayas-closer', status: 'failed' }]), '2026-10-27', undefined);
+  assert.equal(failed.ordered[0].code, 'himalayas-closer');
+  // Techo de entorno menor: el presupuesto no baja de un mínimo usable y nunca rebasa el techo.
+  assert.equal(t.planRun(t.SOURCES, null, '2026-10-26', 12).budget, 6);
+  assert.equal(t.planRun(t.SOURCES, null, '2026-10-26', 400).budget, t.PLATFORM_SUBREQUEST_LIMIT - t.D1_RESERVED_SUBREQUESTS);
+  // Sin estado previo o ilegible no se rompe: queda la rotación del día.
+  assert.deepEqual(t.planRun(t.SOURCES, '{basura', '2026-10-26').ordered.map(s => s.code), plan.ordered.map(s => s.code));
   // La ventana de términos cubre todo el vocabulario en menos de una semana.
   assert.ok(Math.ceil(t.CLOSER_TERMS.length / 6) <= 4, 'el vocabulario se recorre en ≤ 4 días');
 });

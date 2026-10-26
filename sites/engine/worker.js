@@ -45,6 +45,34 @@ function fetchCost(source) {
   return 1;
 }
 
+// Presupuesto de subrequests POR INVOCACIÓN. El techo es del Worker y lo COMPARTEN los `fetch` de
+// las fuentes y el gasto D1 del propio run (una consulta por fuente más los lotes de ingesta), así
+// que contar solo los `fetch` dejaba la invocación corta por la cola. Medido en producción el
+// 2026-10-26: con el presupuesto a 40 «peticiones», la pasada murió tras 25 fetch y las dos
+// búsquedas de closer de LATAM/Himalayas y el ATS quedaron caídas con «Too many subrequests»: ni un
+// closer entró por ahí. El presupuesto reserva un colchón fijo para D1.
+//
+// Lo que no cabe se APLAZA (declarado en el estado del run, no se disfraza de vacío) y la pasada
+// siguiente ABRE por lo aplazado o caído: la recogida es reanudable y ninguna fuente se queda
+// siempre al final. El resto rota por día.
+const PLATFORM_SUBREQUEST_LIMIT = 50;
+const D1_RESERVED_SUBREQUESTS = 34;
+function planRun(sources, lastSources, day, envBudget) {
+  const ceiling = Math.min(Number(envBudget) || PLATFORM_SUBREQUEST_LIMIT, PLATFORM_SUBREQUEST_LIMIT);
+  const budget = Math.max(6, ceiling - D1_RESERVED_SUBREQUESTS);
+  const rotate = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000) % sources.length;
+  const rotated = [...sources.slice(rotate), ...sources.slice(0, rotate)];
+  const unfinished = new Set();
+  try {
+    for (const state of JSON.parse(lastSources || '[]')) if (state?.code && state.status !== 'completed') unfinished.add(state.code);
+  } catch { /* estado ilegible: se sigue con la rotación del día */ }
+  return {
+    budget,
+    resumed: [...unfinished],
+    ordered: [...rotated.filter(s => unfinished.has(s.code)), ...rotated.filter(s => !unfinished.has(s.code))],
+  };
+}
+
 // Filtro de ROL en el origen (2026-10-26). Las búsquedas por término de las fuentes gratuitas
 // devuelven mucho ruido (dependientes de tienda, «Data Engineer», becarios, «Sales Assistant 30 h»).
 // Cada candidato ingerido cuesta 6 escrituras de D1 (raw, posting, job, catálogo, oportunidad y
@@ -385,7 +413,7 @@ async function sourceFreehire(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, PLATFORM_SUBREQUEST_LIMIT, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -1047,7 +1075,7 @@ async function runCollection(env, force = false) {
   const db = env.DB;
   await ensureSchema(db);
   const last = await db.prepare(
-    "SELECT id,status,completed_at FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
+    "SELECT id,status,completed_at,sources FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
   ).bind(ORG).first();
   if (!force && last?.completed_at) {
     const age = Date.now() - Date.parse(last.completed_at);
@@ -1069,16 +1097,14 @@ async function runCollection(env, force = false) {
 
   // El tope de subrequests por invocación es del Worker, no una decisión de producto: no se recorta
   // cuántas ofertas se traen, se reparte el presupuesto y lo que NO cabe se APLAZA declarándolo en el
-  // estado del run (antes esas fuentes fallaban con «Too many subrequests»). El punto de partida rota
-  // por día para que ninguna se quede siempre al final.
-  const budget = Math.max(SOURCES.length, Number(env?.MAX_SUBREQUESTS || 40));
-  const rotate = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000) % SOURCES.length;
-  const ordered = [...SOURCES.slice(rotate), ...SOURCES.slice(0, rotate)];
+  // estado del run (antes esas fuentes fallaban con «Too many subrequests»). El punto de partida es
+  // lo aplazado o caído en la pasada anterior y, tras eso, la rotación del día.
+  const { budget, ordered, resumed } = planRun(SOURCES, last?.sources, day, env?.MAX_SUBREQUESTS);
   let spent = 0;
   for (const source of ordered) {
     const cost = fetchCost(source);
     if (spent + cost > budget) {
-      setState(source.code, { status: 'deferred', warning: `Aplazada: el presupuesto de ${budget} peticiones de esta ejecución se agotó (entra en la siguiente)` });
+      setState(source.code, { status: 'deferred', warning: `Aplazada: no cabe en el presupuesto de ${budget} peticiones de esta ejecución (abre la siguiente pasada)` });
       continue;
     }
     spent += cost;
@@ -1115,7 +1141,9 @@ async function runCollection(env, force = false) {
     .bind('completed', JSON.stringify(states), now(), runId).run();
   // El resultado del audit diario (corrido al principio de este run) viaja en la respuesta:
   // si un slug cambió, el operador lo ve renamed/gone antes de que el extractor falle.
-  return slugAudit ? { run_id: runId, sources: states, slug_audit: slugAudit } : { run_id: runId, sources: states };
+  // `resumed` deja en la respuesta qué fuentes abrieron esta pasada, para que el recurso se vea sin
+  // leer la tabla. `budget` es el presupuesto real de subrequests que quedó para fetch.
+  return { run_id: runId, budget, resumed, sources: states, ...(slugAudit ? { slug_audit: slugAudit } : {}) };
 }
 
 async function ingestBatch(db, source, candidates, known) {
