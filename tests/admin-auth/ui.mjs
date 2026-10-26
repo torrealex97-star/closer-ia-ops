@@ -20,9 +20,14 @@ await step('login y Resumen: contador del objetivo, pendientes y siguiente paso'
   await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
   await page.getByText('Faltan 13').waitFor();
   assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'), '7');
-  await page.getByText('3', { exact: true }).first().waitFor();
-  await page.getByText(/Hay 3 oferta\(s\) sin revisar/).waitFor();
+  // Dos colas separadas: la máquina clasifica los borradores y a la persona le quedan las excepciones.
+  const exceptionsCard = page.locator('article.source-card', { hasText: 'EXCEPCIONES PARA TI' });
+  await exceptionsCard.waitFor();
+  assert.equal(await exceptionsCard.locator('strong').innerText(), '0', 'en el mock no hay excepciones humanas');
+  const draftsCard = page.locator('article.source-card', { hasText: 'POR CLASIFICAR' });
+  assert.equal(await draftsCard.locator('strong').innerText(), '3', 'los tres borradores del motor son trabajo automático');
   assert.ok(await page.getByText(/1 fuente\(s\) fallan/).isVisible());
+  assert.equal(await page.getByText(/sin revisar/).count(), 0, 'el resumen ya no pide revisar borradores a mano');
 });
 await step('Fuentes: catálogo completo (todas las del backend + las del motor) con filtros', async () => {
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
@@ -60,6 +65,8 @@ await step('Revisión rápida: filtra closers, carga ubicación, oculta no-Espa�
 await step('Revisión una a una: guardar una oferta con payload raw ya no da 422', async () => {
   state.opps[2].editorial_status = 'draft';
   await page.getByRole('button', { name: 'Revisión una a una' }).click(); await page.getByRole('heading', { name: 'Revisar a fondo lo que lo merece.' }).waitFor();
+  // La cola humana abre por defecto en excepciones; este caso es un borrador que se edita a mano.
+  await page.getByLabel('Filtrar por estado editorial').selectOption('draft');
   await page.getByRole('button', { name: /Desarrollador Backend/ }).click(); await page.getByLabel('Título (headline)').waitFor();
   await page.getByRole('button', { name: 'Guardar borrador' }).click(); await page.getByText(/Guardado: Borrador/).waitFor();
 });

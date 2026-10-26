@@ -42,16 +42,19 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
 
   const visible = closers ?? 0;
   const pct = Math.min(100, Math.round((visible / TARGET_CLOSERS_ES) * 100));
-  const waiting = (counts.draft ?? 0) + (counts.needs_review ?? 0);
+  // Dos colas distintas, nunca una suma: lo que la máquina clasifica sola y lo que de verdad
+  // necesita criterio humano. Sumarlas hacía parecer que miles de borradores esperaban a una persona.
+  const exceptions = counts.needs_review ?? 0;
+  const drafts = counts.draft ?? 0;
   const extPending = overview?.external?.pending ?? 0;
   const failed = overview?.sources.filter(s => s.run_status === 'failed') ?? [];
   const poolClosers = overview?.pool.by_role.closer ?? 0;
   const reached = visible >= TARGET_CLOSERS_ES;
   const steps: Array<{ text: string; action: string; tab: Parameters<Go>[0] }> = [];
-  if (!reached && waiting > 0) steps.push({ text: `Hay ${waiting} oferta(s) sin revisar. Filtra por Closer, verifica y aprueba las buenas.`, action: 'Abrir revisión rápida', tab: 'quick' });
-  if (!reached && extPending > 0) steps.push({ text: `Hay ${extPending} oferta(s) de fuentes externas (InfoJobs, Adzuna, Jooble, JobSpy) por revisar.`, action: 'Revisar externas', tab: 'external' });
+  if (exceptions > 0) steps.push({ text: `Hay ${exceptions} oferta(s) que la clasificación automática no pudo cerrar. Revisa solo esas.`, action: 'Ver excepciones', tab: 'review' });
+  if (extPending > 0) steps.push({ text: `Hay ${extPending} borrador(es) de fuentes externas esperando la pasada automática (reglas + IA). No hace falta que las revises a mano.`, action: 'Clasificar ahora', tab: 'external' });
   if (failed.length) steps.push({ text: `${failed.length} fuente(s) fallan en la última recogida: ${failed.slice(0, 3).map(f => f.name).join(', ')}${failed.length > 3 ? '…' : ''}.`, action: 'Ver fuentes', tab: 'sources' });
-  if (!reached && waiting === 0 && extPending === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más: lanza un actor de Apify (scraping a escala sin proxies propios) o guarda las claves de InfoJobs, Adzuna y Jooble.', action: 'Abrir Apify', tab: 'apify' });
+  if (!reached && exceptions === 0 && extPending === 0) steps.push({ text: 'No quedan ofertas por revisar. Para llegar al objetivo hacen falta más: lanza un actor de Apify (scraping a escala sin proxies propios) o guarda las claves de InfoJobs, Adzuna y Jooble.', action: 'Abrir Apify', tab: 'apify' });
   if (reached && !steps.length) steps.push({ text: 'Objetivo cumplido. Prueba la vista de alumna para comprobar cómo se ve.', action: 'Probar ofertas', tab: 'catalog' });
 
   return <section aria-label="Resumen">
@@ -67,7 +70,8 @@ export default function SummaryTab({ go, onSessionLost }: { go: Go; onSessionLos
     </article>
     <div className="card-grid" style={{ marginBottom: 20 }}>
       <article className="source-card"><span className="eyebrow">VISIBLES EN ESPAÑA (TODOS LOS PERFILES)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{allEs ?? '…'}</strong>ofertas</span></div></article>
-      <article className="source-card"><span className="eyebrow">POR REVISAR</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{busy ? '…' : waiting}</strong>borradores y a revisar</span></div></article>
+      <article className="source-card"><span className="eyebrow">EXCEPCIONES PARA TI</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{busy ? '…' : exceptions}</strong>necesitan criterio humano</span></div></article>
+      <article className="source-card"><span className="eyebrow">POR CLASIFICAR (AUTOMÁTICO)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{busy ? '…' : drafts}</strong>reglas + IA, sin ti</span></div></article>
       <article className="source-card"><span className="eyebrow">LISTAS PARA APROBAR (CUALQUIER MERCADO)</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{overview ? poolClosers : '…'}</strong>de perfil closer que ya cumplen las reglas</span></div></article>
       <article className="source-card"><span className="eyebrow">FUENTES CON FALLO</span><div className="stat-strip" style={{ margin: '8px 0 0' }}><span><strong style={{ fontSize: 28 }}>{overview ? failed.length : '…'}</strong>de {overview?.sources.length ?? '…'} en el motor cloud</span></div></article>
     </div>
