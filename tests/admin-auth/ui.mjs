@@ -75,6 +75,9 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   mk('x1', {}); mk('x2', { location: 'Austin, Texas', spain: false, score: 20 }); mk('x3', { title: 'Setter de ventas', location: 'Valencia', role: 'setter', score: 60 });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Ofertas de España y del mercado en dólares.' }).waitFor();
+  // La cola externa abre en las excepciones (needs_review): los borradores los cierra la pasada automática.
+  assert.equal(await page.locator('#ex-status').inputValue(), 'needs_review', 'abre en A revisar, no en borradores');
+  await page.locator('#ex-status').selectOption('draft'); // el resto del paso trabaja sobre borradores
   await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Últimos 14 días: \d+ ofertas buenas/);
   // Contraste: el texto pequeño gris usa --secondary (≥ 4,5:1), no --muted (3,4:1)
   assert.equal(await page.locator('.data-table th').first().evaluate(el => getComputedStyle(el).color), 'rgb(116, 107, 107)', 'cabeceras de tabla con --secondary');
@@ -88,6 +91,9 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   // Error ≠ vacío: si falla la carga se dice y se puede reintentar; después vuelve el panel
   await page.route('**/api/admin/metrics', r => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'No se pudieron calcular las métricas.' }) }));
   await page.reload(); await page.getByRole('button', { name: 'Fuentes externas' }).click();
+  // Tras recargar vuelve a abrir en excepciones; este paso sigue sobre borradores.
+  assert.equal(await page.locator('#ex-status').inputValue(), 'needs_review');
+  await page.locator('#ex-status').selectOption('draft');
   await page.getByTestId('metrics-error').waitFor(); assert.match(await page.getByTestId('metrics-error').innerText(), /No se pudieron calcular las métricas/);
   await page.unroute('**/api/admin/metrics'); await page.getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('metrics').waitFor();
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'métricas sin scroll horizontal en móvil'); await page.setViewportSize({ width: 1280, height: 900 });
