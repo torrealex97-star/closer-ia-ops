@@ -32,7 +32,9 @@ export function orderRecipes(portal: Portal, rows: ActorRow[], runs: RunRow[], n
 async function ensureRows(portal: Portal, by: string): Promise<ActorRow[]> {
   let rows = (await listActors() ?? []).filter(a => a.source === portal.source);
   for (const r of portal.recipes.filter(x => !rows.some(a => a.actor === x.actor))) {
-    await serviceRest('apify_actors', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, label: r.name, actor: r.actor, source: portal.source, input_template: null, max_items: portal.maxItems, memory_mb: 1024, timeout_s: 900, schedule_daily: rows.some(a => a.schedule_daily), created_by: by }) }).catch(() => null);
+    // La plantilla del portal (si la tiene) viaja a cada fila: los repuestos de un mismo portal comparten
+    // contrato de búsqueda; si alguno no lo acepta, el intento se anota y se pasa al siguiente.
+    await serviceRest('apify_actors', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, label: r.name, actor: r.actor, source: portal.source, input_template: portal.inputTemplate ?? null, max_items: portal.maxItems, memory_mb: 1024, timeout_s: 900, schedule_daily: rows.some(a => a.schedule_daily), created_by: by }) }).catch(() => null);
   }
   rows = (await listActors() ?? []).filter(a => a.source === portal.source);
   return rows;
