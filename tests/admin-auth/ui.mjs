@@ -73,10 +73,12 @@ await step('Revisión una a una: guardar una oferta con payload raw ya no da 422
 await step('Fuentes externas: filtra closers de España, verifica y aprueba; el catálogo marca la fuente como externa', async () => {
   const mk = (id, over) => state.external.set(id, { id: crypto.randomUUID(), source: 'indeed', external_id: id, title: 'Closer de ventas', company: 'Acme', location: 'Madrid, España', url: 'http://127.0.0.1:8792/page/ok', salary: null, description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa', posted_at: new Date().toISOString(), editorial_status: 'draft', role: 'closer', spain: true, score: 80, also_seen: [], verified_result: null, first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), expires_at: new Date(Date.now() + 5 * 864e5).toISOString(), ...over });
   mk('x1', {}); mk('x2', { location: 'Austin, Texas', spain: false, score: 20 }); mk('x3', { title: 'Setter de ventas', location: 'Valencia', role: 'setter', score: 60 });
+  // Una excepción de verdad: con ella la pestaña abre en «A revisar» (sin excepciones abriría en borradores).
+  mk('x0', { title: 'Closer sin condiciones claras', editorial_status: 'needs_review', score: 55 });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Fuentes externas' }).click(); await page.getByRole('heading', { name: 'Ofertas de España y del mercado en dólares.' }).waitFor();
   // La cola externa abre en las excepciones (needs_review): los borradores los cierra la pasada automática.
-  assert.equal(await page.locator('#ex-status').inputValue(), 'needs_review', 'abre en A revisar, no en borradores');
+  await page.locator('#ex-status').inputValue().then(v => assert.equal(v, 'needs_review', 'con excepciones, abre en A revisar y no en borradores'));
   await page.locator('#ex-status').selectOption('draft'); // el resto del paso trabaja sobre borradores
   await page.getByTestId('metrics').waitFor(); assert.match(await page.getByTestId('metrics').innerText(), /Últimos 14 días: \d+ ofertas buenas/);
   // Contraste: el texto pequeño gris usa --secondary (≥ 4,5:1), no --muted (3,4:1)
@@ -115,7 +117,8 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByRole('button', { name: 'Aprobar las mejores' }).click(); await page.getByText(/Aprobadas 1 de 1 que cumplían los filtros/).waitFor();
   assert.equal([...state.external.values()].filter(o => o.editorial_status === 'approved').length, 2);
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
-  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 4 activas/).waitFor();
+  // 5 activas: las cuatro de siempre más la excepción 'x0' que crea este paso.
+  await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 5 activas/).waitFor();
 });
 await step('Apify: añadir el actor, guardar la clave, lanzar y recoger resultados con coste y presupuesto', async () => {
   await page.getByRole('button', { name: 'Búsqueda automática', exact: true }).click(); await page.getByRole('heading', { name: 'Buscar ofertas.' }).waitFor();

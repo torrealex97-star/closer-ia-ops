@@ -30,9 +30,11 @@ async function call<T>(init?: RequestInit, query = ''): Promise<T> {
 
 export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; onSessionLost: () => void }) {
   const [data, setData] = useState<Data | null>(null);
-  // La cola humana abre en las excepciones: los borradores los cierra la pasada automática
-  // (reglas + IA) y pedirle a una persona que los mire primero era justo lo que sobraba.
+  // La cola humana abre en las excepciones si las hay: los borradores los cierra la pasada
+  // automática (reglas + IA). Si no hay ninguna, se abre en borradores en vez de en una lista
+  // vacía — un hueco no es un cero, pero tampoco es una pantalla en blanco sin explicación.
   const [status, setStatus] = useState('needs_review');
+  const autoPicked = useRef(false);
   const [role, setRole] = useState<'' | RoleFamily | 'none'>('closer');
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
@@ -60,7 +62,15 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
   const load = useCallback(() => {
     setBusy(true);
     const p = filters(); p.set('page', String(page));
-    call<Data>(undefined, `?${p}`).then(d => { setData(d); setError(''); setPicked(new Set()); }).catch(lost).finally(() => setBusy(false));
+    call<Data>(undefined, `?${p}`).then(d => {
+      setData(d); setError(''); setPicked(new Set());
+      // Una sola vez, y solo si el operador no ha elegido filtro: sin excepciones, los
+      // borradores pendientes son lo único que hay que enseñar.
+      if (!autoPicked.current) {
+        autoPicked.current = true;
+        if (!(d.counts?.needs_review > 0) && d.counts?.draft > 0) setStatus('draft');
+      }
+    }).catch(lost).finally(() => setBusy(false));
   }, [filters, page, lost]);
   useEffect(load, [load]);
   useEffect(() => { clearTimeout(timer.current); timer.current = setTimeout(() => { setQuery(text.trim()); setPage(1); }, 350); return () => clearTimeout(timer.current); }, [text]);
@@ -167,7 +177,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
         <td style={{ textAlign: 'right' }}>{owner && <button disabled={working !== ''} onClick={() => void toggle(code, !!off)} aria-label={`${off ? 'Reanudar' : 'Pausar'} ${name}`}>{off ? <Play size={14} /> : <Pause size={14} />} {off ? 'Reanudar' : 'Pausar'}</button>}</td></tr>; })}</tbody></table></div>
     {!!data?.runs.length && <p className="card-meta">Última entrada: {data.runs[0].source} vía {data.runs[0].via}, {data.runs[0].accepted} de {data.runs[0].received} guardadas · {fmt(data.runs[0].created_at)}</p>}
     <div className="search-panel admin-toolbar">
-      <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => change(setStatus)(e.target.value)}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label htmlFor="ex-status">Estado<select id="ex-status" value={status} onChange={e => { autoPicked.current = true; change(setStatus)(e.target.value); }}>{Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
       <label htmlFor="ex-role">Perfil (por el título)<select id="ex-role" value={role} onChange={e => change(setRole)(e.target.value as typeof role)}><option value="">Todos</option>{Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}<option value="none">Sin perfil claro</option></select></label>
       <label htmlFor="ex-source">Fuente<select id="ex-source" value={source} onChange={e => change(setSource)(e.target.value)}><option value="">Todas</option>{(data?.sources ?? []).map(s => <option key={s.source} value={s.source}>{s.source}</option>)}</select></label>
       <label htmlFor="ex-min">Puntuación mínima<select id="ex-min" value={minScore} onChange={e => change(setMinScore)(Number(e.target.value))}><option value={0}>Cualquiera</option><option value={45}>≥ 45 (decente)</option><option value={60}>≥ 60 (buena)</option><option value={75}>≥ 75 (muy buena)</option></select></label>
