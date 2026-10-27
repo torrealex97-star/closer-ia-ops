@@ -19,6 +19,9 @@ BASE="http://127.0.0.1:$PORT" node tests/admin-auth/flow.mjs
 # Motor en pausa por cuota (429 + texto plano, como responde la plataforma de verdad) o caído (500): la
 # causa tiene que llegar en JSON al panel y a la alumna, sin ceros falsos ni mensajes que culpen a quien usa la app.
 BASE="http://127.0.0.1:$PORT" node tests/admin-auth/enginepause.mjs
+# Aviso del motor: un aviso por estado, al propietario y por correo solo si hay clave de Resend; sin
+# historial (migración sin aplicar) se declara y no se envía nada en vez de repetirlo en cada comprobación.
+BASE="http://127.0.0.1:$PORT" node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/enginealert.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/parity.mjs
 node --experimental-strip-types tests/admin-auth/csv.mjs
 node --experimental-strip-types tests/admin-auth/salary.mjs

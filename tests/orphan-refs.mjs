@@ -4,7 +4,7 @@
 // actividad de alumnas sin su código, y main estuvo en rojo varios pushes sin que el motivo se viera.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
@@ -46,7 +46,11 @@ export function missingFiles(text, exists = path => existsSync(join(ROOT, path))
   return [...found].filter(path => !exists(path));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// `fileURLToPath(import.meta.url)` y no `file://${argv[1]}`: con espacios en la ruta (este checkout los tiene)
+// `import.meta.url` va percent-encoded y la comparación NO coincidía nunca, así que la comprobación principal
+// se saltaba en silencio y decía «todo bien» sin mirar nada. El chequeo se prueba a sí mismo en
+// `tests/orphan-refs.selftest.mjs`.
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? '')) {
   const patterns = routePatterns();
   assert.ok(patterns.length > 10, 'no se encontraron rutas en apps/web/app/api: ¿cambió la estructura?');
   const problems = [];

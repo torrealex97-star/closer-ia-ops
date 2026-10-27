@@ -23,6 +23,7 @@ Los menús de terceros **cambian**: si un botón no está donde digo, búscalo p
 | 13 | Activaciones | Vercel + panel | Todo lo anterior hecho | variable |
 | 14 | Motor y esquema | Supabase CLI | Tarball del motor | 15 min |
 | 15 | Decisiones de producto | Este chat | Prompt 10 | 10 min |
+| 16 | Avisos del motor (panel y correo) | SQL Editor + Panel → APIs + Vercel | Clave de Resend | 15 min |
 
 Orden recomendado: 1 → 3 → 4 → 5 → 6 → 7 → 8 → resto.
 
@@ -103,7 +104,7 @@ git push origin --delete \
 
 ## 4. Pruebas de BD con escrituras · 10 min
 **Qué consigues**: confirmar con la base real que restricciones y RLS funcionan (todo se deshace solo).
-**Herramientas**: Supabase SQL Editor. **Enlaces**: [SQL Editor](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/sql/new) · [Advisors](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/advisors/security) · ficheros: [student_activity.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/student_activity.sql), [application_outcomes.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/application_outcomes.sql), [voice_consent.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/voice_consent.sql), [integration_resend.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/integration_resend.sql)
+**Herramientas**: Supabase SQL Editor. **Enlaces**: [SQL Editor](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/sql/new) · [Advisors](https://supabase.com/dashboard/project/jzchuizybyubtkownhlw/advisors/security) · ficheros: [student_activity.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/student_activity.sql), [application_outcomes.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/application_outcomes.sql), [voice_consent.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/voice_consent.sql), [integration_resend.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/integration_resend.sql), [engine_alerts.sql](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/engine_alerts.sql)
 1. Abre el SQL Editor → **New query**.
 2. Abre cada fichero en GitHub (botón **Raw**), copia **todo**, pégalo y **Run**. Resultado esperado: `student_activity` acaba con error `ACTIVIDAD_OK:` y `application_outcomes` con `RESULTADOS_OK:` (a propósito, así se deshace todo); `voice_consent` e `integration_resend` no deben dar error. Un error que empiece por `FALLO` = algo no se cumple.
 3. **Prompt 8** (abajo) si algo falla.
@@ -180,6 +181,16 @@ Hoy el texto de la sala de práctica se envía a Groq (consta en `/privacidad`).
 
 ## 15. Decisiones de producto
 Respóndeme con el **Prompt 10** (pegado y rellenado).
+
+## 16. Avisos del motor (panel y correo) · 15 min
+**Qué consigues**: enterarte de que el motor se ha pausado por cuota o ha dejado de responder **sin abrir la pestaña Fuentes** (la banda de aviso sale en todas las pestañas) y, si guardas la clave de Resend, también **por correo**.
+**Herramientas**: SQL Editor de Supabase + Panel → APIs + Variables de Vercel. **Enlaces**: [migración](https://github.com/torrealex97-star/closer-ia-ops/blob/main/supabase/migrations/20261029_engine_alerts.sql) · [prueba de BD](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/engine_alerts.sql) · [ADR-016](https://github.com/torrealex97-star/closer-ia-ops/blob/main/docs/decisions/ADR-016-avisos-del-motor-por-correo.md)
+1. **Aplica la migración** `20261029_engine_alerts.sql` en el SQL Editor (paso 4). Es lo que permite avisar **una sola vez por estado**: sin ella el panel sigue diciendo la causa y el estado real, pero **no envía correo** y lo explica en pantalla (sin registro el aviso se repetiría en cada comprobación).
+2. Pasa la prueba `tests/db/engine_alerts.sql` (se deshace sola): esperado, ningún `FALLO`.
+3. Guarda la **clave de Resend** en Panel → APIs (paso 7). El aviso va **solo al propietario** de la lista de usuarios del panel, nunca a alumnas.
+4. **Remitente**: por defecto se usa `onboarding@resend.dev`, que Resend solo deja escribir al correo de tu propia cuenta de Resend. Cuando verifiques tu dominio (paso 7), añade en Vercel `RESEND_FROM=avisos@careers.womendigitalclosers.com` y haz redeploy.
+5. **Pruébalo** en Panel: si el motor está mal verás la banda con «Comprobar ahora»; al pulsarlo se registra la comprobación y, si toca, sale el correo. La pantalla dice a quién se envió o por qué no.
+6. **Frecuencia**: la comprobación va con la recogida diaria (06:00 UTC). Con **Vercel Pro** se puede pasar a cada hora: pídemelo y añado la entrada del cron (el plan gratuito solo admite crons diarios).
 
 ---
 
