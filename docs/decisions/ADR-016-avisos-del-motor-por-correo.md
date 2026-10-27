@@ -1,6 +1,6 @@
 # ADR-016 — Avisos del motor: en el panel y por correo al propietario (Resend)
 
-Estado: aceptada e implementada (2026-10-27) · Evidencia: *tested* con servicios simulados (Supabase y Resend simulados); **no verified** con la clave real de Resend ni con dominio verificado, y la migración `20261029_engine_alerts.sql` está **pendiente de aplicar** por el propietario.
+Estado: aceptada e implementada (2026-10-27) · Evidencia: *tested* con servicios simulados (Supabase y Resend simulados) y la migración `20261029_engine_alerts.sql` **aplicada y verificada en la base real el 2026-10-27** (sesión 125); **no verified** el envío con la clave real de Resend ni con dominio verificado. La Decisión 4 describe además el caso de la tabla ausente, que ya **no** es el estado real (la migración está aplicada; sin clave de Resend el panel declara el motivo y no envía).
 
 ## Contexto
 En la sesión 123 se midió que el motor cloud puede estar **publicado y en pausa por cuota** (la plataforma responde `HTTP 429` con texto plano) sin que nadie se entere: la causa se declaraba solo dentro de las pestañas «Resumen» y «Fuentes», así que el operador tenía que abrir el panel y esa pestaña para descubrir que no se estaban recogiendo ofertas. El mismo hueco existe si el motor simplemente deja de responder.
@@ -29,7 +29,7 @@ El propietario pidió: «Avisa en el panel (y por correo si hay clave) cuando el
 El cron de `/api/cron/collect` comprueba el motor **al principio y fuera del presupuesto de 40 s** (una llamada de ≤ 8 s; el total sigue muy por debajo de los 60 s de `maxDuration`), con el mismo camino que el botón «Comprobar ahora». El plan gratuito de Vercel solo admite crons diarios: con **Vercel Pro** se puede añadir una pasada cada hora (una línea de `apps/web/vercel.json`) sin tocar el código.
 
 ## Consecuencias
-El operador se entera de una pausa o una caída sin abrir la pestaña, y el propio aviso dice qué se ha hecho con el correo. El aviso es explicable y reproducible desde el historial. Coste: nada, salvo los correos (Resend gratuito: 3.000/mes, cuota compartida con lo recibido; a lo sumo uno por cambio de estado). Queda pendiente: aplicar la migración, verificar el dominio y fijar `RESEND_FROM`, y decidir si se quiere la pasada horaria.
+El operador se entera de una pausa o una caída sin abrir la pestaña, y el propio aviso dice qué se ha hecho con el correo. El aviso es explicable y reproducible desde el historial. Coste: nada, salvo los correos (Resend gratuito: 3.000/mes, cuota compartida con lo recibido; a lo sumo uno por cambio de estado). Queda pendiente: **guardar la clave de Resend en Panel → APIs** (en cuanto esté, la siguiente comprobación envía: el reintento está probado y la migración ya está aplicada), verificar el dominio y fijar `RESEND_FROM`, y decidir si se quiere la pasada horaria.
 
 ## Fuera de alcance
 - **Avisos a alumnas** (correo o WhatsApp): siguen exigiendo orden expresa del propietario (Prompt 11 de `docs/OWNER_GUIDE.md`).

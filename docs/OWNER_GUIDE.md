@@ -185,8 +185,8 @@ Respóndeme con el **Prompt 10** (pegado y rellenado).
 ## 16. Avisos del motor (panel y correo) · 15 min
 **Qué consigues**: enterarte de que el motor se ha pausado por cuota o ha dejado de responder **sin abrir la pestaña Fuentes** (la banda de aviso sale en todas las pestañas) y, si guardas la clave de Resend, también **por correo**.
 **Herramientas**: SQL Editor de Supabase + Panel → APIs + Variables de Vercel. **Enlaces**: [migración](https://github.com/torrealex97-star/closer-ia-ops/blob/main/supabase/migrations/20261029_engine_alerts.sql) · [prueba de BD](https://github.com/torrealex97-star/closer-ia-ops/blob/main/tests/db/engine_alerts.sql) · [ADR-016](https://github.com/torrealex97-star/closer-ia-ops/blob/main/docs/decisions/ADR-016-avisos-del-motor-por-correo.md)
-1. **Aplica la migración** `20261029_engine_alerts.sql` en el SQL Editor (paso 4). Es lo que permite avisar **una sola vez por estado**: sin ella el panel sigue diciendo la causa y el estado real, pero **no envía correo** y lo explica en pantalla (sin registro el aviso se repetiría en cada comprobación).
-2. Pasa la prueba `tests/db/engine_alerts.sql` (se deshace sola): esperado, ningún `FALLO`.
+1. ✅ **Migración aplicada** (2026-10-27, por orden tuya): `20261029_engine_alerts.sql` ya está en la base real y **verificada** (existe, con RLS y sin acceso para el navegador, con su índice). Es lo que permite avisar **una sola vez por estado**.
+2. ✅ **Prueba pasada**: `tests/db/engine_alerts.sql` corrió en la base real sin ningún `FALLO` y se deshizo sola (0 filas después).
 3. Guarda la **clave de Resend** en Panel → APIs (paso 7). El aviso va **solo al propietario** de la lista de usuarios del panel, nunca a alumnas.
 4. **Remitente**: por defecto se usa `onboarding@resend.dev`, que Resend solo deja escribir al correo de tu propia cuenta de Resend. Cuando verifiques tu dominio (paso 7), añade en Vercel `RESEND_FROM=avisos@careers.womendigitalclosers.com` y haz redeploy.
 5. **Pruébalo** en Panel: si el motor está mal verás la banda con «Comprobar ahora»; al pulsarlo se registra la comprobación y, si toca, sale el correo. La pantalla dice a quién se envió o por qué no.

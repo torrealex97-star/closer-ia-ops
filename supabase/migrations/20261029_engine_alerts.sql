@@ -1,4 +1,7 @@
--- PENDIENTE DE APLICAR en Supabase real: lo aplica el propietario, por orden expresa (AGENTS.md).
+-- APLICADA en Supabase real (proyecto closer-ia-ops, ref jzchuizybyubtkownhlw) el 2026-10-27, por orden expresa
+-- del propietario (AGENTS.md). Verificada: `list_migrations` la incluye, la prueba `tests/db/engine_alerts.sql`
+-- pasó sin ningún FALLO y con ROLLBACK (0 filas), y los asesores solo dan el INFO esperado de tabla sin
+-- políticas (la clave de servicio es la única que la alcanza).
 -- Historial de salud del motor cloud y de los avisos por correo ya enviados. Es lo que permite avisar UNA
 -- vez por estado: sin este registro no se puede saber si el aviso ya salió, y se repetiría en cada
 -- comprobación (el cron diario y, con Vercel Pro, una pasada cada hora). Aditiva y reversible.
