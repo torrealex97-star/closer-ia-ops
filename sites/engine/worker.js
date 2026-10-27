@@ -13,6 +13,90 @@ const MAX_ITEMS_PER_SOURCE = 300;
 // vida útil a ~1-2: el componente que aún escalaba con el catálogo cae ~10×.
 const CATALOG_WINDOW_MS = 10 * 86400000;
 const REFRESH_AHEAD_MS = 2 * 86400000;
+// Vocabulario de búsqueda de closer: sólo términos que en la medición real (2026-10-26) devolvieron
+// ofertas en español y remotas. Un término = una petición pública; se rotan por día para que el
+// presupuesto de subrequests del Worker no deje fuera ninguna fuente.
+const CLOSER_TERMS = [
+  'closer', 'closer remoto', 'remote closer', 'closer de ventas', 'sales closer',
+  'cierre comercial', 'cierre de ventas', 'cierre de negocios', 'cerrador de ventas',
+  'high ticket', 'inside sales', 'setter', 'agendador', 'comercial remoto',
+  'asesor comercial remoto', 'agente comercial remoto', 'ejecutivo comercial remoto',
+  'ventas remotas', 'closing sales', 'televentas remoto',
+];
+// Términos de esta ejecución: ventana fija por día (determinista y comprobable) que avanza
+// `perRun` posiciones cada día, así en CLOSER_TERMS.length / perRun días se cubren todos sin
+// repetir y sin depender de estado guardado.
+function pickTerms(perRun, when = new Date()) {
+  const total = CLOSER_TERMS.length;
+  const size = Math.max(1, Math.min(perRun || 3, total));
+  const day = Math.floor(Date.parse(`${when.toISOString().slice(0, 10)}T00:00:00Z`) / 86400000);
+  const start = (day * size) % total;
+  return Array.from({ length: size }, (_, i) => CLOSER_TERMS[(start + i) % total]);
+}
+// Peticiones que costará una fuente: el Worker tiene un tope de subrequests POR INVOCACIÓN y,
+// cuando se agota, las últimas fuentes fallaban con «Too many subrequests». Se cuenta antes
+// para aplazar (declarado) en vez de romper, y el orden rota por día para que ninguna se
+// quede siempre al final.
+function fetchCost(source) {
+  if (source.kind === 'jobtoday-cities') return (source.paths || []).length;
+  if (source.kind === 'getonbrd') return 2;
+  if (source.terms) return source.termsPerRun || 3;
+  if (source.kind === 'freehire') return source.region === 'latam' ? 1 : 3;
+  return 1;
+}
+
+// Presupuesto de subrequests POR INVOCACIÓN. El techo es del Worker y lo COMPARTEN los `fetch` de
+// las fuentes y el gasto D1 del propio run (una consulta por fuente más los lotes de ingesta), así
+// que contar solo los `fetch` dejaba la invocación corta por la cola. Medido en producción el
+// 2026-10-26: con el presupuesto a 40 «peticiones», la pasada murió tras 25 fetch y las dos
+// búsquedas de closer de LATAM/Himalayas y el ATS quedaron caídas con «Too many subrequests»: ni un
+// closer entró por ahí. El presupuesto reserva un colchón fijo para D1.
+//
+// Lo que no cabe se APLAZA (declarado en el estado del run, no se disfraza de vacío) y la pasada
+// siguiente ABRE por lo aplazado o caído: la recogida es reanudable y ninguna fuente se queda
+// siempre al final. El resto rota por día.
+const PLATFORM_SUBREQUEST_LIMIT = 50;
+const D1_RESERVED_SUBREQUESTS = 34;
+function planRun(sources, lastSources, day, envBudget) {
+  const ceiling = Math.min(Number(envBudget) || PLATFORM_SUBREQUEST_LIMIT, PLATFORM_SUBREQUEST_LIMIT);
+  const budget = Math.max(6, ceiling - D1_RESERVED_SUBREQUESTS);
+  const rotate = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000) % sources.length;
+  const rotated = [...sources.slice(rotate), ...sources.slice(0, rotate)];
+  const unfinished = new Set();
+  try {
+    for (const state of JSON.parse(lastSources || '[]')) if (state?.code && state.status !== 'completed') unfinished.add(state.code);
+  } catch { /* estado ilegible: se sigue con la rotación del día */ }
+  return {
+    budget,
+    resumed: [...unfinished],
+    ordered: [...rotated.filter(s => unfinished.has(s.code)), ...rotated.filter(s => !unfinished.has(s.code))],
+  };
+}
+
+// Filtro de ROL en el origen (2026-10-26). Las búsquedas por término de las fuentes gratuitas
+// devuelven mucho ruido (dependientes de tienda, «Data Engineer», becarios, «Sales Assistant 30 h»).
+// Cada candidato ingerido cuesta 6 escrituras de D1 (raw, posting, job, catálogo, oportunidad y
+// versión) y el ruido NUNCA puede salir a la alumna, así que se descarta ANTES de escribir.
+//
+// Qué se queda: las familias del perfil WDC (closer, setter, cold caller, sdr). La familia
+// `account_executive` NO entra por aquí: ya llega abundante por el barrido por categoría de
+// FreeHire (medido 2026-10-26: 278 candidatos por pasada, 851 en catálogo, 19 elegibles y
+// **0 closers**) y duplicarla gastaría la cuota mensual de escrituras de D1 sin aportar closers.
+//
+// No es una lista paralela: la familia sale del MISMO `classifyRole` del motor (prioridad
+// closer → setter → cold_caller → account_executive → sdr), así que clasificador y filtro no
+// pueden divergir. Lo descartado se cuenta y se publica en el estado del run (`filtered`), para
+// que «leídas» no se lea como «no había nada».
+const PROFILE_FAMILIES = new Set(['closer', 'setter', 'cold_caller', 'sdr']);
+const extractFiltered = new Map();
+const resetExtractFiltered = () => extractFiltered.clear();
+const filteredOf = code => extractFiltered.get(code) || 0;
+const countFiltered = code => extractFiltered.set(code, filteredOf(code) + 1);
+function familyOf(payload) {
+  const text = fold(`${payload.title ?? ''} ${payload.location ?? ''} ${String(payload.raw?.description ?? payload.raw?.excerpt ?? payload.raw?.summary ?? '').slice(0, 800)}`);
+  return classifyRole({ title: payload.title }, text);
+}
+const isProfileCandidate = payload => PROFILE_FAMILIES.has(familyOf(payload));
 
 // Fuentes públicas de España verificadas (JobToday slugs canónicos verificados 2026-10-09;
 // ATS de la watchlist WDC; sin claves ni scraping autenticado).
@@ -75,6 +159,20 @@ const SOURCES = [
   { code: 'getonbrd', name: 'Get on Board · ventas', kind: 'getonbrd' },
   { code: 'freehire', name: 'FreeHire España', kind: 'freehire', region: 'es' },
   { code: 'freehire-latam', name: 'FreeHire LATAM', kind: 'freehire', region: 'latam' },
+  // Búsquedas de CLOSER por término (2026-10-26, medido contra la API real): la consulta
+  // por categoría traía comerciales genéricos (58 elegibles, sólo 2 closers); con `q` y
+  // términos en español, la misma fuente devuelve 58 ofertas únicas de closer en español
+  // y remotas (ES/LATAM). Mismo conector, 1 petición por término; los términos ROTAN por
+  // día para que el presupuesto de subrequests cubra todo el vocabulario en una semana.
+  // Ventana ampliada (2026-10-26, tras medir rendimiento por término): 6 términos por pasada en
+  // ES y 5 en LATAM cubren los 20 del vocabulario en ~4 días y no dejan sin presupuesto al resto
+  // de fuentes. Es 1 petición por término: más términos, no más límite de ofertas.
+  { code: 'freehire-closer', name: 'FreeHire España · closer', kind: 'freehire', region: 'es', terms: true, termsPerRun: 6 },
+  { code: 'freehire-latam-closer', name: 'FreeHire LATAM · closer', kind: 'freehire', region: 'latam', terms: true, termsPerRun: 5 },
+  // Himalayas: retirada el 2026-10-22 por inglés (0 elegibles con `q=closer`). Medición de
+  // hoy 2026-10-26 con el vocabulario español: 19 closers únicos en español y remotos
+  // (Colombia, México, Perú, Guatemala y remoto en USD), así que vuelve solo con términos.
+  { code: 'himalayas-closer', name: 'Himalayas · closer (ES/remoto)', kind: 'himalayas', terms: true, termsPerRun: 4 },
   // ATS al final: el budget de subrequests por invocación (~20 fetches medidos
   // 2026-10-15) se agotaba antes de terminar. Recorte por ROI 2026-10-14 (sesión
   // 16): fuera greenhouse ×3 y recruitee. Hoy 2026-10-15: fuera también
@@ -203,23 +301,30 @@ async function sourceTeamtailorRss(source) {
   });
 }
 
-async function sourceHimalayas() {
-  // Términos del vocabulario comercial (no inventados; un término = una búsqueda pública).
-  const terms = ['closer']; // 1 fetch (budget de subrequests 2026-10-15; ver comentario en SOURCES)
-  const all = [];
-  for (const term of terms) {
-    const data = JSON.parse(await fetchText(`https://himalayas.app/jobs/api/search?q=${encodeURIComponent(term)}&sort=recent&page=1`));
-    for (const j of (data.jobs || data || []).slice(0, 40)) {
-      const external = String(pick(j, 'id', 'jobId', 'slug') || j.title || '');
-      if (!external) continue;
-      all.push({ external_id: external, payload: {
-        title: pick(j, 'title', 'jobTitle'), company: pick(j, 'companyName', 'company'),
-        location: pick(j, 'locationRestrictions', 'location'), url: pick(j, 'applicationLink', 'jobUrl', 'guid'),
-        posted_at: pick(j, 'publishedDate', 'pubDate'), raw: j,
-      } });
-    }
+async function sourceHimalayas(source = {}) {
+  // Términos del vocabulario (rotan por día). Cada término es una búsqueda pública: si una
+  // falla, las demás siguen y lo traído se ingiere; sólo si fallan TODAS la fuente se declara
+  // caída (un fallo no puede esconder los resultados buenos de los otros términos).
+  const seen = new Set(); const all = []; const errors = [];
+  for (const term of pickTerms(source.termsPerRun || 3)) {
+    try {
+      const data = JSON.parse(await fetchText(`https://himalayas.app/jobs/api/search?q=${encodeURIComponent(term)}&sort=recent&page=1`));
+      for (const j of (data.jobs || data || []).slice(0, 100)) {
+        const external = String(pick(j, 'id', 'jobId', 'slug') || j.title || '');
+        if (!external || seen.has(external)) continue;
+        seen.add(external);
+        const payload = {
+          title: pick(j, 'title', 'jobTitle'), company: pick(j, 'companyName', 'company'),
+          location: pick(j, 'locationRestrictions', 'location'), url: pick(j, 'applicationLink', 'jobUrl', 'guid'),
+          posted_at: pick(j, 'publishedDate', 'pubDate'), raw: { ...j, search_term: term },
+        };
+        if (!isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+        all.push({ external_id: external, payload });
+      }
+    } catch (error) { errors.push(`${term}: ${String(error.message || error).slice(0, 80)}`); }
   }
-  return all;
+  if (errors.length && !all.length) throw new Error(`ningún término respondió (${errors[0]})`);
+  return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
 async function sourceRss(source) {
@@ -265,36 +370,50 @@ async function sourceFreehire(source) {
   // API pública v1 de freehire.me (agregador de 92 ATS, verificada 2026-10-13:
   // 2941 ofertas); igual que el conector local, solo 'fresh'/sin señal cuentan:
   // 'stale' y 'likely-evergreen' son fichas repintadas, no novedades.
-  const params = new URLSearchParams({ category: 'sales', limit: '100', sort: 'posted_at', order: 'desc' });
-  if (source.region === 'es') params.set('countries', 'ES');
-  if (source.region === 'latam') params.set('regions', 'latam');
-  // LATAM es el pool más grande y el último en la secuencia de subrequests del run;
-  // a 2 páginas siguió agotando la cuota del plan: queda a 1 página (100 más recientes).
-  // ES a 3 páginas (2026-10-14): la página 3 (offset 200) midió 14 elegibles
-  // ES por 100 revisadas, la mejor de las tres: p1 4, p2 9 — la p1 está llena de
-  // fichas repintadas que el filtro reality descarta). Coste: +1 subrequest que
-  // absorbe la cola ATS.
-  const maxPages = source.region === 'latam' ? 1 : 3;
-  const all = [];
-  for (let page = 0; page < maxPages; page++) {
-    const offset = page * 100;
-    const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`));
-    const rows = data.data || [];
-    for (const row of rows) {
-      const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
-      if (reality.class && !['fresh', null, undefined].includes(reality.class)) continue;
-      const external = String(row.public_slug || row.url || '');
-      if (!external || !row.url) continue;
-      all.push({ external_id: external.slice(-120), payload: {
-        title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.join(', ') : (row.location || null),
-        url: row.url, posted_at: row.posted_at ?? null, raw: row,
-      } });
-    }
-    const total = data.meta?.total; const pageLen = rows.length;
-    if (!Number.isFinite(total) || offset + 100 >= total || pageLen < 100) break;
+  // Dos modos: por CATEGORÍA (barrido amplio) y por TÉRMINO `q` (lo que trae closers: medido
+  // 2026-10-26, la categoría daba 58 elegibles y sólo 2 closers; los términos en español, 58
+  // closers únicos en español y remotos). Los términos rotan por día.
+  const terms = source.terms ? pickTerms(source.termsPerRun || 3) : [null];
+  const maxPages = source.terms ? 1 : source.region === 'latam' ? 1 : 3;
+  const all = []; const seen = new Set(); const errors = [];
+  for (const term of terms) {
+    const params = new URLSearchParams({ limit: '100', sort: 'posted_at', order: 'desc' });
+    if (term) params.set('q', term); else params.set('category', 'sales');
+    if (source.region === 'es') params.set('countries', 'ES');
+    if (source.region === 'latam') params.set('regions', 'latam');
+    try {
+      for (let page = 0; page < maxPages; page++) {
+        const offset = page * 100;
+        const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`));
+        const rows = data.data || [];
+        for (const row of rows) {
+          const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
+          if (reality.class && !['fresh', null, undefined].includes(reality.class)) continue;
+          const external = String(row.public_slug || row.url || '');
+          if (!external || !row.url || seen.has(external.slice(-120))) continue;
+          seen.add(external.slice(-120));
+          const payload = {
+            title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.join(', ') : (row.location || null),
+            url: row.url, posted_at: row.posted_at ?? null, raw: term ? { ...row, search_term: term } : row,
+          };
+          // Solo las búsquedas por término filtran por rol: el barrido por categoría conserva su
+          // comportamiento amplio (es el que descubre roles fuera del vocabulario de closer).
+          if (term && !isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+          all.push({ external_id: external.slice(-120), payload });
+        }
+        const total = data.meta?.total; const pageLen = rows.length;
+        if (!Number.isFinite(total) || offset + 100 >= total || pageLen < 100) break;
+      }
+    } catch (error) { errors.push(`${term ?? 'categoría'}: ${String(error.message || error).slice(0, 80)}`); }
   }
+  if (errors.length && !all.length) throw new Error(`ninguna búsqueda respondió (${errors[0]})`);
   return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
+
+// Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
+// sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
+// solo declara el módulo y el entrypoint.
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, PLATFORM_SUBREQUEST_LIMIT, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -957,7 +1076,7 @@ async function runCollection(env, force = false) {
   const db = env.DB;
   await ensureSchema(db);
   const last = await db.prepare(
-    "SELECT id,status,completed_at FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
+    "SELECT id,status,completed_at,sources FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
   ).bind(ORG).first();
   if (!force && last?.completed_at) {
     const age = Date.now() - Date.parse(last.completed_at);
@@ -978,11 +1097,24 @@ async function runCollection(env, force = false) {
   // se deploye el cron, tendrá su propio trigger; ensureDaySlugAudit queda para ese uso.
   const slugAudit = null;
   const states = SOURCES.map(s => ({ code: s.code, name: s.name, status: 'queued', fetched: 0, accepted: 0 }));
+  resetExtractFiltered();
   await db.prepare('INSERT INTO collection_runs (id,org_id,day,status,sources,created_at) VALUES (?,?,?,?,?,?)')
     .bind(runId, ORG, day, 'running', JSON.stringify(states), now()).run();
   const setState = (code, patch) => { const s = states.find(x => x.code === code); if (s) Object.assign(s, patch); };
 
-  for (const source of SOURCES) {
+  // El tope de subrequests por invocación es del Worker, no una decisión de producto: no se recorta
+  // cuántas ofertas se traen, se reparte el presupuesto y lo que NO cabe se APLAZA declarándolo en el
+  // estado del run (antes esas fuentes fallaban con «Too many subrequests»). El punto de partida es
+  // lo aplazado o caído en la pasada anterior y, tras eso, la rotación del día.
+  const { budget, ordered, resumed } = planRun(SOURCES, last?.sources, day, env?.MAX_SUBREQUESTS);
+  let spent = 0;
+  for (const source of ordered) {
+    const cost = fetchCost(source);
+    if (spent + cost > budget) {
+      setState(source.code, { status: 'deferred', warning: `Aplazada: no cabe en el presupuesto de ${budget} peticiones de esta ejecución (abre la siguiente pasada)` });
+      continue;
+    }
+    spent += cost;
     try {
       setState(source.code, { status: 'running' });
       // Ingest diferenciada (optimización D1 2026-10-14 + refresco condicional):
@@ -1007,7 +1139,7 @@ async function runCollection(env, force = false) {
         accepted += Math.min(50, candidates.length - i);
         setState(source.code, { fetched: accepted, accepted });
       }
-      setState(source.code, { status: 'completed', fetched: candidates.length, accepted: candidates.length });
+      setState(source.code, { status: 'completed', fetched: candidates.length, accepted: candidates.length, filtered: filteredOf(source.code) });
     } catch (error) {
       setState(source.code, { status: 'failed', warning: String(error.message || error).slice(0, 300) });
     }
@@ -1016,7 +1148,9 @@ async function runCollection(env, force = false) {
     .bind('completed', JSON.stringify(states), now(), runId).run();
   // El resultado del audit diario (corrido al principio de este run) viaja en la respuesta:
   // si un slug cambió, el operador lo ve renamed/gone antes de que el extractor falle.
-  return slugAudit ? { run_id: runId, sources: states, slug_audit: slugAudit } : { run_id: runId, sources: states };
+  // `resumed` deja en la respuesta qué fuentes abrieron esta pasada, para que el recurso se vea sin
+  // leer la tabla. `budget` es el presupuesto real de subrequests que quedó para fetch.
+  return { run_id: runId, budget, resumed, sources: states, ...(slugAudit ? { slug_audit: slugAudit } : {}) };
 }
 
 async function ingestBatch(db, source, candidates, known) {
@@ -1104,6 +1238,9 @@ const ROLE_KEYWORDS = {
     'patient advisor', 'patient coordinator', 'treatment coordinator',
     'treatment consultant', 'healthcare sales', 'medical sales advisor',
     'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones',
+    // Variantes con evidencia real (pasada de Workana 2026-10-26): un proyecto de
+    // «Seguimiento y Cierre de Ventas por WhatsApp» quedaba sin perfil.
+    'cierre de ventas', 'cierre comercial', 'cierre de negocios',
   ],
   setter: [
     'setter', 'appointment setter', 'sales setter', 'high-ticket setter',
@@ -1128,6 +1265,8 @@ const ROLE_KEYWORDS = {
     'sales specialist', 'sales representative', 'commercial advisor',
     'commercial executive', 'business development executive',
     'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas',
+    // «Ejecutivo(a) Comercial» (Workana 2026-10-26): la forma con (a) no estaba y se perdía.
+    'ejecutivo(a) comercial', 'ejecutiva(o) comercial',
     'ejecutiva de ventas', 'asesor comercial', 'asesora comercial',
     'asesor/a comercial', 'asesor comercial senior', 'representante comercial',
     'representante de ventas', 'representante de ventas senior', 'agente comercial',
@@ -10142,17 +10281,43 @@ function spainSignal(p) { return ES_HINTS.some(k => `${p.title ?? ''} ${p.locati
 function nonSpain(p) { return NON_ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''}`.toLowerCase().includes(k)); }
 
 const ROLE_EVAL_ORDER = ['closer', 'setter', 'cold_caller', 'account_executive', 'sdr'];
+// Coincidencia por PALABRA completa (2026-10-26). `includes` metía «…bring online stores'
+// inventory closer to their customers» (una vacante de Java) en la familia closer: el 30 % de los
+// closers de una medición eran ofertas de ingeniería. Se exige frontera a ambos lados y se admite
+// el plural ('closers', 'setters', 'agendadores'). Mismo criterio que roleFromTitle en
+// apps/web/lib/vocabulary.ts para que el embudo y el panel no discrepen.
+const isWordChar = ch => ch !== undefined && /[a-z0-9]/.test(ch);
+function hasWord(text, keyword) {
+  if (!text || !keyword) return false;
+  for (let from = 0; ;) {
+    const at = text.indexOf(keyword, from);
+    if (at < 0) return false;
+    let end = at + keyword.length;
+    if (text[end] === 's') end += 1;
+    else if (text[end] === 'e' && text[end + 1] === 's') end += 2;
+    if (!isWordChar(at === 0 ? undefined : text[at - 1]) && !isWordChar(text[end])) return true;
+    from = at + 1;
+  }
+}
+// `closer` a secas en el CUERPO no es evidencia de rol: en inglés es el comparativo («bring
+// inventory closer to their customers», «teams closer together»). Medido 2026-10-26: vacantes de
+// Java y de SRE/DevOps entraban como closer y quedaban elegibles para la alumna. En el título sí
+// cuenta (es donde vive el nombre del puesto) y en el cuerpo siguen contando las fórmulas
+// inequívocas: «closer de ventas», «sales closer», «high ticket closer», «closer remoto»…
+const BODY_AMBIGUOUS_KEYWORDS = new Set(['closer']);
 function classifyRole(p, text) {
   // Determinista y con la misma prioridad que presentation.py: primero el título de toda
   // la vida, después la evidencia en el texto de la oferta; nunca se inventa familia.
   // 'closer' va primero (2026-10-14): su keyword es la menos ambigua y los títulos
   // combinados 'Setter y Closer de Ventas' (núcleo exacto del perfil WDC) no deben
   // clasificarse como setter solo por el orden de evaluación.
+  const title = fold(p.title ?? '');
+  const body = String(text ?? '');
   for (const role of ROLE_EVAL_ORDER) {
-    if (ROLE_KEYWORDS[role].some(k => fold(p.title ?? '').includes(k))) return role;
+    if (ROLE_KEYWORDS[role].some(k => hasWord(title, k))) return role;
   }
   for (const role of ROLE_EVAL_ORDER) {
-    if (ROLE_KEYWORDS[role].some(k => text.includes(k))) return role;
+    if (ROLE_KEYWORDS[role].some(k => !BODY_AMBIGUOUS_KEYWORDS.has(k) && hasWord(body, k))) return role;
   }
   return null;
 }

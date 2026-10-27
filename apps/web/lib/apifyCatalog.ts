@@ -8,6 +8,10 @@ export type Recipe = { actor: string; name: string };
 export type Portal = {
   id: string; source: string; name: string; plain: string; caution?: string;
   maxItems: number; testItems: number; query?: string; sites?: string[]; recipes: Recipe[];
+  // Plantilla de entrada para los actores cuyo contrato no encaja con los sinónimos genéricos
+  // (p. ej. Workana espera `country` como código ISO de 2 letras, no «España»). Se guarda en la
+  // fila del actor y solo se rellenan los huecos {{query}}, {{max_items}}, etc.
+  inputTemplate?: Record<string, unknown>;
 };
 
 export const PORTALS: Portal[] = [
@@ -35,6 +39,20 @@ export const PORTALS: Portal[] = [
       { actor: 'crawlworks/linkedin-job-scraper', name: 'Buscador de LinkedIn B' },
       { actor: 'gopalakrishnan/linkedin-jobs', name: 'Buscador de LinkedIn C' },
       { actor: 'harvestapi/linkedin-job-search', name: 'Buscador de LinkedIn D' },
+    ],
+  },
+  {
+    // Workana: mercado de proyectos freelance de ventas en España y LatAm (P04B). El actor documenta
+    // `query`, `locale`, `maxItems` y `maxPages`; NO se le pasa `country` (espera un código ISO de dos
+    // letras) ni se infiere sueldo del presupuesto: un presupuesto por proyecto no es un salario.
+    id: 'workana', source: 'apify-workana', name: 'Workana', maxItems: 100, testItems: 10, query: 'ventas',
+    plain: 'Proyectos freelance de ventas en España y LatAm. El presupuesto es por proyecto, no un sueldo.',
+    /* eslint-disable-next-line */
+    inputTemplate: { query: '{{query}}', locale: 'es', maxItems: '{{max_items}}', maxPages: 5 },
+    recipes: [
+      { actor: 'automation-lab/workana-freelance-projects-scraper', name: 'Buscador de Workana A' },
+      { actor: 'getdataforme/workana-job-scraper', name: 'Buscador de Workana B' },
+      { actor: 'gio21/workana-scraper', name: 'Buscador de Workana C' },
     ],
   },
   {

@@ -10,6 +10,7 @@ import QuickReview from './QuickReview';
 import StudentsTab from './StudentsTab';
 import SummaryTab from './SummaryTab';
 import sourceCatalog from '../lib/sourceCatalog.json';
+import { catalogCodeFor, groupByFamily } from '../lib/sourceFamilies';
 
 // Panel hospedado: mismo marco que el panel local (barra lateral, cabecera, título en serif), con acceso por
 // email + contraseña de Supabase Auth (solo usuarios invitados) y las secciones de gestión de la app.
@@ -67,7 +68,9 @@ type Overview = {
   external?: { pending: number; sources: ExtSource[]; paused?: string[] };
 };
 const CONN: Record<string, string> = { ok: 'Conectado', error: 'Con fallo', not_configured: 'Sin configurar' };
-const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida' };
+// `deferred`: el motor aplazó la fuente porque se acabó el presupuesto de peticiones de esa
+// ejecución (no es un fallo ni una fuente apagada); entra en la siguiente pasada.
+const RUN: Record<string, string> = { completed: 'Completada', failed: 'Fallida', running: 'En curso', queued: 'En cola', skipped: 'Omitida', deferred: 'Aplazada' };
 const statusClass = (s: string | null) => s === 'ok' || s === 'completed' ? 'status ok' : s === 'error' || s === 'failed' ? 'status bad' : 'status';
 
 type ExtSource = { source: string; live: number; approved: number; last_seen: string | null };
@@ -84,11 +87,13 @@ function SourceCatalog({ sources, external = [], paused = [] }: { sources: Cloud
   const [limit, setLimit] = useState(25); // por tandas: el catálogo tiene decenas de filas y en móvil medía ~11.000 px
   useEffect(() => setLimit(25), [filter, category, text]);
   const ext = new Map(external.map(e => [e.source, e]));
-  const cloud = new Map(sources.map(s => [s.code, s]));
+  // Los conectores del motor se agrupan por portal (himalayas-closer + himalayas → himalayas): antes,
+  // un portal recogido por un conector con otro nombre se leía como «Fuera del cloud».
+  const cloud = groupByFamily(sources);
   const known = new Set(CATALOG.map(c => c.code));
   const rows = [
     ...CATALOG.map(c => ({ ...c, cloud: cloud.get(c.code) ?? null, ext: ext.get(c.code) ?? null })),
-    ...sources.filter(s => !known.has(s.code)).map(s => ({ code: s.code, name: s.name, category: 'Motor cloud', website: null, acquisition_method: 'Recogida del motor cloud', validation_status: null, requires: 'none', note: null, cloud: s, ext: null })),
+    ...sources.filter(s => !known.has(catalogCodeFor(s.code))).map(s => ({ code: s.code, name: s.name, category: 'Motor cloud', website: null, acquisition_method: 'Recogida del motor cloud', validation_status: null, requires: 'none', note: null, cloud: cloud.get(catalogCodeFor(s.code)) ?? null, ext: null })),
     ...external.filter(e => !known.has(e.source) && !cloud.has(e.source)).map(e => ({ code: e.source, name: e.source, category: 'Fuentes externas', website: null, acquisition_method: 'API o recolector externo', validation_status: null, requires: 'none', note: null, cloud: null, ext: e })),
   ];
   const failed = (r: (typeof rows)[number]) => r.cloud?.run_status === 'failed';
@@ -98,7 +103,7 @@ function SourceCatalog({ sources, external = [], paused = [] }: { sources: Cloud
     && (!category || (r.category ?? 'Otras') === category) && (!q || `${r.name} ${r.code} ${r.note ?? ''}`.toLowerCase().includes(q)));
   const inCloud = rows.filter(r => r.cloud || r.ext).length;
   const cell = (r: (typeof rows)[number]) => paused.includes(r.code) ? <span className="status bad">Pausada</span> : r.ext && !r.cloud ? <span className="status ok">Externa · {r.ext.live} activas</span> : r.cloud
-    ? <span className={statusClass(r.cloud.run_status)}>{r.cloud.run_status ? RUN[r.cloud.run_status] ?? r.cloud.run_status : 'Sin recogida'}</span>
+    ? <span className={statusClass(r.cloud.run_status)}>{r.cloud.run_status ? RUN[r.cloud.run_status] ?? r.cloud.run_status : 'Sin recogida'}{r.cloud.connectors > 1 && <span className="sub">{r.cloud.connectors} conectores</span>}</span>
     : <span className="status">{r.requires === 'input' ? 'Requiere configurar' : 'Fuera del cloud'}</span>;
   return <>
     <h2 className="section-title">Fuentes de datos</h2>

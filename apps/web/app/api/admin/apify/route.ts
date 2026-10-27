@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (!portal || typeof body.on !== 'boolean') return Response.json({ detail: 'Portal o valor no válido.' }, { status: 422 });
     const rows = (await listActors() ?? []).filter(a => a.source === portal.source);
     if (!rows.length && body.on) {
-      for (const r of portal.recipes) await serviceRest('apify_actors', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, label: r.name, actor: r.actor, source: portal.source, input_template: null, max_items: portal.maxItems, memory_mb: 1024, timeout_s: 900, schedule_daily: true, created_by: auth!.admin.email }) });
+      for (const r of portal.recipes) await serviceRest('apify_actors', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ org_id: ORG, label: r.name, actor: r.actor, source: portal.source, input_template: portal.inputTemplate ?? null, max_items: portal.maxItems, memory_mb: 1024, timeout_s: 900, schedule_daily: true, created_by: auth!.admin.email }) });
     } else {
       const response = await serviceRest(`apify_actors?org_id=eq.${ORG}&source=eq.${encodeURIComponent(portal.source)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ schedule_daily: body.on }) });
       if (!response.ok) return Response.json({ detail: 'No se pudo guardar el cambio.' }, { status: 503 });

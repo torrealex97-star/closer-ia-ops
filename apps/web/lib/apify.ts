@@ -133,14 +133,21 @@ export function mapItem(item: Record<string, unknown>): Candidate | null {
   const title = text(first(item, ['title', 'jobtitle', 'positiontitle', 'position', 'name']));
   const url = text(first(item, ['joburldirect', 'jobdirecturl', 'applyurl', 'joburl', 'jobpostingurl', 'url', 'link']));
   if (!title || !url) return null;
+  // Proyecto de marketplace (Workana, Freelancer…): el importe es un PRESUPUESTO por proyecto, no un
+  // sueldo. La spec P04B lo prohíbe («salario/potencial no se infiere de presupuesto»), así que no se
+  // rellena `salary`; el texto literal del presupuesto queda en `raw` sin disfrazarse.
+  const isProject = first(item, ['projectid', 'budgetcurrency', 'ishourly']) !== undefined;
   const min = first(item, ['minamount', 'salarymin']), max = first(item, ['maxamount', 'salarymax']), cur = text(first(item, ['currency'])) ?? '€', interval = text(first(item, ['interval']));
-  const structured = text(first(item, ['salary', 'salaryrange', 'salarydescription', 'compensation', 'wage'])) ?? (min || max ? `${[min, max].filter(Boolean).join('–')} ${cur}${interval ? ` / ${interval}` : ''}` : null);
+  const structured = text(first(item, ['salary', 'salaryrange', 'salarydescription', 'compensation', 'wage']))
+    ?? (isProject ? null : (min || max ? `${[min, max].filter(Boolean).join('–')} ${cur}${interval ? ` / ${interval}` : ''}` : null));
   return {
-    external_id: text(first(item, ['id', 'jobid', 'jobkey', 'key', 'externalid'])) ?? url, title, url, salary: structured,
-    company: text(first(item, ['company', 'companyname', 'employer', 'organization', 'hiringorganization'])), location: text(first(item, ['location', 'joblocation', 'city'])),
+    external_id: text(first(item, ['id', 'jobid', 'jobkey', 'key', 'externalid', 'projectid', 'projectslug', 'slug'])) ?? url, title, url, salary: structured,
+    company: text(first(item, ['company', 'companyname', 'employer', 'organization', 'hiringorganization'])),
+    location: text(first(item, ['location', 'joblocation', 'city', 'clientcountry'])),
     description: text(first(item, ['description', 'jobdescription', 'descriptiontext', 'snippet'])),
     posted_at: text(first(item, ['dateposted', 'postedat', 'publishedat', 'posteddate', 'published', 'date', 'created', 'listeddate'])),
-    raw: { site: text(first(item, ['site', 'source', 'platform'])) ?? '', job_type: text(first(item, ['jobtype', 'employmenttype'])) ?? '', is_remote: first(item, ['isremote', 'remote']) === true, provider: 'apify' },
+    raw: { site: text(first(item, ['site', 'source', 'platform'])) ?? '', job_type: text(first(item, ['jobtype', 'employmenttype'])) ?? '', is_remote: first(item, ['isremote', 'remote']) === true, provider: 'apify',
+      ...(isProject ? { kind: 'freelance_project', budget_text: text(first(item, ['budget', 'budgetrange'])) } : {}) },
   };
 }
 

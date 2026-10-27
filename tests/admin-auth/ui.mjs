@@ -34,9 +34,14 @@ await step('login y Resumen: contador del objetivo, pendientes y siguiente paso'
 });
 await step('Fuentes: catálogo completo (todas las del backend + las del motor) con filtros', async () => {
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
-  const expected = catalog.length + 1; // + jobtoday-closers, que solo existe en el motor cloud
+  // El motor recoge por CONECTOR y el panel agrupa por PORTAL: `jobtoday` + `jobtoday-closers` son
+  // una sola fila (rotulada «2 conectores»), así que el total es el del catálogo y no crece con cada
+  // búsqueda nueva del motor. Antes esta prueba esperaba una fila suelta por conector.
+  const expected = catalog.length;
   await page.getByText(String(expected), { exact: true }).first().waitFor();
   assert.ok(expected >= 60);
+  const jobtoday = page.locator('table').first().locator('tbody tr').filter({ hasText: 'JobToday España' }).first();
+  assert.match(await jobtoday.innerText(), /2 conectores/, 'el portal agrupa sus dos conectores en una fila');
   await page.getByLabel('Mostrar').selectOption('failed');
   await page.getByText('Pennylane').first().waitFor();
   assert.equal(await page.locator('table').first().locator('tbody tr').count(), 1);
