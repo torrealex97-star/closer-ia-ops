@@ -324,6 +324,33 @@ await step('motor en pausa por cuota: el Resumen nombra la causa y pone «—» 
   state.enginePaused = null;
 });
 
+await step('avisos del motor: aparece en CUALQUIER pestaña, con su causa, sin tener que abrir Fuentes', async () => {
+  state.enginePaused = 'allowance';
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(BASE + '/admin');
+  await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
+  const banner = page.getByTestId('engine-alert');
+  await banner.waitFor(); // el panel abre en Resumen: el aviso no vive dentro de la pestaña Fuentes
+  assert.match(await banner.innerText(), /pausa por cuota de hosting/);
+  assert.match(await banner.innerText(), /Aviso por correo desactivado: sin clave de Resend/, 'sin clave guardada, el panel dice por qué no hay correo');
+  assert.ok(!/Aviso enviado a/.test(await banner.innerText()), 'y no presume de un aviso que no ha salido');
+  // «Comprobar ahora» registra la comprobación y vuelve a intentar el aviso; con la clave ausente lo declara.
+  await banner.getByRole('button', { name: 'Comprobar ahora' }).click();
+  await page.getByTestId('engine-alert-note').waitFor();
+  assert.match(await page.getByTestId('engine-alert-note').innerText(), /Sin clave de Resend/);
+  assert.match(await banner.innerText(), /Se detectó el/, 'la comprobación deja fecha de detección, sin inventarla');
+  assert.match(await banner.innerText(), /Última comprobación/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'el aviso no desborda en móvil');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  // Con el motor bien el aviso desaparece: un aviso que siempre está no se lee.
+  state.enginePaused = null;
+  await page.goto(BASE + '/admin');
+  await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
+  await page.getByTestId('engine-alert').waitFor({ state: 'detached', timeout: 8000 });
+  assert.equal(await page.getByTestId('engine-alert').count(), 0);
+});
+
 await browser.close(); close();
 for (const [status, name, msg] of results) console.log(`${status}  ${name}${msg ? '\n      ' + msg : ''}`);
 const failed = results.filter(r => r[0] === 'FAIL').length;

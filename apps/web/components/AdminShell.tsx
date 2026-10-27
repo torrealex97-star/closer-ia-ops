@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, BriefcaseBusiness, CloudCog, Globe2, ChevronRight, FileCheck2, LayoutDashboard, ListChecks, KeyRound, LoaderCircle, LogOut, Plug, RefreshCcw, Search, ShieldCheck, Trash2, UserPlus, Users, GraduationCap } from 'lucide-react';
 import CloudAdminPanel from './CloudAdminPanel';
+import EngineAlertBanner from './EngineAlertBanner';
 import ApifyTab from './ApifyTab';
 import ApisTab from './ApisTab';
 import CatalogTab from './CatalogTab';
@@ -252,6 +253,9 @@ export default function AdminShell() {
         <a className="local-badge" href="/" target="_blank" rel="noopener noreferrer"><BriefcaseBusiness size={14} /> Ver la app de alumnas</a></header>
       <main>
         <div className="page-heading"><div><span className="eyebrow">{current.eyebrow}</span><h1>{current.title}</h1><p>{current.lead}</p></div></div>
+        {/* El aviso del motor vive aquí, no dentro de una pestaña: si el motor se pausa o deja de responder,
+            el operador lo ve en cualquiera de ellas sin ir a buscarlo a «Fuentes». */}
+        <EngineAlertBanner go={() => setTab('sources')} />
         {tab === 'summary' && <SummaryTab go={setTab} onSessionLost={lost} />}
         {tab === 'quick' && <QuickReview onSessionLost={lost} />}
         {tab === 'external' && <ExternalTab owner={me.role === 'owner'} onSessionLost={lost} />}

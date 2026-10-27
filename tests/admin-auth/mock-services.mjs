@@ -11,6 +11,9 @@ export function startMocks({ authPort, enginePort }) {
     // Pausa REAL de la plataforma, medida en producción: el sitio está publicado pero la cuota del mes se
     // agotó, y TODAS sus rutas responden 429 con texto plano. `error` imita una caída de verdad (500 HTML).
     enginePaused: null,
+    engineAlerts: [], // historial de salud del motor (tabla public.engine_alerts)
+    alertsTableMissing: false, // simula la migración 20261029 sin aplicar (PostgREST devuelve 404 PGRST205)
+    emails: [], // correos que Resend habría enviado
   };
   const send = (res, code, body, extra = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...extra }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
@@ -80,6 +83,24 @@ export function startMocks({ authPort, enginePort }) {
       if (req.method === 'POST') { state.connections.set(body.provider, { ...body }); return send(res, 201, {}); }
       if (req.method === 'PATCH') { Object.assign(state.connections.get(eq) ?? {}, body); return send(res, 204, {}); }
       if (req.method === 'DELETE') { state.connections.delete(eq); return send(res, 204, {}); }
+    }
+    if (url.pathname === '/rest/v1/engine_alerts') {
+      if (state.alertsTableMissing) return send(res, 404, { code: 'PGRST205', message: "Could not find the table 'public.engine_alerts' in the schema cache" });
+      const q = Object.fromEntries(url.searchParams);
+      if (req.method === 'POST') {
+        const row = { id: crypto.randomUUID(), org_id: 'cloud-wdc', checked_by: 'cron', notified_at: null, notified_kind: null, notified_detail: null, ...body };
+        state.engineAlerts.unshift(row);
+        return send(res, 201, /return=representation/.test(req.headers.prefer ?? '') ? [row] : null);
+      }
+      if (req.method === 'PATCH') {
+        const id = (q.id ?? '').replace('eq.', '');
+        const hit = state.engineAlerts.filter(r => r.id === id); hit.forEach(r => Object.assign(r, body));
+        return send(res, 200, hit);
+      }
+      const eqv = k => q[k]?.startsWith('eq.') ? decodeURIComponent(q[k].slice(3)) : null;
+      const rows = state.engineAlerts.filter(r => !eqv('org_id') || r.org_id === eqv('org_id'))
+        .slice().sort((a, b) => String(b.checked_at).localeCompare(String(a.checked_at)));
+      return send(res, 200, rows.slice(0, Number(q.limit) || 20));
     }
     if (url.pathname === '/rest/v1/rpc/external_upsert' && req.method === 'POST') {
       let n = 0;
@@ -224,6 +245,12 @@ export function startMocks({ authPort, enginePort }) {
       }
       if (apifyMatch[4]) return send(res, 200, { data: { status: state.apifyStatus, defaultDatasetId: 'DS1', usageTotalUsd: 0.07 } });
       if (apifyMatch[5]) { const o = Number(url.searchParams.get('offset')) || 0, l = Number(url.searchParams.get('limit')) || 100; return send(res, 200, state.apifyItems.slice(o, o + l)); }
+    }
+    // Resend simulando: solo una clave que empiece por `re_` puede enviar; el envío se registra con su destinatario.
+    if (url.pathname === '/emails' && req.method === 'POST') {
+      if (!bearer.startsWith('re_')) return send(res, 401, { message: 'API key is invalid' });
+      state.emails.push({ from: body.from, to: body.to, subject: body.subject, text: body.text });
+      return send(res, 200, { id: 'email-' + state.emails.length });
     }
     // Proveedores externos simulados: solo la clave «good-key» es válida.
     const key = bearer || url.searchParams.get('api_key');

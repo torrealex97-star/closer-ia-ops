@@ -537,3 +537,14 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .level-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--sheet);padding:16px 20px;margin:0 0 20px;display:grid;gap:8px;font-size:13px}.level-card .meter{margin:0}.level-card details{font-size:12px}.level-card summary{cursor:pointer;color:var(--accent)}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0 0}.kv div{background:var(--inset);border-radius:8px;padding:10px 12px}.kv dt{font-size:11px;color:var(--secondary)}.kv dd{margin:2px 0 0;font-weight:650;font-variant-numeric:tabular-nums}
 .coordinator-fold>summary{cursor:pointer;font-weight:650;font-size:15px;margin:4px 0 8px}.coordinator-fold:not([open])>summary{margin-bottom:20px}
+
+/* Aviso del motor (todas las pestañas): banda de atención con la causa, su correo y dos acciones. */
+.engine-alert{align-items:flex-start;flex-wrap:wrap;border-left:3px solid var(--warning);background:var(--warning-soft);color:var(--ink)}
+.engine-alert-text{flex:1;min-width:min(100%,320px)}
+.engine-alert-text strong{font-size:13px;font-weight:650}
+.engine-alert-text p{margin-top:6px;max-width:78ch;overflow-wrap:anywhere}
+.engine-alert-text .card-meta{color:var(--secondary);font-size:11px}
+.engine-alert-actions{display:flex;gap:8px;flex-wrap:wrap}
+.engine-alert button{border:1px solid var(--line);background:var(--sheet);color:var(--ink);min-height:36px;font-size:11px}
+.engine-alert button:hover:not(:disabled){background:var(--inset)}
+.engine-alert-unknown{margin-bottom:20px}

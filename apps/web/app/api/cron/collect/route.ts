@@ -11,6 +11,7 @@ import { activateEngine } from '../../../../lib/engineActivate';
 import { loadMetrics } from '../../../../lib/metrics';
 import { skipPaidTier } from '../../../../lib/sourceTiers';
 import { refreshVigencia } from '../../../../lib/external';
+import { checkEngine } from '../../../../lib/engineAlert';
 import { createBudget, MIN_STEP_MS, totalFromEnv } from '../../../../lib/cronBudget';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,11 @@ export async function GET(request: NextRequest) {
   const given = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
   const a = Buffer.from(given), b = Buffer.from(expected);
   if (expected.length < 16 || a.length !== b.length || !timingSafeEqual(a, b)) return Response.json({ detail: 'No autorizado.' }, { status: 401 });
+  // Salud del motor ANTES de nada y FUERA del presupuesto de la recogida: es una sola llamada (≤ 8 s) y su
+  // aviso no debe depender de que quede tiempo para recoger. Registra la comprobación y avisa por correo al
+  // propietario en cuanto el motor se pausa o deja de responder (un aviso por estado). El total del cron sigue
+  // muy por debajo de maxDuration (60 s): 8 s aquí + 40 s de presupuesto.
+  const engineAlert = await checkEngine({ by: 'cron' }).catch(failed('engine_alert', null));
   // Un solo reloj para todo el cron (40 s de 60): cada paso recibe su fin, comprueba el reloj antes de cada llamada externa y, si se
   // queda sin tiempo, se corta y lo DECLARA (`truncated`). Todo es idempotente: la siguiente ejecución continúa. Orden por prioridad:
   // datos nuevos (APIs oficiales → Google Jobs, que cuesta por búsqueda) → lo ya pagado en Apify →
@@ -73,5 +79,5 @@ export async function GET(request: NextRequest) {
     : (budget.cut('motor'), null);
   if (motor?.truncated) budget.cut('motor');
   const report = new Date().getUTCDay() === 1 && budget.remaining() >= MIN_STEP_MS ? await weeklyAiReport().catch(() => false) : null;
-  return Response.json({ outcomes, fallback, googleJobs, vigencia, apify, auto, aiReview: auto.ai, motor, weeklyReport: report, paidTierSkipped: paid.skip ? ('reason' in paid ? paid.reason : 'sin tiempo') : null, truncated: budget.truncated, spent_ms: budget.spent() });
+  return Response.json({ outcomes, fallback, googleJobs, vigencia, apify, auto, aiReview: auto.ai, motor, engineAlert, weeklyReport: report, paidTierSkipped: paid.skip ? ('reason' in paid ? paid.reason : 'sin tiempo') : null, truncated: budget.truncated, spent_ms: budget.spent() });
 }
