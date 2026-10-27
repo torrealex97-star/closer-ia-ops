@@ -88,6 +88,11 @@ const index = judgeOffer(offer(9, { title: 'Ofertas de trabajo de Closer', compa
 assert.equal(index.decision, 'withdraw');
 assert.equal(index.why, 'no_es_oferta');
 assert.equal(judgeOffer(offer(9, { url: 'https://es.trabajo.org/empleos/closer' })).decision, 'withdraw', 'basta la URL del listado');
+// Y no se pasa de listo: la URL de la FICHA de una oferta concreta no es un listado. Son casos reales del
+// catálogo de producción (Jobijoba `/oferta-empleo/69/<hash>`, Univision `/empleo/23-14660_…`), y la primera
+// la había aprobado una persona a mano: retirarla habría borrado una oferta real del catálogo.
+assert.equal(judgeOffer(offer(12, { title: 'Closer de Ventas Inbound | Altos Ingresos y Crecimiento (Palma)', company: 'Tradeando', url: 'https://www.jobijoba.es/oferta-empleo/69/da8f172d91a5ff0ef3d3f7c8fadc7652' })).decision, 'approve', 'la ficha de Jobijoba es una oferta, no un listado');
+assert.equal(judgeOffer(offer(13, { title: 'Elite B2B Closer - 100% de comisión', company: 'Univision', url: 'https://trabajos.univision.com/empleo/23-14660_608E2EDCF80F36D92D0D730987D3176C' })).decision, 'approve', 'la ficha de Univision es una oferta, no un listado');
 // Un enlace cerrado no se revisa a mano: se retira (la vigencia automática ya lo hacía por otra vía).
 assert.equal(judgeOffer(offer(10, { verified_result: 'closed' })).decision, 'withdraw');
 assert.equal(judgeOffer(offer(10, { verified_result: 'closed' })).why, 'enlace_cerrado');

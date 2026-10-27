@@ -23,7 +23,11 @@ type Row = Pick<ExternalOffer, 'title' | 'company' | 'description' | 'location' 
 // resultados, sin empresa y con la URL del listado. Aprobarlas mandaría a la alumna a un buscador, y
 // dejarlas en la cola humana le pediría a una persona que cierre lo que ni siquiera es una oferta.
 const INDEX_TITLE = /^\s*(?:ofertas? de (?:trabajo|empleo)|empleos? (?:de|en)|trabajos? (?:de|en)|bolsa de empleo|vacantes? (?:de|en)|job (?:openings|listings)|jobs? in|search results)\b/i;
-const INDEX_URL = /\/(?:ofertas?-trabajo|ofertas?-empleo|empleos?|jobs?\/search|jobsearch|search\/jobs|vacantes?)\b/i;
+// Solo el PLURAL: los portales usan el plural para el listado y el singular para la ficha de una oferta
+// concreta. En producción, `/oferta-empleo/69/<hash>` es una oferta de Jobijoba y `/empleo/23-14660_…` una de
+// Univision: con `s?` la regla las retiraba como si fueran listados (y una de ellas la había aprobado una
+// persona a mano).
+const INDEX_URL = /\/(?:ofertas-trabajo|ofertas-empleo|empleos|jobs?\/search|jobsearch|search\/jobs|vacantes)\b/i;
 const isIndexPage = (row: Row) => (!row.company && INDEX_TITLE.test(row.title ?? '')) || INDEX_URL.test(row.url ?? '');
 
 // Código de estado de EE. UU. al final de la ubicación («Miramar, FL», «El Paso, TX 79901»). El gazetteer
