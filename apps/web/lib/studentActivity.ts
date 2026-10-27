@@ -2,7 +2,7 @@ import { FINAL_EXAM } from '../components/trainingContent';
 import { EXAM_PASS } from '../components/trainingCheck';
 import { REVIEW_REFS } from '../components/trainingRefs';
 import { ORG } from './external';
-import { serviceRest } from './supabaseAuth';
+import { pagedRest, serviceRest } from './supabaseAuth';
 
 // Actividad de la alumna en el portal (tabla `student_activity`, solo service role). Principios:
 // - el servidor decide la nota del examen a partir de las respuestas acertadas, nunca el `score` del navegador;
@@ -79,9 +79,8 @@ export async function readActivity(opts: { studentId?: string; sinceIso?: string
   const filters = [`org_id=eq.${ORG}`];
   if (opts.studentId) filters.push(`student_id=eq.${opts.studentId}`);
   if (opts.sinceIso) filters.push(`created_at=gte.${encodeURIComponent(opts.sinceIso)}`);
-  const r = await serviceRest(`student_activity?${filters.join('&')}&select=${SELECT}&order=created_at.desc&limit=${READ_LIMIT}`).catch(() => null);
-  const rows = r?.ok ? await r.json().catch(() => null) : null;
-  return Array.isArray(rows) ? { rows: rows as ActivityRow[], truncated: rows.length >= READ_LIMIT } : null;
+  // Por páginas: PostgREST corta cada respuesta en `db-max-rows` (1.000) y una sola petición dejaba `truncated` siempre en falso.
+  return pagedRest<ActivityRow>(`student_activity?${filters.join('&')}&select=${SELECT}`, 'created_at.desc,id.desc', READ_LIMIT);
 }
 
 // ---- Calendario de Madrid ---------------------------------------------------

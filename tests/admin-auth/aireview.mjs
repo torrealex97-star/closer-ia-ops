@@ -64,6 +64,7 @@ assert.equal(g({ offerRedFlags: ['mlm'] }).decision, 'human');
 assert.equal(g({ proposal: { ...ok, red_flags: ['x'] } }).decision, 'human');
 assert.equal(g({ proposal: { ...ok, verdict: 'human' } }).decision, 'human');
 assert.equal(g({ proposal: { ...ok, verdict: 'reject' } }).decision, 'withdraw');
+assert.equal(g({ proposal: { ...ok, verdict: 'reject', confidence: 60 } }).decision, 'human', 'un rechazo con poca confianza no retira solo');
 assert.equal(g({ link: { result: 'closed', reason: 'http_404' } }).decision, 'withdraw');
 assert.equal(g({ link: { result: 'unknown', reason: 'red' } }).decision, 'approve'); // enlace no verificable no bloquea
 assert.equal(g({ approvedSoFar: 24 }).decision, 'approve');

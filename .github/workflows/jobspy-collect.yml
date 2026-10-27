@@ -10,6 +10,8 @@ on:
       sites:
         description: 'Sitios separados por coma (indeed,linkedin,glassdoor,google)'
         default: 'indeed,linkedin,glassdoor,google'
+permissions:
+  contents: read
 jobs:
   collect:
     runs-on: ubuntu-latest
@@ -25,5 +27,6 @@ jobs:
         env:
           INGEST_URL: ${{ secrets.INGEST_URL }}
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          SITES: ${{ github.event.inputs.sites || 'indeed,linkedin,glassdoor,google' }}
           JOBSPY_PROXIES: ${{ secrets.JOBSPY_PROXIES }}   # opcional: proxies separados por coma si LinkedIn/Indeed bloquean a GitHub
-        run: python scripts/jobspy_collect.py --sites "${{ github.event.inputs.sites || 'indeed,linkedin,glassdoor,google' }}"
+        run: python scripts/jobspy_collect.py --sites "$SITES"

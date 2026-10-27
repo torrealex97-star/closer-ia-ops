@@ -14,4 +14,6 @@ assert.deepEqual([a.proposed, a.pairs, a.agree, a.false_approve, a.false_withdra
 assert.equal(a.agree_rate, 0.6); assert.equal(a.ai_approvals_decided, 3); assert.equal(a.false_approve_rate, 0.333); assert.equal(a.verdict, 'insufficient');
 const many = (good, bad) => computeAgreement([...Array(good).fill(0).map(() => r('approve', 'approved', 'a@x.dev')), ...Array(bad).fill(0).map(() => r('approve', 'withdrawn', 'a@x.dev'))]);
 assert.equal(many(MIN_PAIRS, 0).verdict, 'ready'); assert.equal(many(28, 2).verdict, 'not_ready', '2/30 > 5 %'); assert.equal(many(29, 1).verdict, 'ready', '1/30 ≤ 5 %');
+const wd = (good, bad) => computeAgreement([...Array(good).fill(0).map(() => r('withdraw', 'withdrawn', 'a@x.dev')), ...Array(bad).fill(0).map(() => r('withdraw', 'approved', 'a@x.dev'))]);
+assert.equal(wd(27, 3).verdict, 'ready', '3/30 = 10 %'); assert.equal(wd(26, 4).verdict, 'not_ready', '4/30 retiradas falsas > 10 %: la IA no pasa a live');
 console.log('PASS  acuerdo IA/humano: pares, falsas aprobaciones/retiradas, aplicadas excluidas, veredicto solo con ≥ 30 pares');

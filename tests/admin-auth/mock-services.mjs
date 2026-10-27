@@ -114,7 +114,8 @@ export function startMocks({ authPort, enginePort }) {
       if (eqv('org_id')) rows = rows.filter(r => r.org_id === eqv('org_id'));
       if (eqv('student_id')) rows = rows.filter(r => r.student_id === eqv('student_id'));
       if (gte) rows = rows.filter(r => r.created_at >= gte);
-      if (Number(q.limit)) rows = rows.slice(0, Number(q.limit));
+      // `limit` + `offset` como PostgREST: la lectura por páginas del servidor necesita avanzar.
+      rows = rows.slice(Number(q.offset) || 0); if (Number(q.limit)) rows = rows.slice(0, Number(q.limit));
       return send(res, 200, rows);
     }
     if (url.pathname === '/rest/v1/student_application_profiles') {

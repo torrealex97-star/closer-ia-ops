@@ -23,6 +23,8 @@ await step('negar el pago previo («no es necesario pagar», «sin inversión in
     assert.ok(!codes(assessOffer({ title: 'Closer', description: text })).includes('ADVANCE_PAYMENT_DETECTED'), text);
   }
   assert.ok(codes(assessOffer({ description: 'Sin experiencia previa. Debes pagar una licencia de 300 €' })).includes('ADVANCE_PAYMENT_DETECTED')); // la negación de otra frase no la tapa
+  // «sin experiencia» en la misma frase (separada por coma) tampoco tapa un pago por adelantado
+  assert.ok(codes(assessOffer({ description: 'Puesto sin experiencia previa, es necesario pagar 300 euros por el kit de inicio' })).includes('ADVANCE_PAYMENT_DETECTED'));
 });
 await step('multinivel y pirámide → bloqueada; vender no es reclutar', () => {
   assert.ok(codes(assessOffer({ description: 'Negocio de network marketing, construye tu línea descendente' })).includes('MLM_OR_PYRAMID'));
