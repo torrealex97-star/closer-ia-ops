@@ -60,6 +60,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 node --experimental-strip-types tests/engine/activate.mjs
 # Búsquedas de closer del motor: vocabulario en español, rotación por día y extractores con `q`.
 node --experimental-strip-types tests/engine/terms.mjs
+# Cuota de escritura de la plataforma (100.000 filas/mes): el motor se para antes de que la pausa deje el sitio sin servir.
+node --experimental-strip-types tests/engine/writebudget.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offerrisk.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offertags.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/voice.mjs

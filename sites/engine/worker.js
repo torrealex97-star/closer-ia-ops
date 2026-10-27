@@ -413,7 +413,7 @@ async function sourceFreehire(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, PLATFORM_SUBREQUEST_LIMIT, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, PLATFORM_SUBREQUEST_LIMIT, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -467,6 +467,11 @@ async function ensureSchema(db) {
       http_status INTEGER, requested_url TEXT NOT NULL, canonical_url TEXT, renamed_from TEXT,
       UNIQUE(org_id, source, day))`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_slug_audit_day ON slug_audit(org_id, day)'),
+    // Registro propio de filas escritas en D1 (cuota de la plataforma: 100.000/mes y 10.000/día).
+    // Una fila por día y organización; lo escribe solo el servidor. Ver el guardián más abajo.
+    db.prepare(`CREATE TABLE IF NOT EXISTS write_ledger (
+      org_id TEXT NOT NULL, day TEXT NOT NULL, writes INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
+      PRIMARY KEY(org_id, day))`),
   ]);
   // Columnas de vigencia derivadas de verify (port fase 3): ALTER tolerante — en una
   // base ya existente la columna está y D1 lo reclama, que es el estado correcto.
@@ -1061,13 +1066,88 @@ async function handleAdminActivate(request, env) {
       }
     }
   }
+  // Cuota del mes: esta pasada también escribe (una versión y un puntero por oferta, una fila de
+  // evidencia por verificación y una fila por oferta retirada). Se anota APROXIMADO y declarado,
+  // porque el registro solo sirve para parar la RECOGIDA automática: una persona aprobando ofertas
+  // no se bloquea nunca por cuota.
+  const charged = dryRun ? 0 : await chargeWrites(env.DB, counters.withdrawn + written * (verify ? 4 : 2));
   return Response.json({
     dry_run: dryRun, verify, market, role, source, considered: rows.results.length,
     // `truncated` cubre las dos cotas: el barrido y las escrituras. `deferred` dice
     // cuántas se quedaron fuera del presupuesto para la siguiente pasada.
     scan: { limit: SCAN_LIMIT, write_budget: dryRun ? null : writeBudget, truncated: rows.results.length >= SCAN_LIMIT || counters.deferred > 0 },
-    counts: counters, items,
+    counts: counters, items, write_allowance: dryRun ? null : { charged },
   }, { headers: corsHeaders(request) });
+}
+
+// ------ cuota de escritura de la plataforma (guardián propio) ------
+// El techo que pausa el sitio es del PLAN DE HOSTING y se mide en FILAS ESCRITAS en D1 por mes
+// natural: 100.000 al mes y 10.000 al día. Medido en producción el 2026-10-27: `d1Writes`
+// 100.604 de 100.000 y el sitio `suspended` hasta el reinicio del 1 de noviembre, mientras
+// `requests` iba por 2.251 de 100.000: no fue el tráfico, fueron las escrituras. Agotarla no
+// degrada nada, PAUSA el sitio ENTERO —todas las rutas responden HTTP 429, también las lecturas
+// de la alumna—, así que el motor lleva su propio registro y se para antes de que lo pare la
+// plataforma: prefiere dejar de RECOGER, declarándolo, a dejar de SERVIR.
+//
+// El registro es una ESTIMACIÓN honesta (cuenta las filas que escribe el motor leyendo el `meta`
+// de cada lote; no puede leer el contador de la plataforma desde dentro), por eso el guardián se
+// queda un 15% por debajo del techo. Solo lo escribe el servidor, una fila por día y organización,
+// y no guarda nada de las ofertas ni de las alumnas.
+const WRITE_ALLOWANCE = { month: 100000, day: 10000 };
+const WRITE_GUARD_RATIO = 0.85;
+
+// Filas escritas según D1: `rows_written` es la métrica que cuenta la plataforma; `changes` (filas
+// afectadas) es el respaldo para las versiones que no la devuelven.
+function rowsWritten(result) {
+  const meta = result?.meta ?? {};
+  const rows = Number(meta.rows_written ?? meta.changes ?? 0);
+  return Number.isFinite(rows) && rows > 0 ? rows : 0;
+}
+
+// La puerta, pura y comprobable: ¿queda cuota del mes (y del día) para seguir recogiendo?
+function writeAllowance({ month = 0, day = 0 } = {}, allowance = WRITE_ALLOWANCE, ratio = WRITE_GUARD_RATIO) {
+  const monthMax = Math.floor(allowance.month * ratio);
+  const dayMax = Math.floor(allowance.day * ratio);
+  const used = Math.max(0, Number(month) || 0);
+  const today = Math.max(0, Number(day) || 0);
+  if (used >= monthMax) return { ok: false, reason: 'month', used, max: monthMax, left: 0 };
+  if (today >= dayMax) return { ok: false, reason: 'day', used: today, max: dayMax, left: Math.max(0, dayMax - today) };
+  return { ok: true, reason: null, used, max: monthMax, left: monthMax - used };
+}
+
+// Lectura del registro (mes y día). Si no se puede leer NO se inventa un cero: se declara el hueco
+// y se sigue recogiendo, porque el presupuesto por pasada sigue en pie y dejar de traer ofertas por
+// un fallo de lectura sería culpar a la cuota de un problema que no es suyo.
+async function readWriteAllowance(db) {
+  const month = dayKey().slice(0, 7);
+  try {
+    const [sum, today] = await db.batch([
+      db.prepare('SELECT COALESCE(SUM(writes),0) AS writes FROM write_ledger WHERE org_id=? AND day LIKE ?').bind(ORG, `${month}-%`),
+      db.prepare('SELECT writes FROM write_ledger WHERE org_id=? AND day=?').bind(ORG, dayKey()),
+    ]);
+    const monthWrites = Number(sum?.results?.[0]?.writes ?? 0) || 0;
+    const dayWrites = Number(today?.results?.[0]?.writes ?? 0) || 0;
+    return { available: true, month, month_writes: monthWrites, day_writes: dayWrites, ...writeAllowance({ month: monthWrites, day: dayWrites }) };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'write_allowance_unreadable', error: String(error?.message || error) }));
+    return { available: false, month, month_writes: null, day_writes: null, ok: true, reason: null, used: null, max: null, left: null };
+  }
+}
+
+// Anota lo que escribió una pasada. Nunca lanza: un fallo al anotar no puede tumbar la recogida, y
+// el margen del guardián absorbe el hueco.
+async function chargeWrites(db, writes) {
+  const rows = Math.round(Number(writes) || 0);
+  if (rows <= 0) return 0;
+  try {
+    await db.prepare(`INSERT INTO write_ledger (org_id,day,writes,updated_at) VALUES (?,?,?,?)
+      ON CONFLICT(org_id, day) DO UPDATE SET writes=writes+excluded.writes, updated_at=excluded.updated_at`)
+      .bind(ORG, dayKey(), rows, now()).run();
+    return rows;
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'write_ledger_failed', error: String(error?.message || error) }));
+    return 0;
+  }
 }
 
 // ------ recogida ------
@@ -1075,6 +1155,16 @@ const logFail = event => error => console.error(JSON.stringify({ event, error: S
 async function runCollection(env, force = false) {
   const db = env.DB;
   await ensureSchema(db);
+  // Guardián de cuota: con el mes (o el día) cerca del techo NO se recoge. `force` NO salta esta
+  // puerta: las dos pasadas forzadas del 2026-10-26 son justo lo que cruzó el techo (94.177 →
+  // 100.604) y dejó el sitio en pausa. Lo que no se recoge hoy se recoge en la siguiente pasada si
+  // queda cuota; lo que no vuelve es el sitio servido a la alumna. La recogida es reanudable.
+  const allowance = await readWriteAllowance(db);
+  if (!allowance.ok) {
+    console.error(JSON.stringify({ event: 'collection_skipped_write_allowance', reason: allowance.reason, used: allowance.used, max: allowance.max }));
+    return { skipped: true, reason: 'write_allowance', write_allowance: allowance,
+      note: 'Recogida detenida por la cuota de escrituras del motor; se reanuda al reiniciarse la cuota (día 1 del mes). El catálogo ya recogido se sigue sirviendo.' };
+  }
   const last = await db.prepare(
     "SELECT id,status,completed_at,sources FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
   ).bind(ORG).first();
@@ -1108,6 +1198,7 @@ async function runCollection(env, force = false) {
   // lo aplazado o caído en la pasada anterior y, tras eso, la rotación del día.
   const { budget, ordered, resumed } = planRun(SOURCES, last?.sources, day, env?.MAX_SUBREQUESTS);
   let spent = 0;
+  let wrote = 0; // filas escritas por esta pasada (lotes de ingesta), para el registro de cuota
   for (const source of ordered) {
     const cost = fetchCost(source);
     if (spent + cost > budget) {
@@ -1135,7 +1226,7 @@ async function runCollection(env, force = false) {
       const candidates = await EXTRACTORS[source.kind](source);
       let accepted = 0;
       for (let i = 0; i < candidates.length; i += 50) {
-        await ingestBatch(db, source, candidates.slice(i, i + 50), known);
+        wrote += await ingestBatch(db, source, candidates.slice(i, i + 50), known);
         accepted += Math.min(50, candidates.length - i);
         setState(source.code, { fetched: accepted, accepted });
       }
@@ -1146,11 +1237,15 @@ async function runCollection(env, force = false) {
   }
   await db.prepare('UPDATE collection_runs SET status=?, sources=?, completed_at=? WHERE id=?')
     .bind('completed', JSON.stringify(states), now(), runId).run();
+  // Se anota la cuota del mes con lo que escribió esta pasada: los lotes de ingesta, su fila de run
+  // y la fila final, más la propia fila del registro (que también es una fila escrita).
+  const charged = await chargeWrites(env.DB, wrote + 3);
   // El resultado del audit diario (corrido al principio de este run) viaja en la respuesta:
   // si un slug cambió, el operador lo ve renamed/gone antes de que el extractor falle.
   // `resumed` deja en la respuesta qué fuentes abrieron esta pasada, para que el recurso se vea sin
   // leer la tabla. `budget` es el presupuesto real de subrequests que quedó para fetch.
-  return { run_id: runId, budget, resumed, sources: states, ...(slugAudit ? { slug_audit: slugAudit } : {}) };
+  return { run_id: runId, budget, resumed, sources: states, writes: charged,
+    write_allowance: { ...allowance, charged }, ...(slugAudit ? { slug_audit: slugAudit } : {}) };
 }
 
 async function ingestBatch(db, source, candidates, known) {
@@ -1203,7 +1298,11 @@ async function ingestBatch(db, source, candidates, known) {
           'cloud-collector-v1', captured),
     );
   }
-  if (statements.length) await db.batch(statements);
+  if (!statements.length) return 0;
+  const results = await db.batch(statements);
+  // Filas escritas de verdad (un `INSERT OR IGNORE` que no inserta escribe 0): es lo que se anota
+  // en el registro de cuota del mes.
+  return (Array.isArray(results) ? results : [results]).reduce((total, result) => total + rowsWritten(result), 0);
 }
 
 // ------ API de lectura ------
@@ -10584,6 +10683,9 @@ async function handleStatus(env) {
   return Response.json({
     engine: 'closer-ia-ops-engine', org: ORG,
     raw_items: counts[0].results[0].n, catalog_active: counts[1].results[0].n,
+    // Cuota de escritura del mes: es el techo que pausa el sitio, y el panel lo enseña para que se
+    // vea venir en vez de descubrirlo cuando ya no se recoge nada.
+    write_allowance: await readWriteAllowance(db),
     latest_run: run ? { id: run.id, day: run.day, status: run.status, created_at: run.created_at, completed_at: run.completed_at, sources: JSON.parse(run.sources) } : null,
   });
 }
