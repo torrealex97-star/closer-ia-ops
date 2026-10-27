@@ -5,7 +5,7 @@ import { LoaderCircle, RefreshCcw } from 'lucide-react';
 // Acuerdo del revisor IA (modo sombra) con las decisiones de las personas: puerta de salida de shadow → live.
 // «—» + causa cuando no hay pares; error ≠ vacío; el veredicto se escribe en texto (no solo color).
 type Agreement = { proposed: number; deferred: number; pending: number; pairs: number; agree: number; false_approve: number; false_withdraw: number; ai_approvals_decided: number;
-  agree_rate: number | null; false_approve_rate: number | null; verdict: 'insufficient' | 'not_ready' | 'ready'; min_pairs: number; max_false_approve_rate: number };
+  agree_rate: number | null; false_approve_rate: number | null; false_withdraw_rate?: number | null; max_false_withdraw_rate?: number; verdict: 'insufficient' | 'not_ready' | 'ready'; min_pairs: number; max_false_approve_rate: number };
 const pct = (r: number | null) => (r === null ? '—' : `${Math.round(r * 1000) / 10} %`.replace('.', ','));
 
 export default function AiAgreement({ onSessionLost }: { onSessionLost: () => void }) {
@@ -23,7 +23,7 @@ export default function AiAgreement({ onSessionLost }: { onSessionLost: () => vo
   if (error || !a) return <div className="alert error" role="alert" data-testid="agreement-error"><span>{error || 'No se pudo cargar el acuerdo IA/humano.'}</span> <button onClick={load} disabled={busy}><RefreshCcw size={14} /> Reintentar</button></div>;
 
   const verdict = a.verdict === 'ready' ? `Cumple la puerta propuesta (≥ ${a.min_pairs} pares y falsas aprobaciones ≤ ${a.max_false_approve_rate * 100} %). La decisión de pasar a «live» sigue siendo tuya.`
-    : a.verdict === 'not_ready' ? `No cumple: demasiadas aprobaciones de la IA que una persona retiró (límite ${a.max_false_approve_rate * 100} %). Mantener en sombra.`
+    : a.verdict === 'not_ready' ? `No cumple: demasiadas aprobaciones de la IA que una persona retiró (límite ${a.max_false_approve_rate * 100} %) o demasiadas retiradas de ofertas que una persona aprobó (límite ${(a.max_false_withdraw_rate ?? 0.1) * 100} %). Mantener en sombra.`
     : `Aún no hay base: ${a.pairs} de ${a.min_pairs} pares comparados. Sigue decidiendo ofertas a mano; la IA anota sin aplicar nada.`;
   return <details className="search-panel" style={{ marginBottom: 16 }} data-testid="ai-agreement" open={a.pairs > 0}>
     <summary><strong>Revisor IA vs. personas: {a.pairs ? `${pct(a.agree_rate)} de acuerdo` : 'sin pares todavía'}</strong> <span className="card-meta" style={{ margin: 0 }}>({a.pairs} comparadas)</span></summary>

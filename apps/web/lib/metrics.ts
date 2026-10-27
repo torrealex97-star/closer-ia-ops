@@ -1,5 +1,5 @@
 import { isHumanReviewer, ORG } from './external';
-import { serviceRest } from './supabaseAuth';
+import { pagedRest, serviceRest } from './supabaseAuth';
 import { tierOf, type Tier } from './sourceTiers';
 
 // Métricas de oferta (incremento 0.2). Todo se calcula de datos reales; lo que no se mide se declara `null`
@@ -50,14 +50,14 @@ export function computeMetrics(offers: OfferRow[], runs: RunRow[] | null, now: D
 export async function loadMetrics(now = new Date(), windowDays = 14): Promise<Metrics | null> {
   const since = encodeURIComponent(new Date(now.getTime() - windowDays * 864e5).toISOString());
   const [o, r, d] = await Promise.all([
-    serviceRest(`external_offers?org_id=eq.${ORG}&first_seen_at=gte.${since}&select=source,score,spain,editorial_status,first_seen_at,reviewed_by,reviewed_at&limit=10000`),
+    pagedRest<Parameters<typeof computeMetrics>[0][number]>(`external_offers?org_id=eq.${ORG}&first_seen_at=gte.${since}&select=source,score,spain,editorial_status,first_seen_at,reviewed_by,reviewed_at`, 'id.asc'),
     serviceRest(`apify_runs?org_id=eq.${ORG}&started_at=gte.${since}&select=cost_usd,started_at,status&limit=1000`).catch(() => null),
     // Decisiones de la ventana sobre cualquier oferta (también las vistas antes de la ventana).
-    serviceRest(`external_offers?org_id=eq.${ORG}&reviewed_at=gte.${since}&select=reviewed_by,reviewed_at&limit=10000`).catch(() => null),
+    pagedRest<{ reviewed_by: string | null; reviewed_at: string | null }>(`external_offers?org_id=eq.${ORG}&reviewed_at=gte.${since}&select=reviewed_by,reviewed_at`, 'id.asc'),
   ]);
-  if (!o.ok) return null;
-  const offers = await o.json().catch(() => null);
+  if (!o) return null;
+  const offers = o.rows;
   const runs = r?.ok ? await r.json().catch(() => null) : null;
-  const decided = d?.ok ? await d.json().catch(() => null) : null;
+  const decided = d?.rows ?? null;
   return Array.isArray(offers) ? computeMetrics(offers, Array.isArray(runs) ? runs : null, now, windowDays, Array.isArray(decided) ? decided : null) : null;
 }

@@ -952,6 +952,7 @@ async function handleAdminActivate(request, env) {
 }
 
 // ------ recogida ------
+const logFail = event => error => console.error(JSON.stringify({ event, error: String(error?.message || error) }));
 async function runCollection(env, force = false) {
   const db = env.DB;
   await ensureSchema(db);
@@ -961,6 +962,12 @@ async function runCollection(env, force = false) {
   if (!force && last?.completed_at) {
     const age = Date.now() - Date.parse(last.completed_at);
     if (Number.isFinite(age) && age < COLLECTION_INTERVAL_MS) return { skipped: true, last_run: last };
+  }
+  if (!force) {
+    // Una recogida en curso (lecturas simultáneas) no se duplica: cada pasada repetiría fetches y escrituras en D1.
+    const inFlight = await db.prepare("SELECT id FROM collection_runs WHERE org_id=? AND status='running' AND created_at > ? LIMIT 1")
+      .bind(ORG, new Date(Date.now() - 15 * 60_000).toISOString()).first();
+    if (inFlight) return { skipped: true, in_flight: inFlight.id };
   }
   const runId = 'run-' + crypto.randomUUID();
   const day = dayKey();
@@ -10425,9 +10432,9 @@ const corsHeaders = request => ({
 // ------ entrada ------
 export default {
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(runCollection(env).catch(() => {}));
+    ctx.waitUntil(runCollection(env).catch(logFail('collection_failed')));
     // Audit de slugs en cada tick programado: cubre también días sin lecturas.
-    ctx.waitUntil(runSlugAudit(env).catch(() => {}));
+    ctx.waitUntil(runSlugAudit(env).catch(logFail('slug_audit_failed')));
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -10473,7 +10480,7 @@ export default {
     }
     if (url.pathname === '/api/offers') {
       // Refresco perezoso: si la última recogida es vieja, lanza una en segundo plano sin bloquear la lectura.
-      ctx.waitUntil(runCollection(env).catch(() => {}));
+      ctx.waitUntil(runCollection(env).catch(logFail('collection_failed')));
       return handleOffers(request, env, url);
     }
     if (url.pathname === '/v1/opportunities/search') {
@@ -10481,13 +10488,13 @@ export default {
       // mientras el schema de Sites deploy no acepte `crons`): una lectura con la última
       // recogida >6 h lanza la recogida en 2º plano. El umbral anti-duplicados interno de
       // runCollection (6 h) evita que dos lecturas juntas paguen dos veces.
-      ctx.waitUntil(runCollection(env).catch(() => {}));
+      ctx.waitUntil(runCollection(env).catch(logFail('collection_failed')));
     }
     if (url.pathname === '/api/status') return handleStatus(env);
     if (url.pathname === '/api/funnel') return handleFunnel(env);
     if (url.pathname === '/api/audit') return handleAudit(request, env);
     if (url.pathname === '/api/collect' && request.method === 'POST') {
-      if (!env.COLLECT_TOKEN || request.headers.get('X-Collect-Token') !== env.COLLECT_TOKEN) {
+      if (!env.COLLECT_TOKEN || !tokenMatches(request.headers.get('X-Collect-Token'), env.COLLECT_TOKEN)) {
         return Response.json({ detail: 'No autorizado' }, { status: 401 });
       }
       const result = await runCollection(env, true);

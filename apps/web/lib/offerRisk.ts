@@ -21,7 +21,7 @@ const NEGATION = /\b(?:no|sin|nunca|jamas|ni|ningun[oa]?|tampoco)\b/;
 const COMPANY_PAYS = /\b(?:la empresa|nuestra empresa|la compania|nosotros|nosotras|el cliente)\b/;
 const unnegated = (text: string, re: RegExp, skip?: RegExp) => {
   for (const m of text.matchAll(new RegExp(re.source, 'g'))) {
-    const clause = text.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0).split(/[.;:!?\n]/).pop() ?? '';
+    const clause = text.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0).split(/[.,;:!?\n]/).pop() ?? '';
     if (!NEGATION.test(clause) && !(skip && skip.test(clause))) return true;
   }
   return false;

@@ -17,6 +17,12 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// Un paso que falla no tumba el cron, pero deja rastro en los logs de Vercel (antes parecía «truncado» o «sin motor»).
+const failed = <T,>(step: string, fallback: T) => (error: unknown): T => {
+  console.error(JSON.stringify({ event: 'cron_step_failed', step, error: String((error as Error)?.message ?? error) }));
+  return fallback;
+};
+
 // Vercel Cron llama aquí con `Authorization: Bearer $CRON_SECRET`. Recoge las APIs oficiales que tengan clave guardada.
 export async function GET(request: NextRequest) {
   const expected = process.env.CRON_SECRET ?? '';
@@ -28,7 +34,7 @@ export async function GET(request: NextRequest) {
   // datos nuevos (APIs oficiales → Google Jobs, que cuesta por búsqueda) → lo ya pagado en Apify →
   // vigencia (las más antiguas primero) → revisor IA (shadow).
   const budget = createBudget(totalFromEnv());
-  const outcomes = await collectAll('cron', undefined, budget.deadline(10_000)).catch(() => []);
+  const outcomes = await collectAll('cron', undefined, budget.deadline(10_000)).catch(failed('collect', []));
   if (outcomes.some(o => o.truncated)) budget.cut('apis');
   // Google Jobs (SerpApi, clave ya conectada): dorks de closer/ES y LatAm. Entra después de las APIs
   // oficiales porque cuesta por búsqueda; si no hay tiempo se corta y se declara, sin tocar los demás pasos.
@@ -55,7 +61,7 @@ export async function GET(request: NextRequest) {
   // Cualificación automática al final: primero aprueba por reglas lo que cumple hechos comprobables y,
   // si queda hueco de tope y la IA está en vivo, le pasa solo las dudosas. Un fallo no tumba el resto.
   const auto = budget.remaining() >= MIN_STEP_MS
-    ? await runAutoReview({ deadline: budget.end }).catch(() => ({ checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true }))
+    ? await runAutoReview({ deadline: budget.end }).catch(failed('auto_review', { checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true }))
     : (budget.cut('auto'), { checked: 0, approved: 0, exceptions: 0, used_before: null, cap: 0, by_reason: {}, ai: null, truncated: true });
   if (auto.truncated) budget.cut('auto');
   // Pool del motor cloud (catálogo de la superficie de alumna): el mismo criterio, al final del
@@ -63,7 +69,7 @@ export async function GET(request: NextRequest) {
   // retira con su motivo en vez de esperar a una persona. Sin motor configurado devuelve null y el
   // panel ya lo declara; un fallo no tumba el resto de la recogida.
   const motor = budget.remaining() >= MIN_STEP_MS
-    ? await activateEngine({ passes: 1, deadline: budget.deadline(40_000) }).catch(() => null)
+    ? await activateEngine({ passes: 1, deadline: budget.deadline(40_000) }).catch(failed('engine', null))
     : (budget.cut('motor'), null);
   if (motor?.truncated) budget.cut('motor');
   const report = new Date().getUTCDay() === 1 && budget.remaining() >= MIN_STEP_MS ? await weeklyAiReport().catch(() => false) : null;

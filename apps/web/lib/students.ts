@@ -53,7 +53,12 @@ export async function removeStudent(id: string): Promise<boolean> {
   const target = Array.isArray(rows) ? rows[0] as { user_id: string | null; email: string } | undefined : undefined;
   if (!target) return false;
   const authId = target.user_id ?? await findAuthUserId(target.email); // invitada que aún no entró: su usuario de Auth ya existe
-  if (authId) await serviceAuth(`/auth/v1/admin/users/${authId}`, { method: 'DELETE' });
+  if (authId) {
+    const gone = await serviceAuth(`/auth/v1/admin/users/${authId}`, { method: 'DELETE' });
+    // Perfil, formulario base y candidaturas cuelgan de auth.users (ON DELETE CASCADE): si el usuario de Auth no se borra,
+    // NO se declara la baja (un 404 es «ya no existe»). Antes se ignoraba el resultado y la baja salía «ok» con datos vivos.
+    if (!gone.ok && gone.status !== 404) return false;
+  }
   const del = await serviceRest(`students?org_id=eq.${ORG}&id=eq.${id}`, { method: 'DELETE' });
   return del.ok;
 }

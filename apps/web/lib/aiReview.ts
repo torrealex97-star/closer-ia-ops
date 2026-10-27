@@ -64,7 +64,10 @@ export type GateOutput = { decision: Decision; why: string; audit_sample: boolea
 export const auditSample = (id: string) => createHash('sha256').update(id).digest().readUInt16BE(0) % THRESHOLDS.auditEvery === 0;
 export function gate(i: GateInput): GateOutput {
   if (i.link.result === 'closed') return { decision: 'withdraw', why: 'enlace_cerrado', audit_sample: false };
-  if (i.proposal.verdict === 'reject') return { decision: 'withdraw', why: 'ia_rechaza', audit_sample: false };
+  // Retirar una oferta buena es tan caro como aprobar una mala: un «rechazo» con poca confianza va a una persona, no se aplica.
+  if (i.proposal.verdict === 'reject') return i.proposal.confidence >= THRESHOLDS.confidence
+    ? { decision: 'withdraw', why: 'ia_rechaza', audit_sample: false }
+    : { decision: 'human', why: 'confianza_baja', audit_sample: false };
   if (i.proposal.verdict !== 'approve') return { decision: 'human', why: 'ia_duda', audit_sample: false };
   if (i.proposal.confidence < THRESHOLDS.confidence) return { decision: 'human', why: 'confianza_baja', audit_sample: false };
   if (i.score < THRESHOLDS.score) return { decision: 'human', why: 'score_bajo', audit_sample: false };

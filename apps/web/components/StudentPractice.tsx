@@ -163,14 +163,14 @@ export default function StudentPractice() {
           <h1>{scenario.title}</h1>
           <p>{scenario.context}</p>
         </div>
-        <div className="practice-clock" aria-label={`Tiempo de práctica: ${clock(elapsed)}`}><Clock3 size={15} /><span>{clock(elapsed)}</span></div>
+        <div className="practice-clock" role="timer" aria-label={`Tiempo de práctica: ${clock(elapsed)}`}><Clock3 size={15} /><span>{clock(elapsed)}</span></div>
       </div>
       <div className="practice-grid">
         <div className="practice-chat">
           <div className="practice-chat-head"><span className="practice-avatar" aria-hidden="true"><MessageSquare size={16} /></span><div><strong>Interlocutor</strong><small>Simulación · empresa ficticia</small></div><div className="practice-voice"><JarvisOrb state={orb} /><small>{orb === 'listening' ? 'Te escucho' : orb === 'thinking' ? 'Pensando' : orb === 'speaking' ? 'Hablando' : 'Voz en espera'}</small></div></div>
           <div className="practice-body" ref={chat} aria-live="polite">
             {turns.map((turn, index) => <Bubble key={`${index}-${turn.role}`} turn={turn} onSpeak={canSpeak && turn.role === 'coach' ? speak : undefined} />)}
-            {busy && <div className="practice-turn is-them"><div className="practice-bubble is-typing" aria-label="El interlocutor está escribiendo"><i /><i /><i /></div></div>}
+            {busy && <div className="practice-turn is-them"><div className="practice-bubble is-typing" role="status" aria-label="El interlocutor está escribiendo"><i /><i /><i /></div></div>}
           </div>
           {error && <p className="practice-error" role="alert"><CircleAlert size={15} />{error}</p>}
           {voice.error && <p className="practice-error" role="alert"><CircleAlert size={15} />{voice.error}</p>}
