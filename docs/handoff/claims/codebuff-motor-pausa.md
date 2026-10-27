@@ -1,6 +1,6 @@
 ---
 agent: codebuff
-status: in_progress
+status: validated
 branch: main
 touches: apps/web/app/api/admin/, apps/web/app/api/backend/, apps/web/components/IntegrationSettings.tsx, apps/web/components/SummaryTab.tsx, apps/web/components/AdminShell.tsx, tests/admin-auth/mock-services.mjs, tests/admin-auth/enginepause.mjs, tests/admin-auth/ui.mjs, tests/admin-auth/run.sh, tests/browser/workspace.spec.ts, docs/STATUS.md
 date: 2026-10-27
@@ -12,6 +12,9 @@ consulta falló.», las cifras se quedaban en «…» o en cero falso y la alumn
 inténtalo otra vez»; ahora la causa llega en JSON (`engine_reason`, `engine_down`) y el hueco va con «—» y su
 explicación. (2) El selector de proveedor de IA volvía solo a Groq cuando la lectura inicial llegaba después
 del cambio (carrera real, medida: 300-600 ms), dejando la clave escrita bajo el proveedor equivocado.
+
+Verificado en producción (`2a5202c`, CI verde): `/api/admin/overview` publica `engine_reason: "allowance"` y `engine_http_status: 429`,
+el Resumen y Fuentes nombran la pausa con «—» en los huecos y la búsqueda pública de la alumna vuelve a ser JSON legible (42 externas).
 
 NO se toca: el motor (sigue en pausa hasta el reinicio de cuota, es decisión del dueño pasar a plan de pago),
 `Reset`/`STUDENT_LOGIN_REQUIRED`, ni ninguna migración. NO se declara PASS en: Apify, Groq, Resend, ni en un
