@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrainCircuit, KeyRound, Search, Sparkles } from 'lucide-react';
 import { request } from './client';
 
@@ -20,14 +20,37 @@ export default function IntegrationSettings({ onChanged }: { onChanged: () => Pr
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  useEffect(() => { Promise.all([request<{ has_token: boolean }>('integrations/apify'), request<{ has_token: boolean }>('integrations/serpapi'), request<AIConfig>('integrations/ai'), request<ClassificationConfig>('ai/classification')]).then(([a, s, b, c]) => { setApify(a.has_token); setSerpapi(s.has_token); setAI(b); setClassification(c); }).catch(e => setError(e.message)); }, []);
+  // El motor de IA se lee en cuatro momentos (carga inicial, cambio de proveedor, guardado y eliminación).
+  // Cada intención lleva un número y solo se aplica la respuesta de la ÚLTIMA: la carga inicial podía llegar
+  // DESPUÉS de un cambio de proveedor y devolver el selector a Groq con la clave ya escrita delante. Se veía
+  // como «la clave se borró sola» o «volvió a Groq», y era una carrera real del panel, no del test.
+  const aiSeq = useRef(0);
+  useEffect(() => {
+    const seq = ++aiSeq.current;
+    Promise.all([request<{ has_token: boolean }>('integrations/apify'), request<{ has_token: boolean }>('integrations/serpapi'), request<AIConfig>('integrations/ai'), request<ClassificationConfig>('ai/classification')])
+      .then(([a, s, b, c]) => { setApify(a.has_token); setSerpapi(s.has_token); if (seq === aiSeq.current) setAI(b); setClassification(c); })
+      .catch(e => setError(e.message));
+  }, []);
   async function chooseProvider(provider: AIConfig['provider']) {
+    const seq = ++aiSeq.current;
+    const previous = ai.provider;
     setBusy(true); setAIKey(''); setError(''); setMessage('');
-    try { setAI(await request<AIConfig>(`integrations/ai?provider=${provider}`)); setDirty(true); }
-    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    // La elección se ve al instante: esperar a la respuesta dejaba el rótulo «Clave de Groq» con el
+    // desplegable ya en OpenAI, así que la clave escrita parecía pertenecer al proveedor equivocado.
+    setAI(old => ({ ...old, provider }));
+    try {
+      const config = await request<AIConfig>(`integrations/ai?provider=${provider}`);
+      if (seq === aiSeq.current) { setAI(config); setDirty(true); }
+    } catch (e) {
+      // Sin respuesta no hay cambio de proveedor: se vuelve al que sí está guardado en el servidor.
+      if (seq === aiSeq.current) { setError((e as Error).message); setAI(old => ({ ...old, provider: previous })); }
+    } finally { if (seq === aiSeq.current) setBusy(false); }
   }
   const providerName = ai.provider === 'groq' ? 'Groq' : 'OpenAI';
   async function action(provider: 'apify' | 'serpapi' | 'ai', mode: 'save' | 'check' | 'remove') {
+    // Una escritura sobre el motor de IA invalida cualquier lectura en vuelo: si el operador cambia de
+    // proveedor mientras se guarda, la respuesta del guardado no puede devolver el selector al anterior.
+    const seq = provider === 'ai' ? ++aiSeq.current : 0;
     setBusy(true); setError(''); setMessage('');
     try {
       if (mode === 'check') {
@@ -36,7 +59,7 @@ export default function IntegrationSettings({ onChanged }: { onChanged: () => Pr
         const body = provider === 'apify' ? { token: apifyKey, clear_token: mode === 'remove' } : provider === 'serpapi' ? { token: serpapiKey, clear_token: mode === 'remove' } : { provider: ai.provider, token: aiKey, clear_token: mode === 'remove', enabled: mode !== 'remove' && ai.enabled, model: ai.model, daily_limit: ai.daily_limit };
         if (mode === 'remove') body.token = '';
         const result = await request<AIConfig>(`integrations/${provider}`, body);
-        if (provider === 'apify') { setApify(result.has_token); setApifyKey(''); } else if (provider === 'serpapi') { setSerpapi((result as { has_token: boolean }).has_token); setSerpapiKey(''); } else { setAI(result); setAIKey(''); setDirty(false); }
+        if (provider === 'apify') { setApify(result.has_token); setApifyKey(''); } else if (provider === 'serpapi') { setSerpapi((result as { has_token: boolean }).has_token); setSerpapiKey(''); } else if (seq === aiSeq.current) { setAI(result); setAIKey(''); setDirty(false); }
         request<ClassificationConfig>('ai/classification').then(setClassification).catch(() => {});
         // El guardado ya ha ido bien: el aviso no puede esperar al refresco del panel
         // (que consulta varios endpoints y, si uno tarda, dejaba el botón bloqueado y
@@ -44,7 +67,7 @@ export default function IntegrationSettings({ onChanged }: { onChanged: () => Pr
         setMessage(mode === 'remove' ? 'Clave eliminada.' : 'Conexión guardada. Puedes comprobarla sin lanzar una extracción ni generar texto.');
         void onChanged().catch(() => {});
       }
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { setError((e as Error).message); } finally { if (!seq || seq === aiSeq.current) setBusy(false); }
   }
   async function toggleMassive(enabled: boolean) {
     setBusy(true); setError('');

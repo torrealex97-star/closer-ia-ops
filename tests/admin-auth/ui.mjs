@@ -300,6 +300,30 @@ await step('Resumen: la cola humana suma el motor y las fuentes externas, y llev
   assert.equal(await page.locator('#ex-status').inputValue(), 'needs_review');
 });
 
+await step('motor en pausa por cuota: el Resumen nombra la causa y pone «—» en vez de un error genérico', async () => {
+  // Sin externas aprobadas que sirvan de relleno: así se ve el hueco real del motor, que es lo que en
+  // producción aparecía como «La consulta falló.» con las cifras en «…».
+  for (const row of state.external.values()) if (row.editorial_status === 'approved' || row.editorial_status === 'published') row.editorial_status = 'draft';
+  state.enginePaused = 'allowance';
+  await page.getByRole('button', { name: 'Resumen', exact: true }).click(); await page.getByRole('heading', { name: 'Cómo vamos.' }).waitFor();
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  // Se espera al aviso con su causa (solo se pinta con la lectura terminada), no a la primera mención de la
+  // pausa: esa sale también en el paso «Ver fuentes» mientras las cifras aún están cargando.
+  await page.getByRole('status').filter({ hasText: /pausa por cuota de hosting/ }).waitFor();
+  assert.equal(await page.getByText('La consulta falló.').count(), 0, 'la pausa llega explicada, no como error genérico');
+  const goal = page.locator('article.source-card', { hasText: 'OBJETIVO' });
+  assert.match(await goal.innerText(), /—\s*de\s*20/, 'ni un cero inventado ni un «…» que se queda cargando para siempre');
+  assert.equal(await goal.getByText('Sin datos', { exact: true }).count(), 1, 'el estado del objetivo se declara, no se inventa');
+  assert.equal(await goal.getByText(/Faltan/).count(), 0, 'sin datos no se puede decir cuántas faltan');
+  assert.equal(await page.getByRole('progressbar').count(), 0, 'sin datos no hay barra: un 0 % sería un cero falso');
+  for (const label of ['EXCEPCIONES PARA TI', 'POR CLASIFICAR']) {
+    assert.equal(await page.locator('article.source-card', { hasText: label }).locator('strong').innerText(), '—', `${label}: el hueco se declara`);
+  }
+  assert.match(await page.locator('article.source-card', { hasText: 'FUENTES CON FALLO' }).innerText(), /—\s*sin datos del motor cloud/);
+  assert.ok(await page.getByRole('button', { name: 'Ver fuentes' }).isVisible(), 'y el paso lleva a donde se ve el estado real');
+  state.enginePaused = null;
+});
+
 await browser.close(); close();
 for (const [status, name, msg] of results) console.log(`${status}  ${name}${msg ? '\n      ' + msg : ''}`);
 const failed = results.filter(r => r[0] === 'FAIL').length;

@@ -135,6 +135,35 @@ test('Groq is visible and switching provider never carries the typed key', async
   await expect(page.getByRole('status')).toContainText('Conexión guardada');
 });
 
+test('a late initial load never overrides the provider the operator picked', async ({ page }) => {
+  // Carrera real del panel, reproducida a voluntad: la lectura inicial del motor de IA (sin `provider`) tarda
+  // más que el cambio de proveedor. Antes, esa respuesta tardía devolvía el selector a Groq con la clave ya
+  // escrita delante, así que la clave parecía «borrarse sola» y el rótulo dejaba de corresponder al desplegable
+  // (medido con un depurador: el selector volvía a Groq entre 300 y 600 ms después de entregarse la respuesta).
+  let release: () => void = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let delivered = false;
+  const config = (provider: string) => ({ provider, enabled: false, has_token: false, model: provider === 'groq' ? 'openai/gpt-oss-20b' : 'gpt-4.1-mini', daily_limit: 20, used_today: 0, max_input_characters: 6000, max_output_tokens: provider === 'groq' ? 900 : 600 });
+  await page.route('**/api/backend/integrations/ai*', async route => {
+    const provider = new URL(route.request().url()).searchParams.get('provider');
+    if (!provider) { await held; const result = await route.fulfill({ json: config('groq') }); delivered = true; return result; }
+    await route.fulfill({ json: config(provider) });
+  });
+  await page.goto('/admin');
+  await page.getByRole('button', { name: 'Red de oportunidades', exact: true }).click();
+  await page.getByText('Motor de IA · Groq', { exact: false }).first().click();
+  await page.getByLabel('Proveedor de IA').selectOption('openai');
+  await expect(page.getByLabel('Clave de OpenAI')).toBeVisible();
+  release();
+  await expect.poll(() => delivered, { message: 'la respuesta tardía se entrega' }).toBe(true);
+  // La afirmación es que NO cambia nada, así que hay que darle al navegador el margen en el que antes cambiaba:
+  // soltar la respuesta y mirar de inmediato pasaría siempre, con o sin arreglo.
+  await page.waitForTimeout(1200);
+  await expect(page.getByLabel('Proveedor de IA')).toHaveValue('openai');
+  await expect(page.getByLabel('Clave de OpenAI')).toBeVisible();
+  await expect(page.getByLabel('Clave de OpenAI')).toHaveValue('');
+});
+
 test('daily collection budget controls are separate from saved catalog search', async ({ page }) => {
   let settings = { enabled: true, daily_budget_eur: 1, hour: 8 };
   const summary = () => ({ settings, timezone: 'Europe/Madrid', retention_days: 10, catalog_total: 6, added_last_24h: 2, reserved_eur: 0.25, actual_usd: 0.03, uncertain_runs: 0, latest: null });

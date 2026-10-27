@@ -32,8 +32,23 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       // POST incluye la activación en bloque (lenta a propósito: verifica cada enlace); el resto, corto.
       cache: 'no-store', signal: AbortSignal.timeout(request.method === 'POST' ? 55_000 : 30_000),
     });
-    const headers = new Headers({ 'Cache-Control': 'no-store' });
     const contentType = upstream.headers.get('content-type');
+    // El motor puede estar publicado y a la vez en pausa por cuota de la plataforma: entonces responde 429 con
+    // TEXTO PLANO («This site has reached its hosting allowance»). Reenviar ese texto tal cual hacía que el
+    // panel lo leyera como JSON vacío y mostrara un «La consulta falló.» genérico, sin decir la causa real.
+    if (!upstream.ok && !(contentType ?? '').includes('json')) {
+      const text = (await upstream.text().catch(() => '')).slice(0, 300);
+      const paused = upstream.status === 429 || /allowance/i.test(text);
+      return withCookies(Response.json({
+        detail: paused
+          ? 'El motor está en pausa por cuota de hosting (la plataforma responde 429). No es un fallo de la app y no se pierde ningún dato: se reactiva solo cuando la plataforma reinicia la cuota del mes.'
+          : `El motor no responde correctamente (HTTP ${upstream.status}).`,
+        // `engine_down` marca CUALQUIER fallo que no venga explicado por el motor: es lo que permite al panel
+        // contarlo una sola vez (en el aviso con su causa) en lugar de repetirlo como error genérico.
+        engine_paused: paused, engine_down: true, upstream_status: upstream.status,
+      }, { status: paused ? 503 : upstream.status >= 500 ? 502 : upstream.status, headers: { 'Cache-Control': 'no-store' } }), auth.setCookies);
+    }
+    const headers = new Headers({ 'Cache-Control': 'no-store' });
     if (contentType) headers.set('content-type', contentType);
     return withCookies(new Response(upstream.body, { status: upstream.status, headers }), auth.setCookies);
   } catch {

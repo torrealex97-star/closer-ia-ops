@@ -59,6 +59,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }
+    // Cabeceras de las respuestas que construye ESTE proxy. No se copia el `content-type` del motor: cuando
+    // está en pausa por cuota responde 429 con `text/plain`, y etiquetar así un cuerpo que es JSON deja al
+    // navegador sin poder leerlo (mostraba un error genérico incluso con las ofertas externas delante).
+    const jsonHeaders = new Headers({ 'Cache-Control': 'no-store' });
+    for (const value of sessionCookies) jsonHeaders.append('Set-Cookie', value);
     // Motor caído (pausa de cuota, 503): sus ofertas no llegan, pero las externas
     // aprobadas siguen en Supabase. Ocultarlas convertiría un fallo del motor en
     // «no hay ofertas»; se sirven solas y la vista lo declara (`degraded`).
@@ -66,9 +71,19 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       try {
         const body = JSON.parse(requestBody) as { role?: string | null; market?: string; days?: number; include_bilingual?: boolean; starred_only?: boolean };
         const extra = await externalForStudent({ role: body.role ?? null, market: body.market ?? 'any', days: Number(body.days) || 10, include_bilingual: Boolean(body.include_bilingual), starred_only: Boolean(body.starred_only) });
-        if (extra.length) return Response.json({ items: extra, total: extra.length, selection_total: 0, degraded: 'motor' }, { headers });
-      } catch { /* sin externas no hay nada que servir: se devuelve el fallo del motor */ }
-      return new Response(upstream.body, { status: upstream.status, headers });
+        if (extra.length) return Response.json({ items: extra, total: extra.length, selection_total: 0, degraded: 'motor' }, { headers: jsonHeaders });
+      } catch { /* sin externas no hay nada que servir: se devuelve el fallo del motor, pero explicado */ }
+      // Sin externas que ofrecer, el fallo del motor se declara en JSON con su causa. Reenviar el cuerpo tal cual
+      // (la plataforma responde 429 con TEXTO PLANO cuando el motor está en pausa por cuota) hacía que la alumna
+      // leyera «Revisa los campos e inténtalo otra vez»: un mensaje que la culpa de un problema del servidor.
+      const text = await upstream.clone().text().catch(() => '');
+      const paused = upstream.status === 429 || /allowance/i.test(text);
+      return Response.json({
+        items: [], total: 0, selection_total: 0, degraded: 'motor', engine_down: true,
+        detail: paused
+          ? 'El catálogo no responde ahora mismo: el motor está en pausa por cuota de hosting y se reactiva solo cuando la plataforma reinicia la cuota del mes. Vuelve a intentarlo más tarde.'
+          : 'El catálogo no responde ahora mismo. Vuelve a intentarlo en unos minutos.',
+      }, { status: 503, headers: jsonHeaders });
     }
     // Hosted: la búsqueda de alumna suma las ofertas externas aprobadas a las del motor (sin duplicar enlaces).
     if (engine && upstream.ok && path.join('/') === 'opportunities/search' && request.method === 'POST') {

@@ -16,6 +16,9 @@ NEXT_PID=$!
 trap 'kill $NEXT_PID 2>/dev/null || true' EXIT
 for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.5; done
 BASE="http://127.0.0.1:$PORT" node tests/admin-auth/flow.mjs
+# Motor en pausa por cuota (429 + texto plano, como responde la plataforma de verdad) o caído (500): la
+# causa tiene que llegar en JSON al panel y a la alumna, sin ceros falsos ni mensajes que culpen a quien usa la app.
+BASE="http://127.0.0.1:$PORT" node tests/admin-auth/enginepause.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/parity.mjs
 node --experimental-strip-types tests/admin-auth/csv.mjs
 node --experimental-strip-types tests/admin-auth/salary.mjs

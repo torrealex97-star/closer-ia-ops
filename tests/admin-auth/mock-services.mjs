@@ -8,6 +8,9 @@ export function startMocks({ authPort, enginePort }) {
     admins: [{ email: 'owner@test.dev', role: 'owner', invited_by: 'bootstrap', created_at: '2026-10-16T00:00:00Z' }],
     connections: new Map(), external: new Map(), sourceSettings: new Map(), apifyActors: [], apifyRuns: [], apifyCalls: [], apifyItems: [], apifyStatus: 'SUCCEEDED', ingestRuns: [], tokens: new Map(), recoverCalls: [], recoverTokens: new Map(),
     engineDown: false, // simula la pausa de cuota del motor (Sites devuelve 503)
+    // Pausa REAL de la plataforma, medida en producción: el sitio está publicado pero la cuota del mes se
+    // agotó, y TODAS sus rutas responden 429 con texto plano. `error` imita una caída de verdad (500 HTML).
+    enginePaused: null,
   };
   const send = (res, code, body, extra = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...extra }); res.end(JSON.stringify(body)); };
   const read = req => new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r({}); } }); });
@@ -239,6 +242,8 @@ export function startMocks({ authPort, enginePort }) {
   ];
   const engine = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const body = ['POST', 'PATCH'].includes(req.method) ? await read(req) : {};
+    if (state.enginePaused === 'allowance') { res.writeHead(429, { 'content-type': 'text/plain;charset=UTF-8' }); return res.end('This site has reached its hosting allowance. Please try again later.'); }
+    if (state.enginePaused === 'error') { res.writeHead(500, { 'content-type': 'text/html' }); return res.end('<html><body>Internal error</body></html>'); }
     if (state.engineDown && url.pathname.startsWith('/v1/')) return send(res, 503, { detail: 'Site temporarily unavailable' });
     if (url.pathname === '/page/ok') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<h1>Closer de ventas en Madrid</h1>'); }
     if (url.pathname === '/page/gone') return send(res, 404, {});

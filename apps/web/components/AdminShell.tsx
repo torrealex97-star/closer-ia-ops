@@ -80,7 +80,7 @@ type CloudSource = Overview['sources'][number];
 type Filter = 'all' | 'cloud' | 'failed' | 'local';
 
 // Catálogo completo (todas las fuentes que conoce la app) cruzado con el estado real del motor cloud.
-function SourceCatalog({ sources, external = [], paused = [] }: { sources: CloudSource[]; external?: ExtSource[]; paused?: string[] }) {
+function SourceCatalog({ sources, external = [], paused = [], engineDown = false }: { sources: CloudSource[]; external?: ExtSource[]; paused?: string[]; engineDown?: boolean }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [category, setCategory] = useState('');
   const [text, setText] = useState('');
@@ -102,12 +102,16 @@ function SourceCatalog({ sources, external = [], paused = [] }: { sources: Cloud
   const shown = rows.filter(r => (filter === 'all' || (filter === 'cloud' && (r.cloud || r.ext)) || (filter === 'failed' && failed(r)) || (filter === 'local' && !r.cloud && !r.ext))
     && (!category || (r.category ?? 'Otras') === category) && (!q || `${r.name} ${r.code} ${r.note ?? ''}`.toLowerCase().includes(q)));
   const inCloud = rows.filter(r => r.cloud || r.ext).length;
+  // Con el motor sin datos, una fila que no está en el motor NO está «fuera del cloud»: no se sabe. La
+  // diferencia importa: «fuera del cloud» se lee como una configuración pendiente y no como un fallo.
   const cell = (r: (typeof rows)[number]) => paused.includes(r.code) ? <span className="status bad">Pausada</span> : r.ext && !r.cloud ? <span className="status ok">Externa · {r.ext.live} activas</span> : r.cloud
     ? <span className={statusClass(r.cloud.run_status)}>{r.cloud.run_status ? RUN[r.cloud.run_status] ?? r.cloud.run_status : 'Sin recogida'}{r.cloud.connectors > 1 && <span className="sub">{r.cloud.connectors} conectores</span>}</span>
+    : engineDown ? <span className="status">Sin datos del motor</span>
     : <span className="status">{r.requires === 'input' ? 'Requiere configurar' : 'Fuera del cloud'}</span>;
   return <>
     <h2 className="section-title">Fuentes de datos</h2>
-    <div className="stat-strip"><span><strong>{rows.length}</strong>fuentes catalogadas</span><span><strong>{inCloud}</strong>recogidas (motor cloud o externas)</span><span><strong>{rows.filter(failed).length}</strong>con fallo</span><span><strong>{rows.length - inCloud}</strong>fuera del cloud (app local o con configuración)</span></div>
+    {engineDown && <p className="card-meta" style={{ marginBottom: 12 }}>Sin datos del motor cloud en esta consulta: el estado de las fuentes que no son externas no se puede comprobar ahora mismo.</p>}
+    <div className="stat-strip"><span><strong>{rows.length}</strong>fuentes catalogadas</span><span><strong>{inCloud}</strong>recogidas (motor cloud o externas)</span><span><strong>{engineDown ? '—' : rows.filter(failed).length}</strong>con fallo</span><span><strong>{engineDown ? '—' : rows.length - inCloud}</strong>fuera del cloud (app local o con configuración)</span></div>
     <div className="search-panel admin-toolbar">
       <label className="grow" htmlFor="src-q">Buscar<input id="src-q" placeholder="Nombre o código" value={text} onChange={e => setText(e.target.value)} /></label>
       <label htmlFor="src-filter">Mostrar<select id="src-filter" value={filter} onChange={e => setFilter(e.target.value as Filter)}><option value="all">Todas</option><option value="cloud">En el motor cloud</option><option value="failed">Con fallo</option><option value="local">Fuera del cloud</option></select></label>
@@ -147,7 +151,7 @@ function SourcesTab({ onSessionLost }: { onSessionLost: () => void }) {
       <div className="card-grid">{[...data.connections, ...data.paid].map(c => <article className="source-card" key={c.id}>
         <div className="card-head"><h3>{c.name}</h3><span className={statusClass(c.status)}>{CONN[c.status]}</span></div>
         <p className="card-meta">{c.detail}{c.ms ? ` · ${c.ms} ms` : ''}</p></article>)}</div>
-      <SourceCatalog sources={data.sources} external={data.external?.sources} paused={data.external?.paused} />
+      <SourceCatalog sources={data.sources} external={data.external?.sources} paused={data.external?.paused} engineDown={data.engine === null} />
       <h2 className="section-title">Auditoría de enlaces JobToday{data.audit ? ` · ${data.audit.day}` : ''}</h2>
       {!data.audit ? <p className="muted">Sin auditoría disponible hoy.</p> : <div className="table-wrap"><table className="data-table">
         <thead><tr><th>Fuente</th><th>Enlace</th><th>Estado</th><th className="num">HTTP</th></tr></thead>
