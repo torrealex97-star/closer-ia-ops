@@ -16,9 +16,12 @@ export const SOURCE_RE = /^[a-z0-9-]{2,40}$/;
 export const MAX_CANDIDATES = 300;
 // Revisores que NO son personas. Sus decisiones se cuentan aparte: si se confunden con las humanas, el panel
 // infla «decisiones humanas» y el acuerdo IA-persona compara a la IA consigo misma.
-export const MACHINE_REVIEWERS = ['ai-review', 'auto-vigencia', 'auto-reglas', 'auto-excepcion'] as const;
+export const MACHINE_REVIEWERS = ['ai-review', 'auto-vigencia', 'auto-reglas', 'auto-excepcion', 'auto-retira'] as const;
 /** ¿La decisión la tomó una persona? Sólo entonces cuenta como contraste humano. */
 export const isHumanReviewer = (by: string | null | undefined): boolean => Boolean(by) && !(MACHINE_REVIEWERS as readonly string[]).includes(by as string);
+// Revisores automáticos que APROBAN (ponen la oferta delante de una alumna): las reglas y la IA. Los otros tres
+// no aprueban —`auto-vigencia` y `auto-retira` retiran, `auto-excepcion` manda a la cola humana—, así que no gastan cupo.
+export const APPROVAL_REVIEWERS = ['auto-reglas', 'ai-review'] as const;
 const STATUSES = ['draft', 'needs_review', 'approved', 'published', 'withdrawn'];
 
 const clip = (v: unknown, max: number): string | null => {
@@ -380,6 +383,22 @@ export async function approveByRule(ids: string[], review: Record<string, unknow
 }
 
 /**
+ * Retira lo que las reglas descartan sin duda (una página de resultados de un portal no es un anuncio; un enlace
+ * cerrado ya no existe): sale del catálogo y no ocupa ni el cupo de aprobaciones ni la cola humana. Solo toca
+ * borradores —si una persona o la IA la movió antes, no se pisa— y devuelve cuántas confirmó la base; `null` =
+ * no se pudo escribir. `reviewed_by: auto-retira` a propósito: es una retirada, no una aprobación.
+ */
+export async function withdrawByRule(ids: string[], review: Record<string, unknown>): Promise<number | null> {
+  if (!ids.length || ids.length > 100 || ids.some(i => !/^[0-9a-f-]{36}$/.test(i))) return null;
+  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&id=in.(${ids.join(',')})&editorial_status=eq.draft`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ editorial_status: 'withdrawn', reviewed_by: 'auto-retira', reviewed_at: new Date().toISOString(), auto_review: review }),
+  });
+  const rows = response.ok ? await response.json().catch(() => null) : null;
+  return Array.isArray(rows) ? rows.length : null;
+}
+
+/**
  * Mueve a la cola humana lo que las reglas no cierran, con su motivo. Solo toca borradores (si una
  * persona ya la movió, no se pisa) y devuelve cuántas confirmó la base; `null` = no se pudo escribir.
  * `reviewed_by` distinto de `auto-reglas` a propósito: estas filas no consumen el tope de aprobaciones.
@@ -394,10 +413,21 @@ export async function markForReview(ids: string[], review: Record<string, unknow
   return Array.isArray(rows) ? rows.length : null;
 }
 
-/** Aprobadas hoy por la regla automática (UTC). `null` = no se pudo saber: sin dato no se gasta cuota. */
-export async function approvalsToday(by = 'auto-reglas'): Promise<number | null> {
+/**
+ * Aprobadas hoy por la máquina (UTC), de CUALQUIERA de sus revisoras por defecto. `null` = no se pudo saber: sin
+ * dato no se gasta cuota.
+ *
+ * Cuenta a las dos que aprueban, no sólo a las reglas: el tope diario es el freno de un efecto irreversible
+ * (una oferta aprobada se le enseña a la alumna) y, contando sólo `auto-reglas`, cada pasada posterior del día
+ * arrancaba con el cupo aparentemente libre y la IA podía sumar sus aprobaciones por encima de las 100.
+ */
+export async function approvalsToday(by: string | readonly string[] = APPROVAL_REVIEWERS): Promise<number | null> {
   const start = new Date(); start.setUTCHours(0, 0, 0, 0);
-  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&reviewed_by=eq.${by}&reviewed_at=gte.${encodeURIComponent(start.toISOString())}&select=id&limit=1`, { headers: { Prefer: 'count=exact' } });
+  // Los valores son constantes del repo (nunca datos externos); se validan igual antes de tocar el filtro.
+  const reviewers = (typeof by === 'string' ? [by] : [...by]).filter(v => /^[a-z0-9-]{2,40}$/.test(v));
+  if (!reviewers.length) return null;
+  const filter = reviewers.length === 1 ? `eq.${reviewers[0]}` : `in.(${reviewers.join(',')})`;
+  const response = await serviceRest(`external_offers?org_id=eq.${ORG}&reviewed_by=${filter}&reviewed_at=gte.${encodeURIComponent(start.toISOString())}&select=id&limit=1`, { headers: { Prefer: 'count=exact' } });
   if (!response.ok) return null;
   const total = Number((response.headers.get('content-range') ?? '').split('/')[1]);
   return Number.isFinite(total) ? total : null;
