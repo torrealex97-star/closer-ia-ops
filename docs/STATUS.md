@@ -55,6 +55,21 @@ _Nota (sesión 67): las entradas de las sesiones 38–43 de esta rama (activaci�
 - **Tope de filas comprobado**: los 100 resultados por término **no recortan closers**; la segunda página (medida en 4 términos) aporta 0–1 candidatos de perfil y **0 closers**, porque ya cae fuera de la ventana de 10 días (mediana de antigüedad 4 días y varios términos sin nada vivo). El tope que importaba era la ventana de términos, no las filas.
 - **Límites**: (1) la pasada real en producción **no se ha visto todavía**: el motor solo recoge cuando su última pasada tiene más de 6 h (la de hoy fue a las 20:04 UTC) y `/api/collect` exige un token que no tengo, así que la primera confirmación con D1 real será la pasada automática de la madrugada; lo medido arriba es contra las APIs en vivo con los extractores del propio motor, no contra D1. (2) La cuota de escrituras de D1 sigue muy justa hasta el 1 de noviembre (~3.000 escrituras): el filtro reduce el gasto, no lo elimina. (3) Parte de lo que queda clasificado como closer en LATAM/Himalayas es ambiguo (p. ej. «Senior Technical Recruiter» que menciona closers en el cuerpo) y lo decide la cola de revisión.
 
+## Revisión profunda con 8 revisores: lo que se arregló y lo que queda (sesión 116) — 2026-10-27
+
+- **Petición del operador**: «code review más profundo con las mejores skills… y fusiona y lleva al main lo de todas las ramas».
+- **Método** (inspected): skill `project-review` con 8 revisores de solo lectura (seguridad de aplicación, autorización, privacidad, pruebas, rendimiento, infraestructura, accesibilidad, IA); cada hallazgo se contrastó con el código antes de tocarlo.
+- **Arreglado** (tested: typecheck, pruebas unitarias, `run.sh` 45/45, build, diseño, secretos):
+  - [offerRisk](../apps/web/lib/offerRisk.ts): «sin experiencia previa, es necesario pagar 300 €» se aprobaba sola (la coma no cortaba la negación). Ahora es BLOQUEADA; con prueba.
+  - [aiReview](../apps/web/lib/aiReview.ts) / [aiAgreement](../apps/web/lib/aiAgreement.ts): un `reject` de la IA exige confianza ≥ 85 para retirar; la puerta a `live` exige además ≤ 10 % de retiradas falsas.
+  - Lecturas por páginas (`pagedRest`) en [studentActivity](../apps/web/lib/studentActivity.ts), [aiAgreement](../apps/web/lib/aiAgreement.ts) y [metrics](../apps/web/lib/metrics.ts): una sola petición se cortaba en 1.000 filas y `truncated` no saltaba.
+  - [students](../apps/web/lib/students.ts): `removeStudent` ya no da «ok» si falla el borrado en Auth (los datos de la alumna sobrevivían).
+  - Motor: token de recogida con comparación en tiempo constante; una recogida en curso no se duplica (ahorra escrituras D1); los fallos del cron y del motor dejan rastro en logs.
+  - Accesibilidad: texto `--secondary` sobre `--accent-soft` (4,31:1) → `--ink`; `aria-current` en la navegación de alumna; `role=status/timer` en la sala.
+  - Cadena de suministro: `next` 16.3.5 → 16.4.3 (`npm audit --omit=dev`: 0 vulnerabilidades), permisos mínimos en los workflows, `SITES` por entorno (sin interpolar en shell), `dependabot.yml`.
+- **Ramas**: todas las fusionadas. `feat/formacion-progreso` y `claude/cloud-student-view` NO se fusionan: son versiones antiguas y divergentes (31 conflictos) de trabajo ya reconstruido en `main`; lo útil se portó (`tests/db/student_activity_behaviour.sql`). Borrarlas lo hace el dueño.
+- **No arreglado (declarado)**: (1) el examen lo califica el navegador y el servidor solo valida el recuento → no sirve como certificación (necesita enviar respuestas y calificar en servidor); (2) el tope «global» de la sala es por instancia → poner un límite de gasto mensual en Groq; (3) `tests/db/*.sql` no corren en CI; (4) el Worker del motor sirve `/api/offers` sin `STUDENT_LOGIN_REQUIRED`; (5) sin limitador de intentos en el login; (6) acciones sin fijar a SHA; (7) `ensureSchema` repite DDL por petición; (8) `cronbudget.mjs` depende del reloj real.
+
 ## Revisión profunda: los recuentos ya no se cortan en silencio (sesión 115) — 2026-10-26
 
 - **Petición del operador**: «code review más profundo usando las mejores skills… soluciona errores hasta que esté lo más perfecto posible».
