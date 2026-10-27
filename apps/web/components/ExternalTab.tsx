@@ -9,6 +9,7 @@ import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 import MetricsPanel from './MetricsPanel';
 import { NICHE_LABELS, PAY_LABELS, type OfferTags } from '../lib/offerTags';
 import AiAgreement from './AiAgreement';
+import RuleAuditList from './RuleAuditList';
 import SourceIdeas from './SourceIdeas';
 type Offer = { id: string; source: string; title: string; company: string | null; location: string | null; url: string; salary: string | null; posted_at: string | null; first_seen_at: string; editorial_status: string; verified_result: string | null; role: string | null; spain: boolean | null; score: number; also_seen: string[]; ai_review?: AiReview | null; risk?: { level: 'WARNING' | 'BLOCKED'; flags: string[] } | null; tags?: OfferTags };
 type AiReview = { verdict: string; confidence: number; reasons: string[]; red_flags: string[]; would_decide: string; gate: string; mode: string; applied: boolean; audit_sample?: boolean; link?: { result: string; reason: string }; jev?: { verdict: string | null; score: number | null; note: string | null } };
@@ -158,6 +159,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
     </div>
     <MetricsPanel onSessionLost={onSessionLost} />
     <AiAgreement onSessionLost={onSessionLost} />
+    <RuleAuditList onSessionLost={onSessionLost} />
     <SourceIdeas />
     <div className="table-wrap" style={{ marginBottom: 20 }}><table className="data-table">
       <thead><tr><th>Fuente</th><th>Vía</th><th>Estado</th><th className="num">Activas</th><th className="num">Aprobadas</th><th>Última vez</th><th /></tr></thead>

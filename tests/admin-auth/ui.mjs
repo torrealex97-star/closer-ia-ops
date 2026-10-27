@@ -126,6 +126,18 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.getByRole('button', { name: 'Actualizar' }).click(); await page.getByText('Closer high ticket').waitFor();
   await page.getByRole('button', { name: 'Aprobar las mejores' }).click(); await page.getByText(/Aprobadas 1 de 1 que cumplían los filtros/).waitFor();
   assert.equal([...state.external.values()].filter(o => o.editorial_status === 'approved').length, 2);
+  // Auditoría del catálogo: un listado de portal YA aprobado antes del arreglo aparece con su motivo y SIGUE
+  // aprobado (la lista informa, no retira). Sin este panel, lo aprobado por una versión anterior de la regla
+  // quedaba publicado delante de las alumnas y nadie lo veía: la pasada automática solo mira borradores.
+  const listing = mk('old-index', { title: 'Ofertas de trabajo de Closer', company: null, url: 'https://www.infojobs.net/ofertas-trabajo/closer', editorial_status: 'approved', score: 90 });
+  const auditPanel = page.getByTestId('rule-audit');
+  if (!(await auditPanel.evaluate(el => el.open))) await auditPanel.locator('summary').click();
+  await auditPanel.getByRole('button', { name: /Comprobar de nuevo/ }).click();
+  await page.getByTestId('rule-audit').getByText('Ofertas de trabajo de Closer').waitFor();
+  assert.match(await page.getByTestId('rule-audit').innerText(), /Es un listado del portal, no una oferta/);
+  assert.match(await page.getByTestId('rule-audit').innerText(), /Solo lectura/);
+  assert.equal([...state.external.values()].find(o => o.title === 'Ofertas de trabajo de Closer').editorial_status, 'approved', 'la auditoría no cambia ninguna oferta');
+  state.external.delete('old-index'); // fuera del estado para no alterar los recuentos de los pasos siguientes
   await page.getByRole('button', { name: 'Fuentes', exact: true }).click(); await page.getByRole('heading', { name: 'Fuentes de datos.' }).waitFor();
   // 5 activas: las cuatro de siempre más la excepción 'x0' que crea este paso.
   await page.getByLabel('Buscar').fill('indeed'); await page.getByText(/Externa · 5 activas/).waitFor();

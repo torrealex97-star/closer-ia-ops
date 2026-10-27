@@ -28,7 +28,22 @@ const INDEX_TITLE = /^\s*(?:ofertas? de (?:trabajo|empleo)|empleos? (?:de|en)|tr
 // Univision: con `s?` la regla las retiraba como si fueran listados (y una de ellas la había aprobado una
 // persona a mano).
 const INDEX_URL = /\/(?:ofertas-trabajo|ofertas-empleo|empleos|jobs?\/search|jobsearch|search\/jobs|vacantes)\b/i;
-const isIndexPage = (row: Row) => (!row.company && INDEX_TITLE.test(row.title ?? '')) || INDEX_URL.test(row.url ?? '');
+const isIndexPage = (row: Retirable) => (!row.company && INDEX_TITLE.test(row.title ?? '')) || INDEX_URL.test(row.url ?? '');
+
+// Campos que bastan para decidir una retirada (sin leer la descripción). La auditoría del catálogo usa
+// exactamente este tipo, así que no puede quedarse corta de datos sin que el compilador lo diga.
+type Retirable = Pick<Row, 'title' | 'company' | 'url' | 'verified_result'>;
+
+/**
+ * Lo que las reglas retiran sin mirar nada más: una página de resultados de un portal o un enlace ya cerrado.
+ * Se aísla para que la auditoría del catálogo (ofertas YA aprobadas) use el mismo criterio y no una copia que
+ * se desincronice: una regla equivocada se vería en la auditoría antes de borrar nada.
+ */
+export function withdrawalReason(row: Retirable): string | null {
+  if (isIndexPage(row)) return 'no_es_oferta';
+  if (row.verified_result === 'closed') return 'enlace_cerrado';
+  return null;
+}
 
 // Código de estado de EE. UU. al final de la ubicación («Miramar, FL», «El Paso, TX 79901»). El gazetteer
 // español contiene Miramar y El Paso (municipios reales), así que una oferta de Florida se colaba como
@@ -42,8 +57,8 @@ export function judgeOffer(row: Row): RuleVerdict {
   const market: Market | null = us ? 'US_LATINO' : (row.market as Market | null | undefined) ?? computed.market;
   const basis = us ? 'ubicacion_estados_unidos' : row.market_basis ?? computed.basis;
   const verdict = (decision: RuleVerdict['decision'], why: string): RuleVerdict => ({ decision, why, market, basis });
-  if (isIndexPage(row)) return verdict('withdraw', 'no_es_oferta');
-  if (row.verified_result === 'closed') return verdict('withdraw', 'enlace_cerrado');
+  const retire = withdrawalReason(row);
+  if (retire) return verdict('withdraw', retire);
   if (!row.role) return verdict('human', 'sin_perfil');
   if (!market) return verdict('human', 'sin_mercado');
   if (row.spain === false && market === 'ES') return verdict('human', 'mercado_dudoso');

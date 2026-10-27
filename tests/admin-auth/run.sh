@@ -23,6 +23,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/aireview.mjs
 # Cualificación automática: lo claro se aprueba y lo dudoso ACABA en la cola humana (no en borrador).
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/autoreview.mjs
+# Auditoría del catálogo (SOLO LECTURA): lo ya aprobado que la regla retiraría, con su motivo y sin escribir nada.
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/ruleaudit.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/metrics.mjs
 # Cifras por fuente: las cuenta la base (count=exact), sin traer la tabla ni cortarse en 5.000.
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/sources.mjs
