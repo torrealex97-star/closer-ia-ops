@@ -421,34 +421,182 @@ const EXTRACTORS = {
   getonbrd: sourceGetOnBoard, freehire: sourceFreehire,
 };
 
+// ------ forma de escritura del catálogo (esto es cuota, no estilo) ------
+//
+// D1 factura cada ENTRADA DE ÍNDICE como una fila escrita, no solo la fila de la tabla («two rows
+// written: one to the table, one to the index»). Medido en D1 real de workerd (2026-10-28): un
+// candidato nuevo costaba 18 filas escritas —6 tablas × (1 fila + 2 índices)— de las que solo 6 eran
+// datos. Con el plan gratuito (100.000 filas al mes) eso daba ~5.500 candidatos nuevos al mes: más de
+// un tercio de la cuota se iba en índices.
+//
+// La pieza que se quita SIN coste de lectura es el índice implícito de la clave primaria de texto:
+//   · `WITHOUT ROWID`: la clave ES la tabla y no crea índice aparte (medido: 1 fila escrita por fila,
+//     frente a 2 con rowid). Con la forma final, un candidato nuevo cuesta 11 filas (medido).
+//   · sin `idx_catalog_expiry`: se filtra por organización, que ya es la clave. Un alta de catálogo
+//     pasaba de 3 filas escritas a 1, y el refresco de vigencia de 2 a 1 (medido).
+//
+// Lo que NO se quita son los cinco UNIQUE de abajo: no son redundantes, son el camino de LECTURA de
+// la ingesta y del panel. La consulta que construye `known` filtra por (org_id, source) y une por
+// (org_id, source, external_id); los joins de la alumna van por opportunities(org_id, job_id) y las
+// versiones por (org_id, opportunity_id). Sin esos índices cada pasada y cada página harían escaneos
+// completos; con ellos los planes son SEARCH (comprobado con EXPLAIN QUERY PLAN en workerd). Quitarlos
+// ahorraba 1 fila por escritura y costaba lecturas que hoy son el 22% de su cuota.
+//
+// Coste medido por candidato nuevo: 18 (forma actual) → 11 (base nueva) → 16 mientras la base
+// existente conserve el rowid en las cinco tablas con UNIQUE (ver `migrateWriteShape`).
+// Las tablas de bajo volumen (collection_runs, slug_audit, verification_events, write_ledger) se
+// quedan como están: no cuestan por candidato y moverlas solo añadiría migración que pagar.
+const CATALOG_SHAPE = [
+  {
+    table: 'raw_items',
+    names: ['id', 'org_id', 'source', 'provider', 'external_id', 'content_hash', 'payload', 'captured_at'],
+    columns: `id TEXT PRIMARY KEY, org_id TEXT NOT NULL, source TEXT NOT NULL, provider TEXT NOT NULL,
+      external_id TEXT NOT NULL, content_hash TEXT NOT NULL, payload TEXT NOT NULL, captured_at TEXT NOT NULL,
+      UNIQUE(org_id, source, external_id, content_hash)`,
+    // Reconstruirla cuesta 2 filas por fila existente (copia + índice del UNIQUE, medido): se deja
+    // para cuando haya hueco de sobra o plan de pago, no para la ventana de noviembre.
+    migrate: false,
+  },
+  {
+    table: 'job_postings',
+    names: ['id', 'org_id', 'raw_id', 'source', 'external_id', 'payload'],
+    columns: `id TEXT PRIMARY KEY, org_id TEXT NOT NULL, raw_id TEXT NOT NULL, source TEXT NOT NULL,
+      external_id TEXT NOT NULL, payload TEXT NOT NULL, UNIQUE(org_id, source, external_id)`,
+    migrate: false,
+  },
+  {
+    table: 'jobs',
+    names: ['id', 'org_id', 'posting_id', 'starred'],
+    columns: `id TEXT PRIMARY KEY, org_id TEXT NOT NULL, posting_id TEXT NOT NULL, starred INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(org_id, posting_id)`,
+    migrate: false,
+  },
+  {
+    table: 'catalog_entries',
+    names: ['org_id', 'job_id', 'first_seen_at', 'expires_at'],
+    columns: `org_id TEXT NOT NULL, job_id TEXT NOT NULL, first_seen_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+      PRIMARY KEY(org_id, job_id)`,
+    // La única que se migra ahora: no tiene UNIQUE aparte, así que la reconstrucción cuesta 1 fila por
+    // fila existente, y a cambio el alta baja de 3 a 1 y cada refresco de 2 a 1.
+    migrate: true,
+  },
+  {
+    table: 'opportunities',
+    names: ['id', 'org_id', 'job_id', 'current_version_id', 'editorial_status', 'opportunity_status', 'connection_type', 'created_at', 'updated_at', 'last_verified_at', 'verified_until', 'status_reason'],
+    columns: `id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL, current_version_id TEXT,
+      editorial_status TEXT NOT NULL DEFAULT 'draft', opportunity_status TEXT NOT NULL DEFAULT 'verifying',
+      connection_type TEXT NOT NULL DEFAULT 'external_application',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      last_verified_at TEXT, verified_until TEXT, status_reason TEXT,
+      UNIQUE(org_id, job_id)`,
+    migrate: false,
+  },
+  {
+    table: 'opportunity_versions',
+    names: ['id', 'org_id', 'opportunity_id', 'version', 'locale', 'payload', 'created_by', 'created_at', 'reviewed_by', 'reviewed_at'],
+    columns: `id TEXT PRIMARY KEY, org_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, version INTEGER NOT NULL,
+      locale TEXT NOT NULL DEFAULT 'es', payload TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
+      reviewed_by TEXT, reviewed_at TEXT, UNIQUE(org_id, opportunity_id, version)`,
+    migrate: false,
+  },
+];
+
+// Qué tablas siguen con la forma cara. Se lee el esquema REAL en vez de suponerlo por versión: una
+// base nueva ya nace barata y una migrada deja de estar pendiente. `pending` = reconstruibles ya;
+// `legacy` = siguen con rowid pero NO se reconstruyen en esta ventana (cuestan 2 filas por fila).
+// Si el esquema no se puede leer devuelve `null` y NO se toca nada: un fallo de lectura no justifica
+// escribir (misma regla que el registro de cuota).
+async function writeShapeState(db) {
+  const names = CATALOG_SHAPE.map(shape => shape.table);
+  try {
+    const rows = await db.prepare(`SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN (${names.map(() => '?').join(',')})`)
+      .bind(...names).all();
+    const seen = new Map((rows?.results ?? []).map(row => [row.name, String(row.sql ?? '')]));
+    // Una tabla que no está en el mapa no existe todavía: la crea `ensureSchema` con la forma nueva.
+    const stale = CATALOG_SHAPE.filter(shape => {
+      const sql = seen.get(shape.table);
+      return sql !== undefined && !/WITHOUT ROWID/i.test(sql);
+    });
+    return {
+      pending: stale.filter(shape => shape.migrate).map(shape => shape.table),
+      legacy: stale.filter(shape => !shape.migrate).map(shape => shape.table),
+    };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'write_shape_unreadable', error: String(error?.message || error) }));
+    return null;
+  }
+}
+
+// Reconstrucción de UNA tabla en un solo `batch`: atómica (o queda entera o no cambia nada), así que
+// no puede dejar una tabla a medias. Coste medido en D1 real de workerd: 1 fila escrita por fila
+// copiada cuando la tabla no tiene UNIQUE aparte (catalog_entries) y 2 cuando lo conserva.
+async function rebuildWriteShape(db, shape) {
+  const next = `${shape.table}__new`;
+  const columns = shape.names.join(', ');
+  const results = await db.batch([
+    db.prepare(`DROP TABLE IF EXISTS ${next}`),
+    db.prepare(`CREATE TABLE ${next} (${shape.columns}) WITHOUT ROWID`),
+    db.prepare(`INSERT INTO ${next} (${columns}) SELECT ${columns} FROM ${shape.table}`),
+    db.prepare(`DROP TABLE ${shape.table}`),
+    db.prepare(`ALTER TABLE ${next} RENAME TO ${shape.table}`),
+  ]);
+  return (Array.isArray(results) ? results : [results]).reduce((total, result) => total + rowsWritten(result), 0);
+}
+
+// La migración, con la cuota delante: solo tablas `migrate`, con un tope de escrituras por pasada
+// (el tope DIARIO de la plataforma es 10.000 y pausa el sitio entero, así que jamás se cruza) y solo
+// si queda hueco de sobra tras reservar la recogida. Lo que no quepa se declara pendiente y sigue en
+// la siguiente pasada; un fallo se declara y se continúa.
+const MIGRATION_TABLES_PER_PASS = 2;
+const MIGRATION_MAX_WRITES = 6000; // techo por pasada: con el margen, la recogida del día conserva cuota
+const MIGRATION_MARGIN = 1500; // escrituras que se reservan para la propia pasada de recogida
+const MIGRATION_ROWS_PER_WRITE = 1; // catalog_entries no tiene UNIQUE aparte: copiar = 1 fila por fila
+async function migrateWriteShape(db, allowance) {
+  const state = await writeShapeState(db);
+  if (state === null) return { pending: null, legacy: null, rebuilt: [], writes: 0, reason: 'esquema no legible' };
+  // Quitar el índice de caducidad NO exige reconstruir la tabla y es el ahorro que se paga en cada
+  // pasada (refresco de vigencia 2 → 1): se aplica ya, aunque el catálogo conserve el rowid. Es
+  // idempotente —cuando ya no está, `IF EXISTS` no escribe nada— y un fallo se declara, no se calla.
+  await db.prepare('DROP INDEX IF EXISTS idx_catalog_expiry').run()
+    .catch(error => console.error(JSON.stringify({ event: 'write_shape_index_drop_failed', error: String(error?.message || error) })));
+  if (!state.pending.length) return { pending: [], legacy: state.legacy, rebuilt: [], writes: 0, reason: null };
+  const monthLeft = Math.floor(WRITE_ALLOWANCE.month * WRITE_GUARD_RATIO) - (Number(allowance?.month_writes) || 0);
+  const dayLeft = Math.floor(WRITE_ALLOWANCE.day * WRITE_GUARD_RATIO) - (Number(allowance?.day_writes) || 0);
+  const headroom = Math.min(monthLeft, dayLeft, MIGRATION_MAX_WRITES);
+  const rebuilt = [];
+  let writes = 0;
+  for (const name of state.pending.slice(0, MIGRATION_TABLES_PER_PASS)) {
+    const shape = CATALOG_SHAPE.find(item => item.table === name);
+    const counted = await db.prepare(`SELECT count(*) AS n FROM ${name}`).all().catch(() => null);
+    const estimate = (Number(counted?.results?.[0]?.n) || 0) * MIGRATION_ROWS_PER_WRITE;
+    if (headroom - writes < estimate + MIGRATION_MARGIN) {
+      console.error(JSON.stringify({ event: 'write_shape_deferred', table: name, estimate, headroom: headroom - writes }));
+      break;
+    }
+    try {
+      writes += await rebuildWriteShape(db, shape);
+      rebuilt.push(name);
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'write_shape_rebuild_failed', table: name, error: String(error?.message || error) }));
+      break;
+    }
+  }
+  const after = await writeShapeState(db);
+  return { pending: after?.pending ?? null, legacy: after?.legacy ?? null, rebuilt, writes, reason: null };
+}
+
+
 // ------ esquema D1 (additiva, versionada; equivalente del núcleo local) ------
 async function ensureSchema(db) {
   await db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)'),
     db.prepare('INSERT OR IGNORE INTO schema_version VALUES (1)'),
-    db.prepare(`CREATE TABLE IF NOT EXISTS raw_items (
-      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, source TEXT NOT NULL, provider TEXT NOT NULL,
-      external_id TEXT NOT NULL, content_hash TEXT NOT NULL, payload TEXT NOT NULL, captured_at TEXT NOT NULL,
-      UNIQUE(org_id, source, external_id, content_hash))`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS job_postings (
-      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, raw_id TEXT NOT NULL, source TEXT NOT NULL,
-      external_id TEXT NOT NULL, payload TEXT NOT NULL, UNIQUE(org_id, source, external_id))`),
-    db.prepare('CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, posting_id TEXT NOT NULL, starred INTEGER NOT NULL DEFAULT 0, UNIQUE(org_id, posting_id))'),
-    db.prepare(`CREATE TABLE IF NOT EXISTS catalog_entries (
-      org_id TEXT NOT NULL, job_id TEXT NOT NULL, first_seen_at TEXT NOT NULL, expires_at TEXT NOT NULL,
-      PRIMARY KEY(org_id, job_id))`),
+    // Las seis tablas del camino de un candidato, con la forma barata (ver CATALOG_SHAPE): la misma
+    // información y un tercio de las filas escritas.
+    ...CATALOG_SHAPE.map(shape => db.prepare(`CREATE TABLE IF NOT EXISTS ${shape.table} (${shape.columns}) WITHOUT ROWID`)),
     db.prepare(`CREATE TABLE IF NOT EXISTS collection_runs (
       id TEXT PRIMARY KEY, org_id TEXT NOT NULL, day TEXT NOT NULL, status TEXT NOT NULL,
       sources TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS opportunities (
-      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL, current_version_id TEXT,
-      editorial_status TEXT NOT NULL DEFAULT 'draft', opportunity_status TEXT NOT NULL DEFAULT 'verifying',
-      connection_type TEXT NOT NULL DEFAULT 'external_application',
-      created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(org_id, job_id))`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS opportunity_versions (
-      id TEXT PRIMARY KEY, org_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, version INTEGER NOT NULL,
-      locale TEXT NOT NULL DEFAULT 'es', payload TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
-      UNIQUE(org_id, opportunity_id, version))`),
     // Evidencia de verificación de vigencia (port fase 3, espejo migrate v12 local):
     // append-only, una fila por comprobación con su TTL y razón; apunta al raw.
     db.prepare(`CREATE TABLE IF NOT EXISTS verification_events (
@@ -457,7 +605,7 @@ async function ensureSchema(db) {
       method TEXT NOT NULL, evidence_raw_id TEXT, valid_until TEXT,
       reason_code TEXT, verifier_version TEXT NOT NULL DEFAULT '1')`),
     db.prepare('CREATE INDEX IF NOT EXISTS verification_job ON verification_events(org_id, job_id, checked_at)'),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_catalog_expiry ON catalog_entries(org_id, expires_at)'),
+    // A propósito SIN índice de caducidad: la forma barata lo quita (ver CATALOG_SHAPE).
     db.prepare('CREATE INDEX IF NOT EXISTS idx_runs_created ON collection_runs(org_id, created_at)'),
     // Evidencia del audit periódico de slugs JobToday (append-only, como raw_items):
     // una fila por (slug, día) con el destino real; nunca reescribe el slug de la fuente.
@@ -1093,8 +1241,18 @@ async function handleAdminActivate(request, env) {
 // de cada lote; no puede leer el contador de la plataforma desde dentro), por eso el guardián se
 // queda un 15% por debajo del techo. Solo lo escribe el servidor, una fila por día y organización,
 // y no guarda nada de las ofertas ni de las alumnas.
+//
+// Coste por candidato nuevo, MEDIDO en D1 real de workerd (2026-10-27): 18 filas escritas con la
+// forma vieja (6 tablas × tabla + 2 índices cada una) y 6 con la forma de CATALOG_SHAPE. Eso es lo
+// que separa ~5.500 candidatos al mes de ~16.600 sin cambiar de plan; ver `migrateWriteShape`.
 const WRITE_ALLOWANCE = { month: 100000, day: 10000 };
 const WRITE_GUARD_RATIO = 0.85;
+
+// Superficie de prueba de la forma de escritura (como `__test`, pero declarada DESPUÉS de estas
+// constantes: un `const` exportado antes de su declaración es una ReferenceError al importar el
+// módulo). La forma, la migración y la ingesta son donde está el coste de cuota del motor.
+// Ver tests/engine/writeshape.mjs.
+export const __testShape = { CATALOG_SHAPE, ensureSchema, writeShapeState, rebuildWriteShape, migrateWriteShape, ingestBatch, stableId, WRITE_ALLOWANCE, WRITE_GUARD_RATIO, MIGRATION_TABLES_PER_PASS, MIGRATION_MAX_WRITES, MIGRATION_MARGIN };
 
 // Filas escritas según D1: `rows_written` es la métrica que cuenta la plataforma; `changes` (filas
 // afectadas) es el respaldo para las versiones que no la devuelven.
@@ -1165,6 +1323,9 @@ async function runCollection(env, force = false) {
     return { skipped: true, reason: 'write_allowance', write_allowance: allowance,
       note: 'Recogida detenida por la cuota de escrituras del motor; se reanuda al reiniciarse la cuota (día 1 del mes). El catálogo ya recogido se sigue sirviendo.' };
   }
+  // Forma de escritura: se migra a la forma barata ANTES de recoger, porque es lo que abarata todo lo
+  // demás, y se cobra al mismo registro de cuota. Una o dos tablas por pasada; lo que no quepa, sigue.
+  const migration = await migrateWriteShape(db, allowance);
   const last = await db.prepare(
     "SELECT id,status,completed_at,sources FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
   ).bind(ORG).first();
@@ -1198,7 +1359,9 @@ async function runCollection(env, force = false) {
   // lo aplazado o caído en la pasada anterior y, tras eso, la rotación del día.
   const { budget, ordered, resumed } = planRun(SOURCES, last?.sources, day, env?.MAX_SUBREQUESTS);
   let spent = 0;
-  let wrote = 0; // filas escritas por esta pasada (lotes de ingesta), para el registro de cuota
+  // Filas escritas por esta pasada para el registro de cuota: los lotes de ingesta y, si tocó,
+  // la reconstrucción de tablas de la forma barata.
+  let wrote = migration.writes;
   for (const source of ordered) {
     const cost = fetchCost(source);
     if (spent + cost > budget) {
@@ -1245,6 +1408,9 @@ async function runCollection(env, force = false) {
   // `resumed` deja en la respuesta qué fuentes abrieron esta pasada, para que el recurso se vea sin
   // leer la tabla. `budget` es el presupuesto real de subrequests que quedó para fetch.
   return { run_id: runId, budget, resumed, sources: states, writes: charged,
+    // Estado de la forma de escritura: qué tablas se reconstruyeron en esta pasada y cuáles siguen
+    // pendientes (con `null` = esquema no legible, que no es lo mismo que «todo migrado»).
+    write_shape: { rebuilt: migration.rebuilt, pending: migration.pending, legacy: migration.legacy, writes: migration.writes },
     write_allowance: { ...allowance, charged }, ...(slugAudit ? { slug_audit: slugAudit } : {}) };
 }
 
@@ -1274,13 +1440,17 @@ async function ingestBatch(db, source, candidates, known) {
       );
       continue;
     }
-    const rawId = 'raw-' + crypto.randomUUID();
+    // Id determinista, como el del job: misma fuente + mismo anuncio + mismo contenido = misma fila,
+    // así un reintento no duplica evidencia (la clave es lo que deduplica; el id solo la nombra).
+    const rawId = stableId('raw', `${source.code}|${candidate.external_id}|${contentHash}`);
     const postingId = stableId('post', `${source.code}|${candidate.external_id}`);
     statements.push(
       db.prepare('INSERT OR IGNORE INTO raw_items (id,org_id,source,provider,external_id,content_hash,payload,captured_at) VALUES (?,?,?,?,?,?,?,?)')
         .bind(rawId, ORG, source.code, 'cloud-fetch-v1', candidate.external_id, contentHash, JSON.stringify(p), captured),
+      // Conflicto por la clave primaria: el id ya deriva de fuente + id externo, así que no depende
+      // del UNIQUE (que se conserva porque es el camino de lectura de la consulta de `known`).
       db.prepare(`INSERT INTO job_postings (id,org_id,raw_id,source,external_id,payload) VALUES (?,?,?,?,?,?)
-        ON CONFLICT(org_id, source, external_id) DO UPDATE SET raw_id=excluded.raw_id, payload=excluded.payload`)
+        ON CONFLICT(id) DO UPDATE SET raw_id=excluded.raw_id, payload=excluded.payload`)
         .bind(postingId, ORG, rawId, source.code, candidate.external_id, JSON.stringify(p)),
       db.prepare('INSERT OR IGNORE INTO jobs (id,org_id,posting_id) VALUES (?,?,?)').bind(jobId, ORG, postingId),
       db.prepare(`INSERT INTO catalog_entries (org_id,job_id,first_seen_at,expires_at) VALUES (?,?,?,?)
@@ -10686,6 +10856,10 @@ async function handleStatus(env) {
     // Cuota de escritura del mes: es el techo que pausa el sitio, y el panel lo enseña para que se
     // vea venir en vez de descubrirlo cuando ya no se recoge nada.
     write_allowance: await readWriteAllowance(db),
+    // Forma de escritura del catálogo: `pending: []` significa migrado; `legacy` son las tablas que
+    // siguen con rowid y NO se reconstruyen en esta ventana; `null`, que no se pudo leer el esquema
+    // (se declara en vez de fingir que está hecho).
+    write_shape: await writeShapeState(db),
     latest_run: run ? { id: run.id, day: run.day, status: run.status, created_at: run.created_at, completed_at: run.completed_at, sources: JSON.parse(run.sources) } : null,
   });
 }
