@@ -1,5 +1,5 @@
 import { FINAL_EXAM } from '../components/trainingContent';
-import { EXAM_PASS } from '../components/trainingCheck';
+import { EXAM_PASS, gradeExam } from '../components/trainingCheck';
 import { REVIEW_REFS } from '../components/trainingRefs';
 import { ORG } from './external';
 import { pagedRest, serviceRest } from './supabaseAuth';
@@ -37,11 +37,13 @@ export function checkActivity(body: unknown): Checked {
   }
   if (kind === 'training_exam') {
     if (ref !== 'final') return { ok: false, detail: 'Examen desconocido.' };
-    // Sin respuestas acertadas no hay nota: el servidor la calcula y recalcula «superado».
-    if (!isInt(info.correct, 0, EXAM_TOTAL) || info.total !== EXAM_TOTAL || info.correct > EXAM_TOTAL) return { ok: false, detail: 'El examen necesita las respuestas acertadas y el total de preguntas.' };
-    const computed = Math.round((info.correct / EXAM_TOTAL) * 100);
-    const passed = computed >= EXAM_PASS;
-    return { ok: true, passed, value: { kind, ref, score: computed, detail: { correct: info.correct, total: EXAM_TOTAL, passed } } };
+    // El navegador envía las RESPUESTAS elegidas, no un recuento: el servidor las corrige contra la clave y decide nota y «superado».
+    const sent = info.answers;
+    if (!isRecord(sent)) return { ok: false, detail: 'El examen necesita las respuestas elegidas.' };
+    const answers: Record<string, string> = {};
+    for (const [id, value] of Object.entries(sent).slice(0, 50)) if (/^[a-z0-9_-]{1,30}$/i.test(id) && typeof value === 'string' && value.length <= 300) answers[id] = value;
+    const graded = gradeExam(answers);
+    return { ok: true, passed: graded.passed, value: { kind, ref, score: graded.score, detail: { correct: graded.correct, total: graded.total, passed: graded.passed } } };
   }
   if (kind === 'practice') {
     if (typeof ref !== 'string' || !/^[a-z0-9_-]{1,60}$/i.test(ref)) return { ok: false, detail: 'Escenario no válido.' };

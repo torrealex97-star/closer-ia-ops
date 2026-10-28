@@ -1,5 +1,13 @@
 # Estado
 
+## El examen de Formación lo califica el servidor (sesión 127) — 2026-10-28
+
+- **Petición del operador**: «haz 1 y 3» (borrar ramas antiguas y calificar el examen en servidor).
+- **Defecto** (revisión de la sesión 116): el navegador calificaba el examen y enviaba `correct/total`; cualquier alumna podía registrar 6/6 y «Examen superado» sin responder.
+- **Arreglo** (tested: typecheck, `activity.mjs`, `run.sh` 45/45, build, diseño): [studentActivity](../apps/web/lib/studentActivity.ts) recibe ahora las **respuestas elegidas** (`detail.answers`), las corrige con `gradeExam` contra la clave y decide nota y «superado»; un recuento, un `score` o un `passed` enviados se ignoran. Las pruebas cubren recuento falsificado, 4/6 con `correct:6` enviado y examen en blanco (0, no error). `run.sh` ejecuta `flow.mjs` con el cargador de TypeScript para importar la clave.
+- **Límite declarado**: la clave de respuestas viaja en el código del navegador (el examen se corrige también en pantalla), así que una alumna que lea el código puede enviar las correctas. Esto impide falsificar el recuento, no copiar; para una **certificación** con valor haría falta servir las preguntas sin clave desde el servidor y/o corrección por una mentora.
+- **Ramas (punto 1)**: `git push origin --delete feat/formacion-progreso claude/cloud-student-view` lo vuelve a denegar el clasificador de permisos («Git Destructive») aunque lo pidas; no lo rodeé. Lo ejecutas tú (OWNER_GUIDE paso 3) o añades una regla de permiso para ese comando.
+
 ## El motor se para solo antes de que la cuota de escritura pause el sitio entero (sesión 126) — 2026-10-27
 
 - **Petición del operador**: «¿cómo solucionamos lo de “El motor está en pausa por cuota de hosting”?». Primero medí la cuota real de la plataforma (lectura de su propio contador) y después construí la parte que **sí** puede hacer el código; la otra parte es una decisión de gasto del dueño.
