@@ -430,7 +430,7 @@ function Certification() {
   function submit() {
     const graded = gradeExam(answers);
     setResult(graded);
-    void logActivity({ kind: 'training_exam', ref: 'final', detail: { correct: graded.correct, total: graded.total } });
+    void logActivity({ kind: 'training_exam', ref: 'final', detail: { answers } });
     const saved: ExamStored = { score: graded.score, total: graded.total, passed: graded.passed, at: Date.now() };
     setStored(saved);
     try { window.localStorage.setItem(EXAM_KEY, JSON.stringify(saved)); } catch { /* sin almacenamiento */ }
