@@ -62,6 +62,14 @@ node --experimental-strip-types tests/engine/activate.mjs
 node --experimental-strip-types tests/engine/terms.mjs
 # Cuota de escritura de la plataforma (100.000 filas/mes): el motor se para antes de que la pausa deje el sitio sin servir.
 node --experimental-strip-types tests/engine/writebudget.mjs
+# Cuota configurable por entorno: el techo sube con el plan (variables), no con un despliegue de código.
+node --experimental-strip-types tests/engine/quota-config.mjs
+# Exportación para mover la base a otra cuenta: solo ADMIN_TOKEN, sin write_ledger y sin gastar cuota.
+node --experimental-strip-types tests/engine/export.mjs
+# Presupuesto de subrequests por plan: con el techo de pago caben las 16 fuentes en UNA pasada (antes, 9).
+node --experimental-strip-types tests/engine/subrequests.mjs
+# Forma de escritura del catálogo (índices incluidos): coste medido por candidato, índices de lectura intactos y migración reanudable.
+node --experimental-strip-types tests/engine/writeshape.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offerrisk.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offertags.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/voice.mjs
