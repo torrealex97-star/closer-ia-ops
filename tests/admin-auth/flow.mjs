@@ -2,6 +2,8 @@
 // con Supabase y motor simulados. Lo lanza run.sh, que arranca todo con las env correctas.
 import { startMocks } from './mock-services.mjs';
 import assert from 'node:assert/strict';
+import { FINAL_EXAM } from '../../apps/web/components/trainingContent.ts';
+const EXAM_KEY = Object.fromEntries(FINAL_EXAM.filter(q => q.type === 'multiple').map(q => [q.id, q.correctAnswer]));
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3100';
 const { state, close } = startMocks({ authPort: Number(process.env.MOCK_AUTH_PORT ?? 8791), enginePort: Number(process.env.MOCK_ENGINE_PORT ?? 8792) });
@@ -221,15 +223,15 @@ await step('alumnas: invitación, recuperación, login, perfil con consentimient
   assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_review', ref: 'modulo-falso', detail: { met: 1, total: 1 } } })).status, 422);
   assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 101 } })).status, 422);
   assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_review', ref: 'precall', detail: { met: 4, total: 4 } } })).status, 201);
-  const exam = await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100, detail: { correct: 6, total: 6, passed: false } } });
+  const exam = await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100, detail: { answers: EXAM_KEY, passed: false } } });
   assert.equal(exam.status, 201); assert.equal(exam.json.passed, true, 'el servidor recalcula el superado');
   const after = await call('/api/student/progress', studentHeaders);
   assert.deepEqual(after.json.progress.training.modules, ['precall']); assert.equal(after.json.progress.training.examBest, 100); assert.equal(after.json.progress.training.examPassed, true);
   assert.equal(after.json.progress.recent[0].kind, 'training_exam', 'lo más reciente primero');
   assert.equal(after.json.progress.lifetime.training.examBest, 100, 'el resumen de siempre también trae el examen');
-  // La nota la calcula el servidor con las respuestas acertadas: un `score` inflado
+  // La nota la calcula el servidor corrigiendo las respuestas elegidas: un `score` inflado
   // no se guarda y el «superado» se recalcula.
-  const forged = await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100, detail: { correct: 2, total: 6, passed: true } } });
+  const forged = await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100, detail: { answers: Object.fromEntries(Object.entries(EXAM_KEY).map(([id, v], i) => [id, i < 4 ? 'inventada' : v])), correct: 6, total: 6, passed: true } } });
   assert.equal(forged.status, 201); assert.equal(forged.json.score, 33, '2 de 6 = 33, no el 100 del navegador'); assert.equal(forged.json.passed, false);
   assert.equal((await call('/api/student/activity', { ...studentHeaders, method: 'POST', body: { kind: 'training_exam', ref: 'final', score: 100 } })).status, 422, 'sin respuestas no hay nota');
   const recomputed = await call('/api/student/progress', studentHeaders);

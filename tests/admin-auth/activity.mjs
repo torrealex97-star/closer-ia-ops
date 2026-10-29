@@ -1,6 +1,7 @@
 // Actividad y progreso de la alumna: node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/activity.mjs
 import assert from 'node:assert/strict';
 import { achievements, allowWrite, checkActivity, EXAM_TOTAL, madridDay, mondayOf, periodDays, REVIEW_REFS, streaks, summarize } from '../../apps/web/lib/studentActivity';
+import { FINAL_EXAM } from '../../apps/web/components/trainingContent';
 
 const at = iso => ({ created_at: iso });
 const row = (kind, iso, extra = {}) => ({ kind, ref: null, score: null, detail: {}, created_at: iso, ...extra });
@@ -16,11 +17,14 @@ assert.equal(checkActivity({ kind: 'training_review', ref: 'precall', detail: { 
 assert.equal(checkActivity({ kind: 'training_review', ref: 'descubrimiento', detail: { met: 4, total: 5 } }).ok, true);
 assert.equal(checkActivity({ kind: 'training_exam', ref: 'final', score: 101 }).ok, false);
 assert.equal(checkActivity({ kind: 'training_exam', ref: 'final', score: 100 }).ok, false, 'sin respuestas no hay nota');
-assert.equal(checkActivity({ kind: 'training_exam', ref: 'final', detail: { correct: 6, total: 5 } }).ok, false, 'el total real son 6 preguntas');
-const forged = checkActivity({ kind: 'training_exam', ref: 'final', score: 100, detail: { correct: 2, total: 6, passed: true } });
-assert.ok(forged.ok); assert.equal(forged.value.score, 33); assert.equal(forged.passed, false); assert.equal(forged.value.detail.passed, false);
-const full = checkActivity({ kind: 'training_exam', ref: 'final', score: 0, detail: { correct: 6, total: 6, passed: false } });
+assert.equal(checkActivity({ kind: 'training_exam', ref: 'final', detail: { correct: 6, total: 6 } }).ok, false, 'un recuento del navegador ya no vale: hacen falta las respuestas');
+const key = Object.fromEntries(FINAL_EXAM.filter(q => q.type === 'multiple').map(q => [q.id, q.correctAnswer]));
+const wrongTwo = Object.fromEntries(Object.entries(key).map(([id, v], i) => [id, i < 2 ? 'respuesta inventada' : v]));
+const forged = checkActivity({ kind: 'training_exam', ref: 'final', score: 100, detail: { answers: wrongTwo, correct: 6, total: 6, passed: true } });
+assert.ok(forged.ok); assert.equal(forged.value.score, 67, '4 de 6 acertadas; ni el score ni el recuento del navegador cuentan'); assert.equal(forged.passed, false); assert.equal(forged.value.detail.passed, false);
+const full = checkActivity({ kind: 'training_exam', ref: 'final', score: 0, detail: { answers: key } });
 assert.ok(full.ok); assert.equal(full.value.score, 100); assert.equal(full.passed, true);
+assert.equal(checkActivity({ kind: 'training_exam', ref: 'final', detail: { answers: {} } }).value.score, 0, 'sin responder es 0, no un error');
 assert.equal(checkActivity({ kind: 'practice', ref: 'precio', detail: {} }).ok, false, 'la práctica exige nota');
 const practice = checkActivity({ kind: 'practice', ref: 'precio', score: 70, detail: { axes: { empatia: 80, 'x y': 5, cierre: 999 }, difficulty: 'Media', mode: 'voz', extra: 'no' } });
 assert.ok(practice.ok); assert.deepEqual(practice.value.detail, { axes: { empatia: 80 }, difficulty: 'Media', mode: 'voz' }, 'solo ejes válidos y campos conocidos');
