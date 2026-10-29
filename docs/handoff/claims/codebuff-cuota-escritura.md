@@ -1,7 +1,8 @@
 ---
 agent: codebuff
-status: in_progress
+status: validated
 branch: feat/motor-forma-escritura
+pr: 80
 touches: sites/engine/worker.js, sites/engine/wrangler.example.toml, scripts/engine-export.mjs, tests/engine/writebudget.mjs, tests/engine/writeshape.mjs, tests/engine/quota-config.mjs, tests/engine/export.mjs, tests/admin-auth/run.sh, docs/decisions/ADR-017-forma-de-escritura-del-catalogo.md, docs/decisions/ADR-018-motor-en-cuenta-propia-de-cloudflare.md, docs/EXTERNAL_SOURCES.md, docs/STATUS.md, docs/ACTIVE_HANDOFF.md
 date: 2026-10-29
 depends_on: codebuff-himalayas-closer
