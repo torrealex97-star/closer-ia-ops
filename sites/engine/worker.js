@@ -551,7 +551,7 @@ const MIGRATION_TABLES_PER_PASS = 2;
 const MIGRATION_MAX_WRITES = 6000; // techo por pasada: con el margen, la recogida del día conserva cuota
 const MIGRATION_MARGIN = 1500; // escrituras que se reservan para la propia pasada de recogida
 const MIGRATION_ROWS_PER_WRITE = 1; // catalog_entries no tiene UNIQUE aparte: copiar = 1 fila por fila
-async function migrateWriteShape(db, allowance) {
+async function migrateWriteShape(db, allowance, limits = writeLimits()) {
   const state = await writeShapeState(db);
   if (state === null) return { pending: null, legacy: null, rebuilt: [], writes: 0, reason: 'esquema no legible' };
   // Quitar el índice de caducidad NO exige reconstruir la tabla y es el ahorro que se paga en cada
@@ -560,8 +560,11 @@ async function migrateWriteShape(db, allowance) {
   await db.prepare('DROP INDEX IF EXISTS idx_catalog_expiry').run()
     .catch(error => console.error(JSON.stringify({ event: 'write_shape_index_drop_failed', error: String(error?.message || error) })));
   if (!state.pending.length) return { pending: [], legacy: state.legacy, rebuilt: [], writes: 0, reason: null };
-  const monthLeft = Math.floor(WRITE_ALLOWANCE.month * WRITE_GUARD_RATIO) - (Number(allowance?.month_writes) || 0);
-  const dayLeft = Math.floor(WRITE_ALLOWANCE.day * WRITE_GUARD_RATIO) - (Number(allowance?.day_writes) || 0);
+  const monthLeft = Math.floor(limits.month * limits.ratio) - (Number(allowance?.month_writes) || 0);
+  // Sin freno diario (`day: 0`) el techo de la pasada es solo el mensual y el tope del lote.
+  const dayLeft = limits.day > 0
+    ? Math.floor(limits.day * limits.ratio) - (Number(allowance?.day_writes) || 0)
+    : Number.POSITIVE_INFINITY;
   const headroom = Math.min(monthLeft, dayLeft, MIGRATION_MAX_WRITES);
   const rebuilt = [];
   let writes = 0;
@@ -1245,14 +1248,59 @@ async function handleAdminActivate(request, env) {
 // Coste por candidato nuevo, MEDIDO en D1 real de workerd (2026-10-27): 18 filas escritas con la
 // forma vieja (6 tablas × tabla + 2 índices cada una) y 6 con la forma de CATALOG_SHAPE. Eso es lo
 // que separa ~5.500 candidatos al mes de ~16.600 sin cambiar de plan; ver `migrateWriteShape`.
+// Los valores de arriba son los del PLAN GRATUITO del hosting gestionado (100.000/mes, 10.000/día).
+// Se pueden cambiar sin tocar código desde el entorno del Worker, que es lo que permite pasar a un
+// plan de pago (50 M/mes) o a una cuenta propia sin recompilar el motor:
+//   WRITE_ALLOWANCE_MONTH  filas escritas al mes que el motor acepta (entero > 0)
+//   WRITE_ALLOWANCE_DAY    freno diario; 0 = sin freno diario (el plan de pago no tiene techo diario)
+//   WRITE_GUARD_RATIO      fracción del techo que se puede usar (0.1–1); por defecto 0.85
+// Un valor inválido NO se convierte en cero —eso apagaría la recogida para siempre—: se descarta, se
+// declara en el log y en `/api/status` (`config.ignored`) y se usa el defecto.
 const WRITE_ALLOWANCE = { month: 100000, day: 10000 };
 const WRITE_GUARD_RATIO = 0.85;
+
+// Lee un entero del entorno con límites. Devuelve `null` si el valor no sirve (vacío, texto, fuera
+// de rango), y quien llama decide: el defecto se aplica y el descarte se declara.
+function envInteger(value, { min, max }) {
+  if (value === undefined || value === null || value === '') return null;
+  const text = String(value).trim();
+  if (!/^\d+$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isSafeInteger(number) && number >= min && number <= max ? number : null;
+}
+
+// Límites efectivos del guardián: defectos + entorno validado. Puro (no escribe ni lanza), así que
+// se puede probar y llamar en cada petición sin coste de cuota.
+function writeLimits(env = {}) {
+  const ignored = [];
+  const monthEnv = envInteger(env?.WRITE_ALLOWANCE_MONTH, { min: 1, max: 1_000_000_000 });
+  if (monthEnv === null && env?.WRITE_ALLOWANCE_MONTH) ignored.push('WRITE_ALLOWANCE_MONTH');
+  const month = monthEnv ?? WRITE_ALLOWANCE.month;
+  // `0` es un valor válido y explícito: apaga el freno diario (plan de pago). Ausente = defecto.
+  const dayEnv = envInteger(env?.WRITE_ALLOWANCE_DAY, { min: 0, max: 1_000_000_000 });
+  if (dayEnv === null && env?.WRITE_ALLOWANCE_DAY) ignored.push('WRITE_ALLOWANCE_DAY');
+  // Un freno diario mayor que el mensual no tiene sentido: se recorta y se declara.
+  const dayRaw = dayEnv ?? WRITE_ALLOWANCE.day;
+  const day = dayRaw > 0 ? Math.min(dayRaw, month) : 0;
+  // WRITE_GUARD_RATIO se escribe como decimal (0.85); se acepta también «85» y «0,85».
+  const ratio = (() => {
+    const raw = env?.WRITE_GUARD_RATIO;
+    if (raw === undefined || raw === null || raw === '') return WRITE_GUARD_RATIO;
+    const text = String(raw).trim().replace(',', '.');
+    const number = Number(text);
+    if (!Number.isFinite(number) || number <= 0) { ignored.push('WRITE_GUARD_RATIO'); return WRITE_GUARD_RATIO; }
+    const fraction = number > 1 ? number / 100 : number;
+    if (fraction < 0.1 || fraction > 1) { ignored.push('WRITE_GUARD_RATIO'); return WRITE_GUARD_RATIO; }
+    return fraction;
+  })();
+  return { month, day, ratio, ignored };
+}
 
 // Superficie de prueba de la forma de escritura (como `__test`, pero declarada DESPUÉS de estas
 // constantes: un `const` exportado antes de su declaración es una ReferenceError al importar el
 // módulo). La forma, la migración y la ingesta son donde está el coste de cuota del motor.
-// Ver tests/engine/writeshape.mjs.
-export const __testShape = { CATALOG_SHAPE, ensureSchema, writeShapeState, rebuildWriteShape, migrateWriteShape, ingestBatch, stableId, WRITE_ALLOWANCE, WRITE_GUARD_RATIO, MIGRATION_TABLES_PER_PASS, MIGRATION_MAX_WRITES, MIGRATION_MARGIN };
+// Ver tests/engine/writeshape.mjs y tests/engine/writebudget.mjs.
+export const __testShape = { CATALOG_SHAPE, ensureSchema, writeShapeState, rebuildWriteShape, migrateWriteShape, ingestBatch, stableId, WRITE_ALLOWANCE, WRITE_GUARD_RATIO, writeLimits, MIGRATION_TABLES_PER_PASS, MIGRATION_MAX_WRITES, MIGRATION_MARGIN };
 
 // Filas escritas según D1: `rows_written` es la métrica que cuenta la plataforma; `changes` (filas
 // afectadas) es el respaldo para las versiones que no la devuelven.
@@ -1263,21 +1311,25 @@ function rowsWritten(result) {
 }
 
 // La puerta, pura y comprobable: ¿queda cuota del mes (y del día) para seguir recogiendo?
-function writeAllowance({ month = 0, day = 0 } = {}, allowance = WRITE_ALLOWANCE, ratio = WRITE_GUARD_RATIO) {
-  const monthMax = Math.floor(allowance.month * ratio);
-  const dayMax = Math.floor(allowance.day * ratio);
+// `limits` son los efectivos (`writeLimits(env)`); sin argumento, los defectos del plan gratuito.
+function writeAllowance({ month = 0, day = 0 } = {}, limits = writeLimits()) {
+  const monthMax = Math.floor(limits.month * limits.ratio);
+  const dayMax = limits.day > 0 ? Math.floor(limits.day * limits.ratio) : null;
   const used = Math.max(0, Number(month) || 0);
   const today = Math.max(0, Number(day) || 0);
-  if (used >= monthMax) return { ok: false, reason: 'month', used, max: monthMax, left: 0 };
-  if (today >= dayMax) return { ok: false, reason: 'day', used: today, max: dayMax, left: Math.max(0, dayMax - today) };
-  return { ok: true, reason: null, used, max: monthMax, left: monthMax - used };
+  if (used >= monthMax) return { ok: false, reason: 'month', used, max: monthMax, left: 0, day_max: dayMax };
+  if (dayMax !== null && today >= dayMax) return { ok: false, reason: 'day', used: today, max: dayMax, left: Math.max(0, dayMax - today), day_max: dayMax };
+  return { ok: true, reason: null, used, max: monthMax, left: monthMax - used, day_max: dayMax };
 }
 
 // Lectura del registro (mes y día). Si no se puede leer NO se inventa un cero: se declara el hueco
 // y se sigue recogiendo, porque el presupuesto por pasada sigue en pie y dejar de traer ofertas por
 // un fallo de lectura sería culpar a la cuota de un problema que no es suyo.
-async function readWriteAllowance(db) {
+async function readWriteAllowance(db, limits = writeLimits()) {
   const month = dayKey().slice(0, 7);
+  // Los límites efectivos viajan con la lectura: el panel y el operador ven contra qué techo se mide
+  // sin tener que adivinar el entorno del Worker.
+  const config = { month: limits.month, day: limits.day, ratio: limits.ratio, ...(limits.ignored?.length ? { ignored: limits.ignored } : {}) };
   try {
     const [sum, today] = await db.batch([
       db.prepare('SELECT COALESCE(SUM(writes),0) AS writes FROM write_ledger WHERE org_id=? AND day LIKE ?').bind(ORG, `${month}-%`),
@@ -1285,10 +1337,10 @@ async function readWriteAllowance(db) {
     ]);
     const monthWrites = Number(sum?.results?.[0]?.writes ?? 0) || 0;
     const dayWrites = Number(today?.results?.[0]?.writes ?? 0) || 0;
-    return { available: true, month, month_writes: monthWrites, day_writes: dayWrites, ...writeAllowance({ month: monthWrites, day: dayWrites }) };
+    return { available: true, month, month_writes: monthWrites, day_writes: dayWrites, ...writeAllowance({ month: monthWrites, day: dayWrites }, limits), config };
   } catch (error) {
     console.error(JSON.stringify({ event: 'write_allowance_unreadable', error: String(error?.message || error) }));
-    return { available: false, month, month_writes: null, day_writes: null, ok: true, reason: null, used: null, max: null, left: null };
+    return { available: false, month, month_writes: null, day_writes: null, ok: true, reason: null, used: null, max: null, left: null, day_max: limits.day > 0 ? Math.floor(limits.day * limits.ratio) : null, config };
   }
 }
 
@@ -1313,11 +1365,14 @@ const logFail = event => error => console.error(JSON.stringify({ event, error: S
 async function runCollection(env, force = false) {
   const db = env.DB;
   await ensureSchema(db);
+  // Límites efectivos del guardián: los defectos del plan gratuito o los que traiga el entorno
+  // (`WRITE_ALLOWANCE_MONTH`, `WRITE_ALLOWANCE_DAY`, `WRITE_GUARD_RATIO`). Ver `writeLimits`.
+  const limits = writeLimits(env);
   // Guardián de cuota: con el mes (o el día) cerca del techo NO se recoge. `force` NO salta esta
   // puerta: las dos pasadas forzadas del 2026-10-26 son justo lo que cruzó el techo (94.177 →
   // 100.604) y dejó el sitio en pausa. Lo que no se recoge hoy se recoge en la siguiente pasada si
   // queda cuota; lo que no vuelve es el sitio servido a la alumna. La recogida es reanudable.
-  const allowance = await readWriteAllowance(db);
+  const allowance = await readWriteAllowance(db, limits);
   if (!allowance.ok) {
     console.error(JSON.stringify({ event: 'collection_skipped_write_allowance', reason: allowance.reason, used: allowance.used, max: allowance.max }));
     return { skipped: true, reason: 'write_allowance', write_allowance: allowance,
@@ -1325,7 +1380,7 @@ async function runCollection(env, force = false) {
   }
   // Forma de escritura: se migra a la forma barata ANTES de recoger, porque es lo que abarata todo lo
   // demás, y se cobra al mismo registro de cuota. Una o dos tablas por pasada; lo que no quepa, sigue.
-  const migration = await migrateWriteShape(db, allowance);
+  const migration = await migrateWriteShape(db, allowance, limits);
   const last = await db.prepare(
     "SELECT id,status,completed_at,sources FROM collection_runs WHERE org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1"
   ).bind(ORG).first();
@@ -10845,6 +10900,7 @@ async function handleFunnel(env) {
 async function handleStatus(env) {
   const db = env.DB;
   await ensureSchema(db);
+  const limits = writeLimits(env);
   const run = await db.prepare('SELECT * FROM collection_runs WHERE org_id=? ORDER BY created_at DESC LIMIT 1').bind(ORG).first();
   const counts = await db.batch([
     db.prepare('SELECT count(*) AS n FROM raw_items WHERE org_id=?').bind(ORG),
@@ -10855,7 +10911,7 @@ async function handleStatus(env) {
     raw_items: counts[0].results[0].n, catalog_active: counts[1].results[0].n,
     // Cuota de escritura del mes: es el techo que pausa el sitio, y el panel lo enseña para que se
     // vea venir en vez de descubrirlo cuando ya no se recoge nada.
-    write_allowance: await readWriteAllowance(db),
+    write_allowance: await readWriteAllowance(db, limits),
     // Forma de escritura del catálogo: `pending: []` significa migrado; `legacy` son las tablas que
     // siguen con rowid y NO se reconstruyen en esta ventana; `null`, que no se pudo leer el esquema
     // (se declara en vez de fingir que está hecho).
@@ -10863,6 +10919,54 @@ async function handleStatus(env) {
     latest_run: run ? { id: run.id, day: run.day, status: run.status, created_at: run.created_at, completed_at: run.completed_at, sources: JSON.parse(run.sources) } : null,
   });
 }
+
+// ------ exportación de la base (mover el motor a otra cuenta) ------
+// Mover el motor a una cuenta propia de Cloudflare exige sacar el catálogo de la base actual, y la
+// cuenta donde vive hoy es gestionada: no hay `wrangler d1 export` que se pueda usar desde fuera.
+// Esta ruta lee el PROPIO D1 y devuelve SQL listo para `wrangler d1 execute --file`, por páginas y
+// con la clave como cursor, así que no hace falta cargar una tabla entera en memoria.
+//   · Solo con `ADMIN_TOKEN`: devuelve los payloads de las ofertas, no es superficie pública.
+//   · Lista blanca de tablas. `write_ledger` queda FUERA a propósito: mide la cuota de ESTA cuenta,
+//     y heredarlo contaría como gastado lo que la cuenta nueva todavía no ha escrito.
+//   · Solo SELECT y PRAGMA: exportar no gasta una sola fila escrita.
+const EXPORT_TABLES = {
+  raw_items: 'id', job_postings: 'id', jobs: 'id', catalog_entries: 'job_id',
+  opportunities: 'id', opportunity_versions: 'id', collection_runs: 'id',
+  verification_events: 'id', slug_audit: 'id',
+};
+
+// Literal SQL seguro: comillas dobladas y sin bytes nulos. Un título con comillas no puede romper el
+// archivo de importación ni convertirse en una sentencia extra.
+function sqlLiteral(value) {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL';
+  return `'${String(value).replace(/\u0000/g, '').replace(/'/g, "''")}'`;
+}
+
+async function handleExport(request, env) {
+  const adminCheck = requireAdmin(request, env);
+  if (adminCheck) return adminCheck;
+  const db = env.DB;
+  const url = new URL(request.url);
+  const table = url.searchParams.get('table') || '';
+  const key = EXPORT_TABLES[table];
+  if (!key) return Response.json({ detail: 'Tabla no exportable', tables: Object.keys(EXPORT_TABLES) }, { status: 400 });
+  const after = url.searchParams.get('after') || '';
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 200, 1), 500);
+  await ensureSchema(db);
+  // Las columnas se leen del esquema real (no de una lista que se desincronice al añadir una columna).
+  const info = await db.prepare(`PRAGMA table_info(${table})`).all();
+  const columns = (info?.results ?? []).map(row => row.name).filter(name => /^[a-z_]+$/.test(name));
+  if (!columns.length) return Response.json({ detail: `Tabla sin columnas legibles: ${table}` }, { status: 500 });
+  const page = await db.prepare(`SELECT * FROM ${table} WHERE ${key} > ? ORDER BY ${key} LIMIT ?`).bind(after, limit).all();
+  const rows = page?.results ?? [];
+  const next = rows.length === limit ? String(rows[rows.length - 1][key]) : null;
+  const sql = rows.map(row => `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(column => sqlLiteral(row[column])).join(', ')});`).join('\n');
+  return Response.json({ table, key, columns, rows: rows.length, next, sql }, { headers: corsHeaders(request) });
+}
+
+// Superficie de prueba de la exportación (declarada aquí porque usa constantes de este bloque).
+export const __testExport = { EXPORT_TABLES, sqlLiteral, handleExport };
 
 const corsHeaders = request => ({
   'Access-Control-Allow-Origin': '*',
@@ -10932,6 +11036,8 @@ export default {
       ctx.waitUntil(runCollection(env).catch(logFail('collection_failed')));
     }
     if (url.pathname === '/api/status') return handleStatus(env);
+    // Exportación para mover la base a otra cuenta (solo ADMIN_TOKEN, solo lectura).
+    if (url.pathname === '/api/export') return handleExport(request, env);
     if (url.pathname === '/api/funnel') return handleFunnel(env);
     if (url.pathname === '/api/audit') return handleAudit(request, env);
     if (url.pathname === '/api/collect' && request.method === 'POST') {

@@ -1,9 +1,9 @@
 ---
 agent: codebuff
-status: blocked
+status: in_progress
 branch: feat/motor-forma-escritura
-touches: sites/engine/worker.js, tests/engine/writebudget.mjs, tests/engine/writeshape.mjs, tests/admin-auth/run.sh, docs/decisions/ADR-017-forma-de-escritura-del-catalogo.md, docs/EXTERNAL_SOURCES.md, docs/STATUS.md, docs/ACTIVE_HANDOFF.md
-date: 2026-10-28
+touches: sites/engine/worker.js, sites/engine/wrangler.example.toml, scripts/engine-export.mjs, tests/engine/writebudget.mjs, tests/engine/writeshape.mjs, tests/engine/quota-config.mjs, tests/engine/export.mjs, tests/admin-auth/run.sh, docs/decisions/ADR-017-forma-de-escritura-del-catalogo.md, docs/decisions/ADR-018-motor-en-cuenta-propia-de-cloudflare.md, docs/EXTERNAL_SOURCES.md, docs/STATUS.md, docs/ACTIVE_HANDOFF.md
+date: 2026-10-29
 depends_on: codebuff-himalayas-closer
 ---
 La cuota que pausó el sitio es del plan de hosting y se mide en **filas escritas al mes** (`d1Writes` 100.604/100.000,
@@ -25,32 +25,49 @@ base nueva. La migración va en un `batch` atómico, se decide leyendo `sqlite_m
 escribe nada), tiene tope por pasada (6.000 escrituras) y es reanudable; las cinco tablas caras se declaran en
 `/api/status` como `write_shape.legacy` porque reconstruirlas cuesta 2 filas por fila (~35.000 escrituras hoy).
 
+**Sesión 128 — la migración a cuenta propia, preparada (ADR-018).** No se ha ejecutado nada contra una cuenta nueva:
+requiere orden expresa (cuenta y gasto nuevos). Lo que queda listo en esta rama:
+(1) **guardián configurable por entorno** — `WRITE_ALLOWANCE_MONTH`, `WRITE_ALLOWANCE_DAY` (`0` apaga el freno
+diario) y `WRITE_GUARD_RATIO` (0,1–1, acepta `85`/`0,85`); un valor inválido **no se convierte en cero**: se
+descarta, se lista en `config.ignored` y se usa el defecto del plan gratuito; `/api/status` publica
+`write_allowance.config` y `day_max: null` cuando no hay freno diario (null explícito, no un cero que parezca
+agotado);
+(2) **ruta `/api/export`** (solo `ADMIN_TOKEN`, solo lectura, paginada por clave, lista blanca de nueve tablas sin
+`write_ledger` ni `schema_version`) y `scripts/engine-export.mjs`, que se para si una tabla falla en vez de dejar un
+volcado a medias;
+(3) **`wrangler.example.toml`** para desplegar el mismo worker en una cuenta propia (D1 `closer-engine`, cron cada
+6 h, variables del plan de pago ya puestas);
+(4) **runbook del corte** en ADR-018: exportar → importar con `wrangler d1 execute` → rotar `ADMIN_TOKEN` y
+`COLLECT_TOKEN` → reapuntar en Vercel solo `CAREER_ENGINE_URL` y `CAREER_ADMIN_TOKEN` → verificar → despublicar el
+sitio gestionado cuando lleve un día estable, sin borrar su D1.
+
 NO se toca: la superficie de la alumna, el aviso por correo (sesión 125), la ventana de catálogo de 10 días, el
-filtro de rol en el origen, el contrato de lectura de la API (solo se **añade** `write_shape`).
+filtro de rol en el origen, el contrato de lectura de la API (solo se **añade** `write_shape` y `write_allowance.config`).
 
-**Bloqueo (motivo exacto, re-medido hoy 2026-10-28):** el código está en `main`, probado y verificado con D1 real de
-workerd, pero **no se puede desplegar**: el contador sigue en `d1Writes` **100.604 / 100.000** y Sites está
-`suspended` hasta **2026-11-01T00:00Z**; el despliegue se rechaza con «Your sites have reached a hosting allowance
-and are paused» (intentado el 2026-10-27 20:45Z). Sin despliegue no hay forma de mover el estado.
+**Probado (tested):** [quota-config.mjs](../../../tests/engine/quota-config.mjs) (defectos intactos, plan de pago,
+`day: 0`, inválidos declarados y no aplicados, `config` publicado, la recogida real usa el techo del entorno) y
+[export.mjs](../../../tests/engine/export.mjs) (403 sin secreto, 401 con cabecera mala, `write_ledger` fuera de la
+lista blanca, SQL con comillas escapadas, cursor y fin de tabla, cero escrituras). Siguen verdes
+[writeshape](../../../tests/engine/writeshape.mjs) 7/7, [writebudget](../../../tests/engine/writebudget.mjs),
+[terms](../../../tests/engine/terms.mjs) y [activate](../../../tests/engine/activate.mjs); las dos pruebas nuevas
+entran en [run.sh](../../../tests/admin-auth/run.sh) y orphan-refs sigue en PASS.
+`scripts/engine-export.mjs` se probó contra un servidor local (dos páginas, archivo generado, error claro sin
+`ENGINE_URL`/token): **no** contra el motor real, porque está en pausa.
 
-**Verificado en workerd con D1 real (no producción)** — arnés `.local/engine-schema/`, ignorado por git y detenido:
-base nueva → 6 tablas `WITHOUT ROWID`, 0 índices sobre el catálogo, `write_shape {pending: [], legacy: []}` y **11**
-filas por candidato; base antigua sembrada → `pending: ["catalog_entries"]`, `legacy` con las cinco, **18** filas por
-candidato, y la migración real reconstruye el catálogo (21 filas intactas, `WITHOUT ROWID`, 0 índices) y lo deja en
-**16**, con **36** filas escritas para 21 filas (~1 por fila + DDL). Sesión 126, mismo método: una pasada real
-escribió y anotó **7.941** filas, y con el mes sembrado en 92.941 la pasada forzada se salta sin escribir nada.
-
-**Probado (tested):** [writeshape.mjs](../../../tests/engine/writeshape.mjs) 7/7 (coste derivado del DDL, índices de
-lectura fijados uno a uno, migración atómica/reanudable/tope), más writebudget, terms y activate en verde; el test
-entra en [run.sh](../../../tests/admin-auth/run.sh) y orphan-refs sigue en PASS.
+**Bloqueo (motivo exacto):** el código está en esta rama, probado y verificado con D1 real de workerd, pero **no se
+puede desplegar**: el contador sigue en `d1Writes` **100.604 / 100.000** y Sites está `suspended` hasta
+**2026-11-01T00:00Z**. Sin despliegue no hay forma de mover el estado, y sin plan de pago no hay cuenta donde mover
+el motor.
 
 **Siguiente acción exacta:** el **1 de noviembre**, en el primer despliegue del día, publicar `sites/engine` con
 [`deploy-manifest.json`](../../../sites/engine/deploy-manifest.json) (el manifiesto con `crons` lo rechaza el esquema
-de Sites) y comprobar, en este orden: (1) `GET /api/status` publica `write_allowance` con `month_writes` ~0 y
-`write_shape` con `pending: []` y `legacy` con las cinco; (2) `POST /api/collect` con el `COLLECT_TOKEN` responde 200
-con `writes` > 0 y `write_shape.writes` > 0 la primera vez (migró el catálogo) y 0 después; (3) con el mes cerca del
-techo, la pasada responde `skipped: true, reason: 'write_allowance'`. **Riesgo mientras no se despliegue:** el día 1
-el motor se reanuda con el código viejo (sin guardián), y el techo **diario** (10.000) es el que antes se cruza.
+de Sites) y comprobar, en este orden: (1) `GET /api/status` publica `write_allowance` con `month_writes` ~0,
+`write_allowance.config` con los defectos del plan gratuito y `write_shape` con `pending: []` y `legacy` con las
+cinco; (2) `POST /api/collect` con el `COLLECT_TOKEN` responde 200 con `writes` > 0 y `write_shape.writes` > 0 la
+primera vez (migró el catálogo) y 0 después; (3) con el mes cerca del techo, la pasada responde
+`skipped: true, reason: 'write_allowance'`. **Después**, y solo con la orden del dueño, ejecutar el runbook de
+ADR-018 (crear cuenta con Workers Paid, exportar, importar, reapuntar). **Riesgo mientras no se despliegue:** el día
+1 el motor se reanuda con el código viejo (sin guardián), y el techo **diario** (10.000) es el que antes se cruza.
 
 **No declarar PASS en:** el despliegue (verificado en workerd, **no** en producción), la migración del catálogo en la
-base real, ni en un envío real de correo.
+base real, el corte a una cuenta propia (no ejecutado: falta la orden y la cuenta), ni un envío real de correo.
