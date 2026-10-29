@@ -1,5 +1,25 @@
 # Estado
 
+## El plan de pago se aprovecha: las 16 fuentes caben en una pasada y el techo de subrequests es configurable (sesión 129) — 2026-10-29
+
+- **Petición del operador**: «haz que el motor aproveche el plan de pago para recoger más fuentes por pasada, midiendo el presupuesto por fuente antes y después».
+- **La causa, medida**: el techo de subrequests por invocación lo pone el **plan** (50 en el gratuito, 1.000 en Workers Paid) y estaba **fijado en el código** (`PLATFORM_SUBREQUEST_LIMIT = 50`), así que el plan de pago no servía de nada aquí. Con ese techo el motor se daba **16** subrequests para fetch (34 se reservan para el gasto D1 de la misma invocación) y las 16 fuentes juntas cuestan **35**: entraban **9** y **7** se aplazaban en cada pasada, entre ellas **FreeHire ES closer, FreeHire LATAM closer y Himalayas closer** — justo el suministro de closer que el plan de pago debería desbloquear.
+- **Arreglo (código en esta rama)**: `subrequestLimits(env)` calcula los límites efectivos y los usa la pasada real. `SUBREQUEST_LIMIT` (6–1.000; ausente = 50) es el techo del plan; `MAX_SUBREQUESTS` es lo que el motor se da a sí mismo y **se recorta al techo**, así que no puede prometer lo que el plan no da. Un valor inválido **no se convierte en «sin límite»** —eso cortaría la invocación a media pasada con «Too many subrequests»—: se descarta, se declara en `ignored` y se usa el defecto. `/api/status` publica `subrequests` (`ceiling`, `budget`, `sources`, `fetch_cost` y las fuentes que aplazó el último run) y la respuesta de la recogida añade `spent` y `deferred`.
+- **Medido con el worker del repo en workerd y D1 local, contra las fuentes reales** (2026-10-29):
+
+| | Plan gratuito (defecto) | Plan de pago (`SUBREQUEST_LIMIT=1000`) |
+| --- | --- | --- |
+| Techo / presupuesto | 50 / **16** | 1.000 / **966** |
+| Fuentes ejecutadas en una pasada | **9 de 16** | **16 de 16** |
+| Aplazadas | 7 (tres de closer) | **0** |
+| Subrequests gastados | 16 | **35** (el coste real del barrido) |
+| Duración de la pasada | 8 s | 25 s |
+
+  Lo que entra de más con el techo de pago, medido en la misma pasada: **FreeHire ES closer 21** candidatos, **FreeHire LATAM closer 27** y **Himalayas closer 31** (candidatos que pasan el filtro de rol del origen; no todos son closer puro), más el ATS y tres slugs de JobToday que antes se aplazaban.
+- **Probado (tested)**: nueva [subrequests.mjs](../tests/engine/subrequests.mjs) **PASS** — defectos del plan gratuito intactos (techo 50, presupuesto 16), techo de pago (966), el presupuesto nunca supera al techo, valores inválidos (`0`, `-10`, `99999`, texto) descartados y declarados, una pasada con 16 aplaza fuentes y con 966 no aplaza ninguna gastando los **35** reales, y `/api/status` publica el presupuesto y lo aplazado. Siguen verdes [quota-config](../tests/engine/quota-config.mjs), [export](../tests/engine/export.mjs), [writeshape](../tests/engine/writeshape.mjs) 7/7, [writebudget](../tests/engine/writebudget.mjs), [terms](../tests/engine/terms.mjs) y [activate](../tests/engine/activate.mjs); la prueba entra en [run.sh](../tests/admin-auth/run.sh) (la corre el CI) y [orphan-refs](../tests/orphan-refs.mjs) sigue en PASS.
+- **Límites, sin adornos**: (1) **no está desplegado**: el sitio sigue en pausa hasta el **1 de noviembre** y la configuración nueva solo tiene sentido en la cuenta propia de ADR-018; en producción, hoy, siguen entrando 9 de 16 fuentes por pasada. (2) La medición es en **workerd con D1 local y fuentes reales**, no en producción. (3) El presupuesto es un **techo, no un objetivo**: con 966 cabrían ~930 subrequests más de fuentes, pero el límite real pasará a ser el **tiempo de CPU** y la **cortesía con cada portal** — un cron cada 6 h multiplica las peticiones a las fuentes gratuitas, y si empiezan a devolver 429/403 se baja `MAX_SUBREQUESTS` sin tocar código. (4) La reserva de 34 para D1 no cambia: es lo que separa al motor del techo cuando el plan es pequeño.
+- **Siguiente acción exacta**: el **1 de noviembre** desplegar el guardián y la forma de escritura (sesiones 126-127) en el sitio gestionado, **sin** `SUBREQUEST_LIMIT` (allí el plan sigue siendo de 50); al ejecutar el corte a la cuenta propia (ADR-018), poner `SUBREQUEST_LIMIT=1000` y `MAX_SUBREQUESTS=1000` y comprobar en `/api/status` que `subrequests.ceiling` es 1.000 y que una pasada deja `deferred: []`.
+
 ## La migración del motor a una cuenta propia queda preparada y probada, sin ejecutar (sesión 128) — 2026-10-29
 
 - **Petición del operador**: «prepara la migración del motor a una cuenta propia de Cloudflare con plan de pago: pasos, datos a mover, variables a reapuntar y cómo dejar el guardián de cuota configurable». Preparar sí; **contratar la cuenta y gastar es una orden del dueño** (AGENTS.md), así que aquí no se ha creado ninguna cuenta, ni D1 nueva, ni se ha tocado Vercel.

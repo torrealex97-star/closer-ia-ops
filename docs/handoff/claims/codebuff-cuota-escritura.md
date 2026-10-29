@@ -3,7 +3,7 @@ agent: codebuff
 status: validated
 branch: feat/motor-forma-escritura
 pr: 80
-touches: sites/engine/worker.js, sites/engine/wrangler.example.toml, scripts/engine-export.mjs, tests/engine/writebudget.mjs, tests/engine/writeshape.mjs, tests/engine/quota-config.mjs, tests/engine/export.mjs, tests/admin-auth/run.sh, docs/decisions/ADR-017-forma-de-escritura-del-catalogo.md, docs/decisions/ADR-018-motor-en-cuenta-propia-de-cloudflare.md, docs/EXTERNAL_SOURCES.md, docs/STATUS.md, docs/ACTIVE_HANDOFF.md
+touches: sites/engine/worker.js, sites/engine/wrangler.example.toml, scripts/engine-export.mjs, tests/engine/writebudget.mjs, tests/engine/writeshape.mjs, tests/engine/quota-config.mjs, tests/engine/export.mjs, tests/engine/subrequests.mjs, tests/admin-auth/run.sh, docs/decisions/ADR-017-forma-de-escritura-del-catalogo.md, docs/decisions/ADR-018-motor-en-cuenta-propia-de-cloudflare.md, docs/EXTERNAL_SOURCES.md, docs/STATUS.md, docs/ACTIVE_HANDOFF.md
 date: 2026-10-29
 depends_on: codebuff-himalayas-closer
 ---
@@ -42,13 +42,25 @@ volcado a medias;
 `COLLECT_TOKEN` → reapuntar en Vercel solo `CAREER_ENGINE_URL` y `CAREER_ADMIN_TOKEN` → verificar → despublicar el
 sitio gestionado cuando lleve un día estable, sin borrar su D1.
 
+**Sesión 129 — el plan de pago, aprovechado en el presupuesto.** El techo de subrequests por invocación lo pone el
+plan (50 gratuito, 1.000 Workers Paid) y estaba fijado en el código: con 16 de presupuesto entraban 9 de las 16 fuentes
+y se aplazaban 7, entre ellas FreeHire ES closer, FreeHire LATAM closer y Himalayas closer. Ahora `SUBREQUEST_LIMIT`
+(6–1.000; ausente = 50) es el techo del plan y `MAX_SUBREQUESTS` se recorta a él; un valor inválido se descarta y se
+declara en `ignored`, nunca se convierte en «sin límite». `/api/status` publica `subrequests` (`ceiling`, `budget`,
+`sources`, `fetch_cost`, `deferred` del último run) y la recogida añade `spent`. Medido en workerd con D1 local y
+fuentes reales: **9/16 fuentes y 16 subrequests** con el gratuito; **16/16 y 35** con el techo de pago (25 s), entrando
+FreeHire ES closer (21 candidatos), LATAM closer (27) y Himalayas (31).
+
 NO se toca: la superficie de la alumna, el aviso por correo (sesión 125), la ventana de catálogo de 10 días, el
-filtro de rol en el origen, el contrato de lectura de la API (solo se **añade** `write_shape` y `write_allowance.config`).
+filtro de rol en el origen, el contrato de lectura de la API (solo se **añade** `write_shape`, `write_allowance.config`
+y `subrequests`).
 
 **Probado (tested):** [quota-config.mjs](../../../tests/engine/quota-config.mjs) (defectos intactos, plan de pago,
 `day: 0`, inválidos declarados y no aplicados, `config` publicado, la recogida real usa el techo del entorno) y
 [export.mjs](../../../tests/engine/export.mjs) (403 sin secreto, 401 con cabecera mala, `write_ledger` fuera de la
-lista blanca, SQL con comillas escapadas, cursor y fin de tabla, cero escrituras). Siguen verdes
+lista blanca, SQL con comillas escapadas, cursor y fin de tabla, cero escrituras) y
+[subrequests.mjs](../../../tests/engine/subrequests.mjs) (defectos intactos, techo de pago, presupuesto nunca por
+encima del plan, inválidos declarados, 7 aplazadas con 16 y ninguna con 966 gastando los 35 reales, estado publicado). Siguen verdes
 [writeshape](../../../tests/engine/writeshape.mjs) 7/7, [writebudget](../../../tests/engine/writebudget.mjs),
 [terms](../../../tests/engine/terms.mjs) y [activate](../../../tests/engine/activate.mjs); las dos pruebas nuevas
 entran en [run.sh](../../../tests/admin-auth/run.sh) y orphan-refs sigue en PASS.

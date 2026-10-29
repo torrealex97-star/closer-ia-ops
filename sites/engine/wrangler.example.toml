@@ -12,11 +12,15 @@ compatibility_date = "2026-10-01"
 enabled = true
 
 [vars]
-# Presupuesto de subrequests que el motor se da por pasada. El Worker de pago admite 10.000 por
-# invocación (el gratuito, 50), pero el CÓDIGO aún topa en 50 (`PLATFORM_SUBREQUEST_LIMIT`): subir
-# esta variable por encima de 50 no hace nada hasta cambiar esa constante. Se deja en 50 para que la
-# configuración no prometa algo que el motor no hace.
-MAX_SUBREQUESTS = "50"
+# Techo de subrequests por invocación que admite el PLAN: 50 en el gratuito y 1.000 en Workers
+# Paid. El motor lo respeta (nunca pide más) y lo publica en /api/status (`subrequests.ceiling`).
+# OJO: el despliegue gestionado (dejar el manifiesto de Sites) sigue en el plan gratuito y NO
+# lleva esta variable: allí el defecto es 50 y no se toca.
+SUBREQUEST_LIMIT = "1000"
+# Presupuesto que el motor se da a sí mismo dentro de ese techo. En el plan de pago se pone igual
+# al techo (lo único que separa del barrido completo son los 34 subrequests que se reservan para
+# D1): con las 16 fuentes actuales el barrido cuesta 35 y todas entran en una pasada.
+MAX_SUBREQUESTS = "1000"
 # Guardián de cuota: techo del plan de pago (50 M de filas escritas al mes) y SIN freno diario
 # (`0`), porque el plan de pago no tiene tope diario. El margen del 15 % se conserva: es lo que
 # absorbe el error de estimación del propio registro.

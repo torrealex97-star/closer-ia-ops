@@ -55,11 +55,43 @@ function fetchCost(source) {
 // Lo que no cabe se APLAZA (declarado en el estado del run, no se disfraza de vacío) y la pasada
 // siguiente ABRE por lo aplazado o caído: la recogida es reanudable y ninguna fuente se queda
 // siempre al final. El resto rota por día.
+//
+// El techo lo pone el PLAN del Worker, no el producto: **50 por invocación en el gratuito y 1.000
+// en Workers Paid**. Hasta la sesión 129 estaba fijado en el código, así que el plan de pago no
+// servía de nada en esta parte; ahora el techo se lee del entorno (`SUBREQUEST_LIMIT`, 6–1.000) y
+// `MAX_SUBREQUESTS` sigue siendo el presupuesto que el motor se da a sí mismo dentro de ese techo.
+// Sin variables, los defectos son los del plan gratuito y la conducta no cambia.
 const PLATFORM_SUBREQUEST_LIMIT = 50;
+const MAX_SUBREQUEST_CEILING = 1000;
 const D1_RESERVED_SUBREQUESTS = 34;
-function planRun(sources, lastSources, day, envBudget) {
-  const ceiling = Math.min(Number(envBudget) || PLATFORM_SUBREQUEST_LIMIT, PLATFORM_SUBREQUEST_LIMIT);
-  const budget = Math.max(6, ceiling - D1_RESERVED_SUBREQUESTS);
+
+// Límites efectivos (puro, no escribe): techo del plan, presupuesto del motor y colchón de D1.
+// Un valor inválido no se convierte en «sin límite» —eso cortaría la invocación a medias con
+// «Too many subrequests»—: se descarta, se declara en `ignored` y se usa el defecto.
+function subrequestLimits(env = {}) {
+  const ignored = [];
+  const ceilingEnv = envInteger(env?.SUBREQUEST_LIMIT, { min: 6, max: MAX_SUBREQUEST_CEILING });
+  if (ceilingEnv === null && env?.SUBREQUEST_LIMIT) ignored.push('SUBREQUEST_LIMIT');
+  const ceiling = ceilingEnv ?? PLATFORM_SUBREQUEST_LIMIT;
+  const wantedEnv = envInteger(env?.MAX_SUBREQUESTS, { min: 6, max: MAX_SUBREQUEST_CEILING });
+  if (wantedEnv === null && env?.MAX_SUBREQUESTS) ignored.push('MAX_SUBREQUESTS');
+  // El motor no puede darse más de lo que admite el plan.
+  const max = Math.min(wantedEnv ?? ceiling, ceiling);
+  return {
+    ceiling, max, reserve: D1_RESERVED_SUBREQUESTS,
+    budget: Math.max(6, max - D1_RESERVED_SUBREQUESTS),
+    ...(ignored.length ? { ignored } : {}),
+  };
+}
+
+function planRun(sources, lastSources, day, envBudget, ceiling = PLATFORM_SUBREQUEST_LIMIT) {
+  // `envBudget` es lo que el motor se permite gastar en fetch; `ceiling`, lo que admite el plan.
+  // No se supera ninguno de los dos y lo que no cabe se aplaza declarándolo en el estado del run.
+  const cap = Math.min(
+    Number(envBudget) || Number(ceiling) || PLATFORM_SUBREQUEST_LIMIT,
+    Number(ceiling) || PLATFORM_SUBREQUEST_LIMIT,
+  );
+  const budget = Math.max(6, cap - D1_RESERVED_SUBREQUESTS);
   const rotate = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000) % sources.length;
   const rotated = [...sources.slice(rotate), ...sources.slice(0, rotate)];
   const unfinished = new Set();
@@ -413,7 +445,7 @@ async function sourceFreehire(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, PLATFORM_SUBREQUEST_LIMIT, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -1412,7 +1444,11 @@ async function runCollection(env, force = false) {
   // cuántas ofertas se traen, se reparte el presupuesto y lo que NO cabe se APLAZA declarándolo en el
   // estado del run (antes esas fuentes fallaban con «Too many subrequests»). El punto de partida es
   // lo aplazado o caído en la pasada anterior y, tras eso, la rotación del día.
-  const { budget, ordered, resumed } = planRun(SOURCES, last?.sources, day, env?.MAX_SUBREQUESTS);
+  // Presupuesto de subrequests de esta pasada: el techo sale del plan (`SUBREQUEST_LIMIT`) y el
+  // presupuesto del motor (`MAX_SUBREQUESTS`) nunca lo supera. Con Workers Paid caben las 16 fuentes
+  // en una pasada; con el plan gratuito se aplazan las que no entran y la siguiente abre por ellas.
+  const subLimits = subrequestLimits(env);
+  const { budget, ordered, resumed } = planRun(SOURCES, last?.sources, day, subLimits.max, subLimits.ceiling);
   let spent = 0;
   // Filas escritas por esta pasada para el registro de cuota: los lotes de ingesta y, si tocó,
   // la reconstrucción de tablas de la forma barata.
@@ -1463,6 +1499,9 @@ async function runCollection(env, force = false) {
   // `resumed` deja en la respuesta qué fuentes abrieron esta pasada, para que el recurso se vea sin
   // leer la tabla. `budget` es el presupuesto real de subrequests que quedó para fetch.
   return { run_id: runId, budget, resumed, sources: states, writes: charged,
+    // Presupuesto de subrequests con el que corrió la pasada y qué fuentes no entraron (declarado,
+    // no convertido en un vacío): es lo que se compara entre plan gratuito y de pago.
+    subrequests: { ...subLimits, spent, deferred: states.filter(s => s.status === 'deferred').map(s => s.code) },
     // Estado de la forma de escritura: qué tablas se reconstruyeron en esta pasada y cuáles siguen
     // pendientes (con `null` = esquema no legible, que no es lo mismo que «todo migrado»).
     write_shape: { rebuilt: migration.rebuilt, pending: migration.pending, legacy: migration.legacy, writes: migration.writes },
@@ -10901,7 +10940,10 @@ async function handleStatus(env) {
   const db = env.DB;
   await ensureSchema(db);
   const limits = writeLimits(env);
+  const subLimits = subrequestLimits(env);
   const run = await db.prepare('SELECT * FROM collection_runs WHERE org_id=? ORDER BY created_at DESC LIMIT 1').bind(ORG).first();
+  // Estado del último run: si su JSON no se puede leer, se declara vacío en vez de tumbar el estado.
+  const runSources = (() => { try { return JSON.parse(run?.sources) || []; } catch { return []; } })();
   const counts = await db.batch([
     db.prepare('SELECT count(*) AS n FROM raw_items WHERE org_id=?').bind(ORG),
     db.prepare('SELECT count(*) AS n FROM catalog_entries WHERE org_id=? AND expires_at > ?').bind(ORG, now()),
@@ -10916,7 +10958,16 @@ async function handleStatus(env) {
     // siguen con rowid y NO se reconstruyen en esta ventana; `null`, que no se pudo leer el esquema
     // (se declara en vez de fingir que está hecho).
     write_shape: await writeShapeState(db),
-    latest_run: run ? { id: run.id, day: run.day, status: run.status, created_at: run.created_at, completed_at: run.completed_at, sources: JSON.parse(run.sources) } : null,
+    // Subrequests por pasada: techo del plan, presupuesto del motor, coste de las 16 fuentes y las
+    // que quedaron fuera del último run. Es lo que permite comparar planes desde fuera, sin leer el
+    // código: con el gratuito el coste (35) no cabe en el presupuesto (16) y unas se aplazan.
+    subrequests: {
+      ...subLimits,
+      sources: SOURCES.length,
+      fetch_cost: SOURCES.reduce((n, s) => n + fetchCost(s), 0),
+      deferred: runSources.filter(s => s?.status === 'deferred').map(s => s.code),
+    },
+    latest_run: run ? { id: run.id, day: run.day, status: run.status, created_at: run.created_at, completed_at: run.completed_at, sources: runSources } : null,
   });
 }
 

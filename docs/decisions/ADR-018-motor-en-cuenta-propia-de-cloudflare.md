@@ -145,7 +145,8 @@ está en pausa hasta el **1 de noviembre**: la exportación **no puede correr an
 | `CAREER_ADMIN_TOKEN` | Vercel (Production) | token del motor en Sites | **nuevo** `ADMIN_TOKEN` del Worker propio |
 | `ADMIN_TOKEN` | secreto del Worker | gestionado por Sites | nuevo, `wrangler secret put` |
 | `COLLECT_TOKEN` | secreto del Worker | gestionado por Sites | nuevo (lo usa `POST /api/collect`) |
-| `MAX_SUBREQUESTS` | variable del Worker | 50 | 50 (ver límite abajo) |
+| `SUBREQUEST_LIMIT` | variable del Worker | — (50 por código) | `1000` (techo del plan de pago) |
+| `MAX_SUBREQUESTS` | variable del Worker | 50 | `1000` (nunca por encima del techo) |
 | `WRITE_ALLOWANCE_MONTH` | variable del Worker | — (100.000 por código) | `50000000` |
 | `WRITE_ALLOWANCE_DAY` | variable del Worker | — (10.000 por código) | `0` (sin freno diario) |
 | `WRITE_GUARD_RATIO` | variable del Worker | — (0.85 por código) | `0.85` |
@@ -172,6 +173,33 @@ migración de forma los usan. Reglas:
 El panel todavía **no pinta** `write_allowance.config` (lo enseña el endpoint): es una mejora de UI
 pendiente, no un dato inventado.
 
+## El presupuesto de subrequests, configurable (sesión 129)
+
+El techo de subrequests por invocación lo pone el **plan** (50 en el gratuito, 1.000 en Workers
+Paid) y estaba fijado en el código: el plan de pago no servía de nada en esta parte. Ahora:
+
+- `SUBREQUEST_LIMIT` (6–1.000, ausente = 50) es el techo del plan; `MAX_SUBREQUESTS` es lo que el
+  motor se da a sí mismo y **se recorta al techo**, así que no puede prometer lo que el plan no da.
+- Un valor inválido no se convierte en «sin límite» (cortaría la invocación a media pasada con
+  «Too many subrequests»): se descarta, se declara en `ignored` y se usa el defecto.
+- `/api/status` publica `subrequests` con `ceiling`, `budget`, `sources`, `fetch_cost` y las fuentes
+  que aplazó el último run, y la respuesta de la recogida añade `spent` y `deferred`.
+
+Medido con el worker del repo en workerd y D1 local, contra las fuentes reales (2026-10-29):
+
+| | Plan gratuito (por defecto) | Plan de pago (`SUBREQUEST_LIMIT=1000`) |
+| --- | --- | --- |
+| Techo / presupuesto | 50 / **16** | 1.000 / **966** |
+| Fuentes ejecutadas en una pasada | **9 de 16** | **16 de 16** |
+| Aplazadas | 7 (tres de closer: FreeHire ES, FreeHire LATAM, Himalayas) | **0** |
+| Subrequests gastados | 16 | **35** (el coste real del barrido, no el techo) |
+| Duración de la pasada | 8 s | 25 s |
+
+El presupuesto es un **techo, no un objetivo**: el barrido completo cuesta 35 y con 966 sobra para
+añadir fuentes nuevas (hasta ~930 más por pasada, aunque el límite real pasa a ser el tiempo de
+CPU y la cortesía con cada portal). Lo que **no** cambia: la reserva de 34 subrequests para D1, que
+sigue siendo lo que separa al motor del techo en el plan gratuito.
+
 ## Verificación del corte
 
 1. `GET /api/status` del Worker nuevo: mismas cifras que el viejo; `write_shape.pending: []`;
@@ -194,10 +222,11 @@ tomadas contra ella); no se pierde nada de lo anterior.
 
 ## Consecuencias y límites (declarados)
 
-- **El motor sigue topando en 50 subrequests por invocación** (`PLATFORM_SUBREQUEST_LIMIT` en el
-  código) aunque el Worker de pago admita 10.000: subir `MAX_SUBREQUESTS` no sirve todavía. Aprovechar
-  el plan de pago para recoger todas las fuentes en una pasada exige cambiar esa constante y volver a
-  medir el presupuesto por fuente; queda como trabajo aparte.
+- **Subrequests**: el techo ya es configurable (sección anterior) y con 1.000 caben las 16 fuentes
+  en una pasada. Lo que sigue siendo decisión de producto no es el techo sino la **cortesía con
+  cada portal**: pasar de 9 a 16 fuentes por pasada con un cron cada 6 h multiplica las peticiones a
+  las fuentes gratuitas; si eso empieza a devolver 429 o 403, se baja `MAX_SUBREQUESTS` sin tocar
+  código.
 - **CPU**: el plan gratuito da 10 ms por invocación y el de pago 30 s (15 minutos para un cron con
   intervalo ≥ 1 h). El motor no se acerca hoy al límite, pero deja de ser el riesgo que era.
 - **Gasto nuevo**: 5 USD/mes, más los excesos si algún mes se cruzan 50 M de escrituras. Es gasto
@@ -212,9 +241,14 @@ tomadas contra ella); no se pierde nada de lo anterior.
 
 - `node --check sites/engine/worker.js` OK.
 - `tests/engine/quota-config.mjs` **PASS** (defectos intactos; plan de pago; `day: 0`; valores
-  inválidos declarados y no aplicados; `config` publicado; la recogida real usa el techo del entorno).
-- `tests/engine/export.mjs` **PASS** (403 sin secreto, 401 con cabecera mala, `write_ledger` fuera de
-  la lista blanca, SQL con comillas escapadas, cursor y fin de tabla, cero escrituras).
+  inválidos declarados y no aplicados; `config` publicado; la recogida real usa el techo del entorno).- `tests/engine/export.mjs` **PASS** (403 sin secreto, 401 con cabecera mala, `write_ledger` fuera de la
+  lista blanca, SQL con comillas escapadas, cursor y fin de tabla, cero escrituras).
+- `tests/engine/subrequests.mjs` **PASS** (defectos del plan gratuito intactos; techo de pago; el
+  presupuesto nunca supera al plan; valores inválidos descartados y declarados; una pasada con 16
+  aplaza 7 y con 966 no aplaza ninguna gastando los 35 reales; `/api/status` publica el presupuesto
+  y lo aplazado por el último run).
+- **Medido en workerd con D1 local, contra las fuentes reales** (2026-10-29): 9/16 fuentes y 16
+  subrequests con el plan gratuito; **16/16 y 35 subrequests** con el techo de pago, en 25 s.
 - `tests/engine/writebudget.mjs`, `writeshape.mjs` y `terms.mjs` siguen en verde sin cambios.
 - `scripts/engine-export.mjs` **probado contra un servidor de prueba local** (dos páginas, archivo
   generado, fallo claro sin `ENGINE_URL`/token): no contra el motor real, porque está en pausa.
