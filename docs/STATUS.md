@@ -6,6 +6,13 @@
 - **No hecho — dos avisos del correo en comprobaciones simultáneas (cron + «Comprobar ahora» a la vez)**: cerrarlo de verdad exige una reclamación atómica en la base (un índice único parcial por episodio: una migración), y un arreglo sin base solo estrecharía la ventana sin cerrarla. Riesgo real bajo (un correo duplicado); queda declarado, no parcheado a medias.
 - **Bloqueado — `tests/db/*.sql` en el CI**: no se pueden ejecutar desde el repo porque faltan las migraciones base (solo hay 10; las tablas anteriores y el esquema `auth` no están). Depende de la tarea 10 del relevo (`supabase db pull`); entonces bastaría un job con la imagen `supabase/postgres` que aplique las migraciones y ejecute cada prueba esperando su `RLS_OK`.
 
+## Dependencias de Python: starlette y uvicorn al día; ruff y pydantic-core, no (sesión 131) — 2026-10-31
+
+- **Petición del operador**: «avanza con 1 a 3» (probar las PRs de dependabot de Python, cerrar los menores del motor y plantear `tests/db` en CI).
+- **Hecho** (tested, entorno propio `.venv` con `requirements-lock.txt`): `starlette` 1.6.0 → 1.9.0 y `uvicorn` 0.41.0 → 0.54.0. Con ellos: `pip check` limpio, `ruff` (0.15.6, el de CI) limpio, `pytest` 175 pasadas y 2 omitidas (como antes), y `npm run contracts` no cambia `packages/contracts`.
+- **No hecho, a propósito**: `ruff` 0.17.2 (dependabot #71) da **94 errores nuevos** en `apps/api` (reglas nuevas I001, UP017, FURB167…; 67 con arreglo automático): es churn de estilo sin ganancia para el producto, se deja en 0.15.6 hasta que se decida arreglarlos en una PR propia. `pydantic-core` suelto (#68) no se puede mover sin `pydantic` (2.12.5 fija 2.41.5).
+- **Observación**: la suite Python reescribe `apps/api/career/source_audit.json` al ejecutarse (efecto lateral de una prueba); no se sube, pero ensucia el árbol de quien la ejecute.
+
 ## Revisión de lo último de todas las ramas: el aviso del motor se repetía (sesión 130) — 2026-10-31
 
 - **Petición del operador**: «code review de todo lo último de todas las ramas, soluciona bugs y fusiona en el main, repórtame cómo está todo».
