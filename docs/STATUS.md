@@ -1,5 +1,11 @@
 # Estado
 
+## Menores del motor y pruebas de BD en CI: lo hecho y lo que está bloqueado (sesión 132) — 2026-10-31
+
+- **Hecho** (tested): `/api/export` del motor ya no devuelve cabeceras CORS (es una ruta de operador con token de administración, que solo usa `scripts/engine-export.mjs`); la prueba [export.mjs](../tests/engine/export.mjs) lo exige y falla sin el cambio (`'*' !== null`).
+- **No hecho — dos avisos del correo en comprobaciones simultáneas (cron + «Comprobar ahora» a la vez)**: cerrarlo de verdad exige una reclamación atómica en la base (un índice único parcial por episodio: una migración), y un arreglo sin base solo estrecharía la ventana sin cerrarla. Riesgo real bajo (un correo duplicado); queda declarado, no parcheado a medias.
+- **Bloqueado — `tests/db/*.sql` en el CI**: no se pueden ejecutar desde el repo porque faltan las migraciones base (solo hay 10; las tablas anteriores y el esquema `auth` no están). Depende de la tarea 10 del relevo (`supabase db pull`); entonces bastaría un job con la imagen `supabase/postgres` que aplique las migraciones y ejecute cada prueba esperando su `RLS_OK`.
+
 ## Revisión de lo último de todas las ramas: el aviso del motor se repetía (sesión 130) — 2026-10-31
 
 - **Petición del operador**: «code review de todo lo último de todas las ramas, soluciona bugs y fusiona en el main, repórtame cómo está todo».

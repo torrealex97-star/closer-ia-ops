@@ -11013,7 +11013,8 @@ async function handleExport(request, env) {
   const rows = page?.results ?? [];
   const next = rows.length === limit ? String(rows[rows.length - 1][key]) : null;
   const sql = rows.map(row => `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(column => sqlLiteral(row[column])).join(', ')});`).join('\n');
-  return Response.json({ table, key, columns, rows: rows.length, next, sql }, { headers: corsHeaders(request) });
+  // Sin cabeceras CORS: es una ruta de operador (token de administración) que solo se usa desde un script, nunca desde un navegador.
+  return Response.json({ table, key, columns, rows: rows.length, next, sql });
 }
 
 // Superficie de prueba de la exportación (declarada aquí porque usa constantes de este bloque).
