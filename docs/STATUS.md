@@ -1,5 +1,13 @@
 # Estado
 
+## Revisión de lo último de todas las ramas: el aviso del motor se repetía (sesión 130) — 2026-10-31
+
+- **Petición del operador**: «code review de todo lo último de todas las ramas, soluciona bugs y fusiona en el main, repórtame cómo está todo».
+- **Revisado** (inspected): todo lo que entró en `main` desde la sesión 116 (PR #78-#80: aviso del motor por correo, auditoría de reglas, guardián de cuota de escritura, forma de escritura del catálogo, exportación del motor, techo de subrequests): `engineHealth`, `engineAlert`, `ruleAudit`, la migración `20261029_engine_alerts.sql`, `scripts/engine-export.mjs`, `/api/export` y el diff de `sites/engine/worker.js`. `main` pasa tsc, build, diseño, `run.sh` (todas las suites), pruebas del motor, secretos y relevo.
+- **Defecto encontrado y reproducido** (tested): cada comprobación inserta una fila NUEVA sin `notified_*` y `decideNotification` solo mira la última. Con el motor en pausa: aviso (1.ª), fila sin aviso (2.ª, «ya enviado»), y en la 3.ª la última fila no traía aviso → «el aviso anterior no llegó a salir» → **correo repetido** (y otra vez al salir el aviso de la ventana de 5 filas). La prueba solo repetía una vez, por eso pasaba. **Arreglo**: una fila del mismo estado de avería hereda el aviso de la anterior ([engineAlert](../apps/web/lib/engineAlert.ts)); la prueba repite ahora 7 comprobaciones y exige 1 solo correo (falla sin el arreglo: `2 !== 1`).
+- **Ramas**: sin PRs de trabajo abiertas. 13 PRs de dependabot (#65-#77) evaluadas aparte; `feat/formacion-progreso` y `claude/cloud-student-view` siguen sin fusionarse por la razón de la sesión 116 (borrarlas lo hace el dueño: el clasificador deniega `git push --delete`).
+- **Observaciones no arregladas** (bajas): dos comprobaciones simultáneas (cron + «Comprobar ahora») podrían enviar dos correos; `/api/export` responde con `Access-Control-Allow-Origin: *` (solo con token, y `X-Admin-Token` no está en los permitidos, así que un navegador no puede usarla de otro origen).
+
 ## El plan de pago se aprovecha: las 16 fuentes caben en una pasada y el techo de subrequests es configurable (sesión 129) — 2026-10-29
 
 - **Petición del operador**: «haz que el motor aproveche el plan de pago para recoger más fuentes por pasada, midiendo el presupuesto por fuente antes y después».

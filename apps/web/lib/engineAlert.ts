@@ -230,6 +230,7 @@ export async function checkEngine({ by = 'cron', notify = true, probeTimeoutMs }
   const decision = decideNotification(log.rows, probe);
   const prev = log.rows[0] ?? null;
   const since = isOutage(probe.status) && prev?.status === probe.status ? prev.since : probe.checked_at;
+  const carry = Boolean(prev) && isOutage(probe.status) && prev!.status === probe.status;
   let recorded = false;
   let justRecorded: EngineAlertRow | null = null;
   let email: EmailOutcome | null = null;
@@ -247,9 +248,10 @@ export async function checkEngine({ by = 'cron', notify = true, probeTimeoutMs }
         since,
         checked_at: probe.checked_at,
         checked_by: by,
-        notified_at: null,
-        notified_kind: null,
-        notified_detail: null,
+        // Mismo estado de avería que la comprobación anterior: hereda su aviso. Cada comprobación inserta una fila
+        // nueva y `decideNotification` solo mira la última; sin esto, la tercera comprobación de una pausa ya
+        // avisada veía «sin aviso» y lo repetía (y, pasada la ventana de lectura, también la sexta).
+        ...(carry ? { notified_at: prev.notified_at, notified_kind: prev.notified_kind, notified_detail: prev.notified_detail } : { notified_at: null, notified_kind: null, notified_detail: null }),
       }),
     }).catch(() => null);
     const row = inserted?.ok ? ((await inserted.json().catch(() => null)) as EngineAlertRow[] | null)?.[0] ?? null : null;
