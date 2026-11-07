@@ -28,7 +28,10 @@ export function enrich(c: Scorable, now = Date.now()): Enrichment {
   const text = `${c.title} ${c.description ?? ''}`;
   let score = role ? ROLE_POINTS[role] : 0;
   if (VERTICAL.test(text.slice(0, 800))) score += 5;
-  score += spain === true ? 20 : spain === null ? 5 : -30;
+  // Mercado antes que el castigo: una oferta de LatAm es mercado objetivo, no «fuera de España».
+  // Sin esto un closer LatAm sumaba 33-45 y nunca llegaba al 55 del auto-aprobado (autoReview.ts).
+  const verdict = marketFor(c);
+  score += spain === true ? 20 : spain === null || verdict.market === 'LATAM' ? 5 : -30;
   if (c.salary) score += 8;
   if (/comisi[oó]n|variable/i.test(c.description ?? '')) score += 4;
   if (c.raw?.is_remote === true) score += 4;
@@ -40,6 +43,5 @@ export function enrich(c: Scorable, now = Date.now()): Enrichment {
   score += length >= 1000 ? 6 : length >= 300 ? 4 : 0;
   if (spanishWords(text) >= 3) score += 5;
   // Mercado y moneda se guardan al entrar para poder filtrar por ellos sin recalcular miles de filas.
-  const verdict = marketFor(c);
   return { role, spain, score: Math.max(0, Math.min(100, Math.round(score))), fingerprint: fingerprintOf(c), market: verdict.market, market_basis: verdict.basis, currency: verdict.currency };
 }

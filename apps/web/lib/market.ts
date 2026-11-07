@@ -17,7 +17,7 @@ export type MarketVerdict = { market: Market | null; basis: MarketBasis; currenc
 // Ciudades y países que no se confunden con España (Córdoba, Santiago, San José o La Paz existen en
 // ambos lados, así que solo cuentan con el país al lado o con una forma inequívoca).
 const LATAM = [
-  'latam', 'latinoamerica', 'latino americano', 'america latina', 'suramerica', 'sudamerica',
+  'latam', 'latinoamerica', 'latinoamericano', 'hispanoamerica', 'centroamerica', 'cono sur', 'remote latam', 'latin america', 'latino americano', 'america latina', 'suramerica', 'sudamerica',
   'mexico', 'cdmx', 'ciudad de mexico', 'guadalajara', 'monterrey', 'queretaro', 'puebla', 'tijuana',
   'colombia', 'bogota', 'medellin', 'cali', 'barranquilla', 'cartagena de indias',
   'argentina', 'buenos aires', 'rosario', 'mendoza', 'cordoba argentina',
@@ -42,7 +42,14 @@ const US = [
 const EUR = /\u20ac|\b(?:eur|euros?|eura?)\b/i;
 const USD = /\$|\b(?:usd|us\$|dollars?|dolares?)\b/i;
 
-const hit = (hay: string, words: readonly string[]) => words.some(w => hay.includes(w));
+// Palabra completa, no subcadena: `cali` casaba con «california» y «calidad», `peru` con «perugia».
+const wordRe = new Map<string, RegExp>();
+const hasWord = (hay: string, w: string) => {
+  let re = wordRe.get(w);
+  if (!re) { re = new RegExp(`(?<![a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9])`); wordRe.set(w, re); }
+  return re.test(hay);
+};
+const hit = (hay: string, words: readonly string[]) => words.some(w => hasWord(hay, w));
 
 /** Importe en euros o dólares, tal como lo publica el anuncio. `null` si no publica cifra. */
 export function currencyOf(...texts: Array<string | null | undefined>): Currency | null {

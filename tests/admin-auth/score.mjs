@@ -19,4 +19,8 @@ assert.equal(a, fingerprintOf({ title: 'closer de ventas', company: 'ACME', loca
 assert.notEqual(a, fingerprintOf({ title: 'Closer de ventas', company: 'Otra', location: 'Madrid' }));
 assert.notEqual(a, fingerprintOf({ title: 'Closer de ventas', company: 'Acme', location: 'Barcelona' }));
 assert.equal(fingerprintOf({ title: 'Closer', company: null }), null);
+// Una oferta de LatAm es mercado objetivo: no se castiga como «fuera de España» (sumaba 33-45 y nunca aprobaba sola).
+const latamOffer = enrich({ title: 'Closer', company: 'Zeta', location: 'México', posted_at: '2026-10-15', raw: { is_remote: true },
+  description: 'Buscamos closer con experiencia en ventas para el equipo comercial de la empresa. Comisiones. '.repeat(5) }, now);
+assert.equal(latamOffer.market, 'LATAM'); assert.ok(latamOffer.score >= 55, `LATAM=${latamOffer.score}`);
 console.log('PASS  puntuación y huella: ordena mejor→peor y deduplica variantes');
