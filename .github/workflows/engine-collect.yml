@@ -1,0 +1,32 @@
+name: Engine collect
+# Disparador real de la recogida del motor (Cloudflare Worker). Sites rechaza `crons`, así que sin esto el
+# motor solo recogía cuando una alumna abría la búsqueda. Cada 6 h llama a POST /api/collect, que respeta el
+# guardián de cuota D1 (si no hay cuota, no recoge y lo dice). Sin los secretos, el paso se salta y avisa.
+# Secretos del repositorio: ENGINE_URL (https://<motor>) y COLLECT_TOKEN (el mismo COLLECT_TOKEN del Worker).
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: engine-collect
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Lanzar recogida
+        env:
+          ENGINE_URL: ${{ secrets.ENGINE_URL }}
+          COLLECT_TOKEN: ${{ secrets.COLLECT_TOKEN }}
+        run: |
+          if [ -z "$ENGINE_URL" ] || [ -z "$COLLECT_TOKEN" ]; then
+            echo "::warning::Faltan los secretos ENGINE_URL y/o COLLECT_TOKEN: no se lanza la recogida."
+            exit 0
+          fi
+          code=$(curl -sS -o out.json -w '%{http_code}' --max-time 150 -X POST \
+            -H "X-Collect-Token: $COLLECT_TOKEN" "${ENGINE_URL%/}/api/collect" || echo 000)
+          echo "HTTP $code"; head -c 1500 out.json || true
+          [ "$code" = "200" ]

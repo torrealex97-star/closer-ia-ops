@@ -77,6 +77,14 @@ await step('regla: aprueba lo claro y devuelve a la cola solo lo dudoso', async 
   assert.equal(judgeOffer(usd).decision, 'approve');
 });
 
+await step('mercado LATAM: palabra completa (no «california» ni «calidad») y formas nuevas', async () => {
+  assert.notEqual(marketFor({ title: 'Closer', location: 'California, USA' }).market, 'LATAM');
+  assert.notEqual(marketFor({ title: 'Closer de calidad', location: 'Remoto' }).market, 'LATAM');
+  assert.equal(marketFor({ title: 'Closer', location: 'Remote LATAM' }).market, 'LATAM');
+  assert.equal(marketFor({ title: 'Closer', location: 'Hispanoamérica' }).market, 'LATAM');
+  assert.equal(marketFor({ title: 'Closer', location: 'Cali, Colombia' }).market, 'LATAM');
+});
+
 for (const [s, n, m] of results) console.log(`${s}  ${n}${m ? '\n      ' + m : ''}`);
 const failed = results.filter(r => r[0] === 'FAIL').length;
 console.log(`\n${results.length - failed}/${results.length} pasos OK`);
