@@ -445,7 +445,7 @@ async function sourceFreehire(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -10554,7 +10554,9 @@ const MARKET_HINTS = {
     'guatemala', 'honduras', 'el salvador', 'nicaragua', 'panama', 'costa rica', 'latin america', 'latam',
     'latinoamerica', 'america latina', 'sudamerica', 'suramerica', 'hispanoamerica', 'centroamerica', 'cono sur',
     'bolivia', 'paraguay', 'republica dominicana', 'puerto rico', 'cdmx', 'ciudad de mexico', 'bogota',
-    'medellin', 'buenos aires', 'montevideo', 'quito', 'guayaquil', 'monterrey', 'guadalajara'],
+    'medellin', 'buenos aires', 'montevideo', 'quito', 'guayaquil', 'monterrey', 'guadalajara',
+    'cuba', 'la habana', 'cali', 'santiago de chile', 'san jose costa rica', 'tegucigalpa', 'managua', 'asuncion',
+    'santo domingo', 'san salvador', 'ciudad de panama', 'caracas', 'cancun', 'cordoba argentina', 'rosario'],
   US: NON_ES_HINTS,
 };
 
@@ -10681,6 +10683,12 @@ function spanishBodyGate(description, includeBilingual = false) {
   return { ok: !portuguese && (includeBilingual || (langES && !enRequired)), portuguese, langES, enRequired };
 }
 
+// España EXPLÍCITA (ciudad o país), sin contar «remoto»/«europa», que no son un lugar.
+const ES_EXPLICIT = ES_HINTS.filter(k => k !== 'remoto' && k !== 'europa');
+function explicitSpain(p) {
+  const hay = fold(`${p.title ?? ''} ${p.location ?? ''}`);
+  return ES_EXPLICIT.some(k => hintInText(hay, fold(k))) || placeInSpain(p.location) || nonSpain(p);
+}
 function spainSignal(p) { return ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase().includes(k)) || placeInSpain(p.location); }
 function nonSpain(p) { return NON_ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''}`.toLowerCase().includes(k)); }
 
@@ -10778,7 +10786,10 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     } else if (market !== 'any') {
       // Mercados sin cobertura propia del motor: se exponen solo los que traen país explícito.
       const hay = fold(`${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`);
-      if (!MARKET_HINTS[market].some(k => hintInText(hay, k))) continue;
+      const hinted = MARKET_HINTS[market].some(k => hintInText(hay, k));
+      // LATAM además admite lo que está sin país: se asigna por defecto SI no trae señal explícita de España
+      // y después pasa el gate de español (decisión del propietario). El resto de mercados exige país.
+      if (!hinted && !(market === 'LATAM' && !explicitSpain(p))) continue;
     }
     // El regex de lexemas va sin acentos: se evalúa sobre el texto plegado (fold),
     // nunca sobre el original — 'formación' sin plegar no matchea 'formacion'.
