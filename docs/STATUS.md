@@ -1,5 +1,11 @@
 # Estado
 
+## Code review por fases — fase 2: CodeQL y lo que necesita tu decisión (sesión 137) — 2026-11-08
+
+- **Hecho** (tested sintácticamente; el análisis real corre en GitHub tras fusionar): [codeql.yml](../.github/workflows/codeql.yml) — CodeQL sobre TypeScript/JavaScript (web y Worker) y Python, en cada PR a `main`, cada push y los lunes; `build-mode: none` (solo lee código); acciones fijadas por SHA (`github/codeql-action` v4.39.3). Gratis en repos públicos; los hallazgos aparecen en Security → Code scanning.
+- **No hecho — necesita migración o decisión del dueño** (del review de la fase 1): (1) **alerta de cuota agotada del motor**: hoy el chequeo diario dice «ok» aunque el guardián haya parado la recogida; hace falta un estado nuevo en `engine_alerts` (hay un `CHECK` con cuatro valores) ⇒ migración preparada solo con tu orden; mientras tanto el estado se ve en `/api/status` (`write_allowance`) y en el panel Fuentes; (2) catálogo abierto del Worker con `STUDENT_LOGIN_REQUIRED` (secreto compartido proxy↔Worker); (3) tope diario de la sala por instancia (límite mensual en Groq); (4) `LICENSE`, hashes de las dependencias de JobSpy, `pip-audit` y pruebas de RLS en CI.
+- **No verificado**: que CodeQL arranque a la primera (requiere que *Code scanning* esté permitido en los ajustes del repositorio; si el run falla por permisos, activarlo en Settings → Code security).
+
 ## Code review por fases — fase 1: arreglos del primer barrido (sesión 136) — 2026-11-08
 
 - **Cómo**: 8 revisores en paralelo (seguridad ×2, privacidad, tests/correctitud, rendimiento, infraestructura, accesibilidad, IA/LLM); lo que no se pudo comprobar contra el código no se arregla.
