@@ -10,4 +10,5 @@ assert.deepEqual(findHex(`const x = 1; // #fff en un comentario`), [], 'comentar
 assert.equal(findHex('a\nb { background:#123456 }')[0].line, 2);
 assert.deepEqual(findMutedText('.a{color:var(--muted);font-size:10px} .icon-button{color:var(--muted)} .b{color:var(--secondary)}'), ['.a'], '--muted solo en iconos');
 assert.deepEqual(findMutedText('.x{background:var(--muted)}'), []);
+assert.deepEqual(findMutedText('.c{color: var(--muted, #71666d);font-size:14px}'), ['.c'], 'la forma con valor de reserva tampoco se cuela');
 console.log('PASS  diseño: detecta hex fuera de tokens y respeta anclas, entidades y var(--…)');

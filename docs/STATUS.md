@@ -1,5 +1,18 @@
 # Estado
 
+## Code review por fases — fase 1: arreglos del primer barrido (sesión 136) — 2026-11-08
+
+- **Cómo**: 8 revisores en paralelo (seguridad ×2, privacidad, tests/correctitud, rendimiento, infraestructura, accesibilidad, IA/LLM); lo que no se pudo comprobar contra el código no se arregla.
+- **Hecho** (tested; suite completa 285 PASS y 13/13 de interfaz, `tsc`, diseño y `design.mjs` limpios):
+  - **Error mío del LATAM (correctitud)**: «Guadalajara», «Medellín (Badajoz)», «La Puebla de…» y «El Rosario» son también pueblos de España y se marcaban LATAM antes de mirar España. Los nombres ambiguos ahora solo cuentan como LATAM sin señal de España (web: [market.ts](../apps/web/lib/market.ts); motor: `marketHinted`); con país o estado (Jalisco, México, Colombia…) siguen siendo LATAM. Pruebas en market.mjs y latam.mjs.
+  - **Rendimiento del motor**: el registro de cuota anotaba ~la mitad de lo que escribe la activación (4→6 filas por oferta verificada, 2→3 sin verificar); la activación **automática** (`auto: true`, la del cron) respeta el guardián de cuota y se salta si no hay (la de una persona, no); `ensureSchema` se ejecuta una vez por conexión (antes ~6 idas y vueltas a D1 en cada petición, también en la lectura de la alumna). Prueba: [activationquota.mjs](../tests/engine/activationquota.mjs).
+  - **Seguridad**: limitador de intentos fallidos de login (alumnas y admin): 8 por cuenta+IP y 40 por IP en 15 min, `429` con `Retry-After`, sin bloqueo por email a secas (no se puede dejar fuera a la dueña); en memoria de la instancia, best-effort. Prueba: [loginlimit.mjs](../tests/admin-auth/loginlimit.mjs).
+  - **Privacidad**: al cerrar sesión o «Borrar mi perfil» se borran del navegador el historial de práctica, los borradores y el examen guardados y las ofertas guardadas ([studentLocalData.ts](../apps/web/lib/studentLocalData.ts)).
+  - **Accesibilidad**: párrafo del panel de recogida con `--secondary` (antes `--muted`, 3,4:1); `check-design` ahora detecta también `var(--muted, #…)`.
+  - **Infra**: acciones de GitHub fijadas por SHA (checkout 7.0.1, setup-node 7.1.0, setup-python 7.1.0; dependabot las seguirá actualizando).
+- **No hecho — decisión o migración tuya**: (1) el catálogo del Worker sigue abierto a quien conozca su URL aunque actives `STUDENT_LOGIN_REQUIRED` (la puerta solo está en el proxy de Vercel); arreglarlo exige un secreto compartido proxy↔Worker; (2) tope diario de la sala de práctica por instancia, no global (lo cubre un límite de gasto mensual en Groq o una tabla); (3) alerta cuando el guardián de cuota del motor para la recogida (hoy el chequeo diario dice «ok»); (4) CodeQL, `LICENSE`, dependencias transitivas de JobSpy con hashes, `pip-audit`, pruebas de RLS en CI (ya en el relevo).
+- **No verificado**: rendimiento real en producción y la interacción de los 429 del limitador con varias instancias de Vercel.
+
 ## Panel «embudo por fuente y mercado» (sesión 135) — 2026-11-08
 
 - **Para qué**: hasta ahora no había ninguna cifra de cuántas ofertas nuevas entran por día ni dónde se pierden; sin ella el objetivo de 20 (o 100) al día era una estimación. Panel nuevo en Fuentes externas, junto a las métricas.

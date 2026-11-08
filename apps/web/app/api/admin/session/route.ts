@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { createLoginLimiter, loginIp, tooManyAttempts } from '../../../../lib/loginLimit';
 import { ACCESS_COOKIE, authenticate, clearCookies, originBlocked, sessionAvailable, sessionCookies, withCookies } from '../../../../lib/adminAuth';
 import { adminRole, normalizeEmail, passwordLogin, signOut } from '../../../../lib/supabaseAuth';
 
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest) {
 }
 
 // Login con email y contraseña (Supabase Auth). Mensaje único ante cualquier fallo de credenciales.
+// Intentos fallidos por origen (en memoria de la instancia, best-effort): ver lib/loginLimit.ts.
+const limiter = createLoginLimiter();
+
 export async function POST(request: NextRequest) {
   if (originBlocked(request)) return Response.json({ detail: 'Origen no permitido' }, { status: 403 });
   if (!sessionAvailable()) return Response.json({ detail: 'El acceso al panel no está configurado en este despliegue.' }, { status: 503 });
@@ -23,8 +27,11 @@ export async function POST(request: NextRequest) {
   const password = typeof body.password === 'string' ? body.password : '';
   const invalid = Response.json({ detail: 'Email o contraseña incorrectos.' }, { status: 401 });
   if (!email || !password || password.length > 200) return invalid;
+  const ip = loginIp(request.headers), wait = limiter.blockedFor(ip, email);
+  if (wait !== null) return tooManyAttempts(wait);
   const session = await passwordLogin(email, password);
-  if (!session) return invalid;
+  if (!session) { limiter.fail(ip, email); return invalid; }
+  limiter.succeed(ip, email);
   const role = await adminRole(session.user.email);
   if (!role) return Response.json({ detail: 'Tu usuario no está autorizado para este panel.' }, { status: 403 });
   return withCookies(Response.json({ authenticated: true, email: session.user.email, role }), sessionCookies(session.tokens));

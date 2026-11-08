@@ -11,7 +11,7 @@ const workerPath = fileURLToPath(new URL('../../sites/engine/worker.js', import.
 const stage = join(mkdtempSync(join(tmpdir(), 'wdc-engine-latam-')), 'worker.mjs');
 copyFileSync(workerPath, stage);
 const { __test } = await import(pathToFileURL(stage).href);
-const { isoCountryName, hintInText, MARKET_HINTS, spanishBodyGate, activationBudget, checkTarget, explicitSpain } = __test;
+const { isoCountryName, hintInText, MARKET_HINTS, spanishBodyGate, activationBudget, checkTarget, explicitSpain, marketHinted } = __test;
 const latam = hay => MARKET_HINTS.LATAM.some(k => hintInText(hay, k));
 
 assert.equal(isoCountryName('MX'), 'México');
@@ -33,6 +33,11 @@ assert.equal(spanishBodyGate(es + 'perfil bilingue english').ok, false);
 assert.equal(activationBudget({}), 25, 'plan gratuito: 25');
 assert.equal(activationBudget({ SUBREQUEST_LIMIT: '1000' }), 150, 'plan de pago: tope 150');
 assert.equal(activationBudget({ SUBREQUEST_LIMIT: '200' }), 41);
+
+// Ambiguos: «Guadalajara» a secas o con España NO es LatAm; con México o Jalisco, sí.
+const lat = loc => marketHinted('LATAM', { title: 'Closer', location: loc }, loc.toLowerCase());
+assert.equal(lat('guadalajara, espana'), false); assert.equal(lat('guadalajara'), false); assert.equal(lat('medellin, badajoz'), false);
+assert.equal(lat('guadalajara, jalisco'), true); assert.equal(lat('guadalajara, mexico'), true); assert.equal(lat('medellin, colombia'), true);
 
 // LATAM por defecto: sin país ni España explícita entra; con España explícita, no.
 assert.equal(explicitSpain({ title: 'Closer', location: null }), false);
