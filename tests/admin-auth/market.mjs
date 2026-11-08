@@ -67,7 +67,10 @@ await step('regla: aprueba lo claro y devuelve a la cola solo lo dudoso', async 
   const base = { title: 'Closer high ticket', description: 'Buscamos closer para cerrar ventas del programa en el equipo comercial de la empresa.', location: 'Madrid, España', salary: '30.000 €/año', role: 'closer', score: 78, spain: true, verified_result: null, market: 'ES', market_basis: 'ubicacion_espana', red_flags: [] };
   assert.equal(judgeOffer(base).decision, 'approve');
   assert.equal(judgeOffer({ ...base, role: null }).why, 'sin_perfil');
-  assert.equal(judgeOffer({ ...base, location: null, salary: null, market: null, market_basis: 'sin_senal' }).why, 'sin_mercado');
+  // Sin mercado Y sin español suficiente: a la cola humana. En español, LATAM por defecto y sigue su camino.
+  assert.equal(judgeOffer({ ...base, title: 'Sales closer', description: 'Sales closer wanted', location: null, salary: null, market: null, market_basis: 'sin_senal' }).why, 'sin_mercado');
+  const sinMercado = judgeOffer({ ...base, location: null, salary: null, market: null, market_basis: 'sin_senal' });
+  assert.notEqual(sinMercado.why, 'sin_mercado'); assert.equal(sinMercado.market, 'LATAM'); assert.equal(sinMercado.basis, 'sin_senal');
   assert.equal(judgeOffer({ ...base, score: 40 }).why, 'score_bajo');
   assert.equal(judgeOffer({ ...base, description: 'Apply now, our team is hiring a sales closer in Madrid.', spain: true }).why, 'idioma_dudoso');
   assert.equal(judgeOffer({ ...base, verified_result: 'closed' }).why, 'enlace_cerrado');
@@ -83,6 +86,19 @@ await step('mercado LATAM: palabra completa (no «california» ni «calidad») y
   assert.equal(marketFor({ title: 'Closer', location: 'Remote LATAM' }).market, 'LATAM');
   assert.equal(marketFor({ title: 'Closer', location: 'Hispanoamérica' }).market, 'LATAM');
   assert.equal(marketFor({ title: 'Closer', location: 'Cali, Colombia' }).market, 'LATAM');
+});
+
+await step('LATAM completo: todos los países y capitales; español sin señal ⇒ LATAM por defecto (base sin_senal)', async () => {
+  for (const loc of ['La Habana, Cuba', 'Santo Domingo', 'Asunción, Paraguay', 'Tegucigalpa', 'Managua', 'San Salvador', 'Ciudad de Panamá', 'Montevideo', 'Quito', 'La Paz, Bolivia', 'Caracas', 'San Juan, Puerto Rico', 'Cancún'])
+    assert.equal(marketFor({ title: 'Closer', location: loc }).market, 'LATAM', loc);
+  const es = 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa.';
+  assert.deepEqual(marketFor({ title: 'Closer de ventas', description: es }), { market: 'LATAM', basis: 'sin_senal', currency: null });
+  // Sin español suficiente no se inventa nada.
+  assert.equal(marketFor({ title: 'Closer', description: 'Sales closer wanted' }).market, null);
+  // Señal clara de España gana siempre al defecto.
+  assert.equal(marketFor({ title: 'Closer', location: 'Madrid, España', description: es }).market, 'ES');
+  // Palabras corrientes del español no son ciudades.
+  assert.equal(marketFor({ title: 'Closer', location: 'Remoto' , description: 'salta al siguiente nivel, el alto rendimiento' }).market, null);
 });
 
 for (const [s, n, m] of results) console.log(`${s}  ${n}${m ? '\n      ' + m : ''}`);

@@ -1,5 +1,6 @@
 import { spainSignal } from './esPlaces';
-import { marketFor, type Currency, type Market, type MarketBasis } from './market';
+import { marketFor, spanishWords, type Currency, type Market, type MarketBasis } from './market';
+export { spanishWords };
 import { fold, roleFromTitle } from './vocabulary';
 
 // Puntuación 0-100 para ordenar miles de ofertas y quedarse con las mejores. Solo usa lo que la oferta dice:
@@ -8,8 +9,6 @@ import { fold, roleFromTitle } from './vocabulary';
 export type Scorable = { title: string; company?: string | null; location?: string | null; salary?: string | null; description?: string | null; posted_at?: string | null; raw?: Record<string, unknown> };
 export type Enrichment = { role: string | null; spain: boolean | null; score: number; fingerprint: string | null; market: Market | null; market_basis: MarketBasis; currency: Currency | null };
 
-const SPANISH = /\b(?:de|la|el|los|las|para|con|en|y|que|una|un|experiencia|ventas|empresa|buscamos|incorporar|comercial|trabajo|oferta|requisitos|funciones|salario|jornada)\b/g;
-export const spanishWords = (text: string) => (fold(text).match(SPANISH) ?? []).length;
 
 const ROLE_POINTS: Record<string, number> = { closer: 40, setter: 30, cold_caller: 25, account_executive: 20, sdr: 18 };
 const VERTICAL = /high.?ticket|alto ticket|infoproduct|coaching|mentor[ií]a|formaci[oó]n|academia|educaci[oó]n|bootcamp|programa de/i;

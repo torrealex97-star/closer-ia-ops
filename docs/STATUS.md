@@ -1,5 +1,12 @@
 # Estado
 
+## LATAM completo y «español sin mercado claro ⇒ LATAM» (sesión 134) — 2026-11-08
+
+- **Orden del dueño**: «que entienda como LATAM cualquier país de Latinoamérica, y lo que no tiene mercado claro que lo añada a LATAM mientras sea en español».
+- **Hecho** (tested; suite completa 280 PASS, 13/13 de interfaz, `tsc` y diseño limpios): lista de países/capitales/ciudades ampliada en [market.ts](../apps/web/lib/market.ts) y en el motor (Cuba, Rep. Dominicana, Paraguay, Bolivia, Honduras, Nicaragua, El Salvador, Panamá, Puerto Rico…); **sin ubicación útil ni importe y con español suficiente (`spanishWords ≥ 3`) el mercado es `LATAM` con base `sin_senal`** (asignación por defecto, distinguible de un dato de ubicación; sin migración: ambos valores ya los permite el CHECK de `external_offers`); sin español suficiente sigue `null` → `sin_mercado` → cola humana; el filtro LATAM del motor admite lo que no trae país si no tiene España explícita (ni otro mercado claro) y luego pasa el gate de español. Se quitaron del vocabulario palabras corrientes («salta», «el alto», «lima», «san jose»). `spanishWords` pasó a `market.ts` (se reexporta desde `offerScore.ts`) para evitar el ciclo de importación.
+- **Efecto esperado y riesgo**: el respaldo SerpApi (Computrabajo/OCC/Bumerán, sin ubicación) deja de ir entero a la cola por `sin_mercado`. Una oferta española sin ciudad aparecerá también en LATAM (aceptado); señal clara de España nunca pasa a LATAM.
+- **No verificado**: efecto real en producción (cuántas pasan a visibles). Lo medirá el panel de embudo (siguiente PR).
+
 ## Más ofertas, sobre todo de LATAM: lo que se perdía y lo que se arregló (sesión 133) — 2026-11-07
 
 - **Petición del operador**: «hay pocas ofertas en LATAM; necesito al menos 20 nuevas al día (España como mínimo y más de LATAM), fuentes gratis primero; solo español; sin techo de gasto».

@@ -11,7 +11,7 @@ const workerPath = fileURLToPath(new URL('../../sites/engine/worker.js', import.
 const stage = join(mkdtempSync(join(tmpdir(), 'wdc-engine-latam-')), 'worker.mjs');
 copyFileSync(workerPath, stage);
 const { __test } = await import(pathToFileURL(stage).href);
-const { isoCountryName, hintInText, MARKET_HINTS, spanishBodyGate, activationBudget, checkTarget } = __test;
+const { isoCountryName, hintInText, MARKET_HINTS, spanishBodyGate, activationBudget, checkTarget, explicitSpain } = __test;
 const latam = hay => MARKET_HINTS.LATAM.some(k => hintInText(hay, k));
 
 assert.equal(isoCountryName('MX'), 'México');
@@ -33,6 +33,13 @@ assert.equal(spanishBodyGate(es + 'perfil bilingue english').ok, false);
 assert.equal(activationBudget({}), 25, 'plan gratuito: 25');
 assert.equal(activationBudget({ SUBREQUEST_LIMIT: '1000' }), 150, 'plan de pago: tope 150');
 assert.equal(activationBudget({ SUBREQUEST_LIMIT: '200' }), 41);
+
+// LATAM por defecto: sin país ni España explícita entra; con España explícita, no.
+assert.equal(explicitSpain({ title: 'Closer', location: null }), false);
+assert.equal(explicitSpain({ title: 'Closer', location: 'Remoto' }), false, '«remoto» no es un lugar');
+assert.equal(explicitSpain({ title: 'Closer', location: 'Madrid, España' }), true);
+assert.equal(explicitSpain({ title: 'Closer', location: 'Miami, Florida' }), true, 'señal clara de otro mercado: no es «sin país»');
+for (const ok of ['la habana cuba', 'cuba', 'tegucigalpa']) assert.ok(latam(ok), ok);
 
 // Redirección: se sigue una vez y manda el cuerpo de la página final.
 const realFetch = globalThis.fetch;

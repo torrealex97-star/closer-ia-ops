@@ -1,6 +1,10 @@
 import { spainSignal } from './esPlaces';
 import { fold } from './vocabulary';
 
+// Criterio de «está en español»: el mismo que usan la puntuación, la revisión automática y la vista de alumna.
+const SPANISH = /\b(?:de|la|el|los|las|para|con|en|y|que|una|un|experiencia|ventas|empresa|buscamos|incorporar|comercial|trabajo|oferta|requisitos|funciones|salario|jornada)\b/g;
+export const spanishWords = (text: string) => (fold(text).match(SPANISH) ?? []).length;
+
 // Mercado de una oferta externa. Dos señales, en este orden:
 // 1) la ubicación que publica el anuncio manda;
 // 2) si la ubicación no dice nada, el importe: euros ⇒ España/Europa, dólares ⇒ LatAm/EE. UU.
@@ -30,6 +34,11 @@ const LATAM = [
   'republica dominicana', 'santo domingo', 'el salvador', 'san salvador', 'honduras', 'tegucigalpa',
   'nicaragua', 'managua', 'puerto rico', 'san juan de puerto rico',
   'brasil', 'brazil', 'sao paulo', 'rio de janeiro', 'belo horizonte', 'porto alegre', 'curitiba',
+  'cuba', 'la habana', 'havana', 'santiago de cuba', 'panama', 'david panama', 'san pedro sula', 'ciudad de guatemala',
+  'heredia', 'alajuela', 'cusco', 'piura', 'santiago de los caballeros', 'punta cana',
+  'ciudad del este', 'montevideo', 'punta del este', 'la plata', 'mar del plata', 'tucuman', 'neuquen',
+  'cochabamba', 'sucre', 'maracay', 'valencia venezuela', 'barquisimeto', 'bucaramanga', 'pereira', 'manizales',
+  'santa marta', 'cucuta', 'leon nicaragua', 'merida yucatan', 'cancun', 'leon guanajuato', 'toluca', 'san luis potosi',
 ] as const;
 
 const US = [
@@ -82,6 +91,10 @@ export function marketFor(input: { title?: string | null; location?: string | nu
   if (hit(hay, US)) return { market: 'US_LATINO', basis: 'ubicacion_estados_unidos', currency };
   if (currency === 'USD') return { market: 'US_LATINO', basis: 'moneda_usd', currency };
   if (currency === 'EUR') return { market: 'ES', basis: 'moneda_eur', currency };
+  // Sin ubicación útil ni importe: si el anuncio está en español se asigna LATAM por defecto (decisión del
+  // propietario). La base sigue siendo `sin_senal`, así que se distingue de un dato de ubicación y se puede
+  // filtrar después. Sin español suficiente NO se inventa nada: queda desconocido.
+  if (spanishWords(`${input.title ?? ''} ${input.description ?? ''}`) >= 3) return { market: 'LATAM', basis: 'sin_senal', currency };
   return { market: null, basis: 'sin_senal', currency };
 }
 
