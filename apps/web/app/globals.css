@@ -17,7 +17,7 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .source-tag.family{background:var(--accent-soft);color:var(--accent);font-weight:600}.ai-analysis small{color:var(--ink)}.connection-form .panel-title h2{display:flex;align-items:center;gap:8px}
 
 .collection-panel { border: 1px solid var(--line, #e8e0e3); border-radius: 16px; padding: 20px; margin-bottom: 20px; background: var(--paper, #fffdfb); }
-.collection-panel > p { color: var(--muted, #71666d); font-size: 14px; line-height: 1.6; }
+.collection-panel > p { color: var(--secondary); font-size: 14px; line-height: 1.6; }
 .collection-stats { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px; margin: 12px 0; }
 .collection-panel .connection-grid { margin-top: 20px; }
 .collection-panel > button { display: inline-flex; align-items: center; gap: 8px; }

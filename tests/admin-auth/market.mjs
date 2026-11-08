@@ -89,7 +89,7 @@ await step('mercado LATAM: palabra completa (no «california» ni «calidad») y
 });
 
 await step('LATAM completo: todos los países y capitales; español sin señal ⇒ LATAM por defecto (base sin_senal)', async () => {
-  for (const loc of ['La Habana, Cuba', 'Santo Domingo', 'Asunción, Paraguay', 'Tegucigalpa', 'Managua', 'San Salvador', 'Ciudad de Panamá', 'Montevideo', 'Quito', 'La Paz, Bolivia', 'Caracas', 'San Juan, Puerto Rico', 'Cancún'])
+  for (const loc of ['La Habana, Cuba', 'Santo Domingo', 'Asunción, Paraguay', 'Tegucigalpa', 'Managua', 'San Salvador, El Salvador', 'Ciudad de Panamá', 'Montevideo', 'Quito', 'La Paz, Bolivia', 'Caracas', 'San Juan, Puerto Rico', 'Cancún'])
     assert.equal(marketFor({ title: 'Closer', location: loc }).market, 'LATAM', loc);
   const es = 'Buscamos una persona con experiencia en ventas para el equipo comercial de la empresa.';
   assert.deepEqual(marketFor({ title: 'Closer de ventas', description: es }), { market: 'LATAM', basis: 'sin_senal', currency: null });
@@ -99,6 +99,13 @@ await step('LATAM completo: todos los países y capitales; español sin señal �
   assert.equal(marketFor({ title: 'Closer', location: 'Madrid, España', description: es }).market, 'ES');
   // Palabras corrientes del español no son ciudades.
   assert.equal(marketFor({ title: 'Closer', location: 'Remoto' , description: 'salta al siguiente nivel, el alto rendimiento' }).market, null);
+});
+
+await step('nombres que existen en España y en LatAm: sin país gana España; con país o estado, LatAm', async () => {
+  for (const loc of ['Guadalajara, España', 'Guadalajara', 'Guadalajara, Castilla-La Mancha', 'Medellín, Badajoz', 'La Puebla de Cazalla, Sevilla', 'El Rosario, Santa Cruz de Tenerife'])
+    assert.equal(marketFor({ title: 'Closer', location: loc }).market, 'ES', loc);
+  for (const loc of ['Guadalajara, Jalisco', 'Guadalajara, México', 'Medellín, Colombia', 'Puebla, México', 'Rosario, Argentina', 'Monterrey, Nuevo León'])
+    assert.equal(marketFor({ title: 'Closer', location: loc }).market, 'LATAM', loc);
 });
 
 for (const [s, n, m] of results) console.log(`${s}  ${n}${m ? '\n      ' + m : ''}`);

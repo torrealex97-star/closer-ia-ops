@@ -34,12 +34,22 @@ const LATAM = [
   'republica dominicana', 'santo domingo', 'el salvador', 'san salvador', 'honduras', 'tegucigalpa',
   'nicaragua', 'managua', 'puerto rico', 'san juan de puerto rico',
   'brasil', 'brazil', 'sao paulo', 'rio de janeiro', 'belo horizonte', 'porto alegre', 'curitiba',
-  'cuba', 'la habana', 'havana', 'santiago de cuba', 'panama', 'david panama', 'san pedro sula', 'ciudad de guatemala',
+  'jalisco', 'nuevo leon', 'cuba', 'la habana', 'havana', 'santiago de cuba', 'panama', 'david panama', 'san pedro sula', 'ciudad de guatemala',
   'heredia', 'alajuela', 'cusco', 'piura', 'santiago de los caballeros', 'punta cana',
   'ciudad del este', 'montevideo', 'punta del este', 'la plata', 'mar del plata', 'tucuman', 'neuquen',
   'cochabamba', 'sucre', 'maracay', 'valencia venezuela', 'barquisimeto', 'bucaramanga', 'pereira', 'manizales',
   'santa marta', 'cucuta', 'leon nicaragua', 'merida yucatan', 'cancun', 'leon guanajuato', 'toluca', 'san luis potosi',
 ] as const;
+
+// Nombres de ciudad que TAMBIÉN existen en España (Guadalajara, Medellín en Badajoz, «La Puebla de…», El Rosario en
+// Tenerife, Mendoza en Álava, Santa Marta de Tormes…) o son palabras corrientes («la plata», «cali»). Solo cuentan
+// como LatAm si el texto no da señal de España: «Guadalajara, España» o «Medellín, Badajoz» son España.
+const LATAM_AMBIGUOUS = new Set([
+  'guadalajara', 'puebla', 'rosario', 'medellin', 'monterrey', 'mendoza', 'cali', 'santo domingo', 'san salvador', 'asuncion',
+  'la plata', 'heredia', 'santa marta', 'sucre', 'pereira', 'toluca', 'santiago de los caballeros', 'cancun', 'merida yucatan',
+]);
+const LATAM_STRONG = (LATAM as readonly string[]).filter(w => !LATAM_AMBIGUOUS.has(w));
+const LATAM_WEAK = (LATAM as readonly string[]).filter(w => LATAM_AMBIGUOUS.has(w));
 
 const US = [
   'united states', 'estados unidos', 'ee. uu', 'ee uu', 'usa', 'u.s.', 'us remote', 'remote us',
@@ -85,9 +95,10 @@ const placeOnly = (text?: string | null) => (text ?? '').toLowerCase().replace(R
 export function marketFor(input: { title?: string | null; location?: string | null; salary?: string | null; description?: string | null }): MarketVerdict {
   const hay = fold(`${input.title ?? ''} ${input.location ?? ''}`);
   const currency = currencyOf(input.salary, input.description);
-  if (hit(hay, LATAM)) return { market: 'LATAM', basis: 'ubicacion_latam', currency };
+  if (hit(hay, LATAM_STRONG)) return { market: 'LATAM', basis: 'ubicacion_latam', currency };
   const spain = spainSignal(placeOnly(input.title), placeOnly(input.location));
   if (spain === true) return { market: 'ES', basis: 'ubicacion_espana', currency };
+  if (hit(hay, LATAM_WEAK)) return { market: 'LATAM', basis: 'ubicacion_latam', currency };
   if (hit(hay, US)) return { market: 'US_LATINO', basis: 'ubicacion_estados_unidos', currency };
   if (currency === 'USD') return { market: 'US_LATINO', basis: 'moneda_usd', currency };
   if (currency === 'EUR') return { market: 'ES', basis: 'moneda_eur', currency };

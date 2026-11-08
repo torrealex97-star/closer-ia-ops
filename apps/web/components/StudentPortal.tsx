@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, LoaderCircle, LogOut, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/vocabulary';
 import { ApplicationForm, Applications } from './StudentApplications';
+import { clearStudentLocalData } from '../lib/studentLocalData';
 
 // Portal de alumnas: acceso por invitación (email + contraseña de Supabase Auth) y perfil propio. Los vídeos NO se suben
 // aquí: cada alumna los guarda en su propio Drive y solo pega el enlace (por si algún formulario futuro lo pide).
@@ -79,7 +80,7 @@ function ProfileForm({ email, onLogout, onLost }: { email: string; onLogout: () 
   async function erase() {
     if (!window.confirm('¿Borrar tu perfil y el enlace a tu vídeo? No se puede deshacer.')) return;
     setBusy(true); setError(''); setNotice('');
-    try { await api('profile', { method: 'DELETE' }); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil, tu formulario y tus candidaturas se han borrado.'); setSaves(n => n + 1); setApps(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
+    try { await api('profile', { method: 'DELETE' }); clearStudentLocalData(); setP({ full_name: '', city: '', target_roles: [], languages: ['es'], availability: '', video_url: '', consent_at: null }); setConsent(false); setNotice('Tu perfil, tu formulario y tus candidaturas se han borrado.'); setSaves(n => n + 1); setApps(n => n + 1); } catch (err) { fail(err as Error); } finally { setBusy(false); }
   }
   return <div className="auth-wrap"><div className="auth-card" style={{ maxWidth: 640 }}><Brand />
     <div><span className="eyebrow">TU PERFIL</span><h1>Hola, {p.full_name || email}</h1><p>Esta información nos ayuda a elegir ofertas para ti. Puedes cambiarla o borrarla cuando quieras.</p></div>
@@ -112,5 +113,5 @@ export default function StudentPortal() {
   useEffect(refresh, [refresh]);
   if (state.loading) return <div className="auth-wrap"><p className="muted"><LoaderCircle className="spin" size={18} /> Cargando…</p></div>;
   if (!state.email) return <Login onLogin={refresh} />;
-  return <ProfileForm email={state.email} onLogout={() => { void api('session', { method: 'DELETE' }).finally(() => setState({ loading: false, email: null })); }} onLost={() => setState({ loading: false, email: null })} />;
+  return <ProfileForm email={state.email} onLogout={() => { clearStudentLocalData(); void api('session', { method: 'DELETE' }).finally(() => setState({ loading: false, email: null })); }} onLost={() => setState({ loading: false, email: null })} />;
 }

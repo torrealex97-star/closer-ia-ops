@@ -445,7 +445,7 @@ async function sourceFreehire(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain, marketHinted };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -622,7 +622,18 @@ async function migrateWriteShape(db, allowance, limits = writeLimits()) {
 
 
 // ------ esquema D1 (additiva, versionada; equivalente del núcleo local) ------
-async function ensureSchema(db) {
+// Una vez por conexión y aislado: el esquema solo crece al desplegar, y repetirlo en CADA petición costaba ~6 idas y
+// vueltas a D1 seriadas (13 DDL + 5 ALTER que fallan) incluso en la lectura de la alumna. Si falla, se reintenta.
+const schemaReady = new WeakMap();
+function ensureSchema(db) {
+  let ready = schemaReady.get(db);
+  if (!ready) {
+    ready = ensureSchemaOnce(db).catch(error => { schemaReady.delete(db); throw error; });
+    schemaReady.set(db, ready);
+  }
+  return ready;
+}
+async function ensureSchemaOnce(db) {
   await db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)'),
     db.prepare('INSERT OR IGNORE INTO schema_version VALUES (1)'),
@@ -1124,6 +1135,17 @@ async function handleAdminActivate(request, env) {
   catch { body = {}; }
   const dryRun = body.dry_run !== false;
   const verify = body.verify !== false;
+  // `auto: true` = la lanza el cron, no una persona. Una persona aprobando nunca se bloquea por cuota, pero la
+  // activación automática escribe ~6 filas por oferta y, si seguía tras parar la recogida, empujaba el mes hacia el
+  // 429 de la plataforma (que tumbó también las lecturas de las alumnas el 2026-10-27).
+  if (body.auto === true && !dryRun) {
+    const allowance = await readWriteAllowance(db, writeLimits(env));
+    if (!allowance.ok) {
+      return Response.json({ dry_run: false, skipped: true, reason: 'write_allowance', write_allowance: allowance,
+        counts: { published: 0, needs_review: 0, skipped: 0, withdrawn: 0, deferred: 0 }, scan: { limit: SCAN_LIMIT, write_budget: 0, truncated: false },
+        note: 'Activación automática detenida por la cuota de escrituras del motor; se reanuda al reiniciarse la cuota.' });
+    }
+  }
   const market = body.market === undefined ? 'ES' : body.market;
   if (!['ES', 'any'].includes(market)) return Response.json({ detail: 'market: debe ser ES o any' }, { status: 422 });
   const role = body.role === undefined || body.role === null ? null : body.role;
@@ -1278,7 +1300,7 @@ async function handleAdminActivate(request, env) {
   // evidencia por verificación y una fila por oferta retirada). Se anota APROXIMADO y declarado,
   // porque el registro solo sirve para parar la RECOGIDA automática: una persona aprobando ofertas
   // no se bloquea nunca por cuota.
-  const charged = dryRun ? 0 : await chargeWrites(env.DB, counters.withdrawn + written * (verify ? 4 : 2));
+  const charged = dryRun ? 0 : await chargeWrites(env.DB, counters.withdrawn + written * (verify ? 6 : 3));
   return Response.json({
     dry_run: dryRun, verify, market, role, source, considered: rows.results.length,
     // `truncated` cubre las dos cotas: el barrido y las escrituras. `deferred` dice
@@ -10548,13 +10570,16 @@ const ROLE_LABELS = { closer: 'Closer', setter: 'Setter', cold_caller: 'Cold Cal
 const ROLE_PRIORITY = { closer: 0, setter: 1, cold_caller: 2, account_executive: 9, sdr: 10 };
 const EXTRA_ROLES = new Set(['account_executive', 'sdr']);
 const TOP_TARGET = 20;
+// Nombres de ciudad que TAMBIÉN existen en España o son palabras corrientes: solo cuentan como LatAm sin señal de España.
+const LATAM_AMBIGUOUS = new Set(['guadalajara', 'puebla', 'rosario', 'medellin', 'monterrey', 'mendoza', 'cali', 'santo domingo',
+  'san salvador', 'asuncion', 'la plata', 'heredia', 'santa marta', 'sucre', 'pereira', 'toluca', 'cancun']);
 const MARKET_HINTS = {
   EU: ['europa', 'europe', 'european union', 'reino unido', 'portugal', 'francia', 'alemania', 'irlanda', 'paises bajos'],
   LATAM: ['mexico', 'argentina', 'colombia', 'chile', 'peru', 'ecuador', 'uruguay', 'venezuela',
     'guatemala', 'honduras', 'el salvador', 'nicaragua', 'panama', 'costa rica', 'latin america', 'latam',
     'latinoamerica', 'america latina', 'sudamerica', 'suramerica', 'hispanoamerica', 'centroamerica', 'cono sur',
     'bolivia', 'paraguay', 'republica dominicana', 'puerto rico', 'cdmx', 'ciudad de mexico', 'bogota',
-    'medellin', 'buenos aires', 'montevideo', 'quito', 'guayaquil', 'monterrey', 'guadalajara',
+    'medellin', 'buenos aires', 'montevideo', 'quito', 'guayaquil', 'monterrey', 'guadalajara', 'jalisco', 'nuevo leon',
     'cuba', 'la habana', 'cali', 'santiago de chile', 'san jose costa rica', 'tegucigalpa', 'managua', 'asuncion',
     'santo domingo', 'san salvador', 'ciudad de panama', 'caracas', 'cancun', 'cordoba argentina', 'rosario'],
   US: NON_ES_HINTS,
@@ -10685,6 +10710,14 @@ function spanishBodyGate(description, includeBilingual = false) {
 
 // España EXPLÍCITA (ciudad o país), sin contar «remoto»/«europa», que no son un lugar.
 const ES_EXPLICIT = ES_HINTS.filter(k => k !== 'remoto' && k !== 'europa');
+// ¿El anuncio trae pista del mercado pedido? En LATAM los nombres ambiguos (Guadalajara, Medellín, La Puebla…) solo
+// cuentan si el anuncio no da señal de España; el resto de pistas (países, regiones, capitales únicas) cuentan siempre.
+function marketHinted(market, p, hay) {
+  const hints = MARKET_HINTS[market];
+  if (market !== 'LATAM') return hints.some(k => hintInText(hay, k));
+  return hints.some(k => !LATAM_AMBIGUOUS.has(k) && hintInText(hay, k))
+    || (!explicitSpain(p) && hints.some(k => LATAM_AMBIGUOUS.has(k) && hintInText(hay, k)));
+}
 function explicitSpain(p) {
   const hay = fold(`${p.title ?? ''} ${p.location ?? ''}`);
   return ES_EXPLICIT.some(k => hintInText(hay, fold(k))) || placeInSpain(p.location) || nonSpain(p);
@@ -10786,9 +10819,7 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     } else if (market !== 'any') {
       // Mercados sin cobertura propia del motor: se exponen solo los que traen país explícito.
       const hay = fold(`${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`);
-      const hinted = MARKET_HINTS[market].some(k => hintInText(hay, k));
-      // LATAM además admite lo que está sin país: se asigna por defecto SI no trae señal explícita de España
-      // y después pasa el gate de español (decisión del propietario). El resto de mercados exige país.
+      const hinted = marketHinted(market, p, hay);
       if (!hinted && !(market === 'LATAM' && !explicitSpain(p))) continue;
     }
     // El regex de lexemas va sin acentos: se evalúa sobre el texto plegado (fold),
