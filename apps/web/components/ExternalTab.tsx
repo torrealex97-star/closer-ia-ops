@@ -7,6 +7,7 @@ import { ROLE_LABELS, type RoleFamily } from '../lib/vocabulary';
 // Fuentes externas a escala: miles de ofertas filtradas, ordenadas por puntuación y paginadas en el servidor.
 // Llegan como borradores; una alumna solo ve lo que apruebes y que además cumple las reglas básicas de la vista.
 import MetricsPanel from './MetricsPanel';
+import FunnelPanel from './FunnelPanel';
 import { NICHE_LABELS, PAY_LABELS, type OfferTags } from '../lib/offerTags';
 import AiAgreement from './AiAgreement';
 import RuleAuditList from './RuleAuditList';
@@ -158,6 +159,7 @@ export default function ExternalTab({ owner, onSessionLost }: { owner: boolean; 
       </div>
     </div>
     <MetricsPanel onSessionLost={onSessionLost} />
+    <FunnelPanel onSessionLost={onSessionLost} />
     <AiAgreement onSessionLost={onSessionLost} />
     <RuleAuditList onSessionLost={onSessionLost} />
     <SourceIdeas />

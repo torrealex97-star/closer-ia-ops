@@ -1,5 +1,13 @@
 # Estado
 
+## Panel «embudo por fuente y mercado» (sesión 135) — 2026-11-08
+
+- **Para qué**: hasta ahora no había ninguna cifra de cuántas ofertas nuevas entran por día ni dónde se pierden; sin ella el objetivo de 20 (o 100) al día era una estimación. Panel nuevo en Fuentes externas, junto a las métricas.
+- **Hecho** (tested; suite completa 282 PASS y 13/13 de interfaz, `tsc` y diseño limpios): [funnel.ts](../apps/web/lib/funnel.ts) (puro `computeFunnel` + `loadFunnel` con `pagedRest`), ruta `GET /api/admin/funnel` (exige sesión, 503 si falla), [FunnelPanel.tsx](../apps/web/components/FunnelPanel.tsx). Por fuente × mercado, 24 h y 7 d: nuevas (`first_seen_at`), aprobadas, a revisión humana y retiradas por reglas (fecha de la decisión), vigentes (aprobadas y no caducadas), motivos de las reglas y entradas brutas de `external_ingest_runs`. «LATAM por defecto» (español sin ubicación ni importe, base `sin_senal`) va aparte. Sin migración. Pruebas: [funnel.mjs](../tests/admin-auth/funnel.mjs), flow.mjs, ui.mjs; el simulador de ingesta respeta ya `offset`/`limit`.
+- **Límites declarados en el propio panel**: no ve lo descartado antes de guardar, ni los duplicados entre fuentes, ni cuántas eran visibles en un día pasado (solo se acumula hacia delante); «vigentes» es aproximado (la vista de alumna añade filtros de rol e idioma); la ingesta no distingue mercado; el motor de Cloudflare se mide aparte. Si hay más filas que el tope de lectura, el panel avisa de cifras parciales.
+- **No verificado** (necesita producción): las cifras reales. Alex las verá al abrir el panel; no hay acceso a datos de producción desde aquí, y no se hizo captura visual con datos reales (a 390 px las tablas van dentro de `table-wrap`).
+- **Siguiente (opción B, solo con orden de Alex)**: tabla `source_funnel_daily` escrita por el cron para tener serie histórica de «visibles» y contadores de rechazo con motivo; migración preparada, sin aplicar.
+
 ## LATAM completo y «español sin mercado claro ⇒ LATAM» (sesión 134) — 2026-11-08
 
 - **Orden del dueño**: «que entienda como LATAM cualquier país de Latinoamérica, y lo que no tiene mercado claro que lo añada a LATAM mientras sea en español».
