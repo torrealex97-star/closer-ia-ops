@@ -59,7 +59,7 @@ function fakeDb({ columns = ['id', 'org_id', 'payload'], rows = [] } = {}) {
 
 const exportCall = async (db, env, query) => {
   const response = await worker.fetch(new Request(`https://engine.test/api/export?${query}`, { headers: env.headers ?? {} }), { DB: db, ...env }, {});
-  return { code: response.status, body: await response.json() };
+  return { code: response.status, body: await response.json(), cors: response.headers.get('Access-Control-Allow-Origin') };
 };
 
 // 0) El literal SQL no puede romper el archivo de importación.
@@ -103,8 +103,9 @@ const exportCall = async (db, env, query) => {
       { id: 'raw-2', org_id: 'cloud-wdc', payload: '{"title":"SDR"}' },
     ],
   });
-  const { code, body } = await exportCall(db, ok, 'table=raw_items&limit=2');
+  const { code, body, cors } = await exportCall(db, ok, 'table=raw_items&limit=2');
   assert.equal(code, 200);
+  assert.equal(cors, null, 'ruta de operador: sin CORS, ningún navegador de otro origen la lee');
   assert.deepEqual(body.columns, ['id', 'org_id', 'payload']);
   assert.equal(body.rows, 2);
   assert.equal(body.next, 'raw-2');

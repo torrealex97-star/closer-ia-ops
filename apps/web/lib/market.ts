@@ -1,6 +1,10 @@
 import { spainSignal } from './esPlaces';
 import { fold } from './vocabulary';
 
+// Criterio de «está en español»: el mismo que usan la puntuación, la revisión automática y la vista de alumna.
+const SPANISH = /\b(?:de|la|el|los|las|para|con|en|y|que|una|un|experiencia|ventas|empresa|buscamos|incorporar|comercial|trabajo|oferta|requisitos|funciones|salario|jornada)\b/g;
+export const spanishWords = (text: string) => (fold(text).match(SPANISH) ?? []).length;
+
 // Mercado de una oferta externa. Dos señales, en este orden:
 // 1) la ubicación que publica el anuncio manda;
 // 2) si la ubicación no dice nada, el importe: euros ⇒ España/Europa, dólares ⇒ LatAm/EE. UU.
@@ -17,7 +21,7 @@ export type MarketVerdict = { market: Market | null; basis: MarketBasis; currenc
 // Ciudades y países que no se confunden con España (Córdoba, Santiago, San José o La Paz existen en
 // ambos lados, así que solo cuentan con el país al lado o con una forma inequívoca).
 const LATAM = [
-  'latam', 'latinoamerica', 'latino americano', 'america latina', 'suramerica', 'sudamerica',
+  'latam', 'latinoamerica', 'latinoamericano', 'hispanoamerica', 'centroamerica', 'cono sur', 'remote latam', 'latin america', 'latino americano', 'america latina', 'suramerica', 'sudamerica',
   'mexico', 'cdmx', 'ciudad de mexico', 'guadalajara', 'monterrey', 'queretaro', 'puebla', 'tijuana',
   'colombia', 'bogota', 'medellin', 'cali', 'barranquilla', 'cartagena de indias',
   'argentina', 'buenos aires', 'rosario', 'mendoza', 'cordoba argentina',
@@ -30,7 +34,22 @@ const LATAM = [
   'republica dominicana', 'santo domingo', 'el salvador', 'san salvador', 'honduras', 'tegucigalpa',
   'nicaragua', 'managua', 'puerto rico', 'san juan de puerto rico',
   'brasil', 'brazil', 'sao paulo', 'rio de janeiro', 'belo horizonte', 'porto alegre', 'curitiba',
+  'jalisco', 'nuevo leon', 'cuba', 'la habana', 'havana', 'santiago de cuba', 'panama', 'david panama', 'san pedro sula', 'ciudad de guatemala',
+  'heredia', 'alajuela', 'cusco', 'piura', 'santiago de los caballeros', 'punta cana',
+  'ciudad del este', 'montevideo', 'punta del este', 'la plata', 'mar del plata', 'tucuman', 'neuquen',
+  'cochabamba', 'sucre', 'maracay', 'valencia venezuela', 'barquisimeto', 'bucaramanga', 'pereira', 'manizales',
+  'santa marta', 'cucuta', 'leon nicaragua', 'merida yucatan', 'cancun', 'leon guanajuato', 'toluca', 'san luis potosi',
 ] as const;
+
+// Nombres de ciudad que TAMBIÉN existen en España (Guadalajara, Medellín en Badajoz, «La Puebla de…», El Rosario en
+// Tenerife, Mendoza en Álava, Santa Marta de Tormes…) o son palabras corrientes («la plata», «cali»). Solo cuentan
+// como LatAm si el texto no da señal de España: «Guadalajara, España» o «Medellín, Badajoz» son España.
+const LATAM_AMBIGUOUS = new Set([
+  'guadalajara', 'puebla', 'rosario', 'medellin', 'monterrey', 'mendoza', 'cali', 'santo domingo', 'san salvador', 'asuncion',
+  'la plata', 'heredia', 'santa marta', 'sucre', 'pereira', 'toluca', 'santiago de los caballeros', 'cancun', 'merida yucatan',
+]);
+const LATAM_STRONG = (LATAM as readonly string[]).filter(w => !LATAM_AMBIGUOUS.has(w));
+const LATAM_WEAK = (LATAM as readonly string[]).filter(w => LATAM_AMBIGUOUS.has(w));
 
 const US = [
   'united states', 'estados unidos', 'ee. uu', 'ee uu', 'usa', 'u.s.', 'us remote', 'remote us',
@@ -42,7 +61,14 @@ const US = [
 const EUR = /\u20ac|\b(?:eur|euros?|eura?)\b/i;
 const USD = /\$|\b(?:usd|us\$|dollars?|dolares?)\b/i;
 
-const hit = (hay: string, words: readonly string[]) => words.some(w => hay.includes(w));
+// Palabra completa, no subcadena: `cali` casaba con «california» y «calidad», `peru` con «perugia».
+const wordRe = new Map<string, RegExp>();
+const hasWord = (hay: string, w: string) => {
+  let re = wordRe.get(w);
+  if (!re) { re = new RegExp(`(?<![a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9])`); wordRe.set(w, re); }
+  return re.test(hay);
+};
+const hit = (hay: string, words: readonly string[]) => words.some(w => hasWord(hay, w));
 
 /** Importe en euros o dólares, tal como lo publica el anuncio. `null` si no publica cifra. */
 export function currencyOf(...texts: Array<string | null | undefined>): Currency | null {
@@ -69,12 +95,17 @@ const placeOnly = (text?: string | null) => (text ?? '').toLowerCase().replace(R
 export function marketFor(input: { title?: string | null; location?: string | null; salary?: string | null; description?: string | null }): MarketVerdict {
   const hay = fold(`${input.title ?? ''} ${input.location ?? ''}`);
   const currency = currencyOf(input.salary, input.description);
-  if (hit(hay, LATAM)) return { market: 'LATAM', basis: 'ubicacion_latam', currency };
+  if (hit(hay, LATAM_STRONG)) return { market: 'LATAM', basis: 'ubicacion_latam', currency };
   const spain = spainSignal(placeOnly(input.title), placeOnly(input.location));
   if (spain === true) return { market: 'ES', basis: 'ubicacion_espana', currency };
+  if (hit(hay, LATAM_WEAK)) return { market: 'LATAM', basis: 'ubicacion_latam', currency };
   if (hit(hay, US)) return { market: 'US_LATINO', basis: 'ubicacion_estados_unidos', currency };
   if (currency === 'USD') return { market: 'US_LATINO', basis: 'moneda_usd', currency };
   if (currency === 'EUR') return { market: 'ES', basis: 'moneda_eur', currency };
+  // Sin ubicación útil ni importe: si el anuncio está en español se asigna LATAM por defecto (decisión del
+  // propietario). La base sigue siendo `sin_senal`, así que se distingue de un dato de ubicación y se puede
+  // filtrar después. Sin español suficiente NO se inventa nada: queda desconocido.
+  if (spanishWords(`${input.title ?? ''} ${input.description ?? ''}`) >= 3) return { market: 'LATAM', basis: 'sin_senal', currency };
   return { market: null, basis: 'sin_senal', currency };
 }
 

@@ -32,6 +32,8 @@ node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests
 # Auditoría del catálogo (SOLO LECTURA): lo ya aprobado que la regla retiraría, con su motivo y sin escribir nada.
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/ruleaudit.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/metrics.mjs
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/funnel.mjs
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/loginlimit.mjs
 # Cifras por fuente: las cuenta la base (count=exact), sin traer la tabla ni cortarse en 5.000.
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/sources.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/agreement.mjs
@@ -70,6 +72,8 @@ node --experimental-strip-types tests/engine/export.mjs
 node --experimental-strip-types tests/engine/subrequests.mjs
 # Forma de escritura del catálogo (índices incluidos): coste medido por candidato, índices de lectura intactos y migración reanudable.
 node --experimental-strip-types tests/engine/writeshape.mjs
+node --experimental-strip-types tests/engine/latam.mjs
+node --experimental-strip-types tests/engine/activationquota.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offerrisk.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offertags.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/voice.mjs

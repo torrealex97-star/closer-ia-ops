@@ -39,7 +39,7 @@ export async function activateEngine(init: {
       const response = await fetch(`${base}/v1/admin/opportunities/activate`, {
         method: 'POST', cache: 'no-store',
         headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dry_run: false, verify: true, market: init.market ?? 'any' }),
+        body: JSON.stringify({ dry_run: false, verify: true, auto: true, market: init.market ?? 'any' }),
         signal: AbortSignal.timeout(callTimeout(40_000, init.deadline)),
       });
       page = response.ok ? await response.json().catch(() => null) : null;

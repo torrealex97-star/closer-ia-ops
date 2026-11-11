@@ -98,6 +98,7 @@ await step('el mismo estado no se avisa dos veces y el inicio del estado no se c
   assert.match(r.json.decision.why, /ya enviado/);
   assert.equal(r.json.engine.since, since, 'el inicio del estado se mantiene, no se reinicia con cada comprobación');
   assert.match((await alerts()).json.notify.last.detail, /Aviso enviado a owner@test.dev/);
+  for (let i = 0; i < 7; i++) { const again = await alerts({ method: 'POST' }); assert.equal(state.emails.length, 1, `comprobación ${i + 3} del mismo estado: ` + again.json.decision.why); }
 });
 
 await step('la recuperación se anuncia una sola vez', async () => {
@@ -188,6 +189,8 @@ await step('reglas puras: cada transición se decide igual en cualquier llamada'
 await step('sin propietario en la lista no se inventa un destinatario', async () => {
   const keep = state.admins;
   state.admins = keep.filter(a => a.role !== 'owner');
+  state.enginePaused = null;
+  await alert.checkEngine({ by: 'prueba' }); // el motor vuelve: la pausa siguiente es un episodio nuevo
   state.enginePaused = 'allowance';
   const report = await alert.checkEngine({ by: 'prueba' });
   assert.equal(report.email.attempted, false);

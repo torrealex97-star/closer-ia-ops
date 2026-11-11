@@ -458,7 +458,7 @@ async function sourceFreehire(source) {
           if (!external || !row.url || seen.has(external.slice(-120))) continue;
           seen.add(external.slice(-120));
           const payload = {
-            title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.join(', ') : (row.location || null),
+            title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.map(isoCountryName).join(', ') : (row.location || null),
             url: row.url, posted_at: row.posted_at ?? null, raw: term ? { ...row, search_term: term } : row,
           };
           // Solo las búsquedas por término filtran por rol: el barrido por categoría conserva su
@@ -630,7 +630,7 @@ async function sourceJobspresso(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain, marketHinted };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -809,7 +809,18 @@ async function migrateWriteShape(db, allowance, limits = writeLimits()) {
 
 
 // ------ esquema D1 (additiva, versionada; equivalente del núcleo local) ------
-async function ensureSchema(db) {
+// Una vez por conexión y aislado: el esquema solo crece al desplegar, y repetirlo en CADA petición costaba ~6 idas y
+// vueltas a D1 seriadas (13 DDL + 5 ALTER que fallan) incluso en la lectura de la alumna. Si falla, se reintenta.
+const schemaReady = new WeakMap();
+function ensureSchema(db) {
+  let ready = schemaReady.get(db);
+  if (!ready) {
+    ready = ensureSchemaOnce(db).catch(error => { schemaReady.delete(db); throw error; });
+    schemaReady.set(db, ready);
+  }
+  return ready;
+}
+async function ensureSchemaOnce(db) {
   await db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)'),
     db.prepare('INSERT OR IGNORE INTO schema_version VALUES (1)'),
@@ -1093,14 +1104,31 @@ async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
+// FreeHire entrega países como ISO-2 ('MX, CO'); el filtro de mercado busca nombres. Sin esto
+// ninguna oferta de FreeHire LATAM casaba con el filtro LATAM. Código desconocido: se deja tal cual.
+const ISO_COUNTRIES = { MX: 'México', CO: 'Colombia', AR: 'Argentina', CL: 'Chile', PE: 'Perú', EC: 'Ecuador',
+  UY: 'Uruguay', VE: 'Venezuela', BO: 'Bolivia', PY: 'Paraguay', GT: 'Guatemala', HN: 'Honduras', SV: 'El Salvador',
+  NI: 'Nicaragua', PA: 'Panamá', CR: 'Costa Rica', DO: 'República Dominicana', PR: 'Puerto Rico', CU: 'Cuba',
+  ES: 'España', US: 'Estados Unidos', BR: 'Brasil', PT: 'Portugal' };
+function isoCountryName(code) { return ISO_COUNTRIES[String(code ?? '').trim().toUpperCase()] ?? String(code ?? '').trim(); }
 async function checkTarget(url, title, company) {
   let status = null, body = null;
   try {
     const response = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' },
       redirect: 'manual', signal: AbortSignal.timeout(10000) });
     status = response.status;
-    const text = response.status === 200 ? (await response.text()).slice(0, 200_000) : '';
-    body = text;
+    // Una redirección se sigue UNA vez (https, mismo tratamiento que la primera petición): la
+    // evidencia sigue siendo el cuerpo de la página final, nunca la redirección en sí.
+    if ([301, 302, 303, 307, 308].includes(status)) {
+      const next = (() => { try { const u = new URL(response.headers.get('location') || '', url); return u.protocol === 'https:' ? u.toString() : null; } catch { return null; } })();
+      if (next) {
+        const hop = await fetch(next, { headers: { 'User-Agent': UA, 'Accept': '*/*' }, redirect: 'manual', signal: AbortSignal.timeout(10000) });
+        status = hop.status;
+        body = status === 200 ? (await hop.text()).slice(0, 200_000) : '';
+      }
+    } else {
+      body = response.status === 200 ? (await response.text()).slice(0, 200_000) : '';
+    }
   } catch { return ['unknown', 'network_unreachable', { http_status: null }]; }
   if ([301, 302, 303, 307, 308].includes(status))
     return ['unknown', 'redirect_without_verification', { http_status: status }];
@@ -1279,6 +1307,12 @@ const SCAN_LIMIT = 400;
 // agotaba el límite de subrequests a mitad y devolvía 500 con escrituras parciales.
 // Los gates no escriben, así que el barrido puede seguir siendo 400.
 const WRITE_BUDGET = 25;
+const WRITE_BUDGET_PAID_MAX = 150;
+function activationBudget(env) {
+  const { ceiling } = subrequestLimits(env);
+  if (ceiling <= PLATFORM_SUBREQUEST_LIMIT) return WRITE_BUDGET;
+  return Math.max(WRITE_BUDGET, Math.min(WRITE_BUDGET_PAID_MAX, Math.floor((ceiling - D1_RESERVED_SUBREQUESTS) / 4)));
+}
 
 // El cuello de botella real del producto: el catálogo recoge >1300 ofertas y la
 // superficie de alumna solo sirve lo revisado por humanos (spec 15), pero publicar
@@ -1296,6 +1330,17 @@ async function handleAdminActivate(request, env) {
   catch { body = {}; }
   const dryRun = body.dry_run !== false;
   const verify = body.verify !== false;
+  // `auto: true` = la lanza el cron, no una persona. Una persona aprobando nunca se bloquea por cuota, pero la
+  // activación automática escribe ~6 filas por oferta y, si seguía tras parar la recogida, empujaba el mes hacia el
+  // 429 de la plataforma (que tumbó también las lecturas de las alumnas el 2026-10-27).
+  if (body.auto === true && !dryRun) {
+    const allowance = await readWriteAllowance(db, writeLimits(env));
+    if (!allowance.ok) {
+      return Response.json({ dry_run: false, skipped: true, reason: 'write_allowance', write_allowance: allowance,
+        counts: { published: 0, needs_review: 0, skipped: 0, withdrawn: 0, deferred: 0 }, scan: { limit: SCAN_LIMIT, write_budget: 0, truncated: false },
+        note: 'Activación automática detenida por la cuota de escrituras del motor; se reanuda al reiniciarse la cuota.' });
+    }
+  }
   const market = body.market === undefined ? 'ES' : body.market;
   if (!['ES', 'any'].includes(market)) return Response.json({ detail: 'market: debe ser ES o any' }, { status: 422 });
   const role = body.role === undefined || body.role === null ? null : body.role;
@@ -1333,7 +1378,9 @@ async function handleAdminActivate(request, env) {
 
   const items = [];
   const counters = { published: 0, needs_review: 0, skipped: 0, withdrawn: 0, deferred: 0 };
-  const writeBudget = dryRun ? 0 : WRITE_BUDGET;
+  // 25 por invocación con el techo gratuito (50 subrequests). Con Workers de pago el techo sube
+  // (SUBREQUEST_LIMIT) y el lote crece en proporción: cada oferta cuesta ~2 subrequests (D1 + 1 fetch).
+  const writeBudget = dryRun ? 0 : activationBudget(env);
   let written = 0;
   // Lo que la puerta determinista descarta NO se queda en el pool de borradores: se retira con su
   // razón y deja de pedir revisión humana. Se agrupa por razón para retirarlo en pocas escrituras
@@ -1448,7 +1495,7 @@ async function handleAdminActivate(request, env) {
   // evidencia por verificación y una fila por oferta retirada). Se anota APROXIMADO y declarado,
   // porque el registro solo sirve para parar la RECOGIDA automática: una persona aprobando ofertas
   // no se bloquea nunca por cuota.
-  const charged = dryRun ? 0 : await chargeWrites(env.DB, counters.withdrawn + written * (verify ? 4 : 2));
+  const charged = dryRun ? 0 : await chargeWrites(env.DB, counters.withdrawn + written * (verify ? 6 : 3));
   return Response.json({
     dry_run: dryRun, verify, market, role, source, considered: rows.results.length,
     // `truncated` cubre las dos cotas: el barrido y las escrituras. `deferred` dice
@@ -10794,12 +10841,28 @@ const ROLE_LABELS = { closer: 'Closer', setter: 'Setter', cold_caller: 'Cold Cal
 const ROLE_PRIORITY = { closer: 0, setter: 1, cold_caller: 2, account_executive: 9, sdr: 10 };
 const EXTRA_ROLES = new Set(['account_executive', 'sdr']);
 const TOP_TARGET = 20;
+// Nombres de ciudad que TAMBIÉN existen en España o son palabras corrientes: solo cuentan como LatAm sin señal de España.
+const LATAM_AMBIGUOUS = new Set(['guadalajara', 'puebla', 'rosario', 'medellin', 'monterrey', 'mendoza', 'cali', 'santo domingo',
+  'san salvador', 'asuncion', 'la plata', 'heredia', 'santa marta', 'sucre', 'pereira', 'toluca', 'cancun']);
 const MARKET_HINTS = {
   EU: ['europa', 'europe', 'european union', 'reino unido', 'portugal', 'francia', 'alemania', 'irlanda', 'paises bajos'],
   LATAM: ['mexico', 'argentina', 'colombia', 'chile', 'peru', 'ecuador', 'uruguay', 'venezuela',
-    'guatemala', 'honduras', 'el salvador', 'nicaragua', 'panama', 'costa rica', 'latin america', 'latam'],
+    'guatemala', 'honduras', 'el salvador', 'nicaragua', 'panama', 'costa rica', 'latin america', 'latam',
+    'latinoamerica', 'america latina', 'sudamerica', 'suramerica', 'hispanoamerica', 'centroamerica', 'cono sur',
+    'bolivia', 'paraguay', 'republica dominicana', 'puerto rico', 'cdmx', 'ciudad de mexico', 'bogota',
+    'medellin', 'buenos aires', 'montevideo', 'quito', 'guayaquil', 'monterrey', 'guadalajara', 'jalisco', 'nuevo leon',
+    'cuba', 'la habana', 'cali', 'santiago de chile', 'san jose costa rica', 'tegucigalpa', 'managua', 'asuncion',
+    'santo domingo', 'san salvador', 'ciudad de panama', 'caracas', 'cancun', 'cordoba argentina', 'rosario'],
   US: NON_ES_HINTS,
 };
+
+// Palabra completa, no subcadena (`peru` no casa con «perugia»).
+const hintRe = new Map();
+function hintInText(hay, term) {
+  let re = hintRe.get(term);
+  if (!re) { re = new RegExp(`(?<![a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9])`); hintRe.set(term, re); }
+  return re.test(hay);
+}
 
 const fold = text => (text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -10895,7 +10958,12 @@ const VARIABLE_WORDS = /\b(?:comision|commission|ote|promedio|potencial|hasta)\b
 // (experiencia, cliente, campaña, capacitación, postúlate): presencia fuerte de español,
 // no solo fórmulas formales tipo 'buscamos/ofrecemos'.
 const LANG_ES = /\b(?:buscamos|ofrecemos|equipo|ventas|puesto|funciones|formacion|trabajar|nuestro|nuestra|tienes|seras|salario|horario|comisiones|necesitamos|incorporacion|llamadas|remuneracion|contratamos|tareas|experiencia|clientes?|telefono|sms|mail|lider|liderar|exito|crecimiento|capacitacion|entrenamiento|campana|incentivos|candidat[oa]s?|requisitos?|responsabilidades|interesad[oa]s|postul[ae]tes?|carrera|lunes|viernes|sabado|disciplina|proactiv[oa]|objetivos?|empresas?|persona|oferta|semana|mensual|seguimiento|proceso|convocatoria|entrevista)\b/g;
-const LANG_EN_REQ = /\b(?:bilingual|bilingue|fluent|fluency|required|must|proficient|speaking|spoken|communication|requiere|requerido|dominio|nativo|hablantes|idioma|atencion|clientes)\b/;
+// «Inglés requerido» = una palabra de exigencia JUNTO a inglés (≤40 caracteres). Antes bastaba con que el
+// anuncio dijera «inglés» y, en cualquier parte, «clientes», «atención» o «requiere»: se retiraban
+// anuncios en español perfectamente válidos («atención a clientes… se valora inglés»).
+const EN_WORDS = 'english|ingles';
+const REQ_WORDS = 'bilingual|bilingue|fluent|fluency|fluido|required|must|proficient|requiere|requerido|requisito|excluyente|dominio|nivel|nativo|hablantes|idioma|avanzado';
+const LANG_EN_REQ = new RegExp(`\\b(?:${REQ_WORDS})\\b.{0,40}\\b(?:${EN_WORDS})\\b|\\b(?:${EN_WORDS})\\b.{0,40}\\b(?:${REQ_WORDS})\\b|\\b(?:bilingual|bilingue)\\b`);
 const LANG_EN = /\b(?:english|ingles)\b/;
 
 // Gate de cuerpo en español: UNA sola regla para la superficie de alumna y para la
@@ -10911,6 +10979,20 @@ function spanishBodyGate(description, includeBilingual = false) {
   return { ok: !portuguese && (includeBilingual || (langES && !enRequired)), portuguese, langES, enRequired };
 }
 
+// España EXPLÍCITA (ciudad o país), sin contar «remoto»/«europa», que no son un lugar.
+const ES_EXPLICIT = ES_HINTS.filter(k => k !== 'remoto' && k !== 'europa');
+// ¿El anuncio trae pista del mercado pedido? En LATAM los nombres ambiguos (Guadalajara, Medellín, La Puebla…) solo
+// cuentan si el anuncio no da señal de España; el resto de pistas (países, regiones, capitales únicas) cuentan siempre.
+function marketHinted(market, p, hay) {
+  const hints = MARKET_HINTS[market];
+  if (market !== 'LATAM') return hints.some(k => hintInText(hay, k));
+  return hints.some(k => !LATAM_AMBIGUOUS.has(k) && hintInText(hay, k))
+    || (!explicitSpain(p) && hints.some(k => LATAM_AMBIGUOUS.has(k) && hintInText(hay, k)));
+}
+function explicitSpain(p) {
+  const hay = fold(`${p.title ?? ''} ${p.location ?? ''}`);
+  return ES_EXPLICIT.some(k => hintInText(hay, fold(k))) || placeInSpain(p.location) || nonSpain(p);
+}
 function spainSignal(p) { return ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase().includes(k)) || placeInSpain(p.location); }
 function nonSpain(p) { return NON_ES_HINTS.some(k => `${p.title ?? ''} ${p.location ?? ''}`.toLowerCase().includes(k)); }
 
@@ -11008,7 +11090,8 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
     } else if (market !== 'any') {
       // Mercados sin cobertura propia del motor: se exponen solo los que traen país explícito.
       const hay = fold(`${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`);
-      if (!MARKET_HINTS[market].some(k => hay.includes(k))) continue;
+      const hinted = marketHinted(market, p, hay);
+      if (!hinted && !(market === 'LATAM' && !explicitSpain(p))) continue;
     }
     // El regex de lexemas va sin acentos: se evalúa sobre el texto plegado (fold),
     // nunca sobre el original — 'formación' sin plegar no matchea 'formacion'.
@@ -11284,7 +11367,8 @@ async function handleExport(request, env) {
   const rows = page?.results ?? [];
   const next = rows.length === limit ? String(rows[rows.length - 1][key]) : null;
   const sql = rows.map(row => `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(column => sqlLiteral(row[column])).join(', ')});`).join('\n');
-  return Response.json({ table, key, columns, rows: rows.length, next, sql }, { headers: corsHeaders(request) });
+  // Sin cabeceras CORS: es una ruta de operador (token de administración) que solo se usa desde un script, nunca desde un navegador.
+  return Response.json({ table, key, columns, rows: rows.length, next, sql });
 }
 
 // Superficie de prueba de la exportación (declarada aquí porque usa constantes de este bloque).

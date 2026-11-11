@@ -119,7 +119,11 @@ export function startMocks({ authPort, enginePort }) {
     }
     if (url.pathname === '/rest/v1/external_ingest_runs') {
       if (req.method === 'POST') { state.ingestRuns.unshift({ ...body, created_at: new Date().toISOString() }); return send(res, 201, {}); }
-      return send(res, 200, state.ingestRuns);
+      // PostgREST de verdad: `offset`/`limit` (el paginador pide hasta recibir una página vacía) y `created_at=gte.`.
+      const q = Object.fromEntries(url.searchParams); let rows = state.ingestRuns;
+      if (q.created_at?.startsWith('gte.')) rows = rows.filter(r => r.created_at >= decodeURIComponent(q.created_at.slice(4)));
+      const offset = Number(q.offset) || 0, limit = Number(q.limit) || 1000;
+      return send(res, 200, rows.slice(offset, offset + limit));
     }
     if (url.pathname === '/rest/v1/students') {
       state.students ??= []; const q = Object.fromEntries(url.searchParams); const eqv = k => q[k]?.startsWith('eq.') ? decodeURIComponent(q[k].slice(3)) : null;

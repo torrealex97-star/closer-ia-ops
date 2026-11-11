@@ -370,6 +370,12 @@ await step('métricas (panel): exige sesión y devuelve 14 días con coste y dec
   const r = await call('/api/admin/metrics'); assert.equal(r.status, 200);
   assert.equal(r.json.days.length, 14); assert.ok(Array.isArray(r.json.perTier) && Array.isArray(r.json.perSource) && r.json.review.minutes === null && 'cost_per_good' in r.json.apify);
 });
+await step('embudo (panel): exige sesión y devuelve totales, filas por fuente×mercado y entradas brutas', async () => {
+  assert.equal((await call('/api/admin/funnel', { cookies: false })).status, 401);
+  const r = await call('/api/admin/funnel'); assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json.rows) && r.json.totals && typeof r.json.totals.new24 === 'number' && typeof r.json.truncated === 'boolean');
+  assert.ok(r.json.ingest === null || Array.isArray(r.json.ingest), 'ingesta: lista o null (hueco), nunca un 0 inventado');
+});
 await step('acuerdo IA/humano (panel): exige sesión y devuelve pares con veredicto', async () => {
   assert.equal((await call('/api/admin/ai-agreement', { cookies: false })).status, 401);
   const r = await call('/api/admin/ai-agreement'); assert.equal(r.status, 200);

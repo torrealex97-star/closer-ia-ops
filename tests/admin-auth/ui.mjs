@@ -108,6 +108,14 @@ await step('Fuentes externas: filtra closers de España, verifica y aprueba; el 
   await page.locator('#ex-status').selectOption('draft');
   await page.getByTestId('metrics-error').waitFor(); assert.match(await page.getByTestId('metrics-error').innerText(), /No se pudieron calcular las métricas/);
   await page.unroute('**/api/admin/metrics'); await page.getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('metrics').waitFor();
+  // Embudo por fuente y mercado: panel con datos, error ≠ vacío con reintento, tabla accesible
+  await page.getByTestId('funnel').waitFor(); assert.match(await page.getByTestId('funnel').locator('summary').innerText(), /Embudo por fuente y mercado: \d+ nuevas en 24 h/);
+  assert.ok(await page.getByTestId('funnel-table').locator('th[scope="col"]').count() >= 8, 'tabla con cabeceras');
+  await page.route('**/api/admin/funnel', r => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'No se pudo calcular el embudo.' }) }));
+  await page.reload(); await page.getByRole('button', { name: 'Fuentes externas' }).click();
+  await page.getByTestId('funnel-error').waitFor(); assert.match(await page.getByTestId('funnel-error').innerText(), /No se pudo calcular el embudo/);
+  await page.unroute('**/api/admin/funnel'); await page.getByTestId('funnel-error').getByRole('button', { name: 'Reintentar' }).click(); await page.getByTestId('funnel').waitFor();
+  await page.locator('#ex-status').selectOption('draft'); // tras recargar abre en excepciones; el resto del paso trabaja sobre borradores
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'métricas sin scroll horizontal en móvil'); await page.setViewportSize({ width: 1280, height: 900 });
   if (process.env.SHOT) { await page.getByTestId('metrics').getByText('Ver tabla por día').click(); await page.getByTestId('metrics').screenshot({ path: process.env.SHOT }); }
   await page.getByRole('cell', { name: /Closer de ventas/ }).first().waitFor(); // por rol: la frase también está en elementos ocultos (ideas de fuentes, búsquedas de Google Jobs)
