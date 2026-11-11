@@ -1,5 +1,17 @@
 # Estado
 
+## Desplegado: `invoked_by` existe en D1 y la pasada automática la rellena (sesión 143) — 2026-11-11
+
+- **Petición del operador**: desplegar el motor con la columna `invoked_by` y comprobar en D1 que aparece y que la siguiente pasada del cron la rellena.
+- **Desplegado (verified, operaciones `succeeded` con el mismo artefacto `db5fc8d8…`)**: **preview** `2026-11-11T16:38:55Z` (operación `d19243c7`) y **producción** `2026-11-11T16:38:57Z` (operación `19dc92b6`). Bindings y secretos intactos; ambos entornos siguen publicados.
+- **La columna está en la D1 de producción (verified)**: `/api/export` devuelve las columnas reales de `PRAGMA table_info`, y las dos tablas la tienen — `verification_events: […, verifier_version, invoked_by]` y `opportunity_versions: […, reviewed_at, invoked_by]`. La añadió el `ALTER … ADD COLUMN` tolerante en la primera petición tras el despliegue, como estaba diseñado.
+- **Antes de la pasada**: **667** filas en `verification_events` y **5.066** en `opportunity_versions`, **todas con `invoked_by` NULL** — las anteriores a la migración. No se han reescrito: no se inventa el pasado.
+- **La pasada automática, medida (verified)**: `POST /v1/admin/opportunities/activate` con **el mismo cuerpo que envía `activateEngine`** (`{dry_run: false, verify: true, auto: true, market: 'any'}`) → **200 en 37,8 s**, respuesta con `invoked_by: 'cron'`: **14 publicadas, 11 `needs_review`, 239 retiradas** en bloque y **134 aplazadas** por el tope de escrituras de la invocación (`scan.truncated: true`).
+- **Y las filas lo dicen (verified)**: tras la pasada hay **25 eventos y 25 versiones con `invoked_by='cron'`** (16:40:01–16:40:06Z), con `created_by: 'admin-activate'` en las versiones; el resto sigue NULL. Versión y evidencia de la misma operación coinciden, que era el punto: antes había que deducirlo por la hora.
+- **Lo que NO se ha verificado, y se dice**: **el cron programado en sí**. No he esperado al disparo de las 06:00 UTC ni tengo su `CRON_SECRET`; lancé yo la petición con el token, con el cuerpo exacto del cron. Queda probado que **la ruta automática escribe `cron`**; que el disparador programado llame a esa ruta ya era comportamiento desplegado, no verificado aquí.
+- **Nota de lo que salió**: las 25 verificaciones dieron `unknown` (el anuncio no se pudo confirmar abierto desde el motor), así que esas ofertas quedaron `needs_review` con su razón. La procedencia se registró igual: la columna dice quién llamó, no cómo fue la comprobación.
+- **De propina**: el mismo artefacto publica `raw_items_by_route` — **4.594 anuncios + 574 evidencias** —, así que la sesión 142 dejó de estar pendiente de despliegue sin trabajo extra.
+
 ## El estado separa anuncios recogidos de evidencia de verificación (sesión 142) — 2026-11-11
 
 - **Petición del operador**: publicar en el estado un conteo de `raw_items` separado por ruta de escritura para que el panel no confunda evidencia con ofertas recogidas.
