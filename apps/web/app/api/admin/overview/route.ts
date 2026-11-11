@@ -22,7 +22,7 @@ async function timed(fn: () => Promise<{ ok: boolean; detail: string }>): Promis
 // cuota del mes se reinicia; el segundo es un fallo que hay que mirar. El operador tiene que poder
 // distinguirlos desde el panel, sin abrir registros. La clasificación y los textos viven en
 // `lib/engineHealth.ts`, que es también la sonda del aviso automático: aquí no hay una segunda copia.
-type StatusPayload = { catalog_active?: number; raw_items?: number; latest_run?: { day: string; status: string; completed_at: string | null } | null };
+type StatusPayload = { catalog_active?: number; raw_items?: number; raw_items_by_route?: { collection?: number; verification?: number } | null; latest_run?: { day: string; status: string; completed_at: string | null } | null };
 type FunnelPayload = { totales?: { elegible?: number | null }; sources?: Array<Record<string, unknown>> };
 type AuditPayload = { day?: string; slugs?: Array<Record<string, unknown>> };
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   const connections: Check[] = [
     engine
-      ? { id: 'engine', name: 'Motor cloud (Worker + D1)', status: status ? 'ok' : 'error', detail: status ? `${status.catalog_active} ofertas activas · ${status.raw_items} registros raw` : ENGINE_STATUS_TEXT[firstBad?.reason ?? 'down'] }
+      ? { id: 'engine', name: 'Motor cloud (Worker + D1)', status: status ? 'ok' : 'error', detail: status ? `${status.catalog_active} ofertas activas · ${status.raw_items_by_route?.collection ?? '—'} anuncios recogidos · ${status.raw_items_by_route?.verification ?? '—'} evidencias de verificación` : ENGINE_STATUS_TEXT[firstBad?.reason ?? 'down'] }
       : { id: 'engine', name: 'Motor cloud (Worker + D1)', status: 'not_configured', detail: 'Falta CAREER_ENGINE_URL' },
     { id: 'supabase-auth', name: 'Supabase Auth', status: authOk.ok ? 'ok' : 'error', detail: authOk.ok ? authOk.detail : 'No responde', ms: authOk.ms },
     { id: 'supabase-db', name: 'Supabase · lista de operadores', status: admins ? 'ok' : 'error', detail: admins ? `${admins.length} usuario(s) con acceso` : 'No se pudo leer (¿service role?)' },
@@ -72,7 +72,17 @@ export async function GET(request: NextRequest) {
     generated_at: new Date().toISOString(),
     engine_reason: engineReason,
     engine_http_status: engine ? (firstBad?.http_status ?? null) : null,
-    engine: status ? { catalog_active: status.catalog_active, raw_items: status.raw_items, last_run: status.latest_run ? { day: status.latest_run.day, status: status.latest_run.status, completed_at: status.latest_run.completed_at } : null } : null,
+    engine: status ? {
+      catalog_active: status.catalog_active, raw_items: status.raw_items,
+      // Los anuncios recogidos y la evidencia de verificación viven en `raw_items` y no son lo mismo:
+      // se pasan separados. `null` = el motor todavía no publica el desglose (build anterior), que no es
+      // lo mismo que un cero medido.
+      raw_items_by_route: status.raw_items_by_route
+        ? { collection: typeof status.raw_items_by_route.collection === 'number' ? status.raw_items_by_route.collection : null,
+            verification: typeof status.raw_items_by_route.verification === 'number' ? status.raw_items_by_route.verification : null }
+        : null,
+      last_run: status.latest_run ? { day: status.latest_run.day, status: status.latest_run.status, completed_at: status.latest_run.completed_at } : null,
+    } : null,
     sources: sources.map((s: Record<string, unknown>) => ({ code: s.code, name: s.name, run_status: s.run_status ?? null, fetched: s.revisadas ?? null, catalog: s.catalogo ?? 0, eligible: s.elegible ?? 0, selected: s.seleccionada ?? 0, roles: s.roles ?? {}, warning: s.fuente ?? null })),
     pool: { eligible: funnel?.totales?.elegible ?? null, by_role: sources.reduce((acc: Record<string, number>, s: { roles?: Record<string, number> }) => { for (const [k, n] of Object.entries(s.roles ?? {})) acc[k] = (acc[k] ?? 0) + Number(n); return acc; }, {}) },
     // Recuentos exactos por estado (count=exact, solo ofertas vivas): antes se leían 500 filas y su longitud se

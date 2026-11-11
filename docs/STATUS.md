@@ -1,5 +1,14 @@
 # Estado
 
+## El estado separa anuncios recogidos de evidencia de verificación (sesión 142) — 2026-11-11
+
+- **Petición del operador**: publicar en el estado un conteo de `raw_items` separado por ruta de escritura para que el panel no confunda evidencia con ofertas recogidas.
+- **Por qué**: `raw_items` guarda dos cosas distintas en la misma tabla — los anuncios que trae una recogida y la evidencia de una comprobación de vigencia (`source='verification'`) —. Hoy son **4.594 anuncios + 574 evidencias** de 5.168 filas, y el panel las sumaba y las llamaba «registros recogidos». Una cifra que mezcla dos cosas no sirve para decidir.
+- **Hecho** (`/api/status`): nuevo **`raw_items_by_route { collection, verification }`**, calculado en SQL por `source='verification'` **en la misma ronda** que el total (tercera consulta del `batch`) y acotado a la organización. **`raw_items` sigue siendo el total**, para no romper a quien ya lo lee. Un 0 es un cero medido (son conteos de la misma tabla); si la consulta falla, el estado falla — no se publican ceros que parezcan medidos.
+- **Panel** ([AdminShell](../apps/web/components/AdminShell.tsx) y [overview](../apps/web/app/api/admin/overview/route.ts)): el KPI único «registros recogidos» pasa a **«anuncios recogidos»** + **«evidencias de verificación»**, y el detalle del motor dice las dos cifras. Si el motor es un build anterior sin el desglose, el panel muestra **«—»** (no cero): un dato que no llega no es un dato que vale cero.
+- **Probado** (tested): nueva [status.mjs](../tests/engine/status.mjs) y **12/12 del motor en verde**; `tsc --noEmit` de `apps/web` limpio; `node scripts/check-design.mjs` OK; `orphan-refs` PASS y `handoff` sin solapes. La prueba fija: el desglose cuadra con el total, una ruta vacía da **0** y no `null`, y un fallo de la consulta **hace fallar el estado** en vez de devolver ceros.
+- **Límites, sin adornos**: (1) **no está desplegado**: el motor de producción todavía no publica `raw_items_by_route`, así que el panel nuevo mostrará «—» en los dos KPI hasta el próximo despliegue; (2) el desglose **no se ha mirado en el navegador** (cambio de rótulo y de KPI sin comprobación visual); (3) `raw_items` sigue mezclando a propósito por compatibilidad: quien quiera la cifra honesta usa el desglose.
+
 ## La procedencia del invocador, en la fila (sesión 141) — 2026-11-11
 
 - **Petición del operador**: añadir procedencia del invocador a activaciones y verificaciones, con su migración y su prueba.

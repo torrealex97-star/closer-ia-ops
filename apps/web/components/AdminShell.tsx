@@ -61,7 +61,7 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
 }
 
 type Overview = {
-  engine: { catalog_active: number; raw_items: number; last_run: { day: string; status: string; completed_at: string | null } | null } | null;
+  engine: { catalog_active: number; raw_items: number; raw_items_by_route: { collection: number | null; verification: number | null } | null; last_run: { day: string; status: string; completed_at: string | null } | null } | null;
   sources: Array<{ code: string; name: string; run_status: string | null; fetched: number | null; catalog: number; eligible: number; selected: number; warning: string | null }>;
   audit: { day: string; slugs: Array<{ source: string; slug: string; status: string; http_status: number | null; canonical_url: string | null }> } | null;
   connections: Array<{ id: string; name: string; status: 'ok' | 'error' | 'not_configured'; detail: string; ms?: number }>;
@@ -143,7 +143,7 @@ function SourcesTab({ onSessionLost }: { onSessionLost: () => void }) {
   return <section aria-label="Fuentes y conexiones">
     {error && <div className="alert error" role="alert"><span>{error}</span></div>}
     <div className="admin-toolbar" style={{ justifyContent: 'space-between' }}>
-      {data?.engine ? <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data.engine.catalog_active}</strong>ofertas activas</span><span><strong>{data.engine.raw_items}</strong>registros recogidos</span>
+      {data?.engine ? <div className="stat-strip" style={{ margin: 0 }}><span><strong>{data.engine.catalog_active}</strong>ofertas activas</span><span><strong>{data.engine.raw_items_by_route?.collection ?? '—'}</strong>anuncios recogidos</span><span><strong>{data.engine.raw_items_by_route?.verification ?? '—'}</strong>evidencias de verificación</span>
         {data.engine.last_run && <span>Última recogida <strong>{data.engine.last_run.day}</strong>{RUN[data.engine.last_run.status] ?? data.engine.last_run.status}</span>}</div> : <span />}
       <button disabled={busy} onClick={load}>{busy ? <LoaderCircle size={15} className="spin" /> : <RefreshCcw size={15} />} Actualizar</button>
     </div>

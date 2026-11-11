@@ -11373,10 +11373,20 @@ async function handleStatus(env) {
   const counts = await db.batch([
     db.prepare('SELECT count(*) AS n FROM raw_items WHERE org_id=?').bind(ORG),
     db.prepare('SELECT count(*) AS n FROM catalog_entries WHERE org_id=? AND expires_at > ?').bind(ORG, now()),
+    // La evidencia de vigencia se guarda en la MISMA tabla que los anuncios (`source='verification'`),
+    // así que el total las sumaba y el panel las presentaba como «registros recogidos». Se cuentan por
+    // RUTA DE ESCRITURA para no confundir una comprobación de enlace con una oferta encontrada.
+    db.prepare(`SELECT CASE WHEN source='verification' THEN 'verification' ELSE 'collection' END AS route,
+      count(*) AS n FROM raw_items WHERE org_id=? GROUP BY route`).bind(ORG),
   ]);
+  const routes = {};
+  for (const row of counts[2].results ?? []) if (row?.route) routes[row.route] = row.n;
   return Response.json({
     engine: 'closer-ia-ops-engine', org: ORG,
     raw_items: counts[0].results[0].n, catalog_active: counts[1].results[0].n,
+    // `collection` = anuncios traídos por una recogida; `verification` = evidencia de una comprobación
+    // de vigencia. Los dos son conteos de la misma tabla, así que un 0 es un cero medido, no un hueco.
+    raw_items_by_route: { collection: routes.collection ?? 0, verification: routes.verification ?? 0 },
     // Cuota de escritura del mes: es el techo que pausa el sitio, y el panel lo enseña para que se
     // vea venir en vez de descubrirlo cuando ya no se recoge nada.
     write_allowance: await readWriteAllowance(db, limits),
