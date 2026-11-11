@@ -394,14 +394,16 @@ raw no contiene estado mutable: processing_tasks(raw_item_id, stage, status, err
 ### opportunity_versions y opportunities
 
 opportunities: id, org_id, job_id FK, current_version_id, editorial_status, created_at, updated_at; UNIQUE(org_id, job_id).
-opportunity_versions: id, org_id, opportunity_id FK, version, locale, headline, company_name nullable, role, short_summary, what_they_are_looking_for JSON, what_you_would_do JSON, compensation_summary, location_summary, language_requirements JSON, experience_summary, why_it_may_be_interesting JSON, connection_type, application_type, application_url nullable, next_step JSON, field_provenance JSON, generation_id nullable, job_revision_hash, presentation_schema_version, created_by, reviewed_by nullable, reviewed_at nullable, selection_method, selection_policy_version, created_at.
+opportunity_versions: id, org_id, opportunity_id FK, version, locale, headline, company_name nullable, role, short_summary, what_they_are_looking_for JSON, what_you_would_do JSON, compensation_summary, location_summary, language_requirements JSON, experience_summary, why_it_may_be_interesting JSON, connection_type, application_type, application_url nullable, next_step JSON, field_provenance JSON, generation_id nullable, job_revision_hash, presentation_schema_version, created_by, reviewed_by nullable, reviewed_at nullable, invoked_by (`cron`|`operator`) nullable, selection_method, selection_policy_version, created_at.
 UNIQUE(org_id, opportunity_id, locale, version). Revisiones inmutables; pointer actual cambia con control optimista. Por idioma se selecciona la última revisión aprobada compatible; no mezclar campos de versiones distintas.
 
 published_relative se deriva de published_at en respuesta, nunca se almacena como “hace dos días”. Datos de fecha/actividad vienen del job y su verificación vigente, no de texto LLM cacheado.
 
 ### verification_events y elegibilidad
 
-verification_events: id, org_id, job_id, posting_id nullable, checked_at, result (open/closed/unknown), method, evidence_raw_id, valid_until, reason_code, verifier_version.
+verification_events: id, org_id, job_id, posting_id nullable, checked_at, result (open/closed/unknown), method, evidence_raw_id, valid_until, reason_code, verifier_version, invoked_by (`cron`|`operator`) nullable.
+
+`invoked_by` responde a una pregunta concreta: ¿esta versión o esta verificación la movió el horario o una persona? Nulo en las filas anteriores a la migración; el motor lo escribe al crear (`auto: true` del cron → `cron`; panel o script con token → `operator`).
 Estado derivado opportunity_status (active/verifying/closed), last_verified_at, verified_until, status_reason, closed_at. Índice (org_id, opportunity_status, verified_until). Política de conflictos/TTL en [17](17_WDC_OPPORTUNITY_EXPERIENCE.md).
 
 Hechos de elegibilidad en job/posting: employer_country, customer_markets[], allowed_worker_countries[], excluded_worker_countries[], residency_required, work_authorization_requirements, timezone_overlap, languages con required/preferred/level/evidence. allowed vacío = desconocido, nunca worldwide implícito.

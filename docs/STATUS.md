@@ -1,5 +1,15 @@
 # Estado
 
+## La procedencia del invocador, en la fila (sesión 141) — 2026-11-11
+
+- **Petición del operador**: añadir procedencia del invocador a activaciones y verificaciones, con su migración y su prueba.
+- **Por qué**: la investigación del 9-nov dejó una laguna real — las 22 verificaciones de las 06:43Z solo se podían atribuir **por la hora**, porque ni `opportunity_versions` ni `verification_events` guardaban quién las había lanzado (`created_by` nombra la ruta, no el disparador). Una atribución por horario no es evidencia.
+- **Hecho** (inspected; probado en stub D1): columna **`invoked_by`** (`cron` | `operator`, **nula** en las filas anteriores) en `opportunity_versions` y `verification_events`. `handleAdminActivate` la deriva de `body.auto === true ? 'cron' : 'operator'` y la pasa a `applyReview` y a `runVerification`; `POST /verify` y el PATCH de revisión escriben `operator`. Se devuelve en las respuestas (`invoked_by`), así que se puede comprobar sin leer la base.
+- **Migración**: en D1 no hay carpeta de migraciones — la hace `ensureSchema` con **dos `ALTER TABLE … ADD COLUMN invoked_by TEXT` tolerantes** (uno por tabla, idempotentes) y las bases nuevas nacen con la columna en el `CREATE` de `verification_events` y en `CATALOG_SHAPE` de `opportunity_versions`. **No se reescribe nada**: las filas viejas se quedan en nulo, que es la verdad (no se sabe quién las lanzó).
+- **Prueba**: [provenance.mjs](../tests/engine/provenance.mjs) y **11/11 del motor en verde** (`ENGINE PASS=11 FAIL=0`), `node --check` OK, `orphan-refs` PASS y `handoff` sin solapes. Cubre: base nueva con la columna en el DDL y sin `NOT NULL`; base existente que recibe los **dos ALTER**; activación del cron → versión `cron`; activación de una persona → `operator`; activación **con** verificación → versión y evidencia dicen lo mismo y `verifier_version` sigue siendo `'1'`; `POST /verify` → `operator`; y la evidencia cruda de `raw_items` intacta (misma fila con hash, `source='verification'`).
+- **Contrato**: [03_DATA_MODEL](../docs/spec/03_DATA_MODEL.md) documenta la columna en las dos tablas y qué significa (nulo = anterior a la migración).
+- **Límites, sin adornos**: (1) **no está desplegado**: producción no tiene la columna hasta el próximo despliegue, que la añade por `ALTER` en la primera petición; (2) las filas anteriores a hoy quedan con `invoked_by` nulo a propósito; (3) la columna dice el **disparador** (cron u operador), no la persona: para eso sigue `reviewed_by`, que la activación automática deja nulo; (4) el libro de cuota y el resto de escrituras no cambian.
+
 ## Motor desplegado con el backoff de FreeHire, libro sembrado y una pasada real medida (sesión 140) — 2026-11-11
 
 - **Petición del operador**: desplegar `main` en el motor gestionado y verificar en `/api/status` las **22 fuentes**, **LATAM** y **la siembra del libro**, con una pasada real medida.

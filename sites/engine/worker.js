@@ -771,10 +771,10 @@ const CATALOG_SHAPE = [
   },
   {
     table: 'opportunity_versions',
-    names: ['id', 'org_id', 'opportunity_id', 'version', 'locale', 'payload', 'created_by', 'created_at', 'reviewed_by', 'reviewed_at'],
+    names: ['id', 'org_id', 'opportunity_id', 'version', 'locale', 'payload', 'created_by', 'created_at', 'reviewed_by', 'reviewed_at', 'invoked_by'],
     columns: `id TEXT PRIMARY KEY, org_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, version INTEGER NOT NULL,
       locale TEXT NOT NULL DEFAULT 'es', payload TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
-      reviewed_by TEXT, reviewed_at TEXT, UNIQUE(org_id, opportunity_id, version)`,
+      reviewed_by TEXT, reviewed_at TEXT, invoked_by TEXT, UNIQUE(org_id, opportunity_id, version)`,
     migrate: false,
   },
 ];
@@ -895,7 +895,7 @@ async function ensureSchemaOnce(db) {
       id TEXT PRIMARY KEY, org_id TEXT NOT NULL, job_id TEXT NOT NULL,
       posting_id TEXT, checked_at TEXT NOT NULL, result TEXT NOT NULL,
       method TEXT NOT NULL, evidence_raw_id TEXT, valid_until TEXT,
-      reason_code TEXT, verifier_version TEXT NOT NULL DEFAULT '1')`),
+      reason_code TEXT, verifier_version TEXT NOT NULL DEFAULT '1', invoked_by TEXT)`),
     db.prepare('CREATE INDEX IF NOT EXISTS verification_job ON verification_events(org_id, job_id, checked_at)'),
     // A propósito SIN índice de caducidad: la forma barata lo quita (ver CATALOG_SHAPE).
     db.prepare('CREATE INDEX IF NOT EXISTS idx_runs_created ON collection_runs(org_id, created_at)'),
@@ -932,6 +932,12 @@ async function ensureSchemaOnce(db) {
   for (const col of ['reviewed_by', 'reviewed_at']) {
     try { await db.prepare(`ALTER TABLE opportunity_versions ADD COLUMN ${col} TEXT`).run(); } catch { /* ya existe */ }
   }
+  // Procedencia del INVOCADOR: quién lanzó la escritura —`cron` o `operator`—. Sin esta columna, una
+  // verificación de las 06:43 o una activación en lote solo se distinguen por la hora, y adivinar no
+  // es evidencia. Nula en las filas anteriores a esta migración; se rellena al escribir, no se reescribe.
+  // ALTER tolerante (migración de una base ya existente); una base nueva ya la trae en el CREATE.
+  try { await db.prepare('ALTER TABLE opportunity_versions ADD COLUMN invoked_by TEXT').run(); } catch { /* ya existe */ }
+  try { await db.prepare('ALTER TABLE verification_events ADD COLUMN invoked_by TEXT').run(); } catch { /* ya existe */ }
 }
 
 // ------ audit periódico de slugs JobToday ------
@@ -1201,7 +1207,7 @@ async function checkTarget(url, title, company) {
 // Núcleo de la verificación de vigencia (port fase 3): UNA sola ruta de escritura,
 // compartida por el POST /verify de una oferta y por la activación en lote. Devuelve
 // `{ error }` cuando no hay URL verificable (el llamante decide el 409).
-async function runVerification(db, row, posting, requestedUrl) {
+async function runVerification(db, row, posting, requestedUrl, invokedBy = null) {
   // OJO: el id va en el SELECT — bindearlo después sin traerlo dio 500 undefined-unsupported (misma clase de bug de la sesión 28).
   const current = row.current_version_id
     ? await db.prepare('SELECT id, payload FROM opportunity_versions WHERE org_id=? AND opportunity_id=? AND id=?').bind(ORG, row.id, row.current_version_id).first()
@@ -1231,8 +1237,8 @@ async function runVerification(db, row, posting, requestedUrl) {
     closed: `Cerrada según el origen (${reasonCode})`,
     unknown: `No verificable (${reasonCode}); sigue verificando` }[result];
   await db.batch([
-    db.prepare('INSERT INTO verification_events (id,org_id,job_id,posting_id,checked_at,result,method,evidence_raw_id,valid_until,reason_code,verifier_version) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(crypto.randomUUID(), ORG, row.job_id, row.posting_id ?? row.job_id, checkedAt, result, method, evidenceId, validUntil, reasonCode, '1'),
+    db.prepare('INSERT INTO verification_events (id,org_id,job_id,posting_id,checked_at,result,method,evidence_raw_id,valid_until,reason_code,verifier_version,invoked_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(crypto.randomUUID(), ORG, row.job_id, row.posting_id ?? row.job_id, checkedAt, result, method, evidenceId, validUntil, reasonCode, '1', invokedBy),
     db.prepare('UPDATE opportunities SET opportunity_status=?, last_verified_at=?, verified_until=?, status_reason=?, updated_at=? WHERE org_id=? AND id=?')
       .bind(statusDerived, checkedAt, validUntil, statusReason, checkedAt, ORG, row.id),
   ]);
@@ -1252,7 +1258,7 @@ async function runVerification(db, row, posting, requestedUrl) {
     result, method, checked_at: checkedAt, valid_until: validUntil,
     reason_code: reasonCode, evidence_raw_id: evidenceId,
     opportunity_status: statusDerived, next_step_enabled: nextStepEnabled,
-    status_reason: statusReason, detail,
+    status_reason: statusReason, invoked_by: invokedBy, detail,
   };
 }
 
@@ -1272,7 +1278,8 @@ async function handleAdminVerify(request, env, opportunityId) {
   let body = {};
   try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
   catch { body = {}; } // cuerpo vacío = verificar la URL por defecto
-  const outcome = await runVerification(db, row, posting, body.url || null);
+  // Esta ruta la llama una persona (panel o script con el token): la procedencia se dice, no se supone.
+  const outcome = await runVerification(db, row, posting, body.url || null, 'operator');
   if (outcome.error) return Response.json({ detail: outcome.error }, { status: 409 });
   return Response.json(outcome, { headers: corsHeaders(request) });
 }
@@ -1328,7 +1335,7 @@ async function handleAdminReview(request, env, opportunityId) {
     payload.next_step.enabled = true;
     delete payload.next_step.disabled_reason;
   }
-  const applied = await applyReview(db, row, payload, editorial_status, finalLocale, reviewed_by);
+  const applied = await applyReview(db, row, payload, editorial_status, finalLocale, reviewed_by, 'operator');
   return Response.json({
     id: row.id, job_id: row.job_id, current_version_id: applied.newId,
     version: applied.version, editorial_status, opportunity_status: row.opportunity_status,
@@ -1343,19 +1350,19 @@ async function handleAdminReview(request, env, opportunityId) {
 // UNA sola ruta para el PATCH del panel y la activación en lote, con la procedencia
 // del revisor registrada (espejo de opportunity_versions del núcleo local; el cloud
 // aceptaba `reviewed_by` y lo descartaba).
-async function applyReview(db, row, payload, editorialStatus, locale, reviewedBy) {
+async function applyReview(db, row, payload, editorialStatus, locale, reviewedBy, invokedBy = null) {
   const maxVersion = await db.prepare('SELECT max(version) AS v FROM opportunity_versions WHERE org_id=? AND opportunity_id=?').bind(ORG, row.id).first();
   const created = now();
   const newId = 'ver-' + crypto.randomUUID();
   const reviewer = reviewedBy || null;
   const reviewedAt = ['approved', 'published', 'withdrawn'].includes(editorialStatus) ? created : null;
   await db.batch([
-    db.prepare(`INSERT INTO opportunity_versions (id,org_id,opportunity_id,version,locale,payload,created_by,created_at,reviewed_by,reviewed_at) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .bind(newId, ORG, row.id, (maxVersion?.v ?? 0) + 1, locale, JSON.stringify(payload), reviewer ?? 'admin', created, reviewer, reviewedAt),
+    db.prepare(`INSERT INTO opportunity_versions (id,org_id,opportunity_id,version,locale,payload,created_by,created_at,reviewed_by,reviewed_at,invoked_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(newId, ORG, row.id, (maxVersion?.v ?? 0) + 1, locale, JSON.stringify(payload), reviewer ?? 'admin', created, reviewer, reviewedAt, invokedBy),
     db.prepare('UPDATE opportunities SET current_version_id=?, editorial_status=?, updated_at=? WHERE org_id=? AND id=?')
       .bind(newId, editorialStatus, created, ORG, row.id),
   ]);
-  return { newId, version: (maxVersion?.v ?? 0) + 1, created, reviewed_by: reviewer, reviewed_at: reviewedAt };
+  return { newId, version: (maxVersion?.v ?? 0) + 1, created, reviewed_by: reviewer, reviewed_at: reviewedAt, invoked_by: invokedBy };
 }
 
 // Cota de escaneo del pool de drafts (no del lote): el catálogo tiene miles y una
@@ -1389,6 +1396,9 @@ async function handleAdminActivate(request, env) {
   catch { body = {}; }
   const dryRun = body.dry_run !== false;
   const verify = body.verify !== false;
+  // `auto: true` es la pasada del cron (`activateEngine`); sin él, una persona con el token. La fila
+  // lo guarda para que dentro de un mes se sepa quién movió el catálogo sin reconstruirlo por la hora.
+  const invokedBy = body.auto === true ? 'cron' : 'operator';
   // `auto: true` = la lanza el cron, no una persona. Una persona aprobando nunca se bloquea por cuota, pero la
   // activación automática escribe ~6 filas por oferta y, si seguía tras parar la recogida, empujaba el mes hacia el
   // 429 de la plataforma (que tumbó también las lecturas de las alumnas el 2026-10-27).
@@ -1509,7 +1519,7 @@ async function handleAdminActivate(request, env) {
     const target = verifyUrl || url;
     if (verify && target) {
       verification = await runVerification(db, opp,
-        { payload: row.posting_payload, source: row.source, posting_id: row.posting_id }, target);
+        { payload: row.posting_payload, source: row.source, posting_id: row.posting_id }, target, invokedBy);
       if (verification.error) verification = { result: 'unknown', reason_code: 'no_verificable', status_reason: verification.error };
     }
     // El CTA de la versión nueva se deriva de la verificación recién hecha (la MISMA
@@ -1527,7 +1537,7 @@ async function handleAdminActivate(request, env) {
     // nacería apagado. `application_type` conocido no sustituye al enlace.
     const publisher = Boolean(url) && applicationType !== 'unknown' && (!verify || verification?.result === 'open');
     const status = publisher ? 'published' : 'needs_review';
-    const applied = await applyReview(db, opp, payload, status, 'es', reviewedBy ?? 'admin-activate');
+    const applied = await applyReview(db, opp, payload, status, 'es', reviewedBy ?? 'admin-activate', invokedBy);
     counters[status] += 1;
     items.push({ id: row.opportunity_id, job_id: row.job_id, action: status, role: derivedRole, version: applied.version,
       application_type: applicationType, application_url: url,
@@ -1556,7 +1566,7 @@ async function handleAdminActivate(request, env) {
   // no se bloquea nunca por cuota.
   const charged = dryRun ? 0 : await chargeWrites(env.DB, counters.withdrawn + written * (verify ? 6 : 3));
   return Response.json({
-    dry_run: dryRun, verify, market, role, source, considered: rows.results.length,
+    dry_run: dryRun, verify, invoked_by: invokedBy, market, role, source, considered: rows.results.length,
     // `truncated` cubre las dos cotas: el barrido y las escrituras. `deferred` dice
     // cuántas se quedaron fuera del presupuesto para la siguiente pasada.
     scan: { limit: SCAN_LIMIT, write_budget: dryRun ? null : writeBudget, truncated: rows.results.length >= SCAN_LIMIT || counters.deferred > 0 },
