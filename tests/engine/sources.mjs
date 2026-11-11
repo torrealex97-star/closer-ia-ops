@@ -1,5 +1,6 @@
-// Fuentes del motor: la lista no se duplica, el 429 se reintenta una vez y el extractor de
-// Freelancer.com lee lo que la API devuelve DE VERDAD (respuesta recortada, no inventada).
+// Fuentes del motor: la lista no se duplica, el 429 se reintenta sin comerse el presupuesto (FreeHire
+// con `Retry-After`, 2 s entre búsquedas y dos reintentos) y los extractores leen lo que la API
+// devuelve DE VERDAD (respuesta recortada, no inventada).
 // Uso: node --experimental-strip-types tests/engine/sources.mjs
 // Sin red: `fetch` se sustituye por los casos de abajo.
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ const workerPath = fileURLToPath(new URL('../../sites/engine/worker.js', import.
 const stage = join(mkdtempSync(join(tmpdir(), 'wdc-engine-sources-')), 'worker.mjs');
 copyFileSync(workerPath, stage);
 const worker = await import(pathToFileURL(stage).href);
-const { SOURCES, fetchCost, planRun, subrequestLimits, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, resetExtractFiltered, filteredOf } = worker.__test;
+const { SOURCES, fetchCost, planRun, subrequestLimits, sourceFreehire, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, parseRetryAfter, noteOf, resetSourceNotes, resetExtractFiltered, filteredOf } = worker.__test;
 
 // Respuesta real de https://www.freelancer.com/api/projects/0.1/projects/active/ (2026-11-08),
 // recortada a los campos que usa el extractor. El segundo proyecto es el ruido típico de la
@@ -150,4 +151,66 @@ try {
   assert.equal(jobspresso[0].payload.url, 'https://jobspresso.co/job/1/');
 }
 
-console.log('PASS  motor: fuentes sin duplicados, 429 con un reintento y extractores (Freelancer + 5 portales) sin inventar salario');
+// 6) FreeHire: el 429 no es una ráfaga que se arregle con un intento y medio. Lee `Retry-After`,
+//    espera 2 s entre búsquedas, reintenta DOS veces y gasta como mucho lo que declara, para que su
+//    backoff no se lleve por delante el presupuesto de las fuentes que sí responden.
+try {
+  // 6a) `Retry-After`: segundos, fecha HTTP, basura y esperas absurdas (acotadas al tope).
+  {
+    assert.equal(parseRetryAfter('2'), 2000);
+    assert.equal(parseRetryAfter('0'), 0);
+    assert.equal(parseRetryAfter(undefined), null, 'sin cabecera no se inventa espera');
+    assert.equal(parseRetryAfter('no-es-fecha'), null);
+    assert.equal(parseRetryAfter('600'), 5000, 'diez minutos se acotan: no se cuelga la invocación');
+    const dated = new Date(Date.now() + 3000).toUTCString();
+    assert.ok(parseRetryAfter(dated, 5000) > 0, 'una fecha HTTP se traduce a espera');
+  }
+
+  // 6b) Dos reintentos: tres intentos antes de declarar caída (sin esperar de verdad: `Retry-After: 0`).
+  {
+    let attempts = 0;
+    globalThis.fetch = async () => { attempts++; return new Response('{}', { status: 429, headers: { 'retry-after': '0' } }); };
+    resetSourceNotes();
+    // Los dos reintentos consumen exactamente el presupuesto declarado de la fuente (1 búsqueda + 2),
+    // así que la caída llega con las dos causas a la vez: el 429 y el tope agotado. El mensaje las
+    // dice las dos; lo que NO puede pasar es callarse el 429.
+    await assert.rejects(
+      () => sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 1 }),
+      /ninguna búsqueda respondió \(.*(HTTP 429|presupuesto)/);
+    assert.equal(attempts, 3, 'dos reintentos: tres intentos en total');
+  }
+
+  // 6c) Su backoff gasta SU parte del presupuesto y ni una petición más: con 3 búsquedas declaradas
+  //     (5 peticiones contando reintentos) un 429 persistente consume 5 intentos y se declara cortado.
+  {
+    let attempts = 0;
+    globalThis.fetch = async () => { attempts++; return new Response('{}', { status: 429, headers: { 'retry-after': '0' } }); };
+    resetSourceNotes();
+    await assert.rejects(
+      () => sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 3 }),
+      /presupuesto/);
+    assert.equal(attempts, 5, '5 = 3 búsquedas declaradas + 2 reintentos: ni una petición más');
+    assert.equal(fetchCost({ kind: 'freehire', region: 'es', terms: true, termsPerRun: 3 }), 5, 'lo declarado y lo gastado coinciden');
+    assert.match(noteOf('freehire-closer'), /presupuesto/, 'el corte se declara en el run');
+  }
+
+  // 6d) 2 s entre búsquedas a la misma API: la pasada hacía 11 seguidas y eso es lo que provoca el 429.
+  {
+    let calls = 0;
+    // Una fila de verdad: `sourceFreehire` declara caída cuando no queda NINGÚN candidato, así que un
+    // 200 vacío mediría la caída, no la espera. El candidato pasa el filtro de perfil (`Closer`).
+    const closer = { public_slug: 'demo-closer', url: 'https://freehire.me/job/demo-closer', title: 'Closer Comercial', company: 'Acme', countries: ['ES'], posted_at: '2026-11-08T00:00:00Z', reality: { class: 'fresh' } };
+    globalThis.fetch = async () => { calls++; return respond(200, { meta: { total: 1 }, data: [closer] }); };
+    resetSourceNotes();
+    const started = Date.now();
+    await sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 2 });
+    const elapsed = Date.now() - started;
+    assert.equal(calls, 2, 'una petición por término');
+    assert.ok(elapsed >= 1900, `espera 2 s entre búsquedas (medido ${elapsed} ms)`);
+    assert.equal(noteOf('freehire-closer'), null, 'sin corte no se declara ninguno');
+  }
+} finally {
+  globalThis.fetch = realFetch;
+}
+
+console.log('PASS  motor: fuentes sin duplicados, backoff de FreeHire (Retry-After, 2 s, dos reintentos) dentro de su presupuesto y extractores sin inventar salario');

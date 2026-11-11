@@ -2,7 +2,7 @@
 // 1.000 en Workers Paid) y hasta la sesión 129 estaba fijado en el código, así que el plan de pago
 // no servía de nada aquí. Lo que fija esta prueba:
 //   · sin variables, los defectos del plan gratuito quedan intactos (techo 50, presupuesto 16);
-//   · con el techo de pago (1.000) caben las 22 fuentes en UNA pasada (coste medido 42) y la pasada
+//   · con el techo de pago (1.000) caben las 22 fuentes en UNA pasada (coste medido 50) y la pasada
 //     no aplaza ninguna; con el gratuito se aplazan las que no entran, declaradas, no fingidas;
 //   · el motor nunca se da más de lo que admite el plan (MAX_SUBREQUESTS se recorta al techo);
 //   · un valor inválido se descarta y se declara (`ignored`), no se convierte en «sin límite»;
@@ -77,16 +77,18 @@ const status = async env => {
   return { status: response.status, body: await response.json() };
 };
 
-// 0) La medida base del catálogo actual: 22 fuentes que, juntas, cuestan 42 subrequests de fetch.
+// 0) La medida base del catálogo actual: 22 fuentes que, juntas, cuestan 50 subrequests de fetch.
 //    Si se añade o se quita una fuente, este número se actualiza aquí (es la cifra que se publica).
 //    2026-11-08: +1 (`freelancer-closer`, 2 fetches) → 37, y +5 fuentes de 1 fetch (jobgether,
 //    remotive-sales, jobicy-marketing, workingnomads, jobspresso) → 42.
+//    2026-11-11: FreeHire declara también sus dos reintentos (15 → 23) → 50. No es un adorno: sin
+//    contarlos, sus 429 se llevaban 12 de 16 peticiones y las fuentes sanas quedaban aplazadas.
 const fetchCost = s => t.fetchCost(s);
 const TOTAL_COST = t.SOURCES.reduce((n, s) => n + fetchCost(s), 0);
 assert.equal(t.SOURCES.length, 22, 'el catálogo del motor tiene 22 fuentes: si cambia, actualizar la medida');
-assert.equal(TOTAL_COST, 42, 'coste medido del barrido completo: 42 subrequests de fetch');
+assert.equal(TOTAL_COST, 50, 'coste medido del barrido completo: 50 subrequests de fetch');
 for (const source of t.SOURCES) {
-  assert.ok(fetchCost(source) >= 1 && fetchCost(source) <= 6, `${source.code}: coste fuera de rango (${fetchCost(source)})`);
+  assert.ok(fetchCost(source) >= 1 && fetchCost(source) <= 8, `${source.code}: coste fuera de rango (${fetchCost(source)})`);
 }
 
 // 1) Sin variables, la conducta del plan gratuito NO cambia: techo 50 y 16 de presupuesto.

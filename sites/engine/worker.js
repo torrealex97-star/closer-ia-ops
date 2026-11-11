@@ -37,11 +37,23 @@ function pickTerms(perRun, when = new Date()) {
 // cuando se agota, las últimas fuentes fallaban con «Too many subrequests». Se cuenta antes
 // para aplazar (declarado) en vez de romper, y el orden rota por día para que ninguna se
 // quede siempre al final.
+// FreeHire pide aire (429) y se le da: espera lo que diga `Retry-After`, 2 s entre búsquedas y dos
+// reintentos. Eso cuesta peticiones, así que se DECLARAN aquí: el coste de FreeHire es su peor caso
+// (búsquedas + reintentos) y la pasada reparte el presupuesto con esa cifra. Antes los reintentos no
+// se contaban y sus 429 se llevaban 12 de 16 peticiones dejando fuera a las fuentes que sí responden.
+const FREEHIRE_RETRIES = 2;
+const FREEHIRE_SPACING_MS = 2000;
+const FREEHIRE_RETRY_WAIT_MAX_MS = 5000;
+const FREEHIRE_TIME_BUDGET_MS = 15000;
+
 function fetchCost(source) {
   if (source.kind === 'jobtoday-cities') return (source.paths || []).length;
   if (source.kind === 'getonbrd') return 2;
+  if (source.kind === 'freehire') {
+    const searches = source.terms ? (source.termsPerRun || 3) : (source.region === 'latam' ? 1 : 3);
+    return searches + FREEHIRE_RETRIES;
+  }
   if (source.terms) return source.termsPerRun || 3;
-  if (source.kind === 'freehire') return source.region === 'latam' ? 1 : 3;
   return 1;
 }
 
@@ -124,6 +136,13 @@ const extractFiltered = new Map();
 const resetExtractFiltered = () => extractFiltered.clear();
 const filteredOf = code => extractFiltered.get(code) || 0;
 const countFiltered = code => extractFiltered.set(code, filteredOf(code) + 1);
+// Aviso propio de la fuente para el run (p. ej. «cortada por tiempo» o «presupuesto agotado»). Va
+// aparte de `filtered` porque no es «lo descarté» sino «no llegué a mirarlo»: se declara en el
+// estado de la fuente, no se convierte en un vacío que parezca que no había nada.
+const sourceNotes = new Map();
+const resetSourceNotes = () => sourceNotes.clear();
+const noteOf = code => sourceNotes.get(code) || null;
+const setNote = (code, text) => sourceNotes.set(code, text);
 function familyOf(payload) {
   const text = fold(`${payload.title ?? ''} ${payload.location ?? ''} ${String(payload.raw?.description ?? payload.raw?.excerpt ?? payload.raw?.summary ?? '').slice(0, 800)}`);
   return classifyRole({ title: payload.title }, text);
@@ -254,12 +273,35 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Medido el 2026-11-08: la pasada hace 11 búsquedas seguidas a freehire.me y las dos de LATAM
 // acabaron en 429 con «ninguna búsqueda respondió», mientras una petición suelta responde 200.
 // Un 429 aislado no es una fuente caída: es una fuente que pide aire.
-async function fetchText(url, timeoutMs = 15000, { retry = 0, backoffMs = 1200 } = {}) {
+// `Retry-After` viene en segundos («2») o como fecha HTTP («Wed, 21 Oct 2015 07:28:00 GMT»). Se
+// acota: una fuente que pida esperar diez minutos no puede dejar la invocación colgada, así que por
+// encima del tope se espera el tope y, si el 429 sigue, se declara caída. `null` = no lo mandó o no
+// se entiende, y manda la espera por defecto.
+function parseRetryAfter(value, maxMs = 5000) {
+  if (value === null || value === undefined || value === '') return null;
+  const raw = String(value).trim();
+  let ms = null;
+  if (/^\d+$/.test(raw)) ms = Number(raw) * 1000;
+  else {
+    const at = Date.parse(raw);
+    if (Number.isFinite(at)) ms = at - Date.now();
+  }
+  if (ms === null || !Number.isFinite(ms)) return null;
+  return Math.max(0, Math.min(ms, maxMs));
+}
+
+// `budget` ({ left }) es el tope de peticiones que ESTA fuente puede gastar en la invocación,
+// reintentos incluidos: cada intento lo descuenta y, agotado, no se pide más. Así un 429 repetido
+// gasta la parte de su fuente y no la que necesitan las demás. Sin `budget`, como antes.
+async function fetchText(url, timeoutMs = 15000, { retry = 0, backoffMs = 1200, retryAfterMaxMs = 5000, budget = null } = {}) {
   for (let attempt = 0; ; attempt++) {
+    if (budget && budget.left <= 0) throw new Error('presupuesto de peticiones de la fuente agotado');
+    if (budget) budget.left -= 1;
     const response = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
     if (response.ok) return response.text();
     if (attempt < retry && (response.status === 429 || response.status === 503)) {
-      await sleep(backoffMs * (attempt + 1));
+      const told = parseRetryAfter(response.headers?.get?.('retry-after'), retryAfterMaxMs);
+      await sleep(told ?? backoffMs * (attempt + 1));
       continue;
     }
     throw new Error(`HTTP ${response.status}`);
@@ -437,9 +479,18 @@ async function sourceFreehire(source) {
   const terms = source.terms ? pickTerms(source.termsPerRun || 3) : [null];
   const maxPages = source.terms ? 1 : source.region === 'latam' ? 1 : 3;
   const all = []; const seen = new Set(); const errors = [];
+  // Tope de peticiones de ESTA fuente, reintentos incluidos (lo declara `fetchCost`): un 429 que se
+  // repite gasta su parte del presupuesto, no la de las fuentes que sí responden.
+  const requests = { left: fetchCost(source) };
+  // Y tope de TIEMPO: 2 s entre búsquedas no puede estirar la invocación sin límite. Si se corta, se
+  // declara en el run (`note`) y los términos no buscados vuelven por la rotación de días.
+  const deadline = Date.now() + FREEHIRE_TIME_BUDGET_MS;
+  let cut = null;
   for (const [index, term] of terms.entries()) {
+    if (requests.left <= 0) { cut = 'presupuesto de la fuente agotado (429 repetido)'; break; }
     // Pausa entre búsquedas a la MISMA API: la ráfaga (11 seguidas) es lo que provoca el 429.
-    if (index > 0) await sleep(250);
+    if (index > 0) await sleep(FREEHIRE_SPACING_MS);
+    if (Date.now() >= deadline) { cut = `cortada por tiempo tras ${index} búsqueda(s)`; break; }
     const params = new URLSearchParams({ limit: '100', sort: 'posted_at', order: 'desc' });
     if (term) params.set('q', term); else params.set('category', 'sales');
     if (source.region === 'es') params.set('countries', 'ES');
@@ -447,9 +498,12 @@ async function sourceFreehire(source) {
     try {
       for (let page = 0; page < maxPages; page++) {
         const offset = page * 100;
-        // Un reintento (no una tormenta): se paga del presupuesto y evita declarar caída una
-        // fuente que solo estaba frenando la ráfaga.
-        const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`, 15000, { retry: 1 }));
+        // Dos reintentos con espera declarada: `Retry-After` si la fuente lo manda (acotado) y, si no,
+        // 2 s, 4 s. Se pagan del tope de ESTA fuente, así que no se comen el de las demás.
+        const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`, 15000, {
+          retry: FREEHIRE_RETRIES, backoffMs: FREEHIRE_SPACING_MS,
+          retryAfterMaxMs: FREEHIRE_RETRY_WAIT_MAX_MS, budget: requests,
+        }));
         const rows = data.data || [];
         for (const row of rows) {
           const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
@@ -469,9 +523,14 @@ async function sourceFreehire(source) {
         const total = data.meta?.total; const pageLen = rows.length;
         if (!Number.isFinite(total) || offset + 100 >= total || pageLen < 100) break;
       }
-    } catch (error) { errors.push(`${term ?? 'categoría'}: ${String(error.message || error).slice(0, 80)}`); }
+    } catch (error) {
+      const message = String(error.message || error);
+      if (/presupuesto/.test(message)) cut = cut ?? 'presupuesto de la fuente agotado (429 repetido)';
+      errors.push(`${term ?? 'categoría'}: ${message.slice(0, 80)}`);
+    }
   }
-  if (errors.length && !all.length) throw new Error(`ninguna búsqueda respondió (${errors[0]})`);
+  if (cut) setNote(source.code, cut);
+  if (!all.length) throw new Error(`ninguna búsqueda respondió (${cut ?? errors[0] ?? 'sin respuesta'})`);
   return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
@@ -630,7 +689,7 @@ async function sourceJobspresso(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain, marketHinted };
+export const __test = { parseRetryAfter, noteOf, resetSourceNotes, CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain, marketHinted };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -1754,6 +1813,7 @@ async function runCollection(env, force = false) {
   const slugAudit = null;
   const states = SOURCES.map(s => ({ code: s.code, name: s.name, status: 'queued', fetched: 0, accepted: 0 }));
   resetExtractFiltered();
+  resetSourceNotes();
   await db.prepare('INSERT INTO collection_runs (id,org_id,day,status,sources,created_at) VALUES (?,?,?,?,?,?)')
     .bind(runId, ORG, day, 'running', JSON.stringify(states), now()).run();
   const setState = (code, patch) => { const s = states.find(x => x.code === code); if (s) Object.assign(s, patch); };
@@ -1802,7 +1862,9 @@ async function runCollection(env, force = false) {
         accepted += Math.min(50, candidates.length - i);
         setState(source.code, { fetched: accepted, accepted });
       }
-      setState(source.code, { status: 'completed', fetched: candidates.length, accepted: candidates.length, filtered: filteredOf(source.code) });
+      // `note` es lo que la fuente declara que NO llegó a mirar (corte por tiempo o por su propio
+      // tope de peticiones): va en el estado del run para que una cifra baja no se lea como «no había».
+      setState(source.code, { status: 'completed', fetched: candidates.length, accepted: candidates.length, filtered: filteredOf(source.code), ...(noteOf(source.code) ? { note: noteOf(source.code) } : {}) });
     } catch (error) {
       setState(source.code, { status: 'failed', warning: String(error.message || error).slice(0, 300) });
     }
