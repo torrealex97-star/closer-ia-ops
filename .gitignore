@@ -12,3 +12,6 @@ __pycache__/
 test-results/
 playwright-report/
 .DS_Store
+.vercel/
+.cloud-attachments/
+Growth Oportunity- PLAN/

@@ -205,6 +205,21 @@ const SOURCES = [
   // hoy 2026-10-26 con el vocabulario español: 19 closers únicos en español y remotos
   // (Colombia, México, Perú, Guatemala y remoto en USD), así que vuelve solo con términos.
   { code: 'himalayas-closer', name: 'Himalayas · closer (ES/remoto)', kind: 'himalayas', terms: true, termsPerRun: 4 },
+  // Freelancer.com (2026-11-08): la categoría «trabajos freelance» que pidió el operador. **Workana
+  // no se puede conectar**: responde 403 de Cloudflare a cualquier lectura y no publica API ni feed
+  // (su página de «RSS» es un filtro de habilidades, no un RSS). Freelancer.com sí tiene API pública
+  // SIN CLAVE: verificado hoy, 200 y proyectos reales (`result.projects`), con presupuesto por rango.
+  // Son ENCARGOS, no empleos con nómina: se ingieren con `salary: null` (el presupuesto va en `raw`,
+  // nunca disfrazado de salario) y `raw.engagement: 'freelance'`. Los términos rotan por día.
+  { code: 'freelancer-closer', name: 'Freelancer.com · closer (encargos)', kind: 'freelancer', terms: true, termsPerRun: 2 },
+  // Añadidas 2026-11-08 tras sondear los 108 portales del operador (triage completo en STATUS 133).
+  // Todas: 1 fetch, JSON/RSS legible y filtro de rol delante. Jobicy va por `marketing` porque
+  // `sales` no es un slug válido de su API, y con `count=20` para no tragarse 400 KB por pasada.
+  { code: 'jobgether', name: 'Jobgether', kind: 'jobgether' },
+  { code: 'remotive-sales', name: 'Remotive · ventas', kind: 'remotive', category: 'sales' },
+  { code: 'jobicy-marketing', name: 'Jobicy · marketing', kind: 'jobicy', industry: 'marketing' },
+  { code: 'workingnomads', name: 'Working Nomads', kind: 'workingnomads' },
+  { code: 'jobspresso', name: 'Jobspresso', kind: 'jobspresso', slug: 'https://jobspresso.co/feed/?post_type=job_listing' },
   // ATS al final: el budget de subrequests por invocación (~20 fetches medidos
   // 2026-10-15) se agotaba antes de terminar. Recorte por ROI 2026-10-14 (sesión
   // 16): fuera greenhouse ×3 y recruitee. Hoy 2026-10-15: fuera también
@@ -231,10 +246,24 @@ function stableId(prefix, text) {
   return `${prefix}-` + text.split('').reduce((a, c) => (Math.imul(31, a) + c.charCodeAt(0)) | 0, 7).toString(36).replace('-', '0');
 }
 
-async function fetchText(url, timeoutMs = 15000) {
-  const response = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.text();
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Petición de texto con reintento CORTO y solo para los códigos que significan «ahora no»:
+// 429 (la fuente frena una ráfaga) y 503. Un 404/410/401 NO se reintenta: no cambia solo y
+// reintentarlo gasta subrequests del presupuesto por invocación.
+// Medido el 2026-11-08: la pasada hace 11 búsquedas seguidas a freehire.me y las dos de LATAM
+// acabaron en 429 con «ninguna búsqueda respondió», mientras una petición suelta responde 200.
+// Un 429 aislado no es una fuente caída: es una fuente que pide aire.
+async function fetchText(url, timeoutMs = 15000, { retry = 0, backoffMs = 1200 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
+    if (response.ok) return response.text();
+    if (attempt < retry && (response.status === 429 || response.status === 503)) {
+      await sleep(backoffMs * (attempt + 1));
+      continue;
+    }
+    throw new Error(`HTTP ${response.status}`);
+  }
 }
 
 const pick = (obj, ...keys) => { for (const k of keys) { const v = obj?.[k]; if (v !== undefined && v !== null && v !== '') return v; } return null; };
@@ -323,7 +352,7 @@ async function sourceTeamtailorRss(source) {
   const xml = await fetchText(`https://careers.${source.slug}.com/jobs.rss`);
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, MAX_ITEMS_PER_SOURCE).map(m => {
     const item = m[1];
-    const field = tag => (item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`)) || [])[1]?.trim() || '';
+    const field = tag => (item.match(RSS_FIELD[tag]) || [])[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
     const title = field('title').replace(/<!\[CDATA\[|\]\]>/g, '');
     const link = field('link');
     return { external_id: link || stableId('tt', title), payload: {
@@ -408,7 +437,9 @@ async function sourceFreehire(source) {
   const terms = source.terms ? pickTerms(source.termsPerRun || 3) : [null];
   const maxPages = source.terms ? 1 : source.region === 'latam' ? 1 : 3;
   const all = []; const seen = new Set(); const errors = [];
-  for (const term of terms) {
+  for (const [index, term] of terms.entries()) {
+    // Pausa entre búsquedas a la MISMA API: la ráfaga (11 seguidas) es lo que provoca el 429.
+    if (index > 0) await sleep(250);
     const params = new URLSearchParams({ limit: '100', sort: 'posted_at', order: 'desc' });
     if (term) params.set('q', term); else params.set('category', 'sales');
     if (source.region === 'es') params.set('countries', 'ES');
@@ -416,7 +447,9 @@ async function sourceFreehire(source) {
     try {
       for (let page = 0; page < maxPages; page++) {
         const offset = page * 100;
-        const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`));
+        // Un reintento (no una tormenta): se paga del presupuesto y evita declarar caída una
+        // fuente que solo estaba frenando la ráfaga.
+        const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`, 15000, { retry: 1 }));
         const rows = data.data || [];
         for (const row of rows) {
           const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
@@ -442,15 +475,169 @@ async function sourceFreehire(source) {
   return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
+async function sourceFreelancer(source = {}) {
+  // API pública de Freelancer.com (sin clave; verificada en vivo el 2026-11-08: 200 y
+  // `result.projects` con proyectos reales). Sustituye la intención de conectar Workana, que no se
+  // puede: responde 403 de Cloudflare y no publica API ni feed.
+  // Ojo con lo que ES esto: encargos freelance, no empleos. Por eso `salary` va a null (el
+  // presupuesto es un rango del encargo y vive en `raw.budget`, nunca como salario), la fecha sale
+  // de `time_submitted` y el tipo de encargo queda en `raw.engagement`.
+  const seen = new Set(); const all = []; const errors = [];
+  for (const term of pickTerms(source.termsPerRun || 2)) {
+    try {
+      const data = JSON.parse(await fetchText(
+        `https://www.freelancer.com/api/projects/0.1/projects/active/?query=${encodeURIComponent(term)}&limit=100&job_details=true`,
+        15000, { retry: 1 }));
+      for (const p of (data.result?.projects || [])) {
+        const external = String(p?.id || '');
+        if (!external || !p?.title) continue;
+        if (seen.has(external)) continue;
+        seen.add(external);
+        const payload = {
+          title: p.title, company: null,
+          location: p.location?.country?.name ?? null,
+          url: p.seo_url ? `https://www.freelancer.com/projects/${p.seo_url}` : null,
+          salary: null,
+          posted_at: p.time_submitted ? new Date(Number(p.time_submitted) * 1000).toISOString() : null,
+          raw: { ...p, search_term: term, engagement: 'freelance' },
+        };
+        if (!payload.url || !isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+        all.push({ external_id: external, payload });
+      }
+    } catch (error) { errors.push(`${term}: ${String(error.message || error).slice(0, 80)}`); }
+  }
+  if (errors.length && !all.length) throw new Error(`ningún término respondió (${errors[0]})`);
+  return all.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
+// Etiquetas que usa cualquier feed RSS 2.0 del motor. Regex literales a propósito (ver
+// `sourceJobspresso`): construirlas con `new RegExp` y una plantilla admite un escape de más que
+// deja la expresión casando «\\s» — y el feed se lee vacío sin lanzar error.
+const RSS_FIELD = {
+  title: /<title[^>]*>([\s\S]*?)<\/title>/,
+  link: /<link[^>]*>([\s\S]*?)<\/link>/,
+  pubDate: /<pubDate[^>]*>([\s\S]*?)<\/pubDate>/,
+  description: /<description[^>]*>([\s\S]*?)<\/description>/,
+};
+
+// ------ fuentes añadidas 2026-11-08 desde la lista de portales del operador ------
+// Cada una se comprobó en vivo antes de entrar: 200, JSON/RSS legible y campos reales. Las que
+// quedaron fuera y por qué están en docs/STATUS.md (sesión 133): dominios muertos, 403 antibot,
+// API con token o feeds que devuelven artículos de blog en vez de ofertas (SkipTheDrive).
+// Todas pasan por el mismo filtro de rol (`isProfileCandidate`): lo descartado se cuenta.
+async function sourceJobgether(source = {}) {
+  // JSON compacto con paginación (`jobs`, `pagination`). Verificado 2026-11-08.
+  const data = JSON.parse(await fetchText('https://jobgether.com/api/v1/jobs?limit=100', 15000, { retry: 1 }));
+  const out = [];
+  for (const j of (data.jobs || [])) {
+    if (!j?.title) continue;
+    const company = typeof j.company === 'string' ? j.company : (j.company?.name ?? null);
+    const payload = {
+      title: j.title, company,
+      location: [j.location, j.remote ? 'remoto' : null].filter(Boolean).join(' · ') || null,
+      url: j.url ?? null, salary: null,
+      posted_at: j.postedAt ? new Date(j.postedAt).toISOString() : null,
+      raw: j,
+    };
+    if (!payload.url || !isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+    out.push({ external_id: String(j.id ?? j.url), payload });
+  }
+  return out.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
+async function sourceRemotive(source = {}) {
+  // API pública por categoría (2026-11-08: 200, `jobs[]` con `candidate_required_location`).
+  const category = source.category || 'sales';
+  const data = JSON.parse(await fetchText(`https://remotive.com/api/remote-jobs?category=${encodeURIComponent(category)}&limit=100`, 20000, { retry: 1 }));
+  const out = [];
+  for (const j of (data.jobs || [])) {
+    if (!j?.title || !j.url) continue;
+    const payload = {
+      title: j.title, company: j.company_name ?? null,
+      location: j.candidate_required_location ?? null,
+      url: j.url,
+      // Remotive trae `salary` como TEXTO libre («$40k-$60k»): no es un dato estructurado y no se
+      // publica como salario verificado; queda en `raw`.
+      salary: null,
+      posted_at: j.publication_date ? new Date(j.publication_date).toISOString() : null,
+      raw: j,
+    };
+    if (!isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+    out.push({ external_id: String(j.id ?? j.url), payload });
+  }
+  return out.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
+async function sourceJobicy(source = {}) {
+  // API pública por industria (2026-11-08: `industry=marketing` 200; `sales` no es un slug válido).
+  // `count=20` a propósito: con 50 el cuerpo pasa de 400 KB y se paga en CPU por nada.
+  const industry = source.industry || 'marketing';
+  const data = JSON.parse(await fetchText(`https://jobicy.com/api/v2/remote-jobs?count=20&industry=${encodeURIComponent(industry)}`, 20000, { retry: 1 }));
+  const out = [];
+  for (const j of (data.jobs || [])) {
+    if (!j?.jobTitle || !j.url) continue;
+    const payload = {
+      title: j.jobTitle, company: j.companyName ?? null,
+      location: j.jobGeo ?? null, url: j.url, salary: null,
+      posted_at: j.pubDate ? new Date(j.pubDate).toISOString() : null,
+      raw: j,
+    };
+    if (!isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+    out.push({ external_id: String(j.id ?? j.url), payload });
+  }
+  return out.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
+async function sourceWorkingNomads(source = {}) {
+  // Lista JSON plana (2026-11-08: 200, 17 ofertas en el expuesto; sin filtros por query).
+  const rows = JSON.parse(await fetchText('https://www.workingnomads.com/api/exposed_jobs/', 20000, { retry: 1 }));
+  const out = [];
+  for (const j of (Array.isArray(rows) ? rows : [])) {
+    if (!j?.title || !j.url) continue;
+    const payload = {
+      title: j.title, company: j.company_name ?? null, location: j.location ?? null,
+      url: j.url, salary: null,
+      posted_at: j.pub_date ? new Date(j.pub_date).toISOString() : null,
+      raw: j,
+    };
+    if (!isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+    out.push({ external_id: String(j.url).slice(-120), payload });
+  }
+  return out.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
+async function sourceJobspresso(source) {
+  // RSS de WordPress con `post_type=job_listing` (2026-11-08: 200, 20 ítems de empleo). Usa el
+  // mismo parseo que `sourceRss` pero SÍ filtra por rol: el feed es heterogéneo.
+  const xml = await fetchText(source.slug, 20000, { retry: 1 });
+  const out = [];
+  for (const m of [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 100)) {
+    const item = m[1];
+    const field = tag => (item.match(RSS_FIELD[tag]) || [])[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
+    const title = field('title'); const link = field('link');
+    if (!title || !link) continue;
+    const payload = {
+      title, company: null, location: null, url: link, salary: null,
+      posted_at: field('pubDate') ? new Date(field('pubDate')).toISOString() : null,
+      raw: { title, link, description: field('description').slice(0, 2000) },
+    };
+    if (!isProfileCandidate(payload)) { countFiltered(source.code); continue; }
+    out.push({ external_id: link, payload });
+  }
+  return out.slice(0, MAX_ITEMS_PER_SOURCE);
+}
+
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten };
+export const __test = { CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
   recruitee: sourceRecruitee, teamtailor: sourceTeamtailorRss, himalayas: sourceHimalayas, rss: sourceRss,
-  getonbrd: sourceGetOnBoard, freehire: sourceFreehire,
+  getonbrd: sourceGetOnBoard, freehire: sourceFreehire, freelancer: sourceFreelancer,
+  jobgether: sourceJobgether, remotive: sourceRemotive, jobicy: sourceJobicy,
+  workingnomads: sourceWorkingNomads, jobspresso: sourceJobspresso,
 };
 
 // ------ forma de escritura del catálogo (esto es cuota, no estilo) ------
@@ -655,6 +842,14 @@ async function ensureSchema(db) {
     db.prepare(`CREATE TABLE IF NOT EXISTS write_ledger (
       org_id TEXT NOT NULL, day TEXT NOT NULL, writes INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
       PRIMARY KEY(org_id, day))`),
+    // Línea base del contador REAL de la plataforma (Sites no se lo cuenta al Worker: solo al panel).
+    // Una fila por organización; `month_writes`/`day_writes` son la parte ANTERIOR al libro —
+    // plataforma menos libro en el momento de sembrar —, no el total: el total es libro + esto, así
+    // que re-sembrar RECALCULA en vez de sumar dos veces. Ver `handleWriteLedgerSeed`.
+    db.prepare(`CREATE TABLE IF NOT EXISTS write_baseline (
+      org_id TEXT PRIMARY KEY, day TEXT NOT NULL, month TEXT NOT NULL,
+      month_writes INTEGER NOT NULL DEFAULT 0, day_writes INTEGER NOT NULL DEFAULT 0,
+      source TEXT, created_at TEXT NOT NULL)`),
   ]);
   // Columnas de vigencia derivadas de verify (port fase 3): ALTER tolerante — en una
   // base ya existente la columna está y D1 lo reclama, que es el estado correcto.
@@ -1344,14 +1539,18 @@ function rowsWritten(result) {
 
 // La puerta, pura y comprobable: ¿queda cuota del mes (y del día) para seguir recogiendo?
 // `limits` son los efectivos (`writeLimits(env)`); sin argumento, los defectos del plan gratuito.
-function writeAllowance({ month = 0, day = 0 } = {}, limits = writeLimits()) {
+// `trusted: false` = el libro no cubre el día entero (arrancó a media jornada), así que la cifra del
+// día no se da por buena aunque parezca baja: se declara `day_unseeded` y se cierra hasta que cambie
+// el día o el operador siembre el contador real de la plataforma.
+function writeAllowance({ month = 0, day = 0, trusted = true } = {}, limits = writeLimits()) {
   const monthMax = Math.floor(limits.month * limits.ratio);
   const dayMax = limits.day > 0 ? Math.floor(limits.day * limits.ratio) : null;
   const used = Math.max(0, Number(month) || 0);
   const today = Math.max(0, Number(day) || 0);
-  if (used >= monthMax) return { ok: false, reason: 'month', used, max: monthMax, left: 0, day_max: dayMax };
-  if (dayMax !== null && today >= dayMax) return { ok: false, reason: 'day', used: today, max: dayMax, left: Math.max(0, dayMax - today), day_max: dayMax };
-  return { ok: true, reason: null, used, max: monthMax, left: monthMax - used, day_max: dayMax };
+  if (used >= monthMax) return { ok: false, reason: 'month', used, max: monthMax, left: 0, day_max: dayMax, day_trusted: trusted };
+  if (!trusted) return { ok: false, reason: 'day_unseeded', used: today, max: monthMax, left: monthMax - used, day_max: dayMax, day_trusted: false };
+  if (dayMax !== null && today >= dayMax) return { ok: false, reason: 'day', used: today, max: dayMax, left: Math.max(0, dayMax - today), day_max: dayMax, day_trusted: true };
+  return { ok: true, reason: null, used, max: monthMax, left: monthMax - used, day_max: dayMax, day_trusted: true };
 }
 
 // Lectura del registro (mes y día). Si no se puede leer NO se inventa un cero: se declara el hueco
@@ -1359,17 +1558,40 @@ function writeAllowance({ month = 0, day = 0 } = {}, limits = writeLimits()) {
 // un fallo de lectura sería culpar a la cuota de un problema que no es suyo.
 async function readWriteAllowance(db, limits = writeLimits()) {
   const month = dayKey().slice(0, 7);
+  const todayKey = dayKey();
   // Los límites efectivos viajan con la lectura: el panel y el operador ven contra qué techo se mide
   // sin tener que adivinar el entorno del Worker.
   const config = { month: limits.month, day: limits.day, ratio: limits.ratio, ...(limits.ignored?.length ? { ignored: limits.ignored } : {}) };
   try {
-    const [sum, today] = await db.batch([
+    const [sum, today, first, seeded] = await db.batch([
       db.prepare('SELECT COALESCE(SUM(writes),0) AS writes FROM write_ledger WHERE org_id=? AND day LIKE ?').bind(ORG, `${month}-%`),
-      db.prepare('SELECT writes FROM write_ledger WHERE org_id=? AND day=?').bind(ORG, dayKey()),
+      db.prepare('SELECT writes FROM write_ledger WHERE org_id=? AND day=?').bind(ORG, todayKey),
+      db.prepare('SELECT MIN(day) AS day FROM write_ledger WHERE org_id=?').bind(ORG),
+      db.prepare('SELECT day, month, month_writes, day_writes, source, created_at FROM write_baseline WHERE org_id=?').bind(ORG),
     ]);
-    const monthWrites = Number(sum?.results?.[0]?.writes ?? 0) || 0;
-    const dayWrites = Number(today?.results?.[0]?.writes ?? 0) || 0;
-    return { available: true, month, month_writes: monthWrites, day_writes: dayWrites, ...writeAllowance({ month: monthWrites, day: dayWrites }, limits), config };
+    const ledgerMonth = Number(sum?.results?.[0]?.writes ?? 0) || 0;
+    const ledgerDay = Number(today?.results?.[0]?.writes ?? 0) || 0;
+    const firstDay = first?.results?.[0]?.day ?? null;
+    const baseline = seeded?.results?.[0] || null;
+    // La línea base suma solo lo de SU mes y SU día: sembrada el 8, el 9 vuelve a contar el libro solo.
+    const seededToday = Boolean(baseline && baseline.day === todayKey);
+    const baseMonth = baseline && baseline.month === month ? Number(baseline.month_writes) || 0 : 0;
+    const baseDay = seededToday ? Number(baseline.day_writes) || 0 : 0;
+    const monthWrites = ledgerMonth + baseMonth;
+    const dayWrites = ledgerDay + baseDay;
+    // El libro cubre el día entero si tiene historia de ANTES de hoy. Si su fila más antigua es de hoy
+    // (o está vacío y ya hay línea base), arrancó a media jornada: lo escrito antes no está contado y
+    // se declara en vez de dar por bueno un día incompleto.
+    const dayTrusted = seededToday || !firstDay || String(firstDay) < todayKey;
+    const note = dayTrusted ? null
+      : `El registro de escrituras empezó el ${firstDay || todayKey} a media jornada: este día no está contado entero. No se recoge hasta las 00:00 UTC o hasta sembrar el contador real de la plataforma (POST /v1/admin/write-ledger/seed).`;
+    return {
+      available: true, month, month_writes: monthWrites, day_writes: dayWrites,
+      ledger: { month_writes: ledgerMonth, day_writes: ledgerDay, first_day: firstDay },
+      baseline: baseline ? { day: baseline.day, month: baseline.month, month_writes: Number(baseline.month_writes) || 0, day_writes: Number(baseline.day_writes) || 0, source: baseline.source ?? null, created_at: baseline.created_at } : null,
+      ...writeAllowance({ month: monthWrites, day: dayWrites, trusted: dayTrusted }, limits),
+      ...(note ? { note } : {}), config,
+    };
   } catch (error) {
     console.error(JSON.stringify({ event: 'write_allowance_unreadable', error: String(error?.message || error) }));
     return { available: false, month, month_writes: null, day_writes: null, ok: true, reason: null, used: null, max: null, left: null, day_max: limits.day > 0 ? Math.floor(limits.day * limits.ratio) : null, config };
@@ -1392,6 +1614,49 @@ async function chargeWrites(db, writes) {
   }
 }
 
+// Siembra del libro con el contador REAL de la plataforma. Sites no le da ese número al Worker (solo
+// al panel), así que el operador lo declara y el motor guarda la parte anterior al libro; desde ahí
+// el guardián cuenta lo que la plataforma ya contaba en vez de arrancar de cero.
+//   POST /v1/admin/write-ledger/seed  {"month_writes": 16148, "day_writes": 9582, "source": "..."}
+// Solo con ADMIN_TOKEN. Recalcular es idempotente: (plataforma − libro AHORA), nunca dos veces.
+async function handleWriteLedgerSeed(request, env) {
+  const db = env.DB;
+  await ensureSchema(db);
+  let body = {};
+  try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
+  catch { body = {}; }
+  const monthWrites = envInteger(body.month_writes, { min: 0, max: 1_000_000_000 });
+  const dayWrites = envInteger(body.day_writes, { min: 0, max: 1_000_000_000 });
+  // Un valor raro no se convierte en cero: se rechaza. Un cero silencioso aquí es el guardián ciego
+  // otra vez, con la diferencia de que ya no lo parecería.
+  if (monthWrites === null || dayWrites === null) return Response.json({ detail: 'month_writes y day_writes: enteros ≥ 0 (el contador de la plataforma, no un cero inventado)' }, { status: 422 });
+  if (dayWrites > monthWrites) return Response.json({ detail: 'day_writes no puede superar month_writes' }, { status: 422 });
+  const source = typeof body.source === 'string' ? body.source.trim().slice(0, 200) || null : null;
+  const month = dayKey().slice(0, 7);
+  const todayKey = dayKey();
+  const [sum, dayRow] = await db.batch([
+    db.prepare('SELECT COALESCE(SUM(writes),0) AS writes FROM write_ledger WHERE org_id=? AND day LIKE ?').bind(ORG, `${month}-%`),
+    db.prepare('SELECT writes FROM write_ledger WHERE org_id=? AND day=?').bind(ORG, todayKey),
+  ]);
+  const ledgerMonth = Number(sum?.results?.[0]?.writes ?? 0) || 0;
+  const ledgerDay = Number(dayRow?.results?.[0]?.writes ?? 0) || 0;
+  // Lo que la plataforma cuenta y el libro NO: eso es lo que se guarda como línea base.
+  const baseMonth = Math.max(0, monthWrites - ledgerMonth);
+  const baseDay = Math.max(0, dayWrites - ledgerDay);
+  await db.prepare(`INSERT INTO write_baseline (org_id,day,month,month_writes,day_writes,source,created_at) VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(org_id) DO UPDATE SET day=excluded.day, month=excluded.month, month_writes=excluded.month_writes,
+      day_writes=excluded.day_writes, source=excluded.source, created_at=excluded.created_at`)
+    .bind(ORG, todayKey, month, baseMonth, baseDay, source, now()).run();
+  console.log(JSON.stringify({ event: 'write_ledger_seeded', month_writes: monthWrites, day_writes: dayWrites, ledger_month: ledgerMonth, ledger_day: ledgerDay }));
+  return Response.json({
+    seeded: true, month,
+    platform: { month_writes: monthWrites, day_writes: dayWrites },
+    ledger: { month_writes: ledgerMonth, day_writes: ledgerDay },
+    baseline: { month_writes: baseMonth, day_writes: baseDay },
+    write_allowance: await readWriteAllowance(db, writeLimits(env)),
+  });
+}
+
 // ------ recogida ------
 const logFail = event => error => console.error(JSON.stringify({ event, error: String(error?.message || error) }));
 async function runCollection(env, force = false) {
@@ -1407,8 +1672,14 @@ async function runCollection(env, force = false) {
   const allowance = await readWriteAllowance(db, limits);
   if (!allowance.ok) {
     console.error(JSON.stringify({ event: 'collection_skipped_write_allowance', reason: allowance.reason, used: allowance.used, max: allowance.max }));
-    return { skipped: true, reason: 'write_allowance', write_allowance: allowance,
-      note: 'Recogida detenida por la cuota de escrituras del motor; se reanuda al reiniciarse la cuota (día 1 del mes). El catálogo ya recogido se sigue sirviendo.' };
+    // La causa se dice: «cuota del mes», «techo del día» y «día sin contabilizar» no son lo mismo y
+    // se reanudan en momentos distintos (día 1, 00:00 UTC, o al sembrar el contador real).
+    const note = allowance.reason === 'month'
+      ? 'Recogida detenida por la cuota de escrituras del motor; se reanuda al reiniciarse la cuota (día 1 del mes). El catálogo ya recogido se sigue sirviendo.'
+      : allowance.reason === 'day'
+        ? 'Recogida detenida por el techo diario de escrituras; se reanuda a las 00:00 UTC. El catálogo ya recogido se sigue sirviendo.'
+        : allowance.note || 'Recogida detenida: el registro de escrituras no cubre el día entero. Se reanuda a las 00:00 UTC o al sembrar el contador real de la plataforma.';
+    return { skipped: true, reason: 'write_allowance', write_allowance: allowance, note };
   }
   // Forma de escritura: se migra a la forma barata ANTES de recoger, porque es lo que abarata todo lo
   // demás, y se cobra al mismo registro de cuota. Una o dos tablas por pasada; lo que no quepa, sigue.
@@ -11035,6 +11306,14 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(request) });
+    // Siembra del guardián con el contador real de la plataforma (ver handleWriteLedgerSeed). Antes de
+    // las rutas admin por id, porque «write-ledger» no es una oportunidad; mismo ADMIN_TOKEN.
+    if (url.pathname === '/v1/admin/write-ledger/seed') {
+      if (request.method !== 'POST') return Response.json({ detail: 'Solo POST' }, { status: 405 });
+      const seedCheck = requireAdmin(request, env);
+      if (seedCheck) return seedCheck;
+      return handleWriteLedgerSeed(request, env);
+    }
     const adminMatch = url.pathname.match(/^\/v1\/admin\/opportunities(?:\/([a-zA-Z0-9-]{1,64})(\/verify)?)?$/);
     if (adminMatch) {
       // Superficie admin del catálogo cloud (port del panel por fases): fase 1 =

@@ -2,7 +2,7 @@
 // 1.000 en Workers Paid) y hasta la sesión 129 estaba fijado en el código, así que el plan de pago
 // no servía de nada aquí. Lo que fija esta prueba:
 //   · sin variables, los defectos del plan gratuito quedan intactos (techo 50, presupuesto 16);
-//   · con el techo de pago (1.000) caben las 16 fuentes en UNA pasada (coste medido 35) y la pasada
+//   · con el techo de pago (1.000) caben las 22 fuentes en UNA pasada (coste medido 42) y la pasada
 //     no aplaza ninguna; con el gratuito se aplazan las que no entran, declaradas, no fingidas;
 //   · el motor nunca se da más de lo que admite el plan (MAX_SUBREQUESTS se recorta al techo);
 //   · un valor inválido se descarta y se declara (`ignored`), no se convierte en «sin límite»;
@@ -77,12 +77,14 @@ const status = async env => {
   return { status: response.status, body: await response.json() };
 };
 
-// 0) La medida base del catálogo actual: 16 fuentes que, juntas, cuestan 35 subrequests de fetch.
+// 0) La medida base del catálogo actual: 22 fuentes que, juntas, cuestan 42 subrequests de fetch.
 //    Si se añade o se quita una fuente, este número se actualiza aquí (es la cifra que se publica).
+//    2026-11-08: +1 (`freelancer-closer`, 2 fetches) → 37, y +5 fuentes de 1 fetch (jobgether,
+//    remotive-sales, jobicy-marketing, workingnomads, jobspresso) → 42.
 const fetchCost = s => t.fetchCost(s);
 const TOTAL_COST = t.SOURCES.reduce((n, s) => n + fetchCost(s), 0);
-assert.equal(t.SOURCES.length, 16, 'el catálogo del motor tiene 16 fuentes: si cambia, actualizar la medida');
-assert.equal(TOTAL_COST, 35, 'coste medido del barrido completo: 35 subrequests de fetch');
+assert.equal(t.SOURCES.length, 22, 'el catálogo del motor tiene 22 fuentes: si cambia, actualizar la medida');
+assert.equal(TOTAL_COST, 42, 'coste medido del barrido completo: 42 subrequests de fetch');
 for (const source of t.SOURCES) {
   assert.ok(fetchCost(source) >= 1 && fetchCost(source) <= 6, `${source.code}: coste fuera de rango (${fetchCost(source)})`);
 }
@@ -162,7 +164,7 @@ for (const source of t.SOURCES) {
   }
 }
 
-// 6) La misma pasada con el techo de pago: caben las 16, ninguna se aplaza y se gasta el coste real.
+// 6) La misma pasada con el techo de pago: caben las 22, ninguna se aplaza y se gasta el coste real.
 {
   const realFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response('', { status: 200 });
@@ -176,7 +178,7 @@ for (const source of t.SOURCES) {
     // —el cuerpo vacío no es el HTML/JSON de cada portal—, no del presupuesto: lo que se afirma aquí
     // es que ninguna se queda sin turno por falta de peticiones.
     const executed = body.sources.filter(s => s.status === 'completed' || s.status === 'failed');
-    assert.equal(executed.length, t.SOURCES.length, 'las 16 fuentes se intentan en la misma pasada');
+    assert.equal(executed.length, t.SOURCES.length, 'las 22 fuentes se intentan en la misma pasada');
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -188,7 +190,7 @@ for (const source of t.SOURCES) {
   assert.equal(free.status, 200);
   assert.equal(free.body.subrequests.ceiling, 50);
   assert.equal(free.body.subrequests.budget, FREE_BUDGET);
-  assert.equal(free.body.subrequests.sources, 16);
+  assert.equal(free.body.subrequests.sources, 22);
   assert.equal(free.body.subrequests.fetch_cost, TOTAL_COST);
   assert.deepEqual(free.body.subrequests.deferred, ['himalayas-closer']);
   const paid = await status({ SUBREQUEST_LIMIT: '1000' });
