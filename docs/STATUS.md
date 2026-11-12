@@ -1,5 +1,12 @@
 # Estado
 
+## Skills de Vercel y Supabase, y fuera la última dependencia legacy (sesión 157) — 2026-11-12
+
+- **Petición del operador**: buscar e instalar las skills de Vercel y Supabase y volver a intentar lo pendiente.
+- **Instaladas con `npx skills`** (quedan versionadas en el repo, como las demás): `vercel-labs/agent-skills@deploy-to-vercel` (190 K instalaciones) en `.agents/skills/` y `.claude/skills/`, y `supabase/agent-skills@supabase` actualizada. La de Supabase confirma el criterio que ya seguimos: publicable en cliente, `service_role`/secreta nunca en público, `anon` solo por compatibilidad.
+- **Hallazgo al reintentar la rotación**: el proyecto **ya usa claves de firma asimétricas** (ES256 `in_use`; la HS256 aparece como `previously_used`). Las claves `anon`/`service_role` existen solo como compatibilidad legacy y **ninguna de las dos se usa ya**: se borraron `SUPABASE_ANON_KEY` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` del Worker y se comprobó que el panel sigue `configured: true` y que Auth responde `invalid_credentials` con la clave publicable (no «invalid api key»).
+- **Lo que sigue sin poder hacerse por API**: revocar el secreto JWT legacy. Ni el CLI ni las herramientas de gestión exponen esa acción; es el botón **Revoke legacy JWT secret** en Supabase → Project Settings → JWT Keys. Ahora es un clic sin riesgo: no queda nada en el despliegue que dependa de esas claves.
+
 ## Review de la mudanza: dos fallos reales, corregidos (sesión 156) — 2026-11-12
 
 - **Petición del operador**: revisar que todo esté bien y arreglar lo necesario.
