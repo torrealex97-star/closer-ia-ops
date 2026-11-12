@@ -21,3 +21,4 @@ Growth Oportunity- PLAN/
 # Config de despliegue en la cuenta PROPIA de Cloudflare (ADR-018): lleva el database_id de esa
 # cuenta, que es por entorno. La plantilla versionada es `wrangler.example.toml`.
 sites/engine/wrangler.toml
+sites/cron/wrangler.toml

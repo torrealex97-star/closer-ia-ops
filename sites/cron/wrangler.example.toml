@@ -1,0 +1,22 @@
+# Reloj diario de la plataforma en una cuenta PROPIA de Cloudflare (ADR-018).
+#
+# Copia este archivo a `sites/cron/wrangler.toml` (gitignored) y despliega con
+# `npx wrangler deploy`. Después, `npx wrangler secret put CRON_SECRET` con el MISMO valor que
+# tiene `closer-web`: la ruta compara los dos con `timingSafeEqual`.
+#
+# Antes de encender `[triggers]` hace falta el plan Workers Paid: el cron de la web hace más de 50
+# subpeticiones por ejecución (fuentes, respaldo, Apify, vigencia de 20 enlaces, revisión y
+# activación) y en el plan gratuito se cortaría a medias declarando `truncated`.
+name = "closer-cron"
+main = "worker.js"
+compatibility_date = "2026-11-12"
+
+[observability]
+enabled = true
+
+[vars]
+APP_URL = "https://app.womendigitalclosers.com"
+
+# Mismo horario que tenía el cron de Vercel: 06:00 UTC.
+[triggers]
+crons = ["0 6 * * *"]

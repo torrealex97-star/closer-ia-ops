@@ -1,5 +1,14 @@
 # Estado
 
+## El reloj diario ya tiene Worker propio en la cuenta (sesión 151) — 2026-11-12
+
+- **Petición del operador**: mover a Cloudflare también el cron de recogida, después de confirmar que acepta Workers Paid (5 $/mes).
+- **Hecho** ([sites/cron](../sites/cron/worker.js), [wrangler.example.toml](../sites/cron/wrangler.example.toml)): Worker `closer-cron` desplegado, sin lógica de negocio: llama a `/api/cron/collect` de la web con el secreto compartido y deja en Observability el estado, si se cortó y cuánto tardó. Vive aparte porque el Worker de OpenNext solo exporta `fetch` y un cron de Cloudflare invoca `scheduled`.
+- **Secreto único y comprobado**: `CRON_SECRET` nuevo, el mismo en `closer-web` y `closer-cron` (la ruta compara con `timingSafeEqual`); por error se puso primero en `closer-engine`, donde no pinta nada, y se borró de ahí. La URL pública del cron responde **404**.
+- **Por qué no está encendido**: el cron hace **más de 50 subpeticiones** por ejecución (fuentes, respaldo en Google, Apify, vigencia de 20 enlaces, revisión y activación) y el plan gratuito de Workers corta en 50, así que la recogida se quedaría a medias declarando `truncated`. El disparador `0 6 * * *` está escrito pero comentado en el `wrangler.toml` local hasta que el plan de pago esté activo.
+- **Al encenderlo, en el mismo movimiento**: quitar `crons` de [vercel.json](../vercel.json) —si no, los dos relojes corren a la vez y se duplica la recogida— y subir `SUBREQUEST_LIMIT`/`MAX_SUBREQUESTS` del motor a 1000 para que quepa el barrido completo en una pasada.
+- **Bloqueo actual**: activar el plan de pago requiere método de pago en el dashboard; eso no lo puede hacer un agente.
+
 ## La web ya vive en la cuenta propia: dominio cortado y verificado (sesión 150) — 2026-11-12
 
 - **Corte hecho por el operador, verificado por mí desde fuera**: `app.womendigitalclosers.com` resuelve a IPs de Cloudflare **sin CNAME** y responde con `server: cloudflare` y sin `x-vercel-id`: ya no lo sirve Vercel. El certificado está emitido (las rutas cargan por https/2).
