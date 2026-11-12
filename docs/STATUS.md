@@ -1,5 +1,14 @@
 # Estado
 
+## Techo de subpeticiones a 1.000: barrido completo activado (sesión 158) — 2026-11-12
+
+- **Petición del operador**: activar el techo de pago del motor, ya que Workers Paid está pagado.
+- **Cambio**: `SUBREQUEST_LIMIT = "1000"` y `MAX_SUBREQUESTS = "1000"` en `sites/engine/wrangler.toml` (fichero local, gitignored) y despliegue del motor. `/api/status` ya publica `subrequests.ceiling: 1000` y `budget: 966`.
+- **Prueba real (no deducida)**: pasada forzada → **22 de 22 fuentes**, **439 filas** en 81 s, **0 aplazadas** y **ningún «Too many subrequests»**. Eso confirma que el plan de pago está activo en la cuenta; con el techo gratuito la misma pasada cortaba a las 8 fuentes.
+- **Registro de escrituras sembrado** con `POST /v1/admin/write-ledger/seed` (30/30, el propio libro del motor: es el único escritor de esta D1) porque el día empezó a media jornada y la recogida estaba bloqueada por `day_unseeded`. Queda `day_trusted: true` y **667 de 72.250** filas escritas hoy.
+- **Hallazgo**: FreeHire lleva devolviendo **HTTP 429 al Worker desde el 2026-11-11 01:08** (sus cuatro fuentes, antes la mayor aportación: 1.619 + 1.020 filas). No es nuestro código: la misma URL exacta responde 200 con 100 filas y 8.668 de total desde otra IP, con `x-ratelimit-limit: 120`. Es un bloqueo al tráfico de salida del Worker. Se añadió una **puerta de ritmo global** al dominio (1,2 s entre peticiones, sin importar qué fuente las pida) para que, cuando se levante el bloqueo, no vuelva la ráfaga de cuatro fuentes seguidas; **no se pudo verificar contra el objetivo** porque el 429 sigue activo.
+- **Consecuencia de hoy**: 249 filas crudas (200 de la pasada de las 08:04 + 49 nuevas de las pasadas manuales); lo traído son en su mayoría hashes ya conocidos, que no reescriben evidencia.
+
 ## Skills de Vercel y Supabase, y fuera la última dependencia legacy (sesión 157) — 2026-11-12
 
 - **Petición del operador**: buscar e instalar las skills de Vercel y Supabase y volver a intentar lo pendiente.

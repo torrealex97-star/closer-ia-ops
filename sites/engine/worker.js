@@ -45,6 +45,17 @@ const FREEHIRE_RETRIES = 2;
 const FREEHIRE_SPACING_MS = 2000;
 const FREEHIRE_RETRY_WAIT_MAX_MS = 5000;
 const FREEHIRE_TIME_BUDGET_MS = 15000;
+// Ritmo GLOBAL del dominio: las cuatro fuentes de FreeHire corren seguidas en la misma pasada y cada
+// una pedía su ráfaga (3 páginas la de categoría). Con el barrido completo de 22 fuentes (2026-11-12)
+// las cuatro acabaron en 429: el espaciado por búsqueda no cubría el salto entre fuentes ni entre
+// páginas. Esta puerta pone aire a TODO lo que va a freehire.me, sin importar qué fuente lo pida.
+const FREEHIRE_GLOBAL_SPACING_MS = 1200;
+let freehireGatedAt = 0;
+async function freehireGate() {
+  const now = Date.now();
+  if (now < freehireGatedAt) await sleep(freehireGatedAt - now);
+  freehireGatedAt = Date.now() + FREEHIRE_GLOBAL_SPACING_MS;
+}
 
 function fetchCost(source) {
   if (source.kind === 'jobtoday-cities') return (source.paths || []).length;
@@ -500,6 +511,7 @@ async function sourceFreehire(source) {
         const offset = page * 100;
         // Dos reintentos con espera declarada: `Retry-After` si la fuente lo manda (acotado) y, si no,
         // 2 s, 4 s. Se pagan del tope de ESTA fuente, así que no se comen el de las demás.
+        await freehireGate();
         const data = JSON.parse(await fetchText(`https://freehire.me/api/v1/jobs/search?${params}&offset=${offset}`, 15000, {
           retry: FREEHIRE_RETRIES, backoffMs: FREEHIRE_SPACING_MS,
           retryAfterMaxMs: FREEHIRE_RETRY_WAIT_MAX_MS, budget: requests,
