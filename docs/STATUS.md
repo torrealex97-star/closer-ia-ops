@@ -1,5 +1,12 @@
 # Estado
 
+## La web solo existe en su dominio (sesión 155) — 2026-11-12
+
+- **Petición del operador**: apagar la URL pública de producción en `workers.dev` y comprobar después que el dominio sigue sirviendo.
+- **Hecho**: `workers_dev: false` en [wrangler.jsonc](../apps/web/wrangler.jsonc), con `preview_urls` intacto. El despliegue lo confirma con **«No targets deployed for closer-web»**.
+- **Verificado**: `https://closer-web.women-digital-closers.workers.dev/` → **404, error 1042** (Cloudflare: no hay Worker en esa ruta). El primer intento devolvió 200: era propagación/caché, no el ajuste sin aplicar.
+- **El dominio sigue igual, comprobado después del cambio**: `/`, `/admin`, `/privacidad` y `/terminos` → **200**; búsqueda de alumna → **200 con 43 ofertas**; panel sin sesión → **401**; `/api/admin/session` → `configured: true`. Cabeceras: `server: cloudflare`, sin rastro de Vercel. `closer-cron` sigue devolviendo 404 en su URL pública, como se diseñó.
+
 ## Login del panel comprobado en vivo, hasta el final (sesión 154) — 2026-11-12
 
 - **Petición del operador**: verificar el login completo en `app.womendigitalclosers.com` (entrar, sesión, salir) diciendo qué falla en cada paso.

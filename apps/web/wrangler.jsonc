@@ -7,6 +7,11 @@
     "nodejs_compat",
     "nodejs_compat_populate_process_env"
   ],
+  // La web solo existe en su dominio. `workers.dev` queda apagado para producción; las vistas previas
+  // siguen disponibles. El cron llama por `app.womendigitalclosers.com` y el motor por binding, así que
+  // nada depende de esta URL.
+  "workers_dev": false,
+  "preview_urls": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
