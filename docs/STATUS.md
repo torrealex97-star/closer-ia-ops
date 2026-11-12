@@ -1,5 +1,14 @@
 # Estado
 
+## Rotación de la clave de Supabase y motor viejo apagado (sesión 153) — 2026-11-12
+
+- **Petición del operador**: rotar la `service_role`, actualizar el secreto del Worker y despublicar el motor viejo de Sites, dejando en STATUS qué se rompió y qué se recuperó.
+- **Lo que se rompió, tal cual**: (1) borrar la clave legacy por API **no se puede** — no tiene UUID y la API responde `id: Invalid UUID`, así que **la clave filtrada sigue siendo válida** hasta que se rue el secreto JWT, y eso solo se hace desde el dashboard; (2) mi primer intento de añadir `SUPABASE_PUBLISHABLE_KEY` falló en silencio porque `wrangler.jsonc` lleva comentarios y `JSON.parse` los rechaza: el despliegue salió sin la variable y no me enteré hasta ver el error de Node. Las dos cosas quedan dichas aquí en vez de disimuladas.
+- **Lo que se recuperó / quedó bien**: clave secreta nueva `worker_cf_2026_11` (`sb_secret_…`) creada en Supabase y puesta en el Worker como `SUPABASE_SECRET_KEY` y `SUPABASE_SERVICE_ROLE_KEY`; **comprobada contra Supabase (200)** y con una **ejecución real del cron**: Google Jobs 27 recibidas / 25 aceptadas, motor 1 pasada, `truncated: []`.
+- **La trampa que se evitó**: `secrets.ts` usa la `service_role` como raíz de cifrado de las claves de proveedores. Rotarla a pelo habría dejado ilegibles `apify`, `serpapi` y `groq`. Por eso **primero** se fijó `ADMIN_SECRETS_KEY` con el valor actual (misma raíz, mismo descifrado) y solo después se cambió la clave: el cron lo confirma al seguir usando SerpApi.
+- **Motor viejo de Sites**: `closer-ia-ops-engine` **despublicado** en producción y preview (recibos `succeeded`, `published: false`); sus URLs `.freebuff.page` responden **404**. Los datos siguen en su D1: republicar es la vuelta atrás.
+- **Lo que queda en manos del operador**: en Supabase → Project Settings → API → JWT Settings → **roll del secreto JWT**. Eso invalida de una vez la `service_role` filtrada y la clave `anon` legacy. No rompe nada de lo que corre: la app usa clave publicable y secreta, y la raíz de cifrado está fijada. Efecto secundario esperado: las sesiones abiertas en el panel caducan y hay que volver a entrar. Ojo con el rollback a Vercel: allí la `service_role` legacy dejaría de valer.
+
 ## El cron ya corre en Cloudflare y Vercel se queda sin reloj (sesión 152) — 2026-11-12
 
 - **Petición del operador**: mover los crons de Vercel a Workers, encender el del Worker y apagar el de Vercel en el mismo movimiento, y comprobar que `/api/cron/collect` responde con el `CRON_SECRET` nuevo.

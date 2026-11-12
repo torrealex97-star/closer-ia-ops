@@ -24,6 +24,7 @@
   },
   "vars": {
     "SUPABASE_URL": "https://jzchuizybyubtkownhlw.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_C14EqkImxzVs0qOxBY_gEQ_Sdi78dhR",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6Y2h1aXp5Ynl1YnRrb3duaGx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNTUwOTUsImV4cCI6MjEwNzczMTA5NX0.1BzwpmvTxzS8K_8MzH1oYKbgHuaxQbp1P-kb5yoDZAE",
     "NEXT_PUBLIC_SUPABASE_URL": "https://jzchuizybyubtkownhlw.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6Y2h1aXp5Ynl1YnRrb3duaGx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNTUwOTUsImV4cCI6MjEwNzczMTA5NX0.1BzwpmvTxzS8K_8MzH1oYKbgHuaxQbp1P-kb5yoDZAE",
