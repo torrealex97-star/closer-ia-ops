@@ -1,5 +1,15 @@
 # Estado
 
+## Ubicación legible, modalidad declarada y categorías de rol (sesión 159) — 2026-11-12
+
+- **Petición del operador**: entender por qué 22 fuentes y no las ~70 del catálogo; que las retiradas no ocupen espacio; categorías correctas para comerciales y teleoperadores; reconocer ciudades de España, EE. UU. y LATAM como su país; decir claramente si es presencial; y aprovechar mejor las 3.087 no cualificadas.
+- **Ubicación**: `locationLabel` + `countryOfLocation` en el motor. Antes la ficha heredaba el dato crudo (`es`, `["United States"]`, `Salamanca, Madrid, Comunidad de Madrid, España`); ahora se lee `Ciudad, País`, el país solo si la fuente únicamente da el código ISO, y el texto original si no se reconoce (nunca se inventa). Los barrios de Google no se confunden con ciudades: `Salamanca, Madrid, Comunidad de Madrid` se muestra como `Madrid, España`.
+- **Modalidad**: antes, todo anuncio sin «remoto» ni «híbrido» se publicaba como «Presencial u híbrido» — una suposición. Ahora se declara `Presencial`, `Remoto`, `Híbrido` cuando el anuncio lo dice, y `Modalidad no indicada` cuando no. **Verificado** en el dominio: de las 43 ofertas servidas, 4 presenciales, 1 remota y 38 sin indicar; ninguna inventada.
+- **Categorías de rol**: `teleoperador*` sale de setter y pasa a `cold_caller` (llama para vender, no agenda citas); `comercial` a secas, `comercial telefónico` y `comercial presencial` entran como `account_executive`. **Medido** sobre 600 títulos retirados por «sin perfil comercial reconocible»: **120 (20 %) recuperan familia** (100 ejecutivo comercial, 20 teleoperador); extrapolado a las 1.540 retiradas por ese motivo, ~308 aprovechables.
+- **Retiradas**: 3.087 con motivo guardado (1.540 sin perfil, 1.262 no español, 284 +10 días, 1 verificación). No se borran: siguen fuera de la vista de la alumna y son la evidencia para re-clasificar. **No se re-evalúan solas** — recuperar esas ~308 exige una pasada de re-clasificación de retiradas, que queda pendiente.
+- **Catálogo de fuentes**: el panel lista **66** entradas (`apps/web/lib/sourceCatalog.json`), de las que el motor corre **22 conectores**; el resto son rutas que exigen clave (Adzuna, Jooble, InfoJobs) o actor de pago (Apify), no conectores gratuitos.
+- **Tests**: `tests/engine/location.mjs` (24 casos) y `tests/engine/roles.mjs` (10 casos), añadidos a `run.sh`; regresión de `latam`, `terms`, `subrequests`, `writebudget`, `writeshape`, `activationquota`, `quota-config`, `export` y `provenance` en verde. Sin cambios de UX en las tarjetas: el análisis comparado queda abierto.
+
 ## Techo de subpeticiones a 1.000: barrido completo activado (sesión 158) — 2026-11-12
 
 - **Petición del operador**: activar el techo de pago del motor, ya que Workers Paid está pagado.

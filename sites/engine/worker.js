@@ -701,7 +701,7 @@ async function sourceJobspresso(source) {
 // Superficie de pruebas (Node importa este módulo y comprueba vocabulario, rotación y extractores
 // sin red ni D1). Los Workers ignoran exportaciones extra; `sites/engine/deploy-manifest.json`
 // solo declara el módulo y el entrypoint.
-export const __test = { parseRetryAfter, noteOf, resetSourceNotes, CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain, marketHinted };
+export const __test = { parseRetryAfter, noteOf, resetSourceNotes, CLOSER_TERMS, pickTerms, fetchCost, planRun, subrequestLimits, PLATFORM_SUBREQUEST_LIMIT, MAX_SUBREQUEST_CEILING, D1_RESERVED_SUBREQUESTS, sourceFreehire, sourceHimalayas, sourceFreelancer, sourceJobgether, sourceRemotive, sourceJobicy, sourceWorkingNomads, sourceJobspresso, SOURCES, isProfileCandidate, familyOf, PROFILE_FAMILIES, filteredOf, resetExtractFiltered, classifyRole, hasWord, spanishBodyGate, descriptionOf, writeAllowance, rowsWritten, isoCountryName, hintInText, get MARKET_HINTS() { return MARKET_HINTS; }, activationBudget, checkTarget, explicitSpain, marketHinted, locationLabel, countryOfLocation, modalityOf };
 
 const EXTRACTORS = {
   jobtoday: sourceJobToday, 'jobtoday-cities': sourceJobTodayCities, greenhouse: sourceGreenhouse, ashby: sourceAshby,
@@ -1188,6 +1188,129 @@ const ISO_COUNTRIES = { MX: 'México', CO: 'Colombia', AR: 'Argentina', CL: 'Chi
   NI: 'Nicaragua', PA: 'Panamá', CR: 'Costa Rica', DO: 'República Dominicana', PR: 'Puerto Rico', CU: 'Cuba',
   ES: 'España', US: 'Estados Unidos', BR: 'Brasil', PT: 'Portugal' };
 function isoCountryName(code) { return ISO_COUNTRIES[String(code ?? '').trim().toUpperCase()] ?? String(code ?? '').trim(); }
+// ── Ubicación legible y mercado ────────────────────────────────────────────────
+// Las fuentes entregan la ubicación de cuatro maneras distintas: código ISO suelto ('es', 'es, us'),
+// cadena de Google con barrio y comunidad ('Salamanca, Madrid, Comunidad de Madrid, España'), array
+// serializado ('["United States"]') y texto libre ('Remote'). La alumna tiene que leer un LUGAR:
+// «Ubicación por confirmar» o «es» no le dicen nada, y «Madrid, Comunidad de Madrid, España» le hace
+// leer tres veces la misma ciudad.
+const COUNTRY_ALIASES = { 'united states': 'Estados Unidos', 'united states of america': 'Estados Unidos',
+  usa: 'Estados Unidos', 'u.s.a.': 'Estados Unidos', 'u.s.': 'Estados Unidos', spain: 'España',
+  mexico: 'México', 'mexico city': 'México', peru: 'Perú', panama: 'Panamá', brazil: 'Brasil',
+  'dominican republic': 'República Dominicana', portugal: 'Portugal', colombia: 'Colombia',
+  argentina: 'Argentina', chile: 'Chile', ecuador: 'Ecuador', uruguay: 'Uruguay', venezuela: 'Venezuela',
+  bolivia: 'Bolivia', paraguay: 'Paraguay', guatemala: 'Guatemala', honduras: 'Honduras',
+  'el salvador': 'El Salvador', nicaragua: 'Nicaragua', 'costa rica': 'Costa Rica', cuba: 'Cuba',
+  'puerto rico': 'Puerto Rico', brasil: 'Brasil' };
+// Ciudades que identifican un país por sí solas. Solo para MOSTRAR el país en la ficha: la
+// clasificación de mercado sigue exigiendo país explícito cuando la ciudad es ambigua (Córdoba
+// está en España y en Argentina; Guadalajara en España y en México).
+const CITY_COUNTRY = { madrid: 'España', barcelona: 'España', valencia: 'España', sevilla: 'España',
+  malaga: 'España', bilbao: 'España', zaragoza: 'España', murcia: 'España', alicante: 'España',
+  granada: 'España', valladolid: 'España', vigo: 'España', gijon: 'España', 'a coruna': 'España',
+  tenerife: 'España', mallorca: 'España', 'las palmas': 'España',
+  'new york': 'Estados Unidos', 'nueva york': 'Estados Unidos', 'san francisco': 'Estados Unidos',
+  'los angeles': 'Estados Unidos', miami: 'Estados Unidos', chicago: 'Estados Unidos',
+  austin: 'Estados Unidos', boston: 'Estados Unidos', seattle: 'Estados Unidos', denver: 'Estados Unidos',
+  atlanta: 'Estados Unidos', dallas: 'Estados Unidos', houston: 'Estados Unidos',
+  philadelphia: 'Estados Unidos', phoenix: 'Estados Unidos', 'san diego': 'Estados Unidos',
+  bogota: 'Colombia', medellin: 'Colombia', cali: 'Colombia', barranquilla: 'Colombia',
+  cdmx: 'México', 'ciudad de mexico': 'México', guadalajara: 'México', monterrey: 'México',
+  puebla: 'México', queretaro: 'México', tijuana: 'México', cancun: 'México',
+  'buenos aires': 'Argentina', rosario: 'Argentina', mendoza: 'Argentina',
+  'santiago de chile': 'Chile', 'vina del mar': 'Chile', lima: 'Perú', quito: 'Ecuador',
+  guayaquil: 'Ecuador', montevideo: 'Uruguay', caracas: 'Venezuela',
+  'santo domingo': 'República Dominicana', 'san jose': 'Costa Rica', 'ciudad de panama': 'Panamá',
+  'san salvador': 'El Salvador', tegucigalpa: 'Honduras', managua: 'Nicaragua', asuncion: 'Paraguay',
+  'la paz': 'Bolivia', 'la habana': 'Cuba', 'sao paulo': 'Brasil', 'rio de janeiro': 'Brasil',
+  brasilia: 'Brasil', lisboa: 'Portugal', porto: 'Portugal' };
+const LATAM_COUNTRIES = new Set(['México', 'Colombia', 'Argentina', 'Chile', 'Perú', 'Ecuador', 'Uruguay',
+  'Venezuela', 'Bolivia', 'Paraguay', 'Guatemala', 'Honduras', 'El Salvador', 'Nicaragua', 'Panamá',
+  'Costa Rica', 'República Dominicana', 'Puerto Rico', 'Cuba', 'Brasil']);
+const REMOTE_LOCATION = /^(remote|remoto|remota|teletrabajo|en remoto|anywhere|worldwide|fully remote|remoto o hibrido)\b/;
+const REMOTE_WORDS = /\b(?:remote|remot[oa]s?|teletrabajo|home[ -]?office|work from home|en remoto|100[ %]*remoto)\b/;
+const HYBRID_WORDS = /\b(?:hybrid|hibrid[oa]s?|semi[ -]?presencial|mixt[oa])\b/;
+const ONSITE_WORDS = /\b(?:presencial(?:es)?|on[ -]?site|in[ -]?office|en oficina|acude a la oficina)\b/;
+
+// Texto de ubicación sin corchetes ni comillas de un array serializado, y sin espacios de más.
+function locationText(value) {
+  let text = asText(value);
+  if (!text) return null;
+  if (/^\s*[[{]/.test(text)) {
+    try { const again = asText(JSON.parse(text)); if (again) text = again; }
+    catch { text = text.replace(/[[\]{}"]/g, ' '); }
+  }
+  return text.replace(/\s+/g, ' ').replace(/^[\s,;|]+|[\s,;|]+$/g, '').trim() || null;
+}
+// País SOLO si la ubicación lo dice (código ISO, nombre o alias). `conCiudades` añade el mapa de
+// ciudades, que sirve para mostrar pero no para clasificar cuando la ciudad es ambigua.
+function countryOfLocation(value, { conCiudades = true } = {}) {
+  const text = locationText(value);
+  if (!text) return null;
+  const folded = fold(text);
+  const segments = folded.split(/[,;|/]/).map(s => s.trim()).filter(Boolean);
+  for (const seg of segments) {
+    if (/^[a-z]{2}$/.test(seg) && ISO_COUNTRIES[seg.toUpperCase()]) return ISO_COUNTRIES[seg.toUpperCase()];
+  }
+  // Nombres de país por TRAMO y en el orden en que vienen: '["Colombia","Mexico"]' es Colombia,
+  // no el primero que encuentre el diccionario.
+  for (const seg of segments) {
+    if (seg === 'espana' || seg === 'spain') return 'España';
+    if (COUNTRY_ALIASES[seg]) return COUNTRY_ALIASES[seg];
+    const byName = Object.values(ISO_COUNTRIES).find(n => fold(n) === seg);
+    if (byName) return byName;
+  }
+  // Sin tramos (texto corrido): se busca la mención del país en cualquier posición.
+  for (const [code, name] of Object.entries(ISO_COUNTRIES)) {
+    if (code === 'ES' ? hintInText(folded, 'espana') || hintInText(folded, 'spain') : hintInText(folded, fold(name))) return name;
+  }
+  for (const [alias, name] of Object.entries(COUNTRY_ALIASES)) if (hintInText(folded, alias)) return name;
+  if (conCiudades) {
+    for (const [city, country] of Object.entries(CITY_COUNTRY)) if (hintInText(folded, city)) return country;
+    if (placeInSpain(text)) return 'España';
+  }
+  return null;
+}
+// Lo que se enseña en la ficha: «Ciudad, País» cuando se puede, el país cuando la fuente solo da
+// código ISO, y el texto original cuando no se reconoce nada (nunca se inventa un país).
+function locationLabel(value) {
+  const text = locationText(value);
+  if (!text) return 'Ubicación por confirmar';
+  const folded = fold(text);
+  if (REMOTE_LOCATION.test(folded)) return 'Remoto';
+  const country = countryOfLocation(text);
+  const segments = text.split(/[,;|]/).map(s => s.trim()).filter(Boolean);
+  const regionAt = f => /^(comunidad|provincia|region|state|county|area|zona|distrito)\b/.test(f);
+  // Google entrega «barrio, ciudad, comunidad, país»: si el tercer tramo es una comunidad o provincia,
+  // la ciudad es el SEGUNDO (Salamanca y Retiro son barrios de Madrid, no ciudades).
+  if (segments.length >= 3 && regionAt(fold(segments[2]))) {
+    const city = segments[1];
+    return country && fold(city) !== fold(country) ? `${city}, ${country}` : (country ?? text);
+  }
+  const city = segments.find(seg => {
+    const f = fold(seg);
+    if (!f || f.length < 2) return false;
+    if (/^[a-z]{2}$/.test(f)) return false;
+    // Un tramo que es el país (en español o en inglés) nunca es la ciudad.
+    if (Object.keys(COUNTRY_ALIASES).includes(f) || Object.values(ISO_COUNTRIES).some(n => fold(n) === f)) return false;
+    if (country && (f === fold(country) || fold(country).includes(f))) return false;
+    if (/^(comunidad|provincia|region|state|county|area|zona|distrito)\b/.test(f)) return false;
+    return true;
+  });
+  if (city && country) return `${city}, ${country}`;
+  if (country) return country;
+  return text;
+}
+// Modalidad declarada. Antes, cualquier anuncio sin «remoto» ni «híbrido» se publicaba como
+// «Presencial u híbrido»: una suposición, y encima de dos cosas incompatibles para la alumna.
+// Ahora se dice lo que el anuncio dice, y si no lo dice se declara así.
+function modalityOf(text, location) {
+  const hay = fold(`${text ?? ''} ${locationText(location) ?? ''}`);
+  if (HYBRID_WORDS.test(hay)) return 'Híbrido';
+  if (REMOTE_WORDS.test(hay) || REMOTE_LOCATION.test(fold(locationText(location) ?? ''))) return 'Remoto';
+  if (ONSITE_WORDS.test(hay)) return 'Presencial';
+  return 'Modalidad no indicada';
+}
 async function checkTarget(url, title, company) {
   let status = null, body = null;
   try {
@@ -2016,11 +2139,17 @@ const ROLE_KEYWORDS = {
     'concertador comercial', 'captador de citas', 'captador de leads',
     'cualificador de leads', 'calificador de leads', 'lead qualifier',
     'lead qualification specialist', 'sales appointment setter',
-    'business appointment setter', 'teleconcertador', 'teleoperador comercial',
+    'business appointment setter', 'teleconcertador',
     'lead generation specialist', 'lead generation',
     'especialista en generacion de leads', 'especialista en prospeccion',
   ],
   cold_caller: [
+    // «Teleoperador» es su propia familia, no un setter: llama para vender, no para agendar citas.
+    // Estaba solo como 'teleoperador comercial' dentro de setter, donde la mitad del vocabulario
+    // del puesto no caía (64 anuncios con «teleoperador» quedaron sin perfil).
+    'teleoperador', 'teleoperadora', 'teleoperador/a', 'teleoperadora/o',
+    'teleoperador comercial', 'teleoperadora comercial', 'teleoperador/a comercial',
+    'televenta', 'televentas', 'operador telefonico', 'operadora telefonica',
     'cold caller', 'cold calling', 'llamadas en frio',
     'prospector telefonico', 'prospectora telefonica', 'prospeccion telefonica',
   ],
@@ -2052,6 +2181,10 @@ const ROLE_KEYWORDS = {
     'asesores inmobiliarios', 'agente inmobiliario', 'agentes inmobiliarios',
     'agente inmobiliario/a', 'vendedor', 'vendedora', 'vendedor/a',
     'asesor de programas', 'asesor de cursos', 'asesor de masters',
+    // «Comercial» a secas es el título más repetido del mercado español («Comercial Junior»,
+    // «Comercial telefónico») y no estaba: 633 anuncios retirados por «sin perfil comercial»
+    // lo mencionan. Va en el ejecutivo comercial, que es la familia genérica de venta.
+    'comercial', 'comercial telefonico', 'comercial telefonica', 'comercial presencial',
     'comercial digital', 'comercial online', 'inside sales',
     'inside sales representative', 'inside sales specialist',
     'inbound sales representative', 'outbound sales representative',
@@ -11222,8 +11355,7 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
       if (evidenceLine) pay = evidenceLine;
     }
     const workText = fold(`${p.title ?? ''} ${p.location ?? ''} ${description.slice(0, 4000)}`);
-    const modality = /\b(hybrid|hibrid[oa]|semi[ -]?presencial)\b/.test(workText) ? 'Híbrido'
-      : /\b(remote|remot[oa]|teletrabajo|home office|work from home)\b/.test(workText) ? 'Remoto' : 'Presencial u híbrido';
+    const modality = modalityOf(workText, p.location);
     const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
     if (ages !== null && Number.isFinite(ages) && ages > days) continue;
     items.push({
@@ -11235,7 +11367,7 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
       compensation: pay,
       compensation_note: note,
       modality,
-      location: asText(p.location) ?? 'Ubicación por confirmar',
+      location: locationLabel(p.location),
       language: langES ? 'Anuncio en español' : 'Anuncio original en inglés',
       experience: /\bexperiencia\b/.test(fold(description)) ? excerpt(description, /\bexperiencia\b/, 'Experiencia no especificada') : 'Experiencia no especificada',
       schedule: excerpt(description, /\b(?:jornada|horario|disponibilidad|\d+\s*horas?\s*(?:semanal|a la semana))\b/, 'Horario no especificado'),

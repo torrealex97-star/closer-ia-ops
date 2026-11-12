@@ -75,6 +75,8 @@ node --experimental-strip-types tests/engine/subrequests.mjs
 # Forma de escritura del catálogo (índices incluidos): coste medido por candidato, índices de lectura intactos y migración reanudable.
 node --experimental-strip-types tests/engine/writeshape.mjs
 node --experimental-strip-types tests/engine/latam.mjs
+node --experimental-strip-types tests/engine/location.mjs
+node --experimental-strip-types tests/engine/roles.mjs
 node --experimental-strip-types tests/engine/activationquota.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offerrisk.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/offertags.mjs
