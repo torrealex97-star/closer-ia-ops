@@ -8,6 +8,8 @@ __pycache__/
 *.tsbuildinfo
 .env*
 !.env.example
+.open-next/
+.wrangler/
 .local/
 test-results/
 playwright-report/

@@ -1,5 +1,14 @@
 # Estado
 
+## Reapuntado hecho y la web compila y renderiza en workerd (sesión 148) — 2026-11-12
+
+- **Petición del operador**: hacer todo lo que pudiera hacer yo antes de pasarle su lista de pasos pendientes.
+- **Reapuntado cerrado por mí, no por él**: `CAREER_ENGINE_URL` y `CAREER_ADMIN_TOKEN` de producción cambiados con el CLI de Vercel, redeploy de producción a los 57 s (READY) y secretos `ENGINE_URL`/`COLLECT_TOKEN` de GitHub Actions puestos (las dos vías que antes estaban bloqueadas por permisos de la integración).
+- **Verificado (verified), no supuesto**: con `wrangler tail closer-engine` escuchando, `POST https://app.womendigitalclosers.com/api/backend/opportunities/search` devolvió **200** y el Worker nuevo registró `POST https://closer-engine.women-digital-closers.workers.dev/v1/opportunities/search` desde la IP de salida de Vercel (AWS Ashburn). La web de producción habla con el motor nuevo.
+- **Web en Workers, primera prueba real** ([open-next.config.ts](../apps/web/open-next.config.ts), [wrangler.jsonc](../apps/web/wrangler.jsonc)): `@opennextjs/cloudflare` genera el bundle (`Worker saved in .open-next/worker.js`) y en workerd responden **200 con contenido real** `/`, `/admin`, `/privacidad` y `/terminos`.
+- **Un obstáculo real, resuelto**: con Next **16.4.3** el adapter 1.20.10 compila pero el Worker devuelve 500 (`Unexpected loadManifest(/.next/server/preview-props.json) call!`). El adapter 1.20.16 exige `next >=16.4.5`, así que se subió el parche a **16.4.5**: `tsc` limpio, `next build` OK, guardián **17/17** y las cuatro rutas renderizando en workerd. Queda dicho: es un salto de parche de framework, no cosmético.
+- **Lo que aún no está**: los secretos de servidor de Supabase (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`), `ADMIN_UI_PASSWORD` y `CRON_SECRET` están como *Secret* en Vercel y **no se pueden leer** — sin ellos el Worker arranca pero no autentica ni lee datos. Tampoco están migrados los crons ni el dominio: `app.womendigitalclosers.com` sigue apuntando a Vercel.
+
 ## El guardián SSRF ya no depende de Node: allowlist medida y pruebas (sesión 147) — 2026-11-12
 
 - **Petición del operador**: empezar el incremento de mover la web a Cloudflare por el punto de riesgo; reescribir `apps/web/lib/urlGuard.ts` sin `node:http`, `node:https`, `node:dns/promises` ni `node:net`, con allowlist de host, redirecciones manuales y bloqueo de IP literales, y añadir pruebas antes de tocar el despliegue.

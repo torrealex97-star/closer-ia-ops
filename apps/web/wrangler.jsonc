@@ -1,0 +1,13 @@
+{
+  // Web de Career Platform en Cloudflare Workers (OpenNext). Es independiente del motor
+  // (`sites/engine`), que tiene su propio wrangler.toml y su propia D1.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "closer-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-12",
+  // `nodejs_compat` da crypto/Buffer/timingSafeEqual, que la web sí usa; urlGuard ya no depende de
+  // node:http, node:https, node:dns ni node:net (sesión 147).
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true }
+}
