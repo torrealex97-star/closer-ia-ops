@@ -1,5 +1,14 @@
 # Estado
 
+## Re-clasificación de retiradas e insignias en la tarjeta (sesión 160) — 2026-11-12
+
+- **Ruta nueva**: `POST /v1/admin/opportunities/reclassify` (solo `X-Admin-Token`, **`dry_run` por defecto**). Vuelve a mirar las retiradas por «sin perfil comercial reconocible» con el vocabulario nuevo y las devuelve a `needs_review`; **no publica nada** y no toca la evidencia cruda, solo el estado editorial con su motivo.
+- **Medido (verified)**: en seco escaneó **402** (las que aún tienen entrada de catálogo vigente y no están cerradas), recuperó **85** (84 ejecutivo comercial, 1 cold caller) y descartó 114 «sigue sin perfil», 107 «sin señal de mercado España», 70 «más de 10 días» y 26 «no está en español». En real escribió **85**: `needs_review` 256 → **341**, `withdrawn` 3.087 → **3.002**.
+- **Por qué 402 y no 1.540**: el resto ya no tiene entrada de catálogo vigente; resucitar anuncios caducados sería servir ofertas muertas.
+- **Tarjeta de la alumna**: insignias de **modalidad** (Remoto / Presencial / Híbrido / «Sin indicar»), **ubicación** normalizada y **frescura** («Publicada hoy», «ayer», «Hace N días», o la fecha exacta a partir de 7 días) en la tarjeta y en el bloque ampliado. Sin colores nuevos: `--sage-soft`/`--warning-soft`/`--inset` y siempre con texto, nunca solo color. `npm run design` OK y `tsc` limpio.
+- **Verificado en producción**: `/alumna` 200; el CSS (`067eorq941ea7.css`) y el chunk del componente (`2yr4pt68dcl70.js`) servidos por el Worker contienen las reglas y las insignias; la búsqueda sigue devolviendo ofertas (39 en el momento de la comprobación).
+- **Limitación**: las 84 recuperadas son `account_executive`, que la vista de alumna **oculta por defecto**; para que lleguen a la alumna hay que revisarlas en el panel y decidir si se publican o si se sirven con `include_extra_roles`. Tampoco se hizo revisión visual en navegador.
+
 ## Ubicación legible, modalidad declarada y categorías de rol (sesión 159) — 2026-11-12
 
 - **Petición del operador**: entender por qué 22 fuentes y no las ~70 del catálogo; que las retiradas no ocupen espacio; categorías correctas para comerciales y teleoperadores; reconocer ciudades de España, EE. UU. y LATAM como su país; decir claramente si es presencial; y aprovechar mejor las 3.087 no cualificadas.

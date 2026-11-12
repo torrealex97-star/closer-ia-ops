@@ -548,3 +548,11 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .engine-alert button{border:1px solid var(--line);background:var(--sheet);color:var(--ink);min-height:36px;font-size:11px}
 .engine-alert button:hover:not(:disabled){background:var(--inset)}
 .engine-alert-unknown{margin-bottom:20px}
+/* Insignias de modalidad y frescura de la tarjeta de alumna (2026-11-12): lo que un portal
+   enseña de un vistazo. El color nunca es la única señal: cada insignia lleva su palabra. */
+.opp-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+.opp-badge{font-size:9px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;border-radius:4px;padding:3px 7px;background:var(--inset);color:var(--secondary)}
+.opp-badge.is-remote{background:var(--sage-soft);color:var(--sage)}
+.opp-badge.is-onsite{background:var(--warning-soft);color:var(--warning)}
+.opp-freshness{font-size:10px;color:var(--secondary);margin-left:auto;white-space:nowrap}
+

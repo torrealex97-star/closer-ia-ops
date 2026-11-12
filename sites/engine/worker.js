@@ -1509,6 +1509,72 @@ const SCAN_LIMIT = 400;
 // Los gates no escriben, así que el barrido puede seguir siendo 400.
 const WRITE_BUDGET = 25;
 const WRITE_BUDGET_PAID_MAX = 150;
+// Re-clasificación de retiradas (2026-11-12). El vocabulario de rol creció —«comercial» a secas
+// y «teleoperador» fuera de setter— y las 1.540 retiradas por «sin perfil comercial reconocible»
+// se evaluaron con el vocabulario viejo. Esta ruta las vuelve a mirar SIN tocar la evidencia: solo
+// cambia el estado editorial y escribe el motivo. A diferencia de la activación NO publica nada:
+// lo recuperado queda en `needs_review`, que es donde el operador decide. `dry_run` por defecto.
+async function handleAdminReclassify(request, env) {
+  const db = env.DB;
+  await ensureSchema(db);
+  let body = {};
+  try { const parsed = await request.json(); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed; }
+  catch { body = {}; }
+  const dryRun = body.dry_run !== false;
+  // Cota de escaneo EXPLÍCITA en la respuesta: un plan parcial que se lee como completo es la
+  // forma más fácil de creer recuperado lo que nunca se miró.
+  const limit = Math.min(Math.max(Number(body.limit) || 500, 1), 2000);
+  const days = 10; // misma ventana de frescura que la superficie de alumna
+  const rows = await db.prepare(`
+    SELECT o.id AS opportunity_id, o.job_id, p.payload AS posting_payload
+      FROM opportunities o
+      JOIN jobs j ON j.org_id=o.org_id AND j.id=o.job_id
+      JOIN job_postings p ON p.org_id=j.org_id AND p.id=j.posting_id
+      JOIN catalog_entries c ON c.org_id=o.org_id AND c.job_id=o.job_id
+     WHERE o.org_id=? AND o.editorial_status='withdrawn'
+       AND o.status_reason LIKE 'clasificación automática: sin perfil%'
+       AND o.opportunity_status <> 'closed' AND c.expires_at > ?
+     ORDER BY c.first_seen_at DESC LIMIT ${limit}`).bind(ORG, now()).all();
+  const out = { dry_run: dryRun, scanned: rows.results.length, limit, recovered: 0, skipped: 0,
+    by_role: {}, reasons: {} };
+  const byRole = new Map();
+  for (const row of rows.results) {
+    const p = JSON.parse(row.posting_payload);
+    const description = descriptionOf(p);
+    const role = classifyRole(p, fold(`${p.title ?? ''} ${p.location ?? ''} ${description}`));
+    const skip = why => { out.skipped += 1; out.reasons[why] = (out.reasons[why] ?? 0) + 1; };
+    if (!role) { skip('sigue sin perfil'); continue; }
+    if (!description.trim()) { skip('sin descripción: no se puede comprobar el idioma'); continue; }
+    if (!spanishBodyGate(description, false).ok) { skip('no está en español'); continue; }
+    const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
+    if (ages !== null && Number.isFinite(ages) && ages > days) { skip(`publicado hace más de ${days} días`); continue; }
+    if (nonSpain(p) || !spainSignal(p)) { skip('sin señal de mercado España'); continue; }
+    out.recovered += 1;
+    out.by_role[role] = (out.by_role[role] ?? 0) + 1;
+    const group = byRole.get(role) ?? [];
+    group.push(row.opportunity_id);
+    byRole.set(role, group);
+  }
+  let edited = 0;
+  if (!dryRun && out.recovered) {
+    // La escritura es del operador, pero la cuota se respeta igual: si el registro no cubre el día
+    // o el mes está cerca del techo, se devuelve el plan en vez de escribir a ciegas.
+    const allowance = await readWriteAllowance(db, writeLimits(env));
+    if (!allowance.ok) return Response.json({ ...out, edited: 0, skipped_write: true, write_allowance: allowance }, { status: 409 });
+    for (const [role, ids] of byRole) {
+      for (let i = 0; i < ids.length; i += 80) {
+        const chunk = ids.slice(i, i + 80);
+        const applied = await db.prepare(`UPDATE opportunities SET editorial_status='needs_review', status_reason=?, updated_at=?
+          WHERE org_id=? AND editorial_status='withdrawn' AND id IN (${chunk.map(() => '?').join(',')})`)
+          .bind(`reclasificada (vocabulario 2026-11-12): perfil ${role}`, now(), ORG, ...chunk).run();
+        edited += Number(applied?.meta?.changes ?? 0);
+      }
+    }
+    await chargeWrites(db, edited);
+  }
+  return Response.json({ ...out, edited });
+}
+
 function activationBudget(env) {
   const { ceiling } = subrequestLimits(env);
   if (ceiling <= PLATFORM_SUBREQUEST_LIMIT) return WRITE_BUDGET;
@@ -11635,6 +11701,7 @@ export default {
       // Port fase 5 (sesión 38): POST /activate = activación en lote del pool elegible
       // (dry_run por defecto). Va ANTES de las rutas por id: 'activate' no es un id.
       if (request.method === 'POST' && adminMatch[1] === 'activate' && !adminMatch[2]) return handleAdminActivate(request, env);
+      if (request.method === 'POST' && adminMatch[1] === 'reclassify' && !adminMatch[2]) return handleAdminReclassify(request, env);
       // Port fase 3 (sesión 32): POST {id}/verify = verificación de vigencia.
       if (request.method === 'POST' && adminMatch[1] && adminMatch[2] === '/verify') return handleAdminVerify(request, env, adminMatch[1]);
       if (request.method === 'PATCH' && adminMatch[1]) return handleAdminReview(request, env, adminMatch[1]);

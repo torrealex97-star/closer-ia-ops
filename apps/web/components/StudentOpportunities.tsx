@@ -50,6 +50,25 @@ function urlFromQuery(query: Query): string {
 }
 
 const date = (value: string | null) => value ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(value)) : 'Fecha no indicada';
+// Frescura relativa: es lo primero que se mira en un portal de empleo. Sin fecha no se inventa
+// («Fecha no indicada»), y a partir de 7 días se dice la fecha exacta para no dar aire de nueva.
+const freshness = (value: string | null) => {
+  if (!value) return 'Fecha no indicada';
+  const days = Math.floor((Date.now() - new Date(value).getTime()) / 86400000);
+  if (!Number.isFinite(days) || days < 0) return 'Fecha no indicada';
+  if (days === 0) return 'Publicada hoy';
+  if (days === 1) return 'Publicada ayer';
+  if (days < 7) return `Hace ${days} días`;
+  return `Publicada el ${date(value)}`;
+};
+// Insignia de modalidad: el motor ya la declara (Presencial/Remoto/Híbrido) y, si el anuncio no lo
+// dice, se muestra «Sin indicar» en vez de suponer. Misma palabra que la verdad del dato.
+const modalityBadge = (modality: string) => {
+  if (modality === 'Remoto') return { text: 'Remoto', tone: 'is-remote' };
+  if (modality === 'Presencial') return { text: 'Presencial', tone: 'is-onsite' };
+  if (modality === 'Híbrido') return { text: 'Híbrido', tone: '' };
+  return { text: 'Sin indicar', tone: '' };
+};
 const rank = (offer: Offer) => offer.is_selected && offer.excellence_rank && offer.excellence_rank <= 3 ? String(offer.excellence_rank) : '';
 // El titular de la tarjeta es el PUESTO que anuncia la empresa, no la familia de rol:
 // 'Teleoperador comercial (H/M/X)' dice qué buscan; 'Setter' solo dice cómo lo clasificamos.
@@ -212,6 +231,7 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
           {busy ? <div className="opportunity-grid" aria-hidden="true"><div className="opportunity-card is-skeleton"><span className="shimmer-line wide" /><span className="shimmer-line" /><span className="shimmer-line" /><span className="shimmer-line short" /></div><div className="opportunity-card is-skeleton is-late"><span className="shimmer-line wide" /><span className="shimmer-line" /><span className="shimmer-line" /><span className="shimmer-line short" /></div></div> : !visible.length ? <div className="empty"><Compass size={32} strokeWidth={1.3} /><h3>{saved ? 'Guarda las que te hagan dar el siguiente paso.' : 'Aún no hay oportunidades con estos criterios.'}</h3><p>{saved ? 'Pulsa el marcador de una oferta para volver a verla aquí.' : 'Puedes elegir otro perfil o mercado. Seguimos buscando nuevas oportunidades en español.'}</p></div> :          <div className="opportunity-grid">{visible.map((offer, index) => <article className="opportunity-card" key={offer.id} style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}>
             <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{initials(offer.company)}</div><div><p>{offer.company}</p><span className="role-chip">{offer.role_label}</span>{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${jobTitle(offer)} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
             <h3 className="opportunity-title">{jobTitle(offer)}</h3>
+            <div className="opp-badges"><span className={`opp-badge ${modalityBadge(offer.modality).tone}`}>{modalityBadge(offer.modality).text}</span>{offer.location && <span className="opp-badge">{offer.location}</span>}<span className="opp-freshness">{freshness(offer.published_at)}</span></div>
             <PayBlock offer={offer} />
             <dl className="opportunity-facts"><div><dt>Modalidad y ubicación</dt><dd><Globe2 size={14} />{offer.modality} · {offer.location}</dd></div><div><dt>Idioma</dt><dd>{offer.language}</dd></div><div><dt>Jornada</dt><dd>{offer.schedule}</dd></div><div><dt>Experiencia</dt><dd>{offer.experience}</dd></div><div><dt>Contrato</dt><dd>{offer.contract}</dd></div></dl>
             <div className="opportunity-footer"><div><small>Publicada: {date(offer.published_at)}</small><a href={offer.source_url} target="_blank" rel="noopener noreferrer">Publicado en {offer.source_name}</a><a className="link-button" style={{ padding: 0, marginTop: 4 }} href={applyTo(offer)} target="_blank" rel="noopener noreferrer">Aplicar en {hostOf(applyTo(offer))}<ArrowUpRight size={12} /></a></div><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
@@ -222,6 +242,7 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
             <div className="opportunity-grid">{wider.map(offer => <article className="opportunity-card" key={offer.id}>
               <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{initials(offer.company)}</div><div><p>{offer.company}</p><span className="role-chip">{offer.role_label}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${jobTitle(offer)} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
               <h3 className="opportunity-title is-compact">{jobTitle(offer)}</h3>
+              <div className="opp-badges"><span className={`opp-badge ${modalityBadge(offer.modality).tone}`}>{modalityBadge(offer.modality).text}</span>{offer.location && <span className="opp-badge">{offer.location}</span>}<span className="opp-freshness">{freshness(offer.published_at)}</span></div>
               <p className="opportunity-place"><Globe2 size={13} />{offer.modality} · {offer.location} · {offer.language}</p>
               <PayBlock offer={offer} />
               <div className="opportunity-footer"><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
