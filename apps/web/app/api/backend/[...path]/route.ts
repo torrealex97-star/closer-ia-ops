@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { externalForStudent } from '../../../../lib/externalSurface';
 import { fold } from '../../../../lib/vocabulary';
 import { authenticateStudent, studentLoginRequired } from '../../../../lib/studentAuth';
+import { engineFetch } from '../../../../lib/engineTransport';
 
 export const dynamic = 'force-dynamic';
 const allowed = new Set(['127.0.0.1:3100', 'localhost:3100']);
@@ -46,7 +47,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const requestBody = ['GET', 'HEAD'].includes(request.method) ? '' : await request.text();
   try {
     // Los parámetros de consulta son parte del contrato (p. ej. editorial_status del listado WDC).
-    const upstream = await fetch(`${upstreamOrigin}/v1/${path.join('/')}${request.nextUrl.search}`, {
+    const upstream = await engineFetch(`${upstreamOrigin}/v1/${path.join('/')}${request.nextUrl.search}`, {
       method: request.method,
       headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
                      : { 'Content-Type': 'application/json' },

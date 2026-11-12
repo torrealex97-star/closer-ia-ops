@@ -27,12 +27,16 @@ export const ENGINE_STATUS_TEXT: Record<EngineStatus, string> = {
 
 export const engineBase = (): string => (process.env.CAREER_ENGINE_URL ?? '').replace(/\/$/, '');
 
+import { engineFetch } from './engineTransport';
+
+export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
 export type EngineFetch<T = Record<string, unknown>> = { ok: boolean; data: T | null; http_status: number | null; reason: EngineStatus };
 
 /** GET al motor que NUNCA lanza: devuelve el resultado y su causa clasificada. */
 export async function engineGet<T = Record<string, unknown>>(
   url: string,
-  { timeoutMs = 20_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {},
+  { timeoutMs = 20_000, fetchImpl = engineFetch }: { timeoutMs?: number; fetchImpl?: FetchLike } = {},
 ): Promise<EngineFetch<T>> {
   try {
     const response = await fetchImpl(url, { cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
@@ -61,7 +65,7 @@ const count = (value: unknown): number | null => (typeof value === 'number' && N
 
 /** Sonda corta del motor (por defecto 8 s: la usa el panel en cada carga y el cron antes de recoger). */
 export async function probeEngine(
-  { timeoutMs = 8_000, fetchImpl = fetch, now = Date.now }: { timeoutMs?: number; fetchImpl?: typeof fetch; now?: () => number } = {},
+  { timeoutMs = 8_000, fetchImpl = engineFetch, now = Date.now }: { timeoutMs?: number; fetchImpl?: FetchLike; now?: () => number } = {},
 ): Promise<EngineProbe> {
   const base = engineBase();
   const started = now();

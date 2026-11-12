@@ -11,6 +11,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // El Worker no puede llamar al workers.dev del motor por red (se pierde la petición). El binding
+  // resuelve dentro de la plataforma; `CAREER_ENGINE_URL` sigue siendo el destino en Vercel.
+  "services": [
+    {
+      "binding": "ENGINE",
+      "service": "closer-engine"
+    }
+  ],
   "observability": {
     "enabled": true
   },

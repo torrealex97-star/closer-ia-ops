@@ -1,4 +1,5 @@
 import { callTimeout, timeLeft } from './cronBudget';
+import { engineFetch } from './engineTransport';
 
 // Clasificación automática del catálogo del motor (`POST /v1/admin/opportunities/activate`):
 // deriva el perfil y el payload de la oferta con reglas deterministas, verifica el enlace y
@@ -36,7 +37,7 @@ export async function activateEngine(init: {
     if (timeLeft(init.deadline) < 8_000) { truncated = true; break; }
     let page: Page | null = null;
     try {
-      const response = await fetch(`${base}/v1/admin/opportunities/activate`, {
+      const response = await engineFetch(`${base}/v1/admin/opportunities/activate`, {
         method: 'POST', cache: 'no-store',
         headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: false, verify: true, auto: true, market: init.market ?? 'any' }),
