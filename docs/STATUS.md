@@ -1,5 +1,14 @@
 # Estado
 
+## El corte a cuenta propia se ajusta al plan GRATUITO de Cloudflare (sesión 145) — 2026-11-12
+
+- **Petición del operador**: sacar el motor a una cuenta propia de Cloudflare; el plan disponible es el gratuito (`hobby`).
+- **Lo que cambia respecto al ADR-018**: el ADR está escrito para Workers Paid (50 M de escrituras/mes, 1.000 subrequests, lote de 150). En el plan gratuito los límites reales son **50 subrequests por invocación**, **100.000 filas escritas al día**, 5 M de lecturas/día, 5 GB de almacenamiento y **500 MB por base** ([límites de D1](https://developers.cloudflare.com/d1/platform/limits/), [precios](https://developers.cloudflare.com/d1/platform/pricing/), [límites de Workers](https://developers.cloudflare.com/workers/platform/limits/)).
+- **La ganancia sigue siendo real, pero es otra**: las escrituras pasan de **100.000 al MES** (Sites) a **100.000 al DÍA** — 30× de margen mensual —, así que drenar las 1.054 pendientes deja de competir con la cuota. Lo que **no** cambia es el lote: con techo de 50 subrequests el motor se da 16 para fetch, entran ~9 de 16 fuentes y la activación sigue en **25 ofertas por invocación**. El lote de 150 exige Workers Paid (5 USD/mes).
+- **Config preparada** (`sites/engine/wrangler.toml`, copia de la plantilla, **ignorada por git** porque lleva el `database_id` de esa cuenta): `SUBREQUEST_LIMIT` y `MAX_SUBREQUESTS` **comentados** (con techo gratuito pedir 1.000 corta la invocación con «Too many subrequests»), `WRITE_ALLOWANCE_MONTH=3000000` y `WRITE_ALLOWANCE_DAY=85000` (margen del 15 % sobre los 100.000 del plan, que son diarios y se reinician a las 00:00 UTC), `WRITE_GUARD_RATIO=0.85`. Sin cron propio: la recogida la siguen disparando Vercel (06:00 UTC) y el workflow cada 6 h; activarlo aquí daría dos pasadas simultáneas.
+- **Secretos nuevos generados** (`openssl rand -hex 32`, en `.local/cloudflare-cut/secrets.env`, gitignored): `ADMIN_TOKEN` y `COLLECT_TOKEN`. No se han impreso ni commitado, y **no están activos en ningún sitio**: entran con `wrangler secret put` en el corte.
+- **Lo que NO está hecho**: ni cuenta, ni `wrangler d1 create`, ni despliegue, ni exportación definitiva, ni reapuntado de Vercel. El ensayo de exportación se interrumpió y su volcado parcial se borró (se rehará en el corte): **no hay volcado válido** todavía, así que no se conoce el tamaño real del traslado — el único dato medido es que la prueba escribió 3,6 MB antes de pararse.
+
 ## El desglose del panel está desplegado; los KPI no se leen sin login, y el operador decidió no abrirlo (sesión 144) — 2026-11-12
 
 - **Petición del operador**: abrir el panel y comprobar en el navegador que los KPI de anuncios recogidos y evidencias de verificación muestran cifras reales; después, **no hacer login** y dejar el trabajo hecho pero la comprobación desactivada.
