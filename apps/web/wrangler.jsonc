@@ -27,13 +27,13 @@
   "observability": {
     "enabled": true
   },
+  // Aquí solo van valores públicos que no son credenciales. Las claves de Supabase NO se versionan:
+  // `tests/secrets.mjs` falla si aparecen en el repositorio (y con razón). Se cargan una vez con
+  // `npx wrangler secret put <NOMBRE>` — `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`,
+  // `ADMIN_SECRETS_KEY`, `CAREER_ADMIN_TOKEN`, `CRON_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+  // `SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  // `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — y sobreviven a los despliegues.
   "vars": {
-    "SUPABASE_URL": "https://jzchuizybyubtkownhlw.supabase.co",
-    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_C14EqkImxzVs0qOxBY_gEQ_Sdi78dhR",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6Y2h1aXp5Ynl1YnRrb3duaGx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNTUwOTUsImV4cCI6MjEwNzczMTA5NX0.1BzwpmvTxzS8K_8MzH1oYKbgHuaxQbp1P-kb5yoDZAE",
-    "NEXT_PUBLIC_SUPABASE_URL": "https://jzchuizybyubtkownhlw.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6Y2h1aXp5Ynl1YnRrb3duaGx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNTUwOTUsImV4cCI6MjEwNzczMTA5NX0.1BzwpmvTxzS8K_8MzH1oYKbgHuaxQbp1P-kb5yoDZAE",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_C14EqkImxzVs0qOxBY_gEQ_Sdi78dhR",
     "ADMIN_PUBLIC_URL": "https://app.womendigitalclosers.com",
     "CAREER_ENGINE_URL": "https://closer-engine.women-digital-closers.workers.dev"
   }

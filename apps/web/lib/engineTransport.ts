@@ -30,9 +30,10 @@ export async function engineFetch(url: string, init?: RequestInit): Promise<Resp
     const { pathname, search } = new URL(url);
     try {
       return await binding.fetch(`https://engine${pathname}${search}`, init);
-    } catch {
-      // Si el binding no está disponible en este entorno (p. ej. preview local sin el servicio),
-      // se intenta por red antes de dar el motor por caído.
+    } catch (error) {
+      // Se intenta por red antes de dar el motor por caído, pero la degradación se deja dicha: sin
+      // este aviso, un binding roto se veía como «el motor no responde» y nadie sabía por qué.
+      console.warn(JSON.stringify({ event: 'engine_binding_failed', path: pathname, error: String((error as Error)?.message ?? error) }));
     }
   }
   return fetch(url, init);

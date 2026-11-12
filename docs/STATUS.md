@@ -1,5 +1,15 @@
 # Estado
 
+## Review de la mudanza: dos fallos reales, corregidos (sesión 156) — 2026-11-12
+
+- **Petición del operador**: revisar que todo esté bien y arreglar lo necesario.
+- **Fallo 1, grave y mío: `tests/secrets.mjs` estaba en ROJO** (es control de CI). En la sesión 153 metí las claves de Supabase dentro de `apps/web/wrangler.jsonc` versionado. Ahora ese fichero solo lleva valores públicos (`ADMIN_PUBLIC_URL`, `CAREER_ENGINE_URL`) y las claves viven como **secretos del Worker**, con la lista de nombres documentada en un comentario. Control en verde: «sin secretos reconocibles en 513 ficheros versionados».
+- **Coste real de ese arreglo, dicho sin adornos**: quitar las variables del fichero y desplegar antes de reponer las claves dejó el panel en `configured: false` durante unos minutos. Además, lanzar seis `wrangler secret put` seguidos en un bucle falló los seis; hubo que hacerlos de uno en uno. Repuestos los once secretos, el panel volvió a `configured: true`.
+- **Fallo 2: el cron no habría avisado nunca de un corte**. `sites/cron/worker.js` buscaba `"truncated":true` en el cuerpo, pero la ruta devuelve **la lista** de pasos cortados, así que el registro habría dicho «sin cortes» casi siempre. Ahora parsea la respuesta y registra `cut` (la lista) y `motor_truncated`; además la llamada lleva `AbortSignal.timeout(120_000)` para no dejar la invocación colgada.
+- **Mejora**: `engineTransport` se tragaba en silencio un fallo del *service binding*; ahora emite `engine_binding_failed` antes de caer a la red, que es lo que faltó para diagnosticar el 503 de la sesión 152.
+- **Alarma mía que resultó falsa**: los despliegues de Vercel parecían parados en HEAD~5. Al mirar la hora exacta, el último es de las 11:37:56 y el commit de las 11:37:51: Vercel **sí** despliega cada push, así que `crons: []` está aplicado y no habrá dos relojes.
+- **Verificado (tested)**: `tsc` limpio; `npm run test:web` completo **302 PASS, interfaz 13/13, exit 0**; `tests/secrets.mjs` y `orphan-refs` en verde; `handoff` OK; bundle de OpenNext reconstruido y Worker redesplegado; dominio comprobado después (`/` 200, sesión `configured: true`, búsqueda con 43 ofertas).
+
 ## La web solo existe en su dominio (sesión 155) — 2026-11-12
 
 - **Petición del operador**: apagar la URL pública de producción en `workers.dev` y comprobar después que el dominio sigue sirviendo.
