@@ -1,5 +1,14 @@
 # Estado
 
+## Motor movido a una cuenta propia de Cloudflare, datos incluidos (sesión 146) — 2026-11-12
+
+- **Petición del operador**: mover todo a Cloudflare; el dominio ya está en esa cuenta.
+- **Hecho y verificado**: `wrangler login` en la cuenta **Women Digital Closers**; D1 `closer-engine` creada (`cb5ffe32…`, región EEUR); Worker `closer-engine` desplegado en **`https://closer-engine.women-digital-closers.workers.dev`** con la forma de escritura barata desde el minuto cero (`write_shape {pending: [], legacy: []}`); exportadas **29.888 filas / 39 MB** del motor de Sites con `engine-export.mjs` e importadas con `wrangler d1 execute --remote` → **29.888 consultas, 56.370 filas escritas, 54,3 MB**; secretos `ADMIN_TOKEN` y `COLLECT_TOKEN` nuevos (64 hex, en `.local/cloudflare-cut/secrets.env`, nunca impresos) publicados con `wrangler secret put`.
+- **Copia fiel, medida**: `/api/status` del motor nuevo cuadra **exactamente** con el viejo en el momento del corte — `raw_items 5.387`, `catalog_active 1.131`, `raw_items_by_route {collection: 4.604, verification: 783}`. El mismo `dry_run` de activación devuelve los mismos `counts` (5 skipped) y los mismos ítems con la misma razón. `export` responde **401 sin token** y **200 con token**; la cuota arranca en **0** con `config {month: 3.000.000, day: 85.000, ratio: 0.85}` y `day_max 72.250` (85 % de los 100.000/día del plan gratuito).
+- **Lo que NO se ha movido todavía**: **la web sigue apuntando al motor viejo**. Las variables `CAREER_ENGINE_URL` y `CAREER_ADMIN_TOKEN` de Vercel las tiene que cambiar el operador (la integración conectada responde `forbidden` sobre el proyecto) y los secretos `ENGINE_URL`/`COLLECT_TOKEN` de GitHub Actions también. Instrucciones sin secretos en `.local/cloudflare-cut/REAPUNTAR.md`. Mientras no se cambien, el cron de Vercel y el workflow siguen recogiendo contra Sites.
+- **El plan gratuito cambia lo que se gana**: 50 subrequests por invocación (igual que Sites) y por tanto lote de 25; lo que sube es la cuota de escrituras, de 100.000/mes a 100.000/día. El motor nuevo NO lleva `SUBREQUEST_LIMIT` (pedir 1.000 cortaría la invocación).
+- **La web a Cloudflare queda como incremento aparte**: el adapter (`@opennextjs/cloudflare`) soporta Next 16, pero `apps/web/lib/urlGuard.ts` usa `node:http`, `node:https`, `node:dns/promises` y `node:net` con IP fijada para evitar SSRF, y eso **no corre en Workers**: hay que reescribir esa protección antes de mover la web.
+
 ## El corte a cuenta propia se ajusta al plan GRATUITO de Cloudflare (sesión 145) — 2026-11-12
 
 - **Petición del operador**: sacar el motor a una cuenta propia de Cloudflare; el plan disponible es el gratuito (`hobby`).
