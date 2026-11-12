@@ -1,5 +1,14 @@
 # Estado
 
+## El cron ya corre en Cloudflare y Vercel se queda sin reloj (sesión 152) — 2026-11-12
+
+- **Petición del operador**: mover los crons de Vercel a Workers, encender el del Worker y apagar el de Vercel en el mismo movimiento, y comprobar que `/api/cron/collect` responde con el `CRON_SECRET` nuevo.
+- **Hecho, en un solo paso**: `closer-cron` desplegado con `schedule: 0 6 * * *` y [vercel.json](../vercel.json) con `"crons": []`. Si los dos relojes hubieran coincidido, la recogida se duplicaría cada día. `CRON_SECRET` nuevo y **el mismo** en `closer-web` y `closer-cron`, guardado en `.local/cloudflare-cut/secrets.env` (gitignored) para poder probarlo.
+- **Probado (tested) contra el dominio real**: `GET /api/cron/collect` con el secreto → **200 en 9,1 s**; sin secreto → **401**. La ejecución terminó con **`truncated: []`** (nada cortado), motor con **1 pasada: 4 publicadas, 1 a revisión, 5 omitidas**, Google Jobs **27 recibidas / 25 aceptadas** en 7 búsquedas (0,175 $ de SerpApi) y Apify sin lanzar gasto nuevo.
+- **Un susto primero, y por qué**: la primera ejecución devolvió `error de red con el motor` y cortó `googleJobs`/`auto`. El motor responde en 0,5 s por fuera y la segunda ejecución fue limpia: era transitorio (arranque/actualización del Worker en ese momento). Se ha mejorado el mensaje para que la próxima vez diga la causa concreta en vez de «error de red» a secas.
+- **«Sin clave guardada» en infojobs/adzuna/jooble es cierto, no una regresión**: en `integration_connections` solo hay filas de **apify, serpapi y groq** (comprobado por REST con la service role). Esas tres fuentes nunca tuvieron clave; la recogida va por Google Jobs y el respaldo.
+- **Lo que NO está verificado todavía**: el disparo real de las 06:00 UTC lo hará el `scheduled` de `closer-cron`; hasta el primer disparo no se puede afirmar que ese reloj despierta y llama bien, aunque el endpoint que invoca está probado en verde.
+
 ## El reloj diario ya tiene Worker propio en la cuenta (sesión 151) — 2026-11-12
 
 - **Petición del operador**: mover a Cloudflare también el cron de recogida, después de confirmar que acepta Workers Paid (5 $/mes).

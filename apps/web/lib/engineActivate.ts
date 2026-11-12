@@ -47,7 +47,12 @@ export async function activateEngine(init: {
       if (!response.ok) error = `el motor respondió ${response.status}`;
     } catch (err) {
       const timedOut = (err as Error)?.name === 'TimeoutError';
-      error = timedOut ? 'el motor no respondió a tiempo' : 'error de red con el motor';
+      // La causa se conserva: «error de red» a secas ya ocultó una vez un fallo de transporte concreto
+      // (sesión 152) y dejó el panel sin nada con lo que diagnosticar.
+      const cause = err as Error;
+      error = timedOut
+        ? 'el motor no respondió a tiempo'
+        : `error de red con el motor (${cause?.name ?? 'error'}: ${cause?.message ?? String(err)})`;
       if (timedOut) truncated = true; // quedó trabajo sin hacer: el cron lo anota como corte, no lo esconde
       break;
     }
