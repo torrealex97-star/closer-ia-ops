@@ -1,5 +1,13 @@
 # Estado
 
+## El desglose del panel está desplegado; los KPI no se leen sin login, y el operador decidió no abrirlo (sesión 144) — 2026-11-12
+
+- **Petición del operador**: abrir el panel y comprobar en el navegador que los KPI de anuncios recogidos y evidencias de verificación muestran cifras reales; después, **no hacer login** y dejar el trabajo hecho pero la comprobación desactivada.
+- **Verificado sin sesión**: el panel de producción (`https://app.womendigitalclosers.com/admin`) responde y su **bundle servido ya trae el desglose** — encontrado en `/_next/static/immutable/chunks/09oz3yuy51eh8.js`: `engine.raw_items_by_route?.collection ?? '—'` junto a «anuncios recogidos» y `?.verification ?? '—'` junto a «evidencias de verificación». Es decir: el código de la sesión 142 **está en producción**, no sólo en `main`.
+- **Verificado, del lado del motor**: `/api/status` sigue publicando `raw_items_by_route { collection: 4.594, verification: 598 }` y la suma cuadra con `raw_items` (5.192).
+- **Lo que NO se ha verificado, y es justo el punto**: **los dos KPI con su cifra en pantalla**. `/api/admin/overview` responde **401 `Sesión de operador no iniciada`** sin sesión, y el acceso es Supabase Auth con usuario invitado en `admin_users`; no hay credenciales en este entorno (`.env.local` sólo tiene `VERCEL_OIDC_TOKEN`) y **el operador ha decidido no iniciar sesión**. Queda pendiente **un login**, nada más: la cadena motor → `/api/admin/overview` → KPI está desplegada y el formato de «—» cubre el hueco.
+- **Nota de acceso que salió por el camino**: la integración de Vercel conectada no puede listar el proyecto (`prj_NEdu3KIM8uUBniXmgxduicsM2EhS`, org `team_YvXzqjlmm01xRxbzURQncfOk`): `forbidden` al listar despliegues. Por eso la build servida se comprobó **contra el propio dominio** y no contra el panel de Vercel.
+
 ## Desplegado: `invoked_by` existe en D1 y la pasada automática la rellena (sesión 143) — 2026-11-11
 
 - **Petición del operador**: desplegar el motor con la columna `invoked_by` y comprobar en D1 que aparece y que la siguiente pasada del cron la rellena.
