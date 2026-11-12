@@ -257,6 +257,18 @@ const SOURCES = [
   // = 1 subrequest garantido en 0; si WDC reabre su board, se re-añade con el
   // hallazgo ya documentado aquí. Queda monestcapital (única ATS con closers reales).
   { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
+  // Ampliación de ATS gratuitos (2026-11-12), cada uno verificado en vivo ese día y elegido por
+  // publicar ventas EN ESPAÑA, no por tamaño. Los agregadores tipo SimplyHired, Adzuna, Jooble,
+  // Computrabajo, InfoJobs y Bumeran responden 403/404/405 desde el Worker: no son una opción.
+  //   · Fever (Greenhouse): 564 ofertas, 278 en España, con Account Executive y Account
+  //     Development en Madrid, varias «Spanish Speaker».
+  //   · Qonto (Ashby): 61 ofertas, 10 en Barcelona/Madrid (ventas y crecimiento).
+  //   · Holded (Recruitee): 8 ofertas en Barcelona, con rol comercial.
+  //   · RemotoJOB: único board español con RSS abierto (200, 36 KB); los demás lo cierran.
+  { code: 'ats-greenhouse-feverup', name: 'Fever · Greenhouse', kind: 'greenhouse', slug: 'feverup' },
+  { code: 'ats-ashby-qonto', name: 'Qonto · Ashby', kind: 'ashby', slug: 'qonto' },
+  { code: 'ats-recruitee-holded', name: 'Holded · Recruitee', kind: 'recruitee', slug: 'holded' },
+  { code: 'remotojob', name: 'RemotoJOB', kind: 'rss', slug: 'https://remotojob.com/feed/' },
   // La entrada estaba DUPLICADA (2026-10-20): el run recorría el mismo board dos veces,
   // la segunda instancia quedaba 'queued' para siempre en /api/status y gastaba un
   // subrequest que necesita la cola ATS.
@@ -447,9 +459,12 @@ async function sourceRss(source) {
     const item = m[1];
     const field = tag => (item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`)) || [])[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
     const title = field('title'); const link = field('link');
+    // `content:encoded` trae la oferta entera; `description` solo un resumen de dos líneas. El gate
+    // de idioma y la modalidad leen este texto, así que se prefiere el cuerpo completo.
+    const body = field('content:encoded') || field('description');
     return { external_id: link || stableId('rss', title), payload: {
       title, company: null, location: null, url: link,
-      posted_at: field('pubDate') ? new Date(field('pubDate')).toISOString() : null, raw: { title, link, description: field('description').slice(0, 2000) },
+      posted_at: field('pubDate') ? new Date(field('pubDate')).toISOString() : null, raw: { title, link, description: body.slice(0, 4000) },
     } };
   });
 }

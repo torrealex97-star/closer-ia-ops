@@ -1,5 +1,14 @@
 # Estado
 
+## Más fuentes gratuitas: sondeo y ampliación (sesión 162) — 2026-11-12
+
+- **Petición del operador**: usar más sitios gratis.
+- **Sondeo en vivo (verified)** de 30+ candidatos: **todo agregador está cerrado al Worker** — SimplyHired 404, Adzuna 403, Jooble 403 (Cloudflare), Computrabajo 403, InfoJobs 405, Talent 404, Jobsora 404, Bumeran 404, Trabajando 404, Empleate/SEPE HTML sin feed, Torre 401, Tecnoempleo 404, Manfred 404. RemotoJOB (`/feed/`, 200) es el **único board español con RSS abierto**; Remoto Work Hub publica artículos, no ofertas.
+- **Añadidas 4 fuentes gratuitas** (26 en total, coste 54 subrequests): **Fever · Greenhouse** (564 ofertas, 278 en España), **Qonto · Ashby** (61, 10 en Barcelona/Madrid), **Holded · Recruitee** (8) y **RemotoJOB** (RSS). Todas verificadas ese día y con test actualizado (`tests/engine/subrequests.mjs`: 22→26 fuentes, 50→54).
+- **Barrido real medido**: **26/26 fuentes, 0 aplazadas, 857 filas** en 85 s (antes 439). Nuevas: Fever 300/300 (tope por fuente), Qonto 61/61, Holded 8/8, RemotoJOB 20/20. Fallan las cuatro de FreeHire (429 conocido) y himalayas-closer.
+- **El dato incómodo**: de esas **389 filas nuevas** solo **1 es elegible** (perfil + español). Los tableros ATS son gratis pero **publican en inglés**: Fever 6 con perfil, Qonto 5, RemotoJOB 3, Holded 0. La activación en seco confirma el embudo: 400 escaneadas, 393 sin perfil o sin español.
+- **Conclusión honesta**: el techo no es el número de conectores, es que **las ofertas comerciales en español viven en portales que cierran el paso** (InfoJobs, Adzuna, Jooble) o en FreeHire, que sigue devolviendo 429. Las dos palancas reales son (a) aceptar anuncios en inglés que **exigen español** («Spanish Speaker»), hoy bloqueados por el gate de idioma, y (b) una clave de InfoJobs/Jooble. Ninguna se aplicó sin decisión del dueño.
+
 ## Revisión de la tarjeta en navegador (sesión 161) — 2026-11-12
 
 - **Qué se midió** (`verified` sobre el dominio real, con el DOM): tarjeta a 1280 y 390 px, altura, columnas, desbordes y contraste de las insignias nuevas.
