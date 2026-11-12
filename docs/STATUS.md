@@ -1,5 +1,12 @@
 # Estado
 
+## La web ya vive en la cuenta propia: dominio cortado y verificado (sesión 150) — 2026-11-12
+
+- **Corte hecho por el operador, verificado por mí desde fuera**: `app.womendigitalclosers.com` resuelve a IPs de Cloudflare **sin CNAME** y responde con `server: cloudflare` y sin `x-vercel-id`: ya no lo sirve Vercel. El certificado está emitido (las rutas cargan por https/2).
+- **Comprobado (verified) contra el dominio real, no contra workers.dev**: `/`, `/admin`, `/privacidad` y `/terminos` → **200** con sus títulos; `POST /api/backend/opportunities/search` → **200 con ofertas reales** (motor nuevo, por service binding); `GET /api/admin/overview` sin sesión → **401 «Sesión de operador no iniciada»**.
+- **Lo que NO está verificado, y hay que decirlo**: el ciclo completo de login de operadora y de alumna (entrar, callback de Supabase, sesión, salir) **no se ha ejercitado**: requiere credenciales que esta sesión no tiene. Que el panel responda 401 prueba que la comprobación de sesión corre, no que el login funcione.
+- **Sigue pendiente**: mover los crons de Vercel a Workers (`/api/cron/collect` ya tiene `CRON_SECRET` nuevo en el Worker, pero nadie lo llama todavía), despublicar el motor viejo de Sites tras 24 h estable, rotar la clave `service_role` que quedó visible en el registro de la sesión, y retirar el proyecto de Vercel cuando haya varios días de estabilidad (hoy es el rollback).
+
 ## Reapuntado hecho y la web compila y renderiza en workerd (sesión 148) — 2026-11-12
 
 - **Petición del operador**: hacer todo lo que pudiera hacer yo antes de pasarle su lista de pasos pendientes.
