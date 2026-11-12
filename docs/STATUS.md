@@ -1,5 +1,13 @@
 # Estado
 
+## Login del panel comprobado en vivo, hasta el final (sesión 154) — 2026-11-12
+
+- **Petición del operador**: verificar el login completo en `app.womendigitalclosers.com` (entrar, sesión, salir) diciendo qué falla en cada paso.
+- **Verificado (verified) en el navegador contra el dominio real**: había una sesión abierta de `torre.alex97@gmail.com` con rol **owner**; `/api/admin/session` → `authenticated: true`; el panel cargó datos reales (37/20 del objetivo, 106 visibles, 312 excepciones, 704 por clasificar) y las peticiones internas devolvieron 200. Persistió al recargar. `document.cookie` está **vacío**: los tokens son `HttpOnly` y JavaScript no los ve. Al pulsar **Salir**: `authenticated: false` y aparece el formulario de acceso. Sin errores en consola.
+- **También probado por HTTP**: login con credenciales falsas → **401 `Email o contraseña incorrectos.`** (prueba que Supabase Auth responde, no un 500); login con `Origin` ajeno → **403**; logout sin sesión → 200 y borra las tres cookies con `HttpOnly; SameSite=Lax; Secure`.
+- **Lo que NO hice y por qué**: escribir la contraseña de la operadora. **El paso de introducir credenciales correctas no lo ha ejecutado un agente**: la sesión que había abierta demuestra que ese paso funcionó antes, pero no es una prueba mía.
+- **Un fallo de la propia comprobación, no de la app**: el primer clic en «Salir» no hizo nada porque el botón quedaba en `y=1010` fuera de la ventana del navegador (no hubo ninguna petición `DELETE`); tras ampliar la vista, el clic funcionó a la primera.
+
 ## Rotación de la clave de Supabase y motor viejo apagado (sesión 153) — 2026-11-12
 
 - **Petición del operador**: rotar la `service_role`, actualizar el secreto del Worker y despublicar el motor viejo de Sites, dejando en STATUS qué se rompió y qué se recuperó.
