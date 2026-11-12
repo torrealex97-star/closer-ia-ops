@@ -1,5 +1,14 @@
 # Estado
 
+## Revisión de la tarjeta en navegador (sesión 161) — 2026-11-12
+
+- **Qué se midió** (`verified` sobre el dominio real, con el DOM): tarjeta a 1280 y 390 px, altura, columnas, desbordes y contraste de las insignias nuevas.
+- **Lo que estaba mal**: cada tarjeta medía **934–981 px en móvil** (más de una pantalla y media) y **856 px en escritorio**. Causas: modalidad y ubicación **duplicadas** (insignia + fila de datos), tres filas de «no especificado» que no dicen nada, la nota de compensación repetida en las 39 tarjetas, y dos llamadas a la acción compitiendo («Publicada…» ya estaba en la insignia, y «Aplicar en…» duplicaba el botón).
+- **Lo que se cambió**: la fila de modalidad/ubicación sale de los datos (ya está en la insignia); los datos desconocidos se colapsan en una sola línea honesta («El anuncio no detalla jornada, experiencia ni contrato»); «Publicada» desaparece del pie (está en la insignia de frescura); nota de compensación solo en el detalle; un solo CTA por tarjeta; datos en **dos columnas** desde 900 px y **una línea por dato** en móvil.
+- **Resultado medido**: móvil **489–555 px** (−45 %), escritorio **422–507 px** (−46 %), dos columnas de 470 px a 1280. Sin desborde horizontal a 390 px (`scrollWidth` 375; el único «desborde» es el texto para lectores de pantalla, que está recortado a propósito).
+- **Contraste de las insignias** (calculado con los colores reales): Presencial **4,97**, Remoto **4,79**, neutra (ubicación / «Sin indicar») **4,56** — todas cumplen AA y ninguna usa solo color: cada insignia lleva su palabra.
+- **Limitación**: las capturas de pantalla no se pudieron obtener (el puente devolvió imágenes vacías o congeladas), así que la revisión es por medidas del DOM y no visual. Falta una pasada de ojo humano.
+
 ## Re-clasificación de retiradas e insignias en la tarjeta (sesión 160) — 2026-11-12
 
 - **Ruta nueva**: `POST /v1/admin/opportunities/reclassify` (solo `X-Admin-Token`, **`dry_run` por defecto**). Vuelve a mirar las retiradas por «sin perfil comercial reconocible» con el vocabulario nuevo y las devuelve a `needs_review`; **no publica nada** y no toca la evidencia cruda, solo el estado editorial con su motivo.

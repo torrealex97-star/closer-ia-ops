@@ -61,6 +61,14 @@ const freshness = (value: string | null) => {
   if (days < 7) return `Hace ${days} días`;
   return `Publicada el ${date(value)}`;
 };
+// Un «no especificado» no es un dato: tres filas de «no especificado» ocupan media tarjeta y no
+// dicen nada. Se enseña lo que el anuncio sí cuenta y, si no cuenta nada, se dice una vez.
+const UNKNOWN_FACT = /no (especificad|indicad)[oa]s?\b/i;
+function knownFacts(offer: Offer) {
+  return [{ label: 'Idioma', value: offer.language }, { label: 'Jornada', value: offer.schedule },
+    { label: 'Experiencia', value: offer.experience }, { label: 'Contrato', value: offer.contract }]
+    .filter(f => f.value && !UNKNOWN_FACT.test(f.value));
+}
 // Insignia de modalidad: el motor ya la declara (Presencial/Remoto/Híbrido) y, si el anuncio no lo
 // dice, se muestra «Sin indicar» en vez de suponer. Misma palabra que la verdad del dato.
 const modalityBadge = (modality: string) => {
@@ -77,11 +85,13 @@ const initials = (company: string) => company.slice(0, 2).toUpperCase();
 // Dominio que se enseña junto al botón de aplicar: dice a dónde va antes de pulsar.
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'el anuncio'; } };
 const applyTo = (offer: Offer) => offer.apply_url || offer.source_url;
-function PayBlock({ offer }: { offer: Offer }) {
+// `note` en false para la tarjeta: la misma advertencia repetida en 39 tarjetas es ruido y alargaba
+// cada ficha (en móvil, ~40 px por tarjeta). El detalle la sigue mostrando.
+function PayBlock({ offer, note = true }: { offer: Offer; note?: boolean }) {
   return <div className={`opportunity-pay ${hasPay(offer) ? '' : 'is-unpublished'}`}>
     <span>{hasPay(offer) ? 'COMPENSACIÓN PUBLICADA' : 'COMPENSACIÓN'}</span>
     <p className="pay-value">{hasPay(offer) ? offer.compensation : 'La empresa no publica importe'}</p>
-    <p>{offer.compensation_note}</p>
+    {note && <p>{offer.compensation_note}</p>}
   </div>;
 }
 
@@ -232,9 +242,14 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
             <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{initials(offer.company)}</div><div><p>{offer.company}</p><span className="role-chip">{offer.role_label}</span>{offer.is_selected && <em className="pick-badge">Selección del día{rank(offer) ? ` · Nº ${rank(offer)}` : ''}</em>}</div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${jobTitle(offer)} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
             <h3 className="opportunity-title">{jobTitle(offer)}</h3>
             <div className="opp-badges"><span className={`opp-badge ${modalityBadge(offer.modality).tone}`}>{modalityBadge(offer.modality).text}</span>{offer.location && <span className="opp-badge">{offer.location}</span>}<span className="opp-freshness">{freshness(offer.published_at)}</span></div>
-            <PayBlock offer={offer} />
-            <dl className="opportunity-facts"><div><dt>Modalidad y ubicación</dt><dd><Globe2 size={14} />{offer.modality} · {offer.location}</dd></div><div><dt>Idioma</dt><dd>{offer.language}</dd></div><div><dt>Jornada</dt><dd>{offer.schedule}</dd></div><div><dt>Experiencia</dt><dd>{offer.experience}</dd></div><div><dt>Contrato</dt><dd>{offer.contract}</dd></div></dl>
-            <div className="opportunity-footer"><div><small>Publicada: {date(offer.published_at)}</small><a href={offer.source_url} target="_blank" rel="noopener noreferrer">Publicado en {offer.source_name}</a><a className="link-button" style={{ padding: 0, marginTop: 4 }} href={applyTo(offer)} target="_blank" rel="noopener noreferrer">Aplicar en {hostOf(applyTo(offer))}<ArrowUpRight size={12} /></a></div><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
+            <PayBlock offer={offer} note={false} />
+            {/* Modalidad y ubicación ya están en las insignias de arriba: repetirlas aquí alargaba la ficha
+                sin añadir nada. Quedan los datos que la alumna compara (idioma, jornada, experiencia, contrato). */}
+            <dl className="opportunity-facts">
+              {knownFacts(offer).map(f => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}
+              {knownFacts(offer).length <= 1 && <div><dt>Detalles del puesto</dt><dd>El anuncio no detalla jornada, experiencia ni contrato.</dd></div>}
+            </dl>
+            <div className="opportunity-footer"><div><a href={offer.source_url} target="_blank" rel="noopener noreferrer">Publicado en {offer.source_name}</a></div><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
           </article>)}</div>}
           {!saved && !busy && wider?.length ? <div className="wider-bucket">
             <h3>{items.length} con tu filtro · {wider.length} más del catálogo {applied.market !== 'any' ? 'con tu mercado' : 'comercial en español'}</h3>
@@ -243,7 +258,7 @@ export default function StudentOpportunities({ hosted = false }: { hosted?: bool
               <div className="opportunity-company"><div className="company-monogram" aria-hidden="true">{initials(offer.company)}</div><div><p>{offer.company}</p><span className="role-chip">{offer.role_label}</span></div><button className={`icon-button ${isStarred(offer) ? 'is-starred' : ''}`} disabled={saving === offer.id} aria-label={`${isStarred(offer) ? 'Quitar de guardadas' : 'Guardar'} ${jobTitle(offer)} · ${offer.company}`} onClick={() => void star(offer)}><Bookmark size={19} fill={isStarred(offer) ? 'currentColor' : 'none'} /></button></div>
               <h3 className="opportunity-title is-compact">{jobTitle(offer)}</h3>
               <div className="opp-badges"><span className={`opp-badge ${modalityBadge(offer.modality).tone}`}>{modalityBadge(offer.modality).text}</span>{offer.location && <span className="opp-badge">{offer.location}</span>}<span className="opp-freshness">{freshness(offer.published_at)}</span></div>
-              <p className="opportunity-place"><Globe2 size={13} />{offer.modality} · {offer.location} · {offer.language}</p>
+              <p className="opportunity-place"><Globe2 size={13} />{offer.language}</p>
               <PayBlock offer={offer} />
               <div className="opportunity-footer"><button className="primary" onClick={() => setDetail(offer)}>Ver oportunidad<ArrowUpRight size={16} /></button></div>
             </article>)}</div>

@@ -555,4 +555,16 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .opp-badge.is-remote{background:var(--sage-soft);color:var(--sage)}
 .opp-badge.is-onsite{background:var(--warning-soft);color:var(--warning)}
 .opp-freshness{font-size:10px;color:var(--secondary);margin-left:auto;white-space:nowrap}
+/* Ficha más corta (2026-11-12): en móvil cada tarjeta medía ~950 px porque «Experiencia» volcaba un
+   párrafo entero y los hechos iban en una columna con 16 px de aire. Se compacta y se limita a 2
+   líneas; el texto completo sigue en el detalle, así que no se pierde información. */
+.opportunity-facts{gap:10px;margin-bottom:18px}
+.opportunity-facts dt{font-size:9px;letter-spacing:.4px;text-transform:uppercase}
+.opportunity-facts dd{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;line-height:1.5}
+@media(min-width:900px){.opportunity-facts{grid-template-columns:1fr 1fr;gap:10px 20px}}
+@media(max-width:700px){.opp-freshness{margin-left:0}
+  /* En móvil, una línea por dato: la tarjeta baja de ~950 a ~600 px y el detalle conserva el texto
+     completo. La información no se pierde, deja de empujar el botón fuera de la pantalla. */
+  .opportunity-facts dd{-webkit-line-clamp:1}
+  .opportunity-facts{gap:8px;margin-bottom:14px}}
 
