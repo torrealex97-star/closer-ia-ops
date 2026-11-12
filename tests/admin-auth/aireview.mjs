@@ -74,26 +74,28 @@ assert.ok(sample > 120 && sample < 280, `muestra≈10%: ${sample}`);
 assert.equal(ai.gate({ proposal: ok, score: 99, offerRedFlags: [], link: open, id: Array.from({ length: 50 }, (_, i) => `id-${i}`).find(ai.auditSample), approvedSoFar: 0, maxApprovals: 25 }).audit_sample, true);
 console.log('PASS  puerta determinista: umbrales exactos, tope, auditoría 10 %');
 
-// 3) SSRF y redes sociales.
+// 3) SSRF y redes sociales. La política es la allowlist: los hosts de prueba se declaran por entorno,
+// igual que haría un portal nuevo en producción.
+process.env.URL_GUARD_ALLOWED_HOSTS = 'example.com';
 for (const bad of ['http://127.0.0.1/x', 'http://10.0.0.5/', 'http://[::1]/', 'http://2130706433/', 'http://0x7f.1/', 'http://localhost/', 'http://intranet/', 'http://db.internal/', 'ftp://example.com/', 'http://user:pw@example.com/', 'https://example.com:8443/', 'https://www.linkedin.com/jobs/1', 'https://x.com/a', 'https://t.me/c', 'nope'])
   assert.equal(ai.hostAllowed(bad).ok, false, bad);
-assert.equal(ai.hostAllowed('https://jobs.example.com/oferta/1').ok, true);
+assert.equal(ai.hostAllowed('https://jobs.example.com/oferta/1').ok, true, 'un host declarado en la allowlist pasa');
+assert.equal(ai.hostAllowed('https://jobs.example.net/oferta/1').reason, 'host_no_autorizado', 'uno no declarado, no');
 for (const ip of ['127.0.0.1', '10.1.1.1', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1']) assert.equal(ai.privateAddress(ip), true, ip);
 for (const ip of ['8.8.8.8', '151.101.1.1', '2606:4700::1']) assert.equal(ai.privateAddress(ip), false, ip);
 let fetched = 0;
 const fx = (status, text = '', headers = {}) => async () => { fetched++; return new Response(text, { status, headers }); };
 assert.equal((await ai.checkLink('http://127.0.0.1/', { fetchImpl: fx(200) })).result, 'skipped');
-assert.equal((await ai.checkLink('https://evil.example.com/', { fetchImpl: fx(200), resolve: async () => ['10.0.0.9'] })).reason, 'resuelve_a_red_interna'); // DNS rebinding
+assert.equal((await ai.checkLink('https://evil.example.net/', { fetchImpl: fx(200) })).reason, 'host_no_autorizado'); // fuera de la allowlist
 assert.equal(fetched, 0, 'nunca se hace GET a destinos bloqueados');
-const pub = async () => ['93.184.216.34'];
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(404), resolve: pub })).result, 'closed');
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(410), resolve: pub })).result, 'closed');
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(200, '<h1>Esta oferta ya no está disponible</h1>'), resolve: pub })).result, 'closed');
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(200, 'We are hiring a Closer'), resolve: pub })).result, 'open');
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(429), resolve: pub })).result, 'unknown');
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(302, '', { location: 'http://169.254.169.254/latest' }), resolve: pub })).reason, 'ip_literal'); // redirección a metadatos
-assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(302, '', { location: 'https://www.linkedin.com/x' }), resolve: pub })).reason, 'red_social');
-console.log('PASS  SSRF: IP literal, host interno, DNS rebinding, redirecciones, redes sociales; 404/410/texto ⇒ closed');
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(404) })).result, 'closed');
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(410) })).result, 'closed');
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(200, '<h1>Esta oferta ya no está disponible</h1>') })).result, 'closed');
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(200, 'We are hiring a Closer') })).result, 'open');
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(429) })).result, 'unknown');
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(302, '', { location: 'http://169.254.169.254/latest' }) })).reason, 'ip_literal'); // redirección a metadatos
+assert.equal((await ai.checkLink('https://a.example.com/1', { fetchImpl: fx(302, '', { location: 'https://www.linkedin.com/x' }) })).reason, 'red_social');
+console.log('PASS  SSRF: IP literal, host interno, allowlist, redirecciones, redes sociales; 404/410/texto ⇒ closed');
 
 // 4) Jev: sin clave se omite; con fallo se omite; solo anota.
 assert.equal(await jevAnnotate({ title: 't', company: null, location: null, url: 'https://x.y', salary: null, description: null }, {}), null);
@@ -109,7 +111,7 @@ const seed = () => {
 };
 const llm = async prompt => { assert.ok(prompt.includes('<oferta_no_confiable>')); return prompt.includes('Closer 5') ? '{"verdict":"reject","confidence":90,"reasons":["MLM"]}' : prompt.includes('Closer 4') ? 'basura' : '{"verdict":"approve","confidence":95,"reasons":["ok"],"red_flags":[]}'; };
 const pubFetch = async () => new Response('Closer en Acme', { status: 200 });
-const base = { llm, fetchImpl: pubFetch, resolve: pub };
+const base = { llm, fetchImpl: pubFetch };
 seed();
 const shadow = await ai.runAiReview({ ...base, env: {} });
 assert.equal(shadow.mode, 'shadow'); assert.equal(shadow.reviewed, 6); assert.equal(shadow.applied, 0);

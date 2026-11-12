@@ -1,7 +1,7 @@
 import { enrich } from './offerScore';
 import { callTimeout, timeLeft } from './cronBudget';
 import { salaryFromText } from './salary';
-import { pinnedGet } from './urlGuard';
+import { guardedGet } from './urlGuard';
 import { serviceRest } from './supabaseAuth';
 
 // Fuentes externas (APIs con clave y recolectores programados). Los candidatos llegan tal cual los da la fuente.
@@ -281,9 +281,9 @@ export async function verifyOffer(id: string, timeoutMs = 10000): Promise<{ id: 
   const found = await listOffersById(id);
   if (!found) return null;
   let result: 'open' | 'closed' | 'unknown' = 'unknown'; let reason = 'network_unreachable';
-  // IP fijada tras validar (sin segunda resolución DNS) y sin seguir redirecciones: una URL interna nunca recibe la petición.
-  const got = await pinnedGet(found.url, { timeoutMs });
-  if (!got.ok) reason = got.reason === 'red' || got.reason === 'dns' ? 'network_unreachable' : `url_no_permitida_${got.reason}`;
+  // Allowlist + sin IP literales + sin seguir redirecciones: una URL fuera de la allowlist o interna nunca recibe la petición.
+  const got = await guardedGet(found.url, { timeoutMs });
+  if (!got.ok) reason = got.reason === 'red' ? 'network_unreachable' : `url_no_permitida_${got.reason}`;
   else if (got.status === 404 || got.status === 410) { result = 'closed'; reason = 'job_not_found'; }
   else if (got.status === 403 || got.status === 429) reason = 'source_blocked';
   else if (got.status >= 300 && got.status < 400) reason = 'redirect_without_verification';

@@ -27,6 +27,8 @@ node --experimental-strip-types tests/admin-auth/csv.mjs
 node --experimental-strip-types tests/admin-auth/salary.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/score.mjs
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/aireview.mjs
+# Guardián SSRF sin APIs de Node: allowlist medida, IP literales y redirecciones revalidadas salto a salto.
+node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/urlguard.mjs
 # Cualificación automática: lo claro se aprueba y lo dudoso ACABA en la cola humana (no en borrador).
 node --experimental-strip-types --import ./tests/admin-auth/ts-resolve.mjs tests/admin-auth/autoreview.mjs
 # Auditoría del catálogo (SOLO LECTURA): lo ya aprobado que la regla retiraría, con su motivo y sin escribir nada.

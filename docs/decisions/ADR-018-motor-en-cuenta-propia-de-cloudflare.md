@@ -153,10 +153,11 @@ toca.
    `CAREER_ADMIN_TOKEN` = el `ADMIN_TOKEN` nuevo, en Production, y redeploy.
 2. **GitHub Actions**: `ENGINE_URL` y `COLLECT_TOKEN` nuevos.
 3. **Despublicar Sites** tras un día estable, conservando su D1.
-4. **La web a Cloudflare** es un incremento **aparte**, no parte de este corte:
-   `apps/web/lib/urlGuard.ts` usa `node:http`, `node:https`, `node:dns/promises` y `node:net` con IP
-   fijada contra SSRF, y eso **no corre en Workers**; hay que reescribirlo antes de portar Next con
-   `@opennextjs/cloudflare` (que sí soporta Next 16). Hasta entonces Vercel sigue sirviendo la web.
+4. **La web a Cloudflare** es un incremento **aparte**, no parte de este corte. El primer paso —el
+   riesgo— ya está hecho (sesión 147): `apps/web/lib/urlGuard.ts` **no usa APIs de Node**, trabaja con
+   allowlist medida, `redirect: 'manual'` y bloqueo de IP literales, con pruebas propias
+   (`tests/admin-auth/urlguard.mjs`). Queda **portar Next** con `@opennextjs/cloudflare` (soporta
+   Next 16), el cron y el dominio. Hasta entonces Vercel sigue sirviendo la web.
 
 ## Vuelta atrás
 
