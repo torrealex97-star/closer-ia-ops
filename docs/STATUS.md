@@ -1,5 +1,14 @@
 # Estado
 
+## Segunda activación de FreeHire: 4 publicadas y 0 a revisión (sesión 174) — 2026-11-13
+
+- **Petición**: repetir la activación real con verificación de vigencia sobre las cuatro fuentes de FreeHire, sin tocar las 138 ya publicadas, y decir cuántas filas nuevas entran.
+- **Resultado por fuente** (`dry_run:false`, `verify:true`): `freehire-closer` 1 considerada → **0 publicadas**, 1 retirada; `freehire-latam-closer` 10 → **0**, 10 retiradas; `freehire` 7 → **3 publicadas**, 4 retiradas; `freehire-latam` 45 → **1 publicada**, 44 retiradas.
+- **Totales**: 63 consideradas, **4 publicadas**, **0 a revisión**, 59 retiradas. Ninguna truncada (`deferred:0`) y ~83 escrituras cobradas.
+- **Las 4 nuevas entran con verificación `open`** y `application_type: external_platform`: `opp-0a85nc0`, `opp-hdfr7g`, `opp-ny3q6h` (freehire) y `opp-0zbr5dz` (freehire-latam).
+- **Las 138 anteriores intactas**: la activación solo lee `editorial_status='draft'`, así que no puede reescribir una publicada. Comprobado en cuatro fichas de la tanda de las 07:37 (`opp-015v7mb`, `opp-024msji`, `opp-0j4vm7o`, `opp-37lblh`): siguen `published`/`active` con su `updated_at` original — no se reescribieron.
+- **Nota**: `/api/funnel` todavía devuelve `elegible: 138`; es un recuento por pasada de recogida (se recalcula con el siguiente barrido), no la cuenta viva de publicadas. El estado real de las fichas se comprobó ficha a ficha, como arriba.
+
 ## Revisión del catálogo: tres ATS recogidos que el panel no enseñaba (sesión 173) — 2026-11-13
 
 - **Fallo encontrado**: Fever, Qonto y Holded se recogían cada pasada desde hace días **sin ficha en el catálogo**, así que el panel no los enseñaba como conectados y los recuentos no cuadraban con el motor (41 conectores frente a 27 entradas conectadas). No es un fallo del panel: eran 3 de las 11 fuentes ATS que nunca se dieron de alta en `sourceCatalog.json`.
