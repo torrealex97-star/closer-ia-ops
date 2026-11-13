@@ -1,5 +1,15 @@
 # Estado
 
+## Los cinco tableros ATS gratuitos, dentro (sesión 171) — 2026-11-13
+
+- **Petición**: reactivar los tableros ATS gratuitos que responden 200 y no estaban en el motor. Tres ya entraron en la sesión 166 (Typeform, Wallapop, Livestorm); se añaden los dos que faltaban: **Cabify · Greenhouse** (50 ofertas) y **ProductHackers · Teamtailor** (4).
+- **Fallo encontrado al medir**: el conector Teamtailor construía `https://careers.<slug>.com/jobs.rss`, que es el host de Monest Capital; ProductHackers vive en `producthackers.teamtailor.com` y la primera pasada dio **HTTP 530** con 0 filas. Corregido con un campo `host` opcional en la fuente (una línea en el conector); segunda pasada: **4/4**.
+- **Cambios**: 39 → **41 conectores**, coste declarado 112 → **114** subrequests (1 petición cada tablero). `subrequests.mjs` (41/114) y `catalog.mjs` (conectadas 25 → **27**) actualizados; `docs/SOURCES.md` con los recuentos al día, la tabla de ATS en 11 y la sección «gratis pero fuera del motor» reducida a los dos feeds muertos.
+- **Barrido real medido** (versión `bb8820a3`): **41/41 fuentes, 0 aplazadas, 2.286 filas** (+54 sobre las 2.232 anteriores: 50 de Cabify y 4 de ProductHackers). Typeform 6/6, Wallapop 4/4 y Livestorm 2/2 siguen completas.
+- **Qué aportan hoy, medido en seco** (sin publicar): **0 publicables de 66** consideradas entre los cinco tableros. Cabify 43 sin perfil + 4 sin señal de España; ProductHackers 3 sin perfil + 1 con más de 10 días (su «Account Executive · e-Commerce [España]» es del 21 de octubre); Typeform 3 + 3; Wallapop 4 sin perfil; Livestorm 2 sin señal de España.
+- **Lectura honesta**: los cinco son gratis y cuestan una petición, pero **no mueven el embudo**: son ATS de empresa, publican en inglés y en perfiles que no son comerciales. Se quedan por cobertura y coste cero, y el día que cambien de rol entran solos. Ninguna de las dos fuentes nuevas necesita clave ni cuenta.
+- **Probado**: `subrequests`, `catalog`, `sources`, `terms` y `latam` en PASS; `node --check` OK; dos barridos reales (el primero con 530 en ProductHackers, el segundo limpio); escaneos en seco sin escribir nada.
+
 ## Revisión del motor: el plan B pedía sin filtros de región (sesión 170) — 2026-11-13
 
 - **Encontrado con ojos frescos**: la vía API manda `countries=ES` / `regions=latam`, pero el plan B por `/jobs/__data.json` solo mandaba `q` (o `category=sales`) y `page`. Medido contra el proveedor: `q=closer&page=1` devuelve **16 de 20 filas brasileñas**; `q=closer&page=1&countries=ES` devuelve **20 de 20 españolas**; `regions=latam` devuelve 19/20 brasileñas. La página se gastaba en ofertas que el mercado rechazaría después.

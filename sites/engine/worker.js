@@ -295,6 +295,10 @@ const SOURCES = [
   { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
   { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
   { code: 'ats-recruitee-livestorm', name: 'Livestorm · Recruitee', kind: 'recruitee', slug: 'livestorm' },
+  // Últimos dos tableros gratuitos del catálogo que respondían y seguían fuera (2026-11-13: 50 y 4 ofertas).
+  { code: 'ats-greenhouse-cabify', name: 'Cabify · Greenhouse', kind: 'greenhouse', slug: 'cabify' },
+  // Teamtailor no siempre vive en `careers.<slug>.com`: este tablero usa el subdominio del propio ATS.
+  { code: 'ats-teamtailor-producthackers', name: 'ProductHackers · Teamtailor', kind: 'teamtailor', slug: 'producthackers', host: 'producthackers.teamtailor.com' },
   // JobToday recupera los cuatro slugs retirados el 2026-10-22 por «0 elegibles». La razón de entonces
   // ya no se sostiene: el vocabulario de rol ahora reconoce «comercial» a secas y «teleoperador», que
   // son justo los títulos de estas páginas. Los cinco slugs responden 200 hoy (356–724 KB).
@@ -447,7 +451,7 @@ async function sourceRecruitee(source) {
 }
 
 async function sourceTeamtailorRss(source) {
-  const xml = await fetchText(`https://careers.${source.slug}.com/jobs.rss`);
+  const xml = await fetchText(`https://${source.host ?? `careers.${source.slug}.com`}/jobs.rss`);
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, MAX_ITEMS_PER_SOURCE).map(m => {
     const item = m[1];
     const field = tag => (item.match(RSS_FIELD[tag]) || [])[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';

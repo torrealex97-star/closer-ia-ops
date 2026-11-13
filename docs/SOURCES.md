@@ -5,10 +5,10 @@ Actualizado: 2026-11-13. Los recuentos de esta cabecera y de la sección «Estad
 ## Estado real — medido el 2026-11-13
 
 - **Catálogo del panel: 65 entradas.** De ellas, **36** están marcadas `requires: input` («Requiere configurar») y 29 no piden configuración (22 recogidas y 7 libres sin conector).
-- **Motor cloud: 39 conectores** (`SOURCES`). Una pasada completa declara **112 subrequests de fetch** (tope 1.000 con Workers de pago; 50 en el plan gratuito, donde el planificador aplaza fuentes en vez de romper). El salto desde 79 es el plan B de FreeHire: tres páginas de datos por término cuando su API responde 429.
-- **25 entradas del catálogo tienen recogida ahora.** Las 39 fuentes del motor se agrupan por portal, así que las cifras no coinciden: JobToday son 13 conectores y FreeHire 4; el panel los suma en una fila.
+- **Motor cloud: 41 conectores** (`SOURCES`). Una pasada completa declara **114 subrequests de fetch** (tope 1.000 con Workers de pago; 50 en el plan gratuito, donde el planificador aplaza fuentes en vez de romper). El salto desde 79 es el plan B de FreeHire: tres páginas de datos por término cuando su API responde 429.
+- **27 entradas del catálogo tienen recogida ahora.** Las 41 fuentes del motor se agrupan por portal, así que las cifras no coinciden: JobToday son 13 conectores y FreeHire 4; el panel los suma en una fila.
 - **Sin duplicados engañosos (corregido el 2026-11-13)**: `getonbrd` era una segunda entrada del mismo portal que el motor recoge como `getonbrd-public` y se pintaba «Requiere configurar»; se eliminó. `freelancer` y `jobgether` se recogían pero su ficha seguía diciendo «Adaptador pendiente / Sin proveedor verificado»: ahora dicen «Conector operativo». Un test (`tests/engine/catalog.mjs`) falla si vuelve a pasar cualquiera de las dos cosas.
-- **2 entradas gratuitas sin conector hoy**: dos feeds muertos, Remote.jobs (301) y Remote First Jobs (404). Los tres tableros ATS que faltaban (Typeform · Greenhouse, Wallapop · Greenhouse y Livestorm · Recruitee) se reactivaron el 2026-11-13: respondían 200 y cuestan una petición cada uno.
+- **2 entradas gratuitas sin conector hoy**: dos feeds muertos, Remote.jobs (301) y Remote First Jobs (404). Los cinco tableros ATS que faltaban se reactivaron el 2026-11-13 —Typeform · Greenhouse, Wallapop · Greenhouse, Livestorm · Recruitee, Cabify · Greenhouse y ProductHackers · Teamtailor—: respondían 200 y cuestan una petición cada uno.
 
 ### Gratis y conectadas (36 conectores, coste cero)
 
@@ -21,11 +21,11 @@ Actualizado: 2026-11-13. Los recuentos de esta cabecera y de la sección «Estad
 | Remotive · Jobicy · Working Nomads · Jobspresso · RemotoJOB · We Work Remotely · Remote OK · Arbeitnow · Virtual Vocations | 9 | RSS o JSON públicos | 1 cada uno |
 | Freelancer.com | 1 | API pública de proyectos (encargos, no empleos) | 1 |
 | Jobgether | 1 | feed público | 1 |
-| ATS por empresa | 9 | Greenhouse (Fever, Stripe, Typeform, Wallapop), Ashby (Qonto, Pennylane), Recruitee (Holded, Livestorm), Teamtailor (Monest Capital) | 1 cada uno |
+| ATS por empresa | 11 | Greenhouse (Fever, Stripe, Typeform, Wallapop, Cabify), Ashby (Qonto, Pennylane), Recruitee (Holded, Livestorm), Teamtailor (Monest Capital, ProductHackers) | 1 cada uno |
 
 FreeHire necesita una nota aparte porque es la mayor fuente de volumen y la más frágil: su API limita **por IP de origen** (2.000 peticiones, `retry-after` que llegó a 62.740 s) y el Worker sale por las IPs de egreso compartidas de Cloudflare. Cuando ese pozo común se agota, la API devuelve 429 durante horas aunque su web siga viva: por eso el conector pide la ruta de datos de la web (200, 20 ofertas por página, con descripción y país) y lo declara en la nota del run. Medido el 2026-11-13: **237 filas** recuperadas en una pasada y **149 publicables** en la activación en seco.
 
-Ninguno de estos 39 pide clave, cuenta ni pago. Los ATS se amplían con un slug **verificado** (`boards-api.greenhouse.io/v1/boards/<slug>/jobs` debe devolver 200); un 401/404 no se adivina, se descarta.
+Ninguno de estos 41 pide clave, cuenta ni pago. Los ATS se amplían con un slug **verificado** (`boards-api.greenhouse.io/v1/boards/<slug>/jobs` debe devolver 200); un 401/404 no se adivina, se descarta.
 
 ### Gratis pero fuera del motor hoy (2)
 
