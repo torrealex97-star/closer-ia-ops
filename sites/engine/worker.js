@@ -46,10 +46,14 @@ const FREEHIRE_SPACING_MS = 2000;
 const FREEHIRE_RETRY_WAIT_MAX_MS = 5000;
 const FREEHIRE_TIME_BUDGET_MS = 15000;
 // Ritmo GLOBAL del dominio: las cuatro fuentes de FreeHire corren seguidas en la misma pasada y cada
-// una pedía su ráfaga (3 páginas la de categoría). Con el barrido completo de 22 fuentes (2026-11-12)
+// una pedía su ráfaga (3 páginas la de categoría). Con el barrido completo (36 fuentes desde el 2026-11-13)
 // las cuatro acabaron en 429: el espaciado por búsqueda no cubría el salto entre fuentes ni entre
 // páginas. Esta puerta pone aire a TODO lo que va a freehire.me, sin importar qué fuente lo pida.
 const FREEHIRE_GLOBAL_SPACING_MS = 1200;
+// Plan B (2026-11-13): páginas de 20 que se piden a `/jobs/__data.json` cuando la API responde 429.
+// El coste declarado en `fetchCost` multiplica por esto: es la mayor fuente de filas y no puede
+// quedarse fuera del presupuesto por un cálculo optimista.
+const FREEHIRE_DATA_PAGES = 3;
 let freehireGatedAt = 0;
 async function freehireGate() {
   const now = Date.now();
@@ -62,7 +66,9 @@ function fetchCost(source) {
   if (source.kind === 'getonbrd') return 2;
   if (source.kind === 'freehire') {
     const searches = source.terms ? (source.termsPerRun || 3) : (source.region === 'latam' ? 1 : 3);
-    return searches + FREEHIRE_RETRIES;
+    // +FREEHIRE_DATA_PAGES por término: las páginas de datos que se piden si la API responde 429 (el
+    // límite es por IP compartida, así que el plan B es el camino normal mientras dure el bloqueo).
+    return searches + FREEHIRE_RETRIES + searches * FREEHIRE_DATA_PAGES;
   }
   if (source.terms) return source.termsPerRun || 3;
   return 1;
@@ -517,6 +523,81 @@ async function sourceGetOnBoard() {
   return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
+// Una fila de FreeHire (API o HTML) → candidato, con las mismas reglas en las dos vías.
+function addFreehireRow(row, term, source, seen, all) {
+  const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
+  if (reality.class && !['fresh', null, undefined].includes(reality.class)) return;
+  const external = String(row.public_slug || row.url || '');
+  if (!external || !row.url || seen.has(external.slice(-120))) return;
+  seen.add(external.slice(-120));
+  const payload = {
+    title: row.title, company: row.company ?? row.company_name ?? null,
+    location: Array.isArray(row.countries) && row.countries.length ? row.countries.map(isoCountryName).join(', ') : (row.location || null),
+    url: row.url, posted_at: row.posted_at ?? null,
+    description: row.description ?? null,
+    raw: term ? { ...row, search_term: term } : row,
+  };
+  // Solo las búsquedas por término filtran por rol: el barrido por categoría conserva su
+  // comportamiento amplio (es el que descubre roles fuera del vocabulario de closer).
+  if (term && !isProfileCandidate(payload)) { countFiltered(source.code); return; }
+  all.push({ external_id: external.slice(-120), payload });
+}
+
+// Plan B de FreeHire cuando la API responde 429: la ruta de datos de SvelteKit
+// (`/jobs/__data.json?q=…`) entrega el MISMO JSON que la API (public_slug, url, título, empresa, país,
+// modalidad, descripción y `reality`) y no pasa por el limitador de la API. El HTML NO sirve: al Worker
+// le llega la cáscara de la SPA (251 KB, cero ofertas) con cualquier `Accept`. El JSON viene en formato
+// `devalue`: un array de valores donde los objetos y arrays guardan ÍNDICES (números) a ese mismo array.
+// Se resuelve recursivamente con tope de profundidad; un número que apunta a otro número es un literal.
+function freehireItemsFromData(body) {
+  let doc; try { doc = JSON.parse(body); } catch { return []; }
+  const node = (doc.nodes || []).find(n => Array.isArray(n?.data) && n.data[0] && typeof n.data[0] === 'object' && 'initial' in n.data[0]);
+  if (!node) return [];
+  const arr = node.data;
+  const fromNode = (v, depth = 0) => {
+    if (depth > 12) return null;
+    if (v === null || typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number') return v;
+    if (Array.isArray(v)) return v.map(x => ref(x, depth + 1));
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = ref(v[k], depth + 1);
+    return out;
+  };
+  const ref = (v, depth = 0) => typeof v === 'number'
+    ? (depth > 12 || v < 0 || v >= arr.length ? null : fromNode(arr[v], depth + 1))
+    : fromNode(v, depth);
+  const root = ref(0);
+  const items = root?.initial?.items;
+  return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
+// Prueba de red desde el Worker contra freehire.me: API y página de búsqueda, con lo que hace falta
+// para saber quién nos cierra la puerta (código, cabeceras del limitador, tamaño y si el HTML trae
+// el JSON incrustado). No acepta URL externa: son tres destinos fijos.
+async function handleNetProbe() {
+  const targets = [
+    { name: 'api', url: 'https://freehire.me/api/v1/jobs/search?q=closer&limit=1' },
+    { name: 'data', url: 'https://freehire.me/jobs/__data.json?q=closer', accept: 'application/json' },
+    { name: 'html', url: 'https://freehire.me/jobs?q=closer' },
+    { name: 'home', url: 'https://freehire.me/' },
+  ];
+  const out = [];
+  for (const target of targets) {
+    const started = Date.now();
+    try {
+      const response = await fetch(target.url, { headers: { 'User-Agent': UA, Accept: target.accept ?? '*/*', ...(target.accept ? { 'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8' } : {}) }, signal: AbortSignal.timeout(15000) });
+      const body = await response.text();
+      const pickHeaders = ['x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after', 'cf-cache-status', 'cf-ray', 'server'];
+      const headers = {};
+      for (const h of pickHeaders) { const v = response.headers.get(h); if (v) headers[h] = v; }
+      out.push({ target: target.name, status: response.status, ms: Date.now() - started, bytes: body.length, headers,
+        ...(target.name === 'data' ? { items: freehireItemsFromData(body).length } : {}) });
+    } catch (error) {
+      out.push({ target: target.name, status: 'error', ms: Date.now() - started, error: String(error.message || error).slice(0, 120) });
+    }
+  }
+  return Response.json({ probed_at: new Date().toISOString(), targets: out });
+}
+
 async function sourceFreehire(source) {
   // API pública v1 de freehire.me (agregador de 92 ATS, verificada 2026-10-13:
   // 2941 ofertas); igual que el conector local, solo 'fresh'/sin señal cuentan:
@@ -554,21 +635,7 @@ async function sourceFreehire(source) {
           retryAfterMaxMs: FREEHIRE_RETRY_WAIT_MAX_MS, budget: requests,
         }));
         const rows = data.data || [];
-        for (const row of rows) {
-          const reality = row.reality && typeof row.reality === 'object' ? row.reality : {};
-          if (reality.class && !['fresh', null, undefined].includes(reality.class)) continue;
-          const external = String(row.public_slug || row.url || '');
-          if (!external || !row.url || seen.has(external.slice(-120))) continue;
-          seen.add(external.slice(-120));
-          const payload = {
-            title: row.title, company: row.company ?? row.company_name ?? null, location: Array.isArray(row.countries) ? row.countries.map(isoCountryName).join(', ') : (row.location || null),
-            url: row.url, posted_at: row.posted_at ?? null, raw: term ? { ...row, search_term: term } : row,
-          };
-          // Solo las búsquedas por término filtran por rol: el barrido por categoría conserva su
-          // comportamiento amplio (es el que descubre roles fuera del vocabulario de closer).
-          if (term && !isProfileCandidate(payload)) { countFiltered(source.code); continue; }
-          all.push({ external_id: external.slice(-120), payload });
-        }
+        for (const row of rows) addFreehireRow(row, term, source, seen, all);
         const total = data.meta?.total; const pageLen = rows.length;
         if (!Number.isFinite(total) || offset + 100 >= total || pageLen < 100) break;
       }
@@ -576,10 +643,59 @@ async function sourceFreehire(source) {
       const message = String(error.message || error);
       if (/presupuesto/.test(message)) cut = cut ?? 'presupuesto de la fuente agotado (429 repetido)';
       errors.push(`${term ?? 'categoría'}: ${message.slice(0, 80)}`);
+      // Si el PRIMER término ya vuelve 429, los demás van a volver igual: insistir solo quema reloj y
+      // presupuesto que necesita el plan B. Se corta la vía API y se pasa a las páginas de búsqueda.
+      if (index === 0 && /429/.test(message)) { cut = cut ?? 'API con 429'; break; }
     }
   }
-  if (cut) setNote(source.code, cut);
-  if (!all.length) throw new Error(`ninguna búsqueda respondió (${cut ?? errors[0] ?? 'sin respuesta'})`);
+  // Plan B cuando la API no dio NADA (no un 429 suelto): el limitador es por IP y el Worker comparte
+  // la de egreso, así que puede durar horas. Las páginas de búsqueda del mismo dominio no devuelven
+  // `x-ratelimit-*` y su HTML trae el JSON completo, así que se recogen por ahí y se dice en la nota.
+  // Dos páginas por término como máximo: mismo techo de peticiones que se declaró en `fetchCost`.
+  if (!all.length) {
+    let htmlRows = 0;
+    // Reloj propio: los reintentos de la API pueden haber agotado el de arriba. Si el HTML tampoco
+    // responde, el error se declara con su causa (no se disuelve en «ninguna búsqueda respondió»).
+    const htmlDeadline = Date.now() + 12000;
+    let dataDown = false;
+    for (const term of terms) {
+      if (dataDown || requests.left <= 0 || Date.now() >= htmlDeadline) break;
+      // Tres páginas de 20 por término: una sola daba 87 filas por pasada y esta es la mayor
+      // pérdida de volumen del catálogo. Una página corta se declara: si trae menos de 20, no hay más.
+      for (let page = 1; page <= FREEHIRE_DATA_PAGES; page++) {
+        if (requests.left <= 0 || Date.now() >= htmlDeadline) break;
+        const qs = new URLSearchParams();
+        if (term) qs.set('q', term); else qs.set('category', 'sales');
+        qs.set('page', String(page));
+        try {
+          await freehireGate();
+          if (requests.left <= 0) break;
+          requests.left -= 1;
+          const response = await fetch(`https://freehire.me/jobs/__data.json?${qs}`, {
+            headers: { 'User-Agent': UA, Accept: 'application/json' },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const body = await response.text();
+          const items = freehireItemsFromData(body);
+          if (!items.length) { errors.push(`datos ${term ?? 'categoría'} p${page}: 200 sin filas`); break; }
+          for (const row of items) addFreehireRow(row, term, source, seen, all);
+          htmlRows += items.length;
+          if (items.length < 20) break;
+        } catch (error) {
+          const message = String(error.message || error).slice(0, 60);
+          errors.push(`datos ${term ?? 'categoría'} p${page}: ${message}`);
+          if (/429/.test(message)) dataDown = true; /* plan B caído: no se insiste término tras término */
+          break;
+        }
+      }
+    }
+    if (htmlRows) setNote(source.code, `API con 429 · recuperadas ${all.length} filas por la ruta de datos`);
+  }
+  if (cut && !all.length) setNote(source.code, cut);
+  // La causa del corte Y los errores de las dos vías: si el plan B también falla, el run lo dice (si
+  // no, «API con 429» tapaba que las páginas de búsqueda tampoco respondían).
+  if (!all.length) throw new Error(`ninguna búsqueda respondió (${[cut, ...errors].filter(Boolean).slice(0, 3).join('; ') || 'sin respuesta'})`);
   return all.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
@@ -11752,6 +11868,13 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(request) });
     // Siembra del guardián con el contador real de la plataforma (ver handleWriteLedgerSeed). Antes de
     // las rutas admin por id, porque «write-ledger» no es una oportunidad; mismo ADMIN_TOKEN.
+    // Diagnóstico de red del PROPIO Worker (no de la máquina del operador): sirve para separar «el
+    // proveedor nos bloquea a nosotros» de «la fuente está caída». Solo tres URLs fijas, lectura.
+    if (url.pathname === '/v1/admin/net-probe') {
+      const probeCheck = requireAdmin(request, env);
+      if (probeCheck) return probeCheck;
+      return handleNetProbe();
+    }
     if (url.pathname === '/v1/admin/write-ledger/seed') {
       if (request.method !== 'POST') return Response.json({ detail: 'Solo POST' }, { status: 405 });
       const seedCheck = requireAdmin(request, env);

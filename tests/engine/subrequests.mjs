@@ -93,9 +93,13 @@ const TOTAL_COST = t.SOURCES.reduce((n, s) => n + fetchCost(s), 0);
 //    2026-11-12 (cierre): +4 gratuitas del catálogo (We Work Remotely, RemoteOK, Arbeitnow,
 //    Virtual Vocations) → 36 fuentes y 64.
 assert.equal(t.SOURCES.length, 36, 'el catálogo del motor tiene 36 fuentes: si cambia, actualizar la medida');
-assert.equal(TOTAL_COST, 64, 'coste medido del barrido completo: 64 subrequests de fetch');
+//    2026-11-13: el plan B de FreeHire (`/jobs/__data.json`) pasa a 3 páginas por término, que es lo
+//    que de verdad trae las ofertas mientras la API esté en 429 → 109 de coste declarado.
+assert.equal(TOTAL_COST, 109, 'coste medido del barrido completo: 109 subrequests de fetch');
 for (const source of t.SOURCES) {
-  assert.ok(fetchCost(source) >= 1 && fetchCost(source) <= 8, `${source.code}: coste fuera de rango (${fetchCost(source)})`);
+  // Tope 32 desde el plan B de FreeHire: sus fuentes declaran también las tres páginas de datos por
+  // término (las que se piden cuando la API responde 429 por la IP compartida del Worker).
+  assert.ok(fetchCost(source) >= 1 && fetchCost(source) <= 32, `${source.code}: coste fuera de rango (${fetchCost(source)})`);
 }
 
 // 1) Sin variables, la conducta del plan gratuito NO cambia: techo 50 y 16 de presupuesto.

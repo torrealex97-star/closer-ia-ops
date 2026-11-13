@@ -71,10 +71,11 @@ step('la rotación cubre todos los términos sin repetir y cambia cada día', ()
 });
 
 step('coste en peticiones por fuente: se usa para aplazar, no para recortar ofertas', () => {
-  // FreeHire declara su PEOR CASO: búsquedas + los dos reintentos de su backoff (sesión 138).
-  assert.equal(t.fetchCost({ kind: 'freehire', region: 'es' }), 5);
-  assert.equal(t.fetchCost({ kind: 'freehire', region: 'latam' }), 3);
-  assert.equal(t.fetchCost({ kind: 'freehire', region: 'es', terms: true, termsPerRun: 3 }), 5);
+  // FreeHire declara su PEOR CASO: búsquedas + los dos reintentos de su backoff (sesión 138) + tres
+  // páginas de datos por término, que es el plan B cuando la API responde 429 (2026-11-13).
+  assert.equal(t.fetchCost({ kind: 'freehire', region: 'es' }), 14);
+  assert.equal(t.fetchCost({ kind: 'freehire', region: 'latam' }), 6);
+  assert.equal(t.fetchCost({ kind: 'freehire', region: 'es', terms: true, termsPerRun: 3 }), 14);
   assert.equal(t.fetchCost({ kind: 'himalayas', terms: true, termsPerRun: 3 }), 3);
   assert.equal(t.fetchCost({ kind: 'jobtoday-cities', paths: ['a', 'b', 'c'] }), 3);
   assert.equal(t.fetchCost({ kind: 'getonbrd' }), 2);

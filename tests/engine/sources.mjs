@@ -177,21 +177,25 @@ try {
     await assert.rejects(
       () => sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 1 }),
       /ninguna búsqueda respondió \(.*(HTTP 429|presupuesto)/);
-    assert.equal(attempts, 3, 'dos reintentos: tres intentos en total');
+    // 4 = 1 búsqueda + 2 reintentos (la API) + 1 página de datos (el plan B, que con 429 también falla
+    // y no se insiste). Lo declarado (6) es el techo: 1 búsqueda + 2 reintentos + 3 páginas posibles.
+    assert.equal(attempts, 4, 'tres intentos a la API y uno a la ruta de datos');
+    assert.equal(fetchCost({ kind: 'freehire', region: 'es', terms: true, termsPerRun: 1 }), 6, 'lo declarado incluye las tres páginas del plan B');
   }
 
-  // 6c) Su backoff gasta SU parte del presupuesto y ni una petición más: con 3 búsquedas declaradas
-  //     (5 peticiones contando reintentos) un 429 persistente consume 5 intentos y se declara cortado.
+  // 6c) Un 429 persistente no se convierte en una tormenta de peticiones: el primer término se
+  //     intenta con sus dos reintentos, la vía API se corta y se prueba UNA página del plan B.
+  //     Lo declarado (14) es el techo; lo gastado (4) puede ser menos, nunca más.
   {
     let attempts = 0;
     globalThis.fetch = async () => { attempts++; return new Response('{}', { status: 429, headers: { 'retry-after': '0' } }); };
     resetSourceNotes();
     await assert.rejects(
       () => sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 3 }),
-      /presupuesto/);
-    assert.equal(attempts, 5, '5 = 3 búsquedas declaradas + 2 reintentos: ni una petición más');
-    assert.equal(fetchCost({ kind: 'freehire', region: 'es', terms: true, termsPerRun: 3 }), 5, 'lo declarado y lo gastado coinciden');
-    assert.match(noteOf('freehire-closer'), /presupuesto/, 'el corte se declara en el run');
+      /429/);
+    assert.equal(attempts, 4, '1 búsqueda con dos reintentos + 1 página del plan B: no se insiste término tras término');
+    assert.ok(fetchCost({ kind: 'freehire', region: 'es', terms: true, termsPerRun: 3 }) >= attempts, 'nunca se gasta más de lo declarado');
+    assert.match(noteOf('freehire-closer'), /429/, 'el corte se declara en el run');
   }
 
   // 6d) 2 s entre búsquedas a la misma API: la pasada hacía 11 seguidas y eso es lo que provoca el 429.
@@ -208,6 +212,38 @@ try {
     assert.equal(calls, 2, 'una petición por término');
     assert.ok(elapsed >= 1900, `espera 2 s entre búsquedas (medido ${elapsed} ms)`);
     assert.equal(noteOf('freehire-closer'), null, 'sin corte no se declara ninguno');
+  }
+
+  // 6e) Plan B (2026-11-13): la API responde 429 a TODO (el límite es por IP y el Worker comparte la
+  //     de egreso), pero `/jobs/__data.json` contesta 200 con el mismo contenido en formato `devalue`:
+  //     un array de valores donde objetos y arrays guardan índices. La fuente no es una caída: entrega
+  //     filas, con descripción, y lo dice en la nota.
+  {
+    const nodes = [
+      { type: 'data', data: [{ user: 1 }, null, 'en'] },
+      { type: 'data', data: [
+        { initial: 1, pageNumber: 13 }, { items: 2, total: 13 }, [3],
+        { public_slug: 4, url: 5, title: 6, company: 7, countries: 8, posted_at: 9, reality: 10, description: 11 },
+        'demo-closer-2', 'https://freehire.me/job/demo-closer-2', 'Closer Comercial', 'Acme', ['es'],
+        '2026-11-12T00:00:00Z', { class: 12 }, 'Cierre de ventas [con corchetes] y comillas', 'fresh', 1,
+      ] },
+    ];
+    let apiCalls = 0; let dataCalls = 0;
+    globalThis.fetch = async url => {
+      const u = String(url);
+      if (u.includes('/api/v1/jobs/search')) { apiCalls++; return new Response('{}', { status: 429, headers: { 'retry-after': '0' } }); }
+      if (u.includes('/jobs/__data.json')) { dataCalls++; return new Response(JSON.stringify({ type: 'data', nodes }), { status: 200, headers: { 'content-type': 'application/json' } }); }
+      return new Response('', { status: 404 });
+    };
+    resetSourceNotes();
+    const rows = await sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 1 });
+    assert.equal(apiCalls, 3, 'la API se intenta con sus dos reintentos antes de pasar al plan B');
+    assert.equal(dataCalls, 1, 'una ruta de datos por término');
+    assert.equal(rows.length, 1, 'el plan B entrega la fila, no una fuente caída');
+    assert.equal(rows[0].payload.title, 'Closer Comercial', 'el título sale del JSON devalue resuelto');
+    assert.equal(rows[0].payload.description, 'Cierre de ventas [con corchetes] y comillas', 'la descripción también');
+    assert.equal(rows[0].payload.location, 'España', 'el país ISO se traduce, no se inventa');
+    assert.match(noteOf('freehire-closer') ?? '', /429.*ruta de datos/s, 'el run declara de dónde vino');
   }
 } finally {
   globalThis.fetch = realFetch;
