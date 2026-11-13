@@ -576,29 +576,51 @@ function freehireItemsFromData(body) {
 }
 
 // Prueba de red desde el PROPIO Worker: distingue «el proveedor nos bloquea» de «la fuente está
-// caída», que no se puede ver desde la máquina del operador (otra IP). Dos destinos fijos, sin URL
-// libre, bajo ADMIN_TOKEN: la API que usamos y la ruta de datos que la sustituye.
+// caída», que no se puede ver desde la máquina del operador (otra IP). Tres destinos fijos, sin URL
+// libre, bajo ADMIN_TOKEN: la API que usamos, la ruta de datos que la sustituye y el servidor MCP
+// que el proveedor anuncia para agentes.
 async function handleNetProbe() {
+  const mcpBody = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'search', arguments: { query: 'closer' } } });
   const targets = [
     { name: 'api', url: 'https://freehire.me/api/v1/jobs/search?q=closer&limit=1' },
     { name: 'data', url: 'https://freehire.me/jobs/__data.json?q=closer', accept: 'application/json' },
+    { name: 'mcp', url: 'https://freehire.me/api/v1/mcp', accept: 'application/json, text/event-stream', method: 'POST', body: mcpBody },
   ];
   const out = [];
   for (const target of targets) {
     const started = Date.now();
     try {
-      const response = await fetch(target.url, { headers: { 'User-Agent': UA, Accept: target.accept ?? '*/*', ...(target.accept ? { 'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8' } : {}) }, signal: AbortSignal.timeout(15000) });
+      const response = await fetch(target.url, {
+        method: target.method ?? 'GET',
+        headers: { 'User-Agent': UA, Accept: target.accept ?? '*/*', ...(target.body ? { 'Content-Type': 'application/json' } : {}) },
+        ...(target.body ? { body: target.body } : {}),
+        signal: AbortSignal.timeout(15000),
+      });
       const body = await response.text();
       const pickHeaders = ['x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after', 'cf-cache-status', 'cf-ray', 'server'];
       const headers = {};
       for (const h of pickHeaders) { const v = response.headers.get(h); if (v) headers[h] = v; }
       out.push({ target: target.name, status: response.status, ms: Date.now() - started, bytes: body.length, headers,
-        ...(target.name === 'data' ? { items: freehireItemsFromData(body).length } : {}) });
+        ...(target.name === 'data' ? { items: freehireItemsFromData(body).length } : {}),
+        ...(target.name === 'mcp' ? { items: mcpRowCount(body) } : {}) });
     } catch (error) {
       out.push({ target: target.name, status: 'error', ms: Date.now() - started, error: String(error.message || error).slice(0, 120) });
     }
   }
   return Response.json({ probed_at: new Date().toISOString(), targets: out });
+}
+
+// El MCP contesta por SSE (`event: message` + `data: {...}`). Solo se cuenta lo que trae el `search`
+// de la sonda; si el cuerpo no es SSE o el proveedor devuelve un error JSON-RPC, cuenta 0.
+function mcpRowCount(body) {
+  try {
+    const line = body.split('\n').find(l => l.startsWith('data: '));
+    const payload = JSON.parse(line ? line.slice(6) : body);
+    const result = payload.result;
+    if (!result) return 0;
+    const text = result.content?.[0]?.text ?? '';
+    return (JSON.parse(text).results || []).length;
+  } catch { return 0; }
 }
 
 async function sourceFreehire(source) {

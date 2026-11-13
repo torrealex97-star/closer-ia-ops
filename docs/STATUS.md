@@ -1,5 +1,20 @@
 # Estado
 
+## ¿Sirve el MCP de freehire como plan B? (sesión 168) — 2026-11-13
+
+- **Pregunta**: el proveedor anuncia acceso MCP para agentes (`https://freehire.me/api/v1/mcp`, HTTP+SSE, 56 herramientas, sin clave para lectura). ¿Responde desde el Worker sin el 429 de la API y merece sustituir a `/jobs/__data.json`?
+- **Verificado desde producción (Worker, versión `7cfdeaa2`)**, dos sondas seguidas: `api` **429** con `retry-after: 59191` (~16,4 h), `data` **200** con 20 filas, **`mcp` 200 con 10 filas**. El bloqueo es por endpoint, no por IP: `data` y `mcp` pasan desde la misma IP de egreso que la API bloqueada. Límite del MCP: `x-ratelimit-limit: 300` por minuto.
+- **Lo que devuelve** (`search_jobs`): 10 filas por llamada con `title`, `company`, `location`, `countries`, `work_mode`, `seniority`, `source`, `url`, `slug`, `posted_at` y `summary` de ~400 caracteres. Pagina por `offset` (probado: `offset=10` devuelve otra página) y da `total`. `limit` **se ignora** (pedí 100 y 200 y devolvió 10 en ambos).
+- **Coste comparado para las 4 fuentes de FreeHire** (237 filas medidas):
+  | Vía | Peticiones | Texto completo |
+  |---|---|---|
+  | `__data.json` (plan B actual) | **12** (3 páginas × 4 términos, 20 filas c/u) | sí |
+  | MCP `search_jobs` | **24** (10 filas por llamada) | no: resumen de 400 caracteres |
+  | MCP + `fetch` por fila | **~261** (24 + 237) | sí |
+- **Decisión: NO sustituir.** El MCP es estable y no está bloqueado, pero cuesta el doble de peticiones para el mismo volumen y, o publica con un resumen truncado (inaceptable: rompe el gate de idioma y la descripción de la ficha), o gasta 1 petición por fila para el texto completo. `__data.json` da 20 filas con descripción entera por petición. El MCP queda como **plan C documentado**, a cablear solo si `__data.json` deja de responder; y si algún día se usa, será `search_jobs` para descubrir + `fetch` solo de las filas que vayan a publicarse.
+- **Cambio en el código**: la sonda `/v1/admin/net-probe` gana el destino `mcp` (POST `tools/call search`), para que esta comparación se pueda repetir sin desplegar nada. Los destinos siguen siendo tres URLs fijas, sin URL libre, bajo `ADMIN_TOKEN`.
+- **Probado**: `node --check` OK; `orphan-refs` PASS; sonda real en producción dos veces con el mismo resultado. No se tocó la recogida ni se publicó nada.
+
 ## Revisión de lo de hoy: lo que sobraba (sesión 167) — 2026-11-13
 
 - **Revisión con ojos frescos** de los cuatro commits de hoy (`4e33c08`, `8f7f4e1`, `20007c1`, `c622d19`). El árbol estaba limpio: no había cambios sin commitear, así que se revisó el diff `12a620c..HEAD`.
