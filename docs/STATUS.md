@@ -36,7 +36,7 @@
 - **Vigencia**: las **138 publicadas llevan verificación `open`** (ninguna se publicó sin comprobación). Retry-after de la API sigue en ~16 h, así que esta pasada no dependió de la API: las filas venían de la recogida de 08:00.
 - **Las 11 a revisión**, con motivo: 5 `content_not_corroborated` (la página no corrobora título/empresa) y 6 `source_blocked` (el portal bloquea la comprobación desde el Worker). No es un fallo del gate: es lo que el motor no puede verificar solo.
 - **Sin truncar**: `scan.truncated=false` en las cuatro y `deferred=0`; escrituras cobradas ~1.370 (una versión y un puntero por oferta más evidencia de verificación). CRON sigue sin `auto:true`, así que esto no consume la cuota de la recogida automática.
-- **Comprobado en base de datos** (4 muestras publicadas): `editorial_status='published'`, `opportunity_status='active'`.
+- **Comprobado en base de datos** (4 muestras publicadas): `editorial_status='published'`, `opportunity_status='active'`. Repetición posterior de la comprobación sobre **las 138 fichas una a una**: **138/138 siguen `published`** y las **11 a revisión siguen `needs_review`** (149 = 138 + 11, el mismo total del escaneo en seco).
 - **Incidencia honesta**: el primer intento usé `/v1/admin/activate` (sin `opportunities/`), que devolvió 404 en las cuatro llamadas **sin escribir nada**; corregida la ruta y repetido.
 
 ## ¿Sirve el MCP de freehire como plan B? (sesión 168) — 2026-11-13
