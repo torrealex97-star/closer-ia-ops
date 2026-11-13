@@ -1,5 +1,11 @@
 # Estado
 
+## Anuncios en inglés que exigen español (sesión 163) — 2026-11-13
+
+- **Anuncios en inglés que exigen español** (decisión del dueño, aplicada en `spanishBodyGate`): entra si el anuncio pide español explícitamente («Spanish speaker/speaking/required», «bilingual Spanish», «fluent in Spanish», «español requerido») con la exigencia a ≤30 caracteres; la tarjeta lo etiqueta «Anuncio en inglés · exige español» y la versión de activación guarda `language_requirements: ['Anuncio en inglés', 'Español exigido']`. No entra por mencionar «Spanish» suelto, ni el portugués, ni se reetiqueta un anuncio que ya está en español.
+- **Probado**: `tests/engine/latam.mjs` PASS con los casos nuevos (cinco fórmulas que entran y tres que no: «Spanish is a plus», oficina española, anuncio ya en español), y `sources`/`terms`/`subrequests` en PASS de la sesión anterior. Viajó en `7c4a86c0` y `267f7a18`. Medido en seco después: Fever **0 publicables** de 301 y Qonto **0** de 61; las 2 filas que seguían cayendo por idioma no piden español.
+
+
 ## Más fuentes gratuitas: sondeo y ampliación (sesión 162) — 2026-11-12
 
 - **Petición del operador**: usar más sitios gratis.

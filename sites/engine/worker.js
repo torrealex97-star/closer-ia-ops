@@ -1696,7 +1696,8 @@ async function handleAdminActivate(request, env) {
     // Sin texto no hay evidencia de idioma: no es «no está en español». Se deja en borrador (como antes)
     // en vez de retirar en bloque, con un motivo falso, todo lo que llega sin descripción.
     if (!description.trim()) { skip('sin descripción: no se puede comprobar el idioma'); continue; }
-    if (!spanishBodyGate(description, false).ok) { reject(row.opportunity_id, 'el anuncio no está en español'); continue; }
+    const lang = spanishBodyGate(description, false);
+    if (!lang.ok) { reject(row.opportunity_id, 'el anuncio no está en español'); continue; }
     const ages = p.posted_at ? (Date.now() - Date.parse(p.posted_at)) / 86400000 : null;
     if (ages !== null && Number.isFinite(ages) && ages > days) { reject(row.opportunity_id, `publicado hace más de ${days} días`); continue; }
     const url = typeof p.url === 'string' && /^https:\/\//.test(p.url) ? p.url : null;
@@ -1712,7 +1713,7 @@ async function handleAdminActivate(request, env) {
       why_it_may_be_interesting: [],
       compensation_summary: typeof p.salary === 'string' && p.salary.trim() ? p.salary.trim().slice(0, 300) : 'No especificado',
       location_summary: asText(p.location) ?? 'No especificado',
-      language_requirements: ['Español'],
+      language_requirements: lang.langES ? ['Español'] : ['Anuncio en inglés', 'Español exigido'],
       experience_summary: 'No especificado',
       application_type: applicationType,
       application_url: url,
@@ -11269,12 +11270,21 @@ const LANG_EN = /\b(?:english|ingles)\b/;
 // legales compuestos se confunden al plegar ('vendas', 'comissoes', 'voce'); un anuncio
 // portugués nunca es oferta en español, ni siquiera con el opt-in bilingüe.
 const PORTUGUESE_TEXT = /\b(?:vendas|voce|comissoes|portugues|brasil)\b/;
+// ANUNCIO EN INGLÉS QUE EXIGE ESPAÑOL (decisión del dueño, 2026-11-12): se acepta si el anuncio pide
+// español de forma explícita («Spanish speaker», «Spanish speaking», «Spanish required», «bilingual
+// Spanish», «español requerido», «fluent in Spanish»). No basta con que aparezca «Spanish» suelto: se
+// exige junto a una palabra de exigencia a ≤30 caracteres, en cualquiera de los dos órdenes. Se
+// excluye el anuncio en español (ya entra por la vía normal) y el portugués (nunca es español).
+const ES_WORDS = 'spanish|espanol|castellano';
+const ES_DEMAND_WORDS = 'speaker|speaking|required|require|mandatory|fluent|fluency|native|proficient|needed|must|bilingual|requiere|requerido|exigido|exige|imprescindible';
+const LANG_ES_DEMANDED = new RegExp(`\\b(?:${ES_WORDS})\\b.{0,30}\\b(?:${ES_DEMAND_WORDS})\\b|\\b(?:${ES_DEMAND_WORDS})\\b.{0,30}\\b(?:${ES_WORDS})\\b`);
 function spanishBodyGate(description, includeBilingual = false) {
   const hayES = fold(description);
   const portuguese = PORTUGUESE_TEXT.test(hayES);
   const langES = (hayES.match(LANG_ES) || []).length >= 3;
   const enRequired = Boolean(hayES.match(LANG_EN)) && Boolean(hayES.match(LANG_EN_REQ));
-  return { ok: !portuguese && (includeBilingual || (langES && !enRequired)), portuguese, langES, enRequired };
+  const enRequiresSpanish = !langES && !portuguese && LANG_ES_DEMANDED.test(hayES);
+  return { ok: !portuguese && (includeBilingual || (langES && !enRequired) || enRequiresSpanish), portuguese, langES, enRequired, enRequiresSpanish };
 }
 
 // España EXPLÍCITA (ciudad o país), sin contar «remoto»/«europa», que no son un lugar.
@@ -11449,7 +11459,8 @@ async function studentSurface(env, { role, market, days, includeBilingual, starr
       compensation_note: note,
       modality,
       location: locationLabel(p.location),
-      language: langES ? 'Anuncio en español' : 'Anuncio original en inglés',
+      // Etiqueta explícita: quien lee la tarjeta sabe que el anuncio está en inglés y que pide español.
+      language: langES ? 'Anuncio en español' : (language.enRequiresSpanish ? 'Anuncio en inglés · exige español' : 'Anuncio original en inglés'),
       experience: /\bexperiencia\b/.test(fold(description)) ? excerpt(description, /\bexperiencia\b/, 'Experiencia no especificada') : 'Experiencia no especificada',
       schedule: excerpt(description, /\b(?:jornada|horario|disponibilidad|\d+\s*horas?\s*(?:semanal|a la semana))\b/, 'Horario no especificado'),
       contract: excerpt(description, /\b(?:contrato|contractor|freelance|autonom[oa])\b/, 'Contrato no especificado'),

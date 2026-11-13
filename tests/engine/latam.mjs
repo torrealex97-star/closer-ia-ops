@@ -30,6 +30,27 @@ assert.equal(spanishBodyGate(es + 'requiere ingles avanzado').ok, false);
 assert.equal(spanishBodyGate(es + 'english required').ok, false);
 assert.equal(spanishBodyGate(es + 'perfil bilingue english').ok, false);
 
+// Anuncio EN INGLÉS que EXIGE español (decisión del dueño, 2026-11-12): entra, y se marca para que la
+// tarjeta lo diga. No entra por mencionar «Spanish» suelto, ni el portugués, ni se reetiqueta un anuncio
+// que ya está en español.
+const en = 'We are hiring a high-ticket closer for our sales team. You will run demos and close deals with inbound leads. ';
+for (const [text, why] of [
+  ['Spanish speaker required.', 'la fórmula literal'],
+  ['Spanish speaking candidates only.', 'spanish speaking'],
+  ['Bilingual Spanish is a must.', 'bilingüe + spanish'],
+  ['Must be fluent in Spanish.', 'fluent in spanish'],
+  ['Se requiere español.', 'exigencia en español'],
+]) {
+  const gate = spanishBodyGate(en + text);
+  assert.equal(gate.ok, true, `entra: ${why}`);
+  assert.equal(gate.enRequiresSpanish, true, `se marca: ${why}`);
+  assert.equal(gate.langES, false, `es inglés, no español: ${why}`);
+}
+assert.equal(spanishBodyGate(en + 'Spanish is a plus.').ok, false, '«plus» no es una exigencia');
+assert.equal(spanishBodyGate(en + 'Our Spanish office is in Madrid.').ok, false, 'nombrar el mercado no es exigir el idioma');
+assert.equal(spanishBodyGate('Buscamos closer para nuestro equipo de ventas, con experiencia y clientes. ' + en + 'Spanish speaker required.').enRequiresSpanish, false, 'un anuncio en español no se reetiqueta');
+assert.equal(spanishBodyGate('Vagas de vendas para nosso time. Procuramos closer com comissoes. ' + en + 'Spanish speaker required.').ok, false, 'portugués nunca entra, ni pidiendo español');
+
 assert.equal(activationBudget({}), 25, 'plan gratuito: 25');
 assert.equal(activationBudget({ SUBREQUEST_LIMIT: '1000' }), 150, 'plan de pago: tope 150');
 assert.equal(activationBudget({ SUBREQUEST_LIMIT: '200' }), 41);
