@@ -4,13 +4,13 @@ Actualizado: 2026-11-13. Los recuentos de esta cabecera y de la sección «Estad
 
 ## Estado real — medido el 2026-11-13
 
-- **Catálogo del panel: 65 entradas.** De ellas, **36** están marcadas `requires: input` («Requiere configurar») y 29 no piden configuración (22 recogidas y 7 libres sin conector).
+- **Catálogo del panel: 68 entradas.** De ellas, **36** están marcadas `requires: input` («Requiere configurar») y 32 no piden configuración (30 recogidas y 2 libres sin conector).
 - **Motor cloud: 41 conectores** (`SOURCES`). Una pasada completa declara **114 subrequests de fetch** (tope 1.000 con Workers de pago; 50 en el plan gratuito, donde el planificador aplaza fuentes en vez de romper). El salto desde 79 es el plan B de FreeHire: tres páginas de datos por término cuando su API responde 429.
-- **27 entradas del catálogo tienen recogida ahora.** Las 41 fuentes del motor se agrupan por portal, así que las cifras no coinciden: JobToday son 13 conectores y FreeHire 4; el panel los suma en una fila.
+- **30 entradas del catálogo tienen recogida ahora.** Las 41 fuentes del motor se agrupan por portal, así que las cifras no coinciden: JobToday son 13 conectores y FreeHire 4; el panel los suma en una fila.
 - **Sin duplicados engañosos (corregido el 2026-11-13)**: `getonbrd` era una segunda entrada del mismo portal que el motor recoge como `getonbrd-public` y se pintaba «Requiere configurar»; se eliminó. `freelancer` y `jobgether` se recogían pero su ficha seguía diciendo «Adaptador pendiente / Sin proveedor verificado»: ahora dicen «Conector operativo». Un test (`tests/engine/catalog.mjs`) falla si vuelve a pasar cualquiera de las dos cosas.
 - **2 entradas gratuitas sin conector hoy**: dos feeds muertos, Remote.jobs (301) y Remote First Jobs (404). Los cinco tableros ATS que faltaban se reactivaron el 2026-11-13 —Typeform · Greenhouse, Wallapop · Greenhouse, Livestorm · Recruitee, Cabify · Greenhouse y ProductHackers · Teamtailor—: respondían 200 y cuestan una petición cada uno.
 
-### Gratis y conectadas (36 conectores, coste cero)
+### Gratis y conectadas (41 conectores, coste cero)
 
 | Portal | Conectores | Cómo se lee | Coste por pasada |
 |---|---|---|---|
@@ -146,7 +146,7 @@ Solo entra como conector coste cero lo verificado en vivo con datos reales. Todo
 
 ## Expansión documental US — 2026-09-22
 
-La nueva investigación añade 17 fichas priorizadas en [18_US_HISPANIC_SOURCE_RESEARCH](spec/18_US_HISPANIC_SOURCE_RESEARCH.md). El catálogo ejecutable seguía con 33 entradas y seis conectores públicos **cuando se escribió esta sección (2026-09-22)**; los recuentos vigentes están en «Estado real — medido el 2026-11-13» (36 conectores, 66 entradas). Esta entrega no cambió los recuentos de entonces ni activó scrapers.
+La nueva investigación añade 17 fichas priorizadas en [18_US_HISPANIC_SOURCE_RESEARCH](spec/18_US_HISPANIC_SOURCE_RESEARCH.md). El catálogo ejecutable seguía con 33 entradas y seis conectores públicos **cuando se escribió esta sección (2026-09-22)**; los recuentos vigentes están en «Estado real — medido el 2026-11-13» (41 conectores, 68 entradas). Esta entrega no cambió los recuentos de entonces ni activó scrapers.
 
 Prioridad: ATS por empresa (Greenhouse/Lever/Ashby), recruiters LATAM→US (Remote Latinos/HireLATAM/Near), boards hispanos (Hispanic-Jobs/iHispano/DiversityJobs) y fuentes remotas/ventas/comunidades. Acceso y bloqueos documentados por ficha; sin Actors nuevos declarados operativos.
 

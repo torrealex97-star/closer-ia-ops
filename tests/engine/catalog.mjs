@@ -34,7 +34,19 @@ assert.deepEqual(stale.map(c => c.code), [], 'entradas recogidas que aún dicen 
 
 // 4) El recuento que ve el operador: entradas del catálogo que el panel marca como recogidas.
 const connected = catalog.filter(c => cloud.has(c.code));
-assert.equal(connected.length, 27, `entradas conectadas esperadas 27, hay ${connected.length}: ${connected.map(c => c.code).join(', ')}`);
-assert.equal(catalog.length, 65, `el catálogo tiene 65 entradas, hay ${catalog.length}`);
+assert.equal(connected.length, 30, `entradas conectadas esperadas 30, hay ${connected.length}: ${connected.map(c => c.code).join(', ')}`);
+assert.equal(catalog.length, 68, `el catálogo tiene 68 entradas, hay ${catalog.length}`);
 
-console.log('PASS  catálogo sin duplicados engañosos: 65 entradas, 27 conectadas y ninguna que pida configurar lo que el motor ya recoge');
+// 5) Un tablero ATS es UNA entrada: conector en el motor y ficha en el catálogo, con el mismo código y
+//    el mismo nombre. Faltaban Fever, Qonto y Holded —el motor los recogía y el panel no los enseñaba— y
+//    dos fichas llevaban el nombre del slug («Monestcapital», «Producthackers») en vez del de la empresa.
+const engineAts = __test.SOURCES.filter(s => s.code.startsWith('ats-'));
+const catalogAts = new Map(catalog.filter(c => c.code.startsWith('ats-')).map(c => [c.code, c]));
+assert.deepEqual(engineAts.filter(s => !catalogAts.has(s.code)).map(s => s.code), [], 'conectores ATS sin ficha en el catálogo: el panel no los enseña');
+assert.deepEqual([...catalogAts.keys()].filter(code => !engineAts.some(s => s.code === code)), [], 'fichas ATS sin conector en el motor: anuncian una recogida que no existe');
+assert.deepEqual(
+  engineAts.filter(s => catalogAts.has(s.code) && catalogAts.get(s.code).name !== s.name).map(s => `${s.code}: motor «${s.name}» ≠ catálogo «${catalogAts.get(s.code).name}»`),
+  [], 'el mismo tablero con dos nombres distintos',
+);
+
+console.log(`PASS  catálogo sin duplicados engañosos: ${catalog.length} entradas, ${connected.length} conectadas, ${engineAts.length} ATS con ficha única y ninguna que pida configurar lo que el motor ya recoge`);

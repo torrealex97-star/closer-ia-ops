@@ -238,10 +238,32 @@
   "upstream_filters": []
  },
  {
+  "code": "ats-ashby-qonto",
+  "name": "Qonto · Ashby",
+  "category": "Empresas",
+  "website": "https://api.ashbyhq.com/posting-api/job-board/qonto",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
   "code": "ats-greenhouse-cabify",
   "name": "Cabify · Greenhouse",
   "category": "Empresas",
   "website": "https://boards-api.greenhouse.io/v1/boards/cabify/jobs",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
+  "code": "ats-greenhouse-feverup",
+  "name": "Fever · Greenhouse",
+  "category": "Empresas",
+  "website": "https://boards-api.greenhouse.io/v1/boards/feverup/jobs",
   "acquisition_method": "ATS público por empresa",
   "validation_status": "Conector operativo",
   "requires": "none",
@@ -282,6 +304,17 @@
   "upstream_filters": []
  },
  {
+  "code": "ats-recruitee-holded",
+  "name": "Holded · Recruitee",
+  "category": "Empresas",
+  "website": "https://holded.recruitee.com/api/offers/",
+  "acquisition_method": "ATS público por empresa",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Tablero ATS público de la empresa, según la watchlist. La oferta se publica primero aquí; el enlace y la atribución son de la empresa.",
+  "upstream_filters": []
+ },
+ {
   "code": "ats-recruitee-livestorm",
   "name": "Livestorm · Recruitee",
   "category": "Empresas",
@@ -294,7 +327,7 @@
  },
  {
   "code": "ats-teamtailor-monestcapital",
-  "name": "Monestcapital · Teamtailor",
+  "name": "Monest Capital · Teamtailor",
   "category": "Empresas",
   "website": "https://careers.monestcapital.com/jobs.rss",
   "acquisition_method": "ATS público por empresa",
@@ -305,7 +338,7 @@
  },
  {
   "code": "ats-teamtailor-producthackers",
-  "name": "Producthackers · Teamtailor",
+  "name": "ProductHackers · Teamtailor",
   "category": "Empresas",
   "website": "https://producthackers.teamtailor.com/jobs.rss",
   "acquisition_method": "ATS público por empresa",

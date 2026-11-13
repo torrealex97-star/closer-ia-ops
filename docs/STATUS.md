@@ -1,5 +1,14 @@
 # Estado
 
+## Revisión del catálogo: tres ATS recogidos que el panel no enseñaba (sesión 173) — 2026-11-13
+
+- **Fallo encontrado**: Fever, Qonto y Holded se recogían cada pasada desde hace días **sin ficha en el catálogo**, así que el panel no los enseñaba como conectados y los recuentos no cuadraban con el motor (41 conectores frente a 27 entradas conectadas). No es un fallo del panel: eran 3 de las 11 fuentes ATS que nunca se dieron de alta en `sourceCatalog.json`.
+- **Forma más simple de tener los ATS sin repetir entradas**: una sola ficha por tablero, con **el mismo código y el mismo nombre** que el conector, y un test que lo haga imposible de romper (`catalog.mjs` caso 5): falla si un conector `ats-*` no tiene ficha, si una ficha `ats-*` no tiene conector o si los nombres divergen. Es la regla que ya existía para los portales con alias, aplicada a los ATS.
+- **Corregido**: 3 fichas nuevas (`ats-greenhouse-feverup`, `ats-ashby-qonto`, `ats-recruitee-holded`) y dos nombres alineados con el motor («Monestcapital» → **Monest Capital**, «Producthackers» → **ProductHackers**).
+- **Recuentos que ahora cuadran** (código, no copia): catálogo **68 entradas** (36 `requires: input` + 32 libres), **30 conectadas**, **41 conectores**, **114 subrequests**, **11 ATS con ficha única**. `docs/SOURCES.md` actualizado en las cinco cifras que estaban viejas (65/27/36 conectores y el par 22+7); la tabla de ATS ya decía 11 y sigue bien.
+- **Revisado y sin cambios**: `sourceFamilies.ts` (los 4 alias y los 4 slugs propios de JobToday siguen existiendo en el motor; nada muerto), `sourceSetup.ts` (sus recetas `company` y `custom` sí son alcanzables) y el motor, que no se toca en esta sesión.
+- **Probado**: `catalog`, `subrequests`, `sources`, `terms` y `latam` en PASS; `tsc --noEmit` limpio; `orphan-refs` PASS. Web reconstruida y desplegada para que el panel enseñe las tres fichas nuevas.
+
 ## ¿Aportan algo los ATS de empresa? Cero elegibles en 889 (sesión 172) — 2026-11-13
 
 - **Petición**: medir en seco cuántas ofertas elegibles aporta cada ATS de empresa conectado, para decidir si merece la pena mantenerlos. Sin publicar nada (`dry_run`, mercado ES).
