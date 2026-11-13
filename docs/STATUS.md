@@ -1,5 +1,27 @@
 # Estado
 
+## ¿Aportan algo los ATS de empresa? Cero elegibles en 889 (sesión 172) — 2026-11-13
+
+- **Petición**: medir en seco cuántas ofertas elegibles aporta cada ATS de empresa conectado, para decidir si merece la pena mantenerlos. Sin publicar nada (`dry_run`, mercado ES).
+- **Resultado**: **0 publicables de 889 borradores** en los nueve tableros, y **0 elegibles** en el embudo para todos ellos (el total del motor sigue siendo 138, todas de FreeHire).
+
+| Fuente | En catálogo | Escaneadas | Publicaría | Fuera por perfil | Por mercado | Por idioma | Sin descripción |
+|---|---|---|---|---|---|---|---|
+| Fever · Greenhouse | 301 | 301 | **0** | 295 | 2 | 0 | 4 |
+| Stripe · Greenhouse | 306 | 306 | **0** | 170 | 134 | 0 | 0 |
+| Qonto · Ashby | 61 | 61 | **0** | 56 | 3 | 2 | 0 |
+| Pennylane · Ashby | 201 | 201 | **0** | 184 | 16 | 1 | 0 |
+| Holded · Recruitee | 8 | 8 | **0** | 8 | 0 | 0 | 0 |
+| Monest Capital · Teamtailor | 1 | 0 | **0** | — | — | — | — |
+| Typeform · Greenhouse | 6 | 6 | **0** | 3 | 3 | 0 | 0 |
+| Wallapop · Greenhouse | 4 | 4 | **0** | 4 | 0 | 0 | 0 |
+| Livestorm · Recruitee | 2 | 2 | **0** | 0 | 2 | 0 | 0 |
+
+- **El dato que importa para decidir**: no es que fallen por poco. El patrón es doble y estable — **720 de 889 no son puestos comerciales** (ingeniería, producto, soporte, finanzas) y **160 sí lo son pero no son de España**: Stripe es el caso extremo, 134 comerciales globales (remotos o de otras geografías) y cero en España. Solo 3 se caen por idioma.
+- **Coste de mantenerlos**: 9 de los 114 subrequests declarados (8 %) y ~40 % del catálogo escaneado (889 de 2.286 filas) para 0 elegibles. No cuestan verificación (solo se verifica lo publicable), así que el gasto es de peticiones y de ruido en el pool, no de tiempo de operador.
+- **Recomendación**: **retirar Holded, Monest Capital, Typeform, Wallapop y Livestorm** (23 ofertas entre todas, 0 elegibles jamás) y **mantener Fever, Stripe, Qonto y Pennylane** con la etiqueta de «cobertura, no embudo»: son los cuatro que publican volumen real y el día que abran un rol comercial en España entran solos. La palanca que sí los activaría no es el conector, es `market: any` o `include_extra_roles` — decisión del dueño, no la tomo aquí.
+- **Medido**: 9 escaneos en seco (`dry_run`, sin escribir) contra la versión desplegada; `/api/funnel` confirma `elegible: 0` en las nueve y `138` en el total del motor.
+
 ## Los cinco tableros ATS gratuitos, dentro (sesión 171) — 2026-11-13
 
 - **Petición**: reactivar los tableros ATS gratuitos que responden 200 y no estaban en el motor. Tres ya entraron en la sesión 166 (Typeform, Wallapop, Livestorm); se añaden los dos que faltaban: **Cabify · Greenhouse** (50 ofertas) y **ProductHackers · Teamtailor** (4).
