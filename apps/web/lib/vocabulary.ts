@@ -28,7 +28,14 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'academic advisor', 'course advisor', 'bootcamp advisor',
     'patient advisor', 'patient coordinator', 'treatment coordinator',
     'treatment consultant', 'healthcare sales', 'medical sales advisor',
-    'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones', 'cierre de ventas', 'cierre comercial', 'cierre de negocios',
+    'asesor de pacientes', 'cierre de matriculas', 'cierre de inscripciones',
+    // Variantes con evidencia real (pasada de Workana 2026-10-26): un proyecto de
+    // «Seguimiento y Cierre de Ventas por WhatsApp» quedaba sin perfil.
+    'cierre de ventas', 'cierre comercial', 'cierre de negocios',
+    // «Business Developer» es un puesto de cierre en el mercado de formación y SaaS (mismo trabajo
+    // que un closer: llamada, propuesta, firma). Se escribe distinto de «Business Development
+    // Manager» a propósito: hasWord exige palabra completa, así que el mando NO cae aquí.
+    'business developer',
   ],
   setter: [
     'setter', 'appointment setter', 'sales setter', 'high-ticket setter',
@@ -39,11 +46,23 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'concertador comercial', 'captador de citas', 'captador de leads',
     'cualificador de leads', 'calificador de leads', 'lead qualifier',
     'lead qualification specialist', 'sales appointment setter',
-    'business appointment setter', 'teleconcertador', 'teleoperador comercial',
+    'business appointment setter', 'teleconcertador',
     'lead generation specialist', 'lead generation',
     'especialista en generacion de leads', 'especialista en prospeccion',
+    // ADR/BDR: abren y cualifican la reunión, no cierran. 'bdr' estaba solo en la familia sdr, que
+    // se evaluaba DESPUÉS: el título acababa en un cajón donde el perfil se lee mal. Aquí manda el
+    // orden (setter va antes que sdr) y la sigla suelta no se traga nada: hasWord exige frontera,
+    // así que «Madrid» no es un ADR.
+    'adr', 'bdr', 'account development representative',
+    'business development representative', 'appointment development representative',
   ],
   cold_caller: [
+    // «Teleoperador» es su propia familia, no un setter: llama para vender, no para agendar citas.
+    // Estaba solo como 'teleoperador comercial' dentro de setter, donde la mitad del vocabulario
+    // del puesto no caía (64 anuncios con «teleoperador» quedaron sin perfil).
+    'teleoperador', 'teleoperadora', 'teleoperador/a', 'teleoperadora/o',
+    'teleoperador comercial', 'teleoperadora comercial', 'teleoperador/a comercial',
+    'televenta', 'televentas', 'operador telefonico', 'operadora telefonica',
     'cold caller', 'cold calling', 'llamadas en frio',
     'prospector telefonico', 'prospectora telefonica', 'prospeccion telefonica',
   ],
@@ -52,7 +71,9 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'account manager', 'sales executive', 'sales consultant', 'sales advisor',
     'sales specialist', 'sales representative', 'commercial advisor',
     'commercial executive', 'business development executive',
-    'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas', 'ejecutivo(a) comercial', 'ejecutiva(o) comercial',
+    'ejecutivo comercial', 'ejecutiva comercial', 'ejecutivo de ventas',
+    // «Ejecutivo(a) Comercial» (Workana 2026-10-26): la forma con (a) no estaba y se perdía.
+    'ejecutivo(a) comercial', 'ejecutiva(o) comercial',
     'ejecutiva de ventas', 'asesor comercial', 'asesora comercial',
     'asesor/a comercial', 'asesor comercial senior', 'representante comercial',
     'representante de ventas', 'representante de ventas senior', 'agente comercial',
@@ -73,6 +94,10 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'asesores inmobiliarios', 'agente inmobiliario', 'agentes inmobiliarios',
     'agente inmobiliario/a', 'vendedor', 'vendedora', 'vendedor/a',
     'asesor de programas', 'asesor de cursos', 'asesor de masters',
+    // «Comercial» a secas es el título más repetido del mercado español («Comercial Junior»,
+    // «Comercial telefónico») y no estaba: 633 anuncios retirados por «sin perfil comercial»
+    // lo mencionan. Va en el ejecutivo comercial, que es la familia genérica de venta.
+    'comercial', 'comercial telefonico', 'comercial telefonica', 'comercial presencial',
     'comercial digital', 'comercial online', 'inside sales',
     'inside sales representative', 'inside sales specialist',
     'inbound sales representative', 'outbound sales representative',
@@ -80,7 +105,7 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
     'sales account executive', 'senior sales executive', 'remote sales consultant',
     'high-ticket sales consultant', 'high ticket sales consultant',
   ],
-  sdr: ['sdr', 'bdr', 'sales development', 'sales development representative'],
+  sdr: ['sdr', 'sales development', 'sales development representative'],
 };
 export const ES_HINTS = ['españa', 'spain', 'madrid', 'barcelona', 'valencia', 'sevilla', 'málaga', 'malaga', 'bilbao', 'zaragoza', 'remoto', 'europa'];
 export const NON_ES_HINTS = ['florida', 'texas', 'california', 'new york', 'london', 'londres', 'oklahoma', 'mississippi', 'georgia', 'st. petersburg', 'atlanta', 'nashville', 'dallas', 'okc'];

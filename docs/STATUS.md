@@ -1,5 +1,17 @@
 # Estado
 
+## Business Developer cierra; ADR/BDR agendan (sesión 177) — 2026-11-13
+
+- **`business developer` → closer**: en formación y SaaS es un puesto de cierre (llamada, propuesta, firma), no de desarrollo de negocio puro. Se escribe distinto de «business development manager» a propósito: `hasWord` exige palabra completa, así que el mando no cae en closer.
+- **`adr`, `bdr`, `account development representative`, `business development representative`, `appointment development representative` → setter**: abren y cualifican la reunión, no cierran. `bdr` estaba solo en la familia `sdr`, que se evalúa después, así que el título acababa en un cajón que se lee mal; ahora gana el orden setter.
+- **La sigla va por palabra completa**: «Madrid» contiene «adr» y sigue siendo `account_executive` (test explícito).
+- **Negativos cubiertos**: `Business Development Manager` (AE, no closer), `Head of Business Development`, `Director de Business Development`, `Sales Manager` → null; `Customer Success Manager` / `Specialist` / `Representative` → null. `Key Account Manager` sigue siendo AE.
+- **`tests/engine/roles.mjs`: 31 casos** (antes 10), incluidos el cuerpo de la oferta («buscamos business developer…», «equipo de bdr y adr…») y los dos casos de sigla engañosa.
+- **De paso, `tests/admin-auth/parity.mjs` estaba en rojo**: `apps/web/lib/vocabulary.ts` se había quedado atrás (le faltaban `comercial`, `comercial telefonico/telefonica/presencial` y toda la familia `cold_caller` con `teleoperador`, y aún tenía `teleoperador comercial` dentro de setter). Se regeneró el bloque `ROLE_KEYWORDS` del panel desde el motor: ahora es idéntico y el test pasa.
+- **Desplegado**: motor `74a25b4e`, web `b72426cf` (`BUILD_ID` `rplxOWGZ8F4DgOoRn5LUL` en producción). Sin publicar ofertas.
+- **Barridos reales (dos, mismos totales)**: **36 fuentes, 2.279 filas, 275 filtradas en origen, 0 aplazadas**; `himalayas-closer` cayó en ambos con **HTTP 429** («ningún término respondió»), límite del proveedor, no del vocabulario (la pasada de la sesión 176 la trajo entera). Sin elegibles nuevos que atribuir a este cambio en una sola pasada: la evidencia son los tests, no un delta medido.
+- **No tocado**: `apps/api/career/vocabulary.py` (backend Python anterior, con su propia taxonomía y otro orden de familias). Si ese servicio sigue siendo superficie viva, hay que decidir si se unifica o se retira antes de ampliarlo.
+
 ## Cinco ATS retirados: 23 ofertas y cero elegibles (sesión 176) — 2026-11-13
 
 - **Retirados del motor y del catálogo**: Holded · Recruitee, Monest Capital · Teamtailor, Typeform · Greenhouse, Wallapop · Greenhouse y Livestorm · Recruitee. 23 ofertas entre los cinco y **0 publicables en dos mediciones independientes** (sesiones 172 y 175); el criterio está escrito allí.

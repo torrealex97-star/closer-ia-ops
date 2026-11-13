@@ -2395,6 +2395,10 @@ const ROLE_KEYWORDS = {
     // Variantes con evidencia real (pasada de Workana 2026-10-26): un proyecto de
     // «Seguimiento y Cierre de Ventas por WhatsApp» quedaba sin perfil.
     'cierre de ventas', 'cierre comercial', 'cierre de negocios',
+    // «Business Developer» es un puesto de cierre en el mercado de formación y SaaS (mismo trabajo
+    // que un closer: llamada, propuesta, firma). Se escribe distinto de «Business Development
+    // Manager» a propósito: hasWord exige palabra completa, así que el mando NO cae aquí.
+    'business developer',
   ],
   setter: [
     'setter', 'appointment setter', 'sales setter', 'high-ticket setter',
@@ -2408,6 +2412,12 @@ const ROLE_KEYWORDS = {
     'business appointment setter', 'teleconcertador',
     'lead generation specialist', 'lead generation',
     'especialista en generacion de leads', 'especialista en prospeccion',
+    // ADR/BDR: abren y cualifican la reunión, no cierran. 'bdr' estaba solo en la familia sdr, que
+    // se evaluaba DESPUÉS: el título acababa en un cajón donde el perfil se lee mal. Aquí manda el
+    // orden (setter va antes que sdr) y la sigla suelta no se traga nada: hasWord exige frontera,
+    // así que «Madrid» no es un ADR.
+    'adr', 'bdr', 'account development representative',
+    'business development representative', 'appointment development representative',
   ],
   cold_caller: [
     // «Teleoperador» es su propia familia, no un setter: llama para vender, no para agendar citas.
@@ -2458,7 +2468,7 @@ const ROLE_KEYWORDS = {
     'sales account executive', 'senior sales executive', 'remote sales consultant',
     'high-ticket sales consultant', 'high ticket sales consultant',
   ],
-  sdr: ['sdr', 'bdr', 'sales development', 'sales development representative'],
+  sdr: ['sdr', 'sales development', 'sales development representative'],
 };
 // Señal fuerte de mercado España: la palabra España/país/ciudad explícita o 'remoto' en español.
 // No se usa 'es' ni 'europe' como hints sueltos (subcadenas triviales y demasiados falsos positivos);
