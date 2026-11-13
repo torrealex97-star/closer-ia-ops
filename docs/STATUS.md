@@ -1,5 +1,15 @@
 # Estado
 
+## Tres tableros gratuitos recuperados (sesión 166) — 2026-11-13
+
+- **Petición del operador**: volver a meter en el motor Typeform y Wallapop por Greenhouse y Livestorm por Recruitee, que responden y estaban fuera, y actualizar coste y recuentos en `docs/SOURCES.md`.
+- **Verificado antes de añadirlos** (200 y ofertas reales): Typeform · Greenhouse **6**, Wallapop · Greenhouse **4**, Livestorm · Recruitee **2**. Los tres ya tenían su ficha en el catálogo como «Conector operativo»: solo faltaba el conector en el motor.
+- **Cambios**: tres entradas nuevas en `SOURCES` (kind `greenhouse`/`recruitee`, 1 petición cada una) → **36 → 39 conectores** y coste declarado **109 → 112**. `tests/engine/subrequests.mjs` (39/112) y `tests/engine/catalog.mjs` (conectadas 22 → 25) actualizados.
+- **Barrido real medido (producción, versión `48452dfa`)**: **39/39 fuentes, 0 aplazadas, 2.317 filas** (antes 2.308); las tres nuevas completan **6/6, 4/4 y 2/2**.
+- **`docs/SOURCES.md`**: recuentos al día (39 conectores, 112 subrequests, 25 entradas con recogida), tabla de ATS ampliada a 9 y la sección «Gratis pero fuera del motor» reducida a los dos feeds muertos (Remote.jobs 301 y Remote First Jobs 404).
+- **Probado**: `subrequests`, `catalog` y `sources` en PASS; `node --check` OK; `tests/orphan-refs.mjs` PASS; `npm run handoff` OK. Sin publicar nada: la recogida no activa fichas.
+- **Limitación**: el rendimiento de estos tres tableros es bajo por diseño (son ATS de empresa en inglés: 12 filas en total). Están dentro por cobertura y coste cero, no porque vayan a mover el embudo.
+
 ## Catálogo sin duplicados engañosos (sesión 165) — 2026-11-13
 
 - **Petición del operador**: el panel seguía marcando «Requiere configurar» a Get on Board, Freelancer y Jobgether aunque el motor ya los recoge; quitar duplicados o cruzar bien, y comprobar el recuento.

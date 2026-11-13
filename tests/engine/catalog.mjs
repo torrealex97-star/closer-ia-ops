@@ -34,7 +34,7 @@ assert.deepEqual(stale.map(c => c.code), [], 'entradas recogidas que aún dicen 
 
 // 4) El recuento que ve el operador: entradas del catálogo que el panel marca como recogidas.
 const connected = catalog.filter(c => cloud.has(c.code));
-assert.equal(connected.length, 22, `entradas conectadas esperadas 22, hay ${connected.length}: ${connected.map(c => c.code).join(', ')}`);
+assert.equal(connected.length, 25, `entradas conectadas esperadas 25, hay ${connected.length}: ${connected.map(c => c.code).join(', ')}`);
 assert.equal(catalog.length, 65, `el catálogo tiene 65 entradas, hay ${catalog.length}`);
 
-console.log('PASS  catálogo sin duplicados engañosos: 65 entradas, 22 conectadas y ninguna que pida configurar lo que el motor ya recoge');
+console.log('PASS  catálogo sin duplicados engañosos: 65 entradas, 25 conectadas y ninguna que pida configurar lo que el motor ya recoge');

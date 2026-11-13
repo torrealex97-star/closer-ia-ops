@@ -290,6 +290,11 @@ const SOURCES = [
   // daba 401 hasta hoy) — ambas 1 fetch.
   { code: 'ats-greenhouse-stripe', name: 'Stripe · Greenhouse', kind: 'greenhouse', slug: 'stripe' },
   { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
+  // Tres tableros gratuitos del catálogo que se quedaron fuera al migrar al motor cloud y seguían
+  // respondiendo (verificado 2026-11-13: 6, 4 y 2 ofertas). Cuestan una petición cada uno.
+  { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
+  { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
+  { code: 'ats-recruitee-livestorm', name: 'Livestorm · Recruitee', kind: 'recruitee', slug: 'livestorm' },
   // JobToday recupera los cuatro slugs retirados el 2026-10-22 por «0 elegibles». La razón de entonces
   // ya no se sostiene: el vocabulario de rol ahora reconoce «comercial» a secas y «teleoperador», que
   // son justo los títulos de estas páginas. Los cinco slugs responden 200 hoy (356–724 KB).
