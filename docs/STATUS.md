@@ -1,5 +1,13 @@
 # Estado
 
+## El vocabulario de rol no es el cuello de botella (sesión 175) — 2026-11-13
+
+- **Medido contra los títulos reales de los cuatro tableros** (Fever, Stripe, Qonto, Pennylane; 1.610 títulos descargados hoy y `classifyRole` del motor aplicado): **1.418 no tienen rol comercial** y 192 sí. De los 1.418, solo **241 están en España**.
+- **El diagnóstico de partida era falso en el punto clave**: «Account Executive» aparece en **158 títulos y los 158 ya se clasifican**. Lo que no se reconoce son figuras de **prospección**, no de cierre: `account development representative` (12), `account development associate` (5) y `business development representative` (5) — **22 títulos, 0 con rol, 7 en España** — y `business developer` (2, ambos en España).
+- **Lo que no hay que añadir**, aunque suene comercial: `sales manager` (30, mando), `partnerships` (58, alianzas), `customer success` (23, retención) y `account manager` (6, ya clasificados: son técnicos). Ninguno es un puesto de cierre individual.
+- **Ampliación propuesta, si se quiere hacer**: `business developer` → `closer`; `account development representative`, `account development associate` y `business development representative` → `setter` (prospección, que ya es un rol del vocabulario). Techo medido: **7 títulos en España**, y varios son anuncios en inglés que no exigen español, así que el gate de idioma los seguiría retirando. Volumen esperado: 0-3 publicables.
+- **Conclusión**: ampliar el vocabulario mueve poco porque el contenido de esos tableros no son puestos de cierre en español; la palanca real sigue siendo `market: any`/`include_extra_roles` o fuentes con ofertas comerciales en España. Sin cambios de código en esta sesión.
+
 ## Segunda activación de FreeHire: 4 publicadas y 0 a revisión (sesión 174) — 2026-11-13
 
 - **Petición**: repetir la activación real con verificación de vigencia sobre las cuatro fuentes de FreeHire, sin tocar las 138 ya publicadas, y decir cuántas filas nuevas entran.
