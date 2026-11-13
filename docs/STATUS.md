@@ -1,5 +1,15 @@
 # Estado
 
+## Revisión de lo de hoy: lo que sobraba (sesión 167) — 2026-11-13
+
+- **Revisión con ojos frescos** de los cuatro commits de hoy (`4e33c08`, `8f7f4e1`, `20007c1`, `c622d19`). El árbol estaba limpio: no había cambios sin commitear, así que se revisó el diff `12a620c..HEAD`.
+- **Quitado (no aportaba nada)**: tres recetas de configuración inalcanzables en `apps/web/lib/sourceSetup.ts` (`adzuna` no tiene entrada de catálogo, `getonbrd` se eliminó del catálogo y `freelancer` ya no pide configurar), una comprobación de presupuesto duplicada en el bucle del plan B, y los destinos `html`/`home` de `/v1/admin/net-probe` (la página de búsqueda ya se sabe que llega sin datos; bastan API y ruta de datos).
+- **Comentarios corregidos**: el bloque del plan B seguía describiendo el HTML como fuente del JSON («su HTML trae el JSON completo»), que es justo la vía que no funciona; y el probe decía «tres destinos fijos» cuando ya son dos.
+- **Renombrado**: `htmlRows`/`htmlDeadline` → `dataRows`/`dataDeadline`, que es lo que realmente miden.
+- **Se queda, y por qué**: el decodificador `devalue` (~25 líneas) y el plan B son la única vía gratuita con la API en 429 por IP; la alternativa medida es un Actor de pago. El gate de idioma son 12 líneas y una condición. `net-probe` son ~25 líneas de diagnóstico que no se pueden reproducir desde otra IP.
+- **A vigilar**: `tests/engine/catalog.mjs` fija 65 entradas y 25 conectadas a mano, así que cada alta de fuente obliga a tocar código, test y docs. Es intencionado (evita que la documentación vuelva a mentir), pero es el punto más frágil del conjunto.
+- **Probado**: `sources`, `terms`, `subrequests`, `latam` y `catalog` PASS; `node --check` OK; `tsc --noEmit` limpio; `orphan-refs` y `handoff` OK. Motor desplegado; la web no se redespliega porque las ramas retiradas eran inalcanzables (el HTML servido es idéntico).
+
 ## Tres tableros gratuitos recuperados (sesión 166) — 2026-11-13
 
 - **Petición del operador**: volver a meter en el motor Typeform y Wallapop por Greenhouse y Livestorm por Recruitee, que responden y estaban fuera, y actualizar coste y recuentos en `docs/SOURCES.md`.

@@ -37,16 +37,6 @@ const RECIPES: Record<string, Setup> = {
     ],
     link: { href: 'https://es.jooble.org/api/about', label: 'Pedir clave de Jooble' },
   },
-  adzuna: {
-    requirement: 'Adzuna tiene API gratuita con registro (app_id + app_key) para España.',
-    steps: [
-      'Regístrate en developer.adzuna.com y crea una aplicación.',
-      'Copia APP_ID y APP_KEY y guárdalos como secretos del Worker.',
-      'La búsqueda se hace por país (ES) y término, con la clave en la query.',
-      'Su web bloquea el RSS (403 al Worker), así que la vía es la API, no el feed.',
-    ],
-    link: { href: 'https://developer.adzuna.com', label: 'Crear app en Adzuna' },
-  },
   company: {
     requirement: 'Los ATS públicos (Greenhouse, Ashby, Teamtailor, Recruitee, Lever) son gratis y no piden clave: se añade la empresa al motor.',
     steps: [
@@ -62,20 +52,6 @@ const RECIPES: Record<string, Setup> = {
       'Comprueba que la URL responde 200 y devuelve <item> (RSS) o un JSON con título y enlace.',
       'Añádela al motor como fuente de tipo rss con su URL.',
       'Si el portal bloquea al Worker (403/405), no hay conector posible sin proxy o actor de pago.',
-    ],
-  },
-  getonbrd: {
-    requirement: 'Get on Board ya está conectado en el motor (getonbrd). Esta entrada es la versión Apify y no hace falta.',
-    steps: [
-      'No configures nada: la API pública de Get on Board ya se recoge cada pasada.',
-      'Si quieres más cobertura LATAM, amplía los términos del motor, no un actor de pago.',
-    ],
-  },
-  freelancer: {
-    requirement: 'Freelancer.com ya se recoge desde su API pública (freelancer-closer).',
-    steps: [
-      'No hace falta clave ni actor: la API pública se consulta por términos cada pasada.',
-      'Recuerda que son encargos, no empleos: se sirven con presupuesto y sin salario.',
     ],
   },
 };

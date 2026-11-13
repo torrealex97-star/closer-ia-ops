@@ -575,15 +575,13 @@ function freehireItemsFromData(body) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
-// Prueba de red desde el Worker contra freehire.me: API y página de búsqueda, con lo que hace falta
-// para saber quién nos cierra la puerta (código, cabeceras del limitador, tamaño y si el HTML trae
-// el JSON incrustado). No acepta URL externa: son tres destinos fijos.
+// Prueba de red desde el PROPIO Worker: distingue «el proveedor nos bloquea» de «la fuente está
+// caída», que no se puede ver desde la máquina del operador (otra IP). Dos destinos fijos, sin URL
+// libre, bajo ADMIN_TOKEN: la API que usamos y la ruta de datos que la sustituye.
 async function handleNetProbe() {
   const targets = [
     { name: 'api', url: 'https://freehire.me/api/v1/jobs/search?q=closer&limit=1' },
     { name: 'data', url: 'https://freehire.me/jobs/__data.json?q=closer', accept: 'application/json' },
-    { name: 'html', url: 'https://freehire.me/jobs?q=closer' },
-    { name: 'home', url: 'https://freehire.me/' },
   ];
   const out = [];
   for (const target of targets) {
@@ -654,27 +652,25 @@ async function sourceFreehire(source) {
     }
   }
   // Plan B cuando la API no dio NADA (no un 429 suelto): el limitador es por IP y el Worker comparte
-  // la de egreso, así que puede durar horas. Las páginas de búsqueda del mismo dominio no devuelven
-  // `x-ratelimit-*` y su HTML trae el JSON completo, así que se recogen por ahí y se dice en la nota.
-  // Dos páginas por término como máximo: mismo techo de peticiones que se declaró en `fetchCost`.
+  // la de egreso, así que puede durar horas. La ruta de datos del mismo dominio no lleva
+  // `x-ratelimit-*` y entrega el JSON completo (el HTML no: llega la cáscara de la SPA).
   if (!all.length) {
-    let htmlRows = 0;
-    // Reloj propio: los reintentos de la API pueden haber agotado el de arriba. Si el HTML tampoco
-    // responde, el error se declara con su causa (no se disuelve en «ninguna búsqueda respondió»).
-    const htmlDeadline = Date.now() + 12000;
+    let dataRows = 0;
+    // Reloj propio: los reintentos de la API pueden haber agotado el de arriba. Si la ruta de datos
+    // tampoco responde, el error se declara con su causa (no se disuelve en «ninguna búsqueda respondió»).
+    const dataDeadline = Date.now() + 12000;
     let dataDown = false;
     for (const term of terms) {
-      if (dataDown || requests.left <= 0 || Date.now() >= htmlDeadline) break;
+      if (dataDown || requests.left <= 0 || Date.now() >= dataDeadline) break;
       // Tres páginas de 20 por término: una sola daba 87 filas por pasada y esta es la mayor
       // pérdida de volumen del catálogo. Una página corta se declara: si trae menos de 20, no hay más.
       for (let page = 1; page <= FREEHIRE_DATA_PAGES; page++) {
-        if (requests.left <= 0 || Date.now() >= htmlDeadline) break;
+        if (requests.left <= 0 || Date.now() >= dataDeadline) break;
         const qs = new URLSearchParams();
         if (term) qs.set('q', term); else qs.set('category', 'sales');
         qs.set('page', String(page));
         try {
           await freehireGate();
-          if (requests.left <= 0) break;
           requests.left -= 1;
           const response = await fetch(`https://freehire.me/jobs/__data.json?${qs}`, {
             headers: { 'User-Agent': UA, Accept: 'application/json' },
@@ -685,7 +681,7 @@ async function sourceFreehire(source) {
           const items = freehireItemsFromData(body);
           if (!items.length) { errors.push(`datos ${term ?? 'categoría'} p${page}: 200 sin filas`); break; }
           for (const row of items) addFreehireRow(row, term, source, seen, all);
-          htmlRows += items.length;
+          dataRows += items.length;
           if (items.length < 20) break;
         } catch (error) {
           const message = String(error.message || error).slice(0, 60);
@@ -695,7 +691,7 @@ async function sourceFreehire(source) {
         }
       }
     }
-    if (htmlRows) setNote(source.code, `API con 429 · recuperadas ${all.length} filas por la ruta de datos`);
+    if (dataRows) setNote(source.code, `API con 429 · recuperadas ${all.length} filas por la ruta de datos`);
   }
   if (cut && !all.length) setNote(source.code, cut);
   // La causa del corte Y los errores de las dos vías: si el plan B también falla, el run lo dice (si
