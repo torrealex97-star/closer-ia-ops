@@ -1,5 +1,23 @@
 # Estado
 
+## Activación real de FreeHire: 138 publicadas, 11 a revisión (sesión 169) — 2026-11-13
+
+- **Orden del operador**: activar de verdad lo que el escaneo en seco dio como publicable, con verificación de vigencia, sin límite de lote. Ejecutado `POST /v1/admin/opportunities/activate` con `dry_run:false` y `verify:true` (por defecto), una llamada por fuente.
+- **Resultado por fuente** (consideradas = fichas en borrador del pool con la ventana de frescura de 10 días):
+
+| Fuente | Consideradas | Publicadas | A revisión | Retiradas (clasificación) |
+|---|---|---|---|---|
+| `freehire-closer` | 73 | 2 | 2 | 69 |
+| `freehire-latam-closer` | 77 | 0 | 0 | 77 |
+| `freehire` | 317 | 135 | 8 | 174 |
+| `freehire-latam` | 158 | 1 | 1 | 156 |
+| **Total** | **625** | **138** | **11** | **476** |
+- **Vigencia**: las **138 publicadas llevan verificación `open`** (ninguna se publicó sin comprobación). Retry-after de la API sigue en ~16 h, así que esta pasada no dependió de la API: las filas venían de la recogida de 08:00.
+- **Las 11 a revisión**, con motivo: 5 `content_not_corroborated` (la página no corrobora título/empresa) y 6 `source_blocked` (el portal bloquea la comprobación desde el Worker). No es un fallo del gate: es lo que el motor no puede verificar solo.
+- **Sin truncar**: `scan.truncated=false` en las cuatro y `deferred=0`; escrituras cobradas ~1.370 (una versión y un puntero por oferta más evidencia de verificación). CRON sigue sin `auto:true`, así que esto no consume la cuota de la recogida automática.
+- **Comprobado en base de datos** (4 muestras publicadas): `editorial_status='published'`, `opportunity_status='active'`.
+- **Incidencia honesta**: el primer intento usé `/v1/admin/activate` (sin `opportunities/`), que devolvió 404 en las cuatro llamadas **sin escribir nada**; corregida la ruta y repetido.
+
 ## ¿Sirve el MCP de freehire como plan B? (sesión 168) — 2026-11-13
 
 - **Pregunta**: el proveedor anuncia acceso MCP para agentes (`https://freehire.me/api/v1/mcp`, HTTP+SSE, 56 herramientas, sin clave para lectura). ¿Responde desde el Worker sin el 429 de la API y merece sustituir a `/jobs/__data.json`?
