@@ -1,5 +1,16 @@
 # Estado
 
+## Revisión del motor: el plan B pedía sin filtros de región (sesión 170) — 2026-11-13
+
+- **Encontrado con ojos frescos**: la vía API manda `countries=ES` / `regions=latam`, pero el plan B por `/jobs/__data.json` solo mandaba `q` (o `category=sales`) y `page`. Medido contra el proveedor: `q=closer&page=1` devuelve **16 de 20 filas brasileñas**; `q=closer&page=1&countries=ES` devuelve **20 de 20 españolas**; `regions=latam` devuelve 19/20 brasileñas. La página se gastaba en ofertas que el mercado rechazaría después.
+- **Corregido**: el plan B envía los mismos filtros de región que la API (3 líneas). Aserción nueva en el caso 6e de `tests/engine/sources.mjs`: la URL de datos debe llevar `countries=ES`.
+- **Medido en producción (versión `c1072ad0`)**: recogida **39/39 fuentes, 0 aplazadas, 2.232 filas**; las cuatro fuentes de FreeHire traen **152 filas ya filtradas por región** (47 + 59 + 7 + 39) frente a las 237 globales de antes, y las notas siguen declarando «API con 429 · recuperadas por la ruta de datos». Escaneo en seco de lo nuevo: `freehire` 3 publicables de 7 (43 % frente al 24 % del lote global anterior), `freehire-closer` 0 de 1 por idioma.
+- **Lo que NO cambié, y por qué**:
+  - *Reintentos de la API* (1 búsqueda + 2 reintentos antes del plan B): los fijan los casos 6b/6c/6e y el presupuesto declarado; tocarlos obliga a rehacer la tabla de coste sin ganancia clara.
+  - *Decodificador `devalue`*: su tratamiento uniforme de números como índices **es** la semántica de devalue (un número literal vive en el array y se referencia por índice), así que no hay caso de más; los topes de profundidad cubren grafos raros sin coste.
+  - *Gate de inglés con español*: 8 líneas, excluye ya el español y el portugués por construcción; `enRequiresSpanish` no se solapa con `langES`, así que no hay ramas muertas que quitar. El caso límite («castellano» suelto) no vale un cambio de regex probado.
+- **Probado**: `sources`, `terms`, `subrequests` y `latam` en PASS; `node --check` OK; recogida real sin aplazamientos; escaneo en seco sin publicar nada.
+
 ## Activación real de FreeHire: 138 publicadas, 11 a revisión (sesión 169) — 2026-11-13
 
 - **Orden del operador**: activar de verdad lo que el escaneo en seco dio como publicable, con verificación de vigencia, sin límite de lote. Ejecutado `POST /v1/admin/opportunities/activate` con `dry_run:false` y `verify:true` (por defecto), una llamada por fuente.

@@ -690,6 +690,11 @@ async function sourceFreehire(source) {
         if (requests.left <= 0 || Date.now() >= dataDeadline) break;
         const qs = new URLSearchParams();
         if (term) qs.set('q', term); else qs.set('category', 'sales');
+        // Los mismos filtros de región que la vía API: sin ellos `q=closer` devuelve el catálogo
+        // global (medido 2026-11-13: 16 de 20 filas brasileñas) y la página se gastaba en ofertas que
+        // el mercado iba a rechazar después. Con `countries=ES`, la misma página es 20/20 española.
+        if (source.region === 'es') qs.set('countries', 'ES');
+        if (source.region === 'latam') qs.set('regions', 'latam');
         qs.set('page', String(page));
         try {
           await freehireGate();

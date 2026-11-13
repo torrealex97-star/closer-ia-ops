@@ -228,17 +228,18 @@ try {
         '2026-11-12T00:00:00Z', { class: 12 }, 'Cierre de ventas [con corchetes] y comillas', 'fresh', 1,
       ] },
     ];
-    let apiCalls = 0; let dataCalls = 0;
+    let apiCalls = 0; let dataCalls = 0; let dataUrl = '';
     globalThis.fetch = async url => {
       const u = String(url);
       if (u.includes('/api/v1/jobs/search')) { apiCalls++; return new Response('{}', { status: 429, headers: { 'retry-after': '0' } }); }
-      if (u.includes('/jobs/__data.json')) { dataCalls++; return new Response(JSON.stringify({ type: 'data', nodes }), { status: 200, headers: { 'content-type': 'application/json' } }); }
+      if (u.includes('/jobs/__data.json')) { dataCalls++; dataUrl = u; return new Response(JSON.stringify({ type: 'data', nodes }), { status: 200, headers: { 'content-type': 'application/json' } }); }
       return new Response('', { status: 404 });
     };
     resetSourceNotes();
     const rows = await sourceFreehire({ kind: 'freehire', code: 'freehire-closer', region: 'es', terms: true, termsPerRun: 1 });
     assert.equal(apiCalls, 3, 'la API se intenta con sus dos reintentos antes de pasar al plan B');
     assert.equal(dataCalls, 1, 'una ruta de datos por término');
+    assert.match(dataUrl, /countries=ES/, 'la ruta de datos lleva el mismo filtro de región que la API (sin él, 16 de 20 filas eran de Brasil)');
     assert.equal(rows.length, 1, 'el plan B entrega la fila, no una fuente caída');
     assert.equal(rows[0].payload.title, 'Closer Comercial', 'el título sale del JSON devalue resuelto');
     assert.equal(rows[0].payload.description, 'Cierre de ventas [con corchetes] y comillas', 'la descripción también');
