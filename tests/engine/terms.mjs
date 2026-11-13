@@ -113,7 +113,7 @@ step('el presupuesto por invocación reserva el gasto D1: lo que no cabe se apla
   // La pasada siguiente ABRE por lo aplazado o caído. El orden de cabecera sigue la rotación del día,
   // así que se compara el CONJUNTO y que ninguna completada se cuele por delante.
   const last = t.SOURCES.map(s => ({ code: s.code, status: 'completed' }));
-  const cut = ['himalayas-closer', 'freehire-latam-closer', 'ats-teamtailor-monestcapital'];
+  const cut = ['himalayas-closer', 'freehire-latam-closer', 'ats-greenhouse-cabify'];
   for (const code of cut) last.find(s => s.code === code).status = 'deferred';
   const next = t.planRun(t.SOURCES, JSON.stringify(last), '2026-10-27', undefined);
   assert.deepEqual([...next.resumed].sort(), [...cut].sort());

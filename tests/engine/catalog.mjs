@@ -34,8 +34,8 @@ assert.deepEqual(stale.map(c => c.code), [], 'entradas recogidas que aún dicen 
 
 // 4) El recuento que ve el operador: entradas del catálogo que el panel marca como recogidas.
 const connected = catalog.filter(c => cloud.has(c.code));
-assert.equal(connected.length, 30, `entradas conectadas esperadas 30, hay ${connected.length}: ${connected.map(c => c.code).join(', ')}`);
-assert.equal(catalog.length, 68, `el catálogo tiene 68 entradas, hay ${catalog.length}`);
+assert.equal(connected.length, 25, `entradas conectadas esperadas 25, hay ${connected.length}: ${connected.map(c => c.code).join(', ')}`);
+assert.equal(catalog.length, 63, `el catálogo tiene 63 entradas, hay ${catalog.length}`);
 
 // 5) Un tablero ATS es UNA entrada: conector en el motor y ficha en el catálogo, con el mismo código y
 //    el mismo nombre. Faltaban Fever, Qonto y Holded —el motor los recogía y el panel no los enseñaba— y

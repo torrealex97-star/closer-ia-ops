@@ -1,5 +1,15 @@
 # Estado
 
+## Cinco ATS retirados: 23 ofertas y cero elegibles (sesión 176) — 2026-11-13
+
+- **Retirados del motor y del catálogo**: Holded · Recruitee, Monest Capital · Teamtailor, Typeform · Greenhouse, Wallapop · Greenhouse y Livestorm · Recruitee. 23 ofertas entre los cinco y **0 publicables en dos mediciones independientes** (sesiones 172 y 175); el criterio está escrito allí.
+- **Recuentos verificados contra el código**: **36 conectores** (41 − 5), **109 subrequests** (114 − 5, una petición por tablero), catálogo **63 entradas** (68 − 5), **25 conectadas** (30 − 5), **6 ATS** (11 − 5: Fever, Stripe, Cabify, Qonto, Pennylane, ProductHackers).
+- **Barrido real medido (versión `3d1031ff`)**: **36/36 fuentes, 0 aplazadas, 0 fallidas, 2.267 filas**; las cinco retiradas no aparecen en la respuesta. Sin publicar nada.
+- **Web desplegada** (versión `4f944f2b`, build `r28MSqkyXNxBYaaQr7vCd`, `BUILD_ID` de producción coincidente) para que el panel deje de enseñar las cinco fichas.
+- **Fallo de test encontrado de paso**: `tests/admin-auth/families.mjs` llevaba **en rojo desde `8f7f4e1`** — esperaba `catalogCodeFor('getonbrd') === 'getonbrd'` cuando el alias correcto es `getonbrd-public`. Se corrige la expectativa (y las dos aserciones que citaban Monest Capital pasan a Cabify, que sigue en el motor). Ahora **4/4**.
+- **`terms.mjs`** usaba `ats-teamtailor-monestcapital` como fuente cortada de ejemplo; ahora usa `ats-greenhouse-cabify`. 11/11 pasos.
+- **Probado**: `subrequests`, `catalog`, `sources`, `terms` y `latam` en PASS; `families` 4/4; `orphan-refs` PASS; barrido real sin fallos.
+
 ## El vocabulario de rol no es el cuello de botella (sesión 175) — 2026-11-13
 
 - **Medido contra los títulos reales de los cuatro tableros** (Fever, Stripe, Qonto, Pennylane; 1.610 títulos descargados hoy y `classifyRole` del motor aplicado): **1.418 no tienen rol comercial** y 192 sí. De los 1.418, solo **241 están en España**.

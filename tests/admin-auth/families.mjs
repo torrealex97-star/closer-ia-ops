@@ -16,10 +16,13 @@ step('cada conector del motor cae en su portal del catálogo', () => {
   assert.equal(catalogCodeFor('freehire-latam'), 'freehire');
   assert.equal(catalogCodeFor('jobtoday-closer-ciudades'), 'jobtoday');
   assert.equal(catalogCodeFor('jobtoday'), 'jobtoday');
-  assert.equal(catalogCodeFor('getonbrd'), 'getonbrd');
+  // El conector se llama `getonbrd` y su ficha `getonbrd-public`: el alias es lo que impedía que el
+  // panel lo leyera como «fuera del cloud» (esto quedó sin actualizar en 8f7f4e1 y el test llevaba
+  // desde entonces en rojo sin que nadie lo mirara).
+  assert.equal(catalogCodeFor('getonbrd'), 'getonbrd-public');
   // Lo que no es una familia conocida se queda como está (no se inventa un portal).
-  assert.equal(catalogCodeFor('ats-teamtailor-monestcapital'), 'ats-teamtailor-monestcapital');
-  assert.equal(catalogCodeFor('monestcapital'), 'monestcapital');
+  assert.equal(catalogCodeFor('ats-greenhouse-cabify'), 'ats-greenhouse-cabify');
+  assert.equal(catalogCodeFor('cabify'), 'cabify');
 });
 
 const row = (code, patch = {}) => ({ code, name: code, run_status: 'completed', fetched: 10, catalog: 5, eligible: 1, selected: 0, warning: null, ...patch });

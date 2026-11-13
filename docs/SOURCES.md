@@ -4,13 +4,14 @@ Actualizado: 2026-11-13. Los recuentos de esta cabecera y de la sección «Estad
 
 ## Estado real — medido el 2026-11-13
 
-- **Catálogo del panel: 68 entradas.** De ellas, **36** están marcadas `requires: input` («Requiere configurar») y 32 no piden configuración (30 recogidas y 2 libres sin conector).
-- **Motor cloud: 41 conectores** (`SOURCES`). Una pasada completa declara **114 subrequests de fetch** (tope 1.000 con Workers de pago; 50 en el plan gratuito, donde el planificador aplaza fuentes en vez de romper). El salto desde 79 es el plan B de FreeHire: tres páginas de datos por término cuando su API responde 429.
-- **30 entradas del catálogo tienen recogida ahora.** Las 41 fuentes del motor se agrupan por portal, así que las cifras no coinciden: JobToday son 13 conectores y FreeHire 4; el panel los suma en una fila.
+- **Catálogo del panel: 63 entradas.** De ellas, **36** están marcadas `requires: input` («Requiere configurar») y 27 no piden configuración (25 recogidas y 2 libres sin conector).
+- **Motor cloud: 36 conectores** (`SOURCES`). Una pasada completa declara **109 subrequests de fetch** (tope 1.000 con Workers de pago; 50 en el plan gratuito, donde el planificador aplaza fuentes en vez de romper). El salto desde 79 es el plan B de FreeHire: tres páginas de datos por término cuando su API responde 429.
+- **25 entradas del catálogo tienen recogida ahora.** Las 36 fuentes del motor se agrupan por portal, así que las cifras no coinciden: JobToday son 13 conectores y FreeHire 4; el panel los suma en una fila.
 - **Sin duplicados engañosos (corregido el 2026-11-13)**: `getonbrd` era una segunda entrada del mismo portal que el motor recoge como `getonbrd-public` y se pintaba «Requiere configurar»; se eliminó. `freelancer` y `jobgether` se recogían pero su ficha seguía diciendo «Adaptador pendiente / Sin proveedor verificado»: ahora dicen «Conector operativo». Un test (`tests/engine/catalog.mjs`) falla si vuelve a pasar cualquiera de las dos cosas.
-- **2 entradas gratuitas sin conector hoy**: dos feeds muertos, Remote.jobs (301) y Remote First Jobs (404). Los cinco tableros ATS que faltaban se reactivaron el 2026-11-13 —Typeform · Greenhouse, Wallapop · Greenhouse, Livestorm · Recruitee, Cabify · Greenhouse y ProductHackers · Teamtailor—: respondían 200 y cuestan una petición cada uno.
+- **2 entradas gratuitas sin conector hoy**: dos feeds muertos, Remote.jobs (301) y Remote First Jobs (404).
+- **Cinco tableros ATS retirados el 2026-11-13** por cero elegibles en dos mediciones independientes: Holded · Recruitee, Monest Capital · Teamtailor, Typeform · Greenhouse, Wallapop · Greenhouse y Livestorm · Recruitee (23 ofertas entre los cinco, ninguna publicable nunca). Responden 200 y cuestan una petición, así que volver a conectarlos es re-añadir su fila; el criterio de retirada está en STATUS (sesión 172).
 
-### Gratis y conectadas (41 conectores, coste cero)
+### Gratis y conectadas (36 conectores, coste cero)
 
 | Portal | Conectores | Cómo se lee | Coste por pasada |
 |---|---|---|---|
@@ -21,7 +22,7 @@ Actualizado: 2026-11-13. Los recuentos de esta cabecera y de la sección «Estad
 | Remotive · Jobicy · Working Nomads · Jobspresso · RemotoJOB · We Work Remotely · Remote OK · Arbeitnow · Virtual Vocations | 9 | RSS o JSON públicos | 1 cada uno |
 | Freelancer.com | 1 | API pública de proyectos (encargos, no empleos) | 1 |
 | Jobgether | 1 | feed público | 1 |
-| ATS por empresa | 11 | Greenhouse (Fever, Stripe, Typeform, Wallapop, Cabify), Ashby (Qonto, Pennylane), Recruitee (Holded, Livestorm), Teamtailor (Monest Capital, ProductHackers) | 1 cada uno |
+| ATS por empresa | 6 | Greenhouse (Fever, Stripe, Cabify), Ashby (Qonto, Pennylane), Teamtailor (ProductHackers) | 1 cada uno |
 
 FreeHire necesita una nota aparte porque es la mayor fuente de volumen y la más frágil: su API limita **por IP de origen** (2.000 peticiones, `retry-after` que llegó a 62.740 s) y el Worker sale por las IPs de egreso compartidas de Cloudflare. Cuando ese pozo común se agota, la API devuelve 429 durante horas aunque su web siga viva: por eso el conector pide la ruta de datos de la web (200, 20 ofertas por página, con descripción y país) y lo declara en la nota del run. Medido el 2026-11-13: **237 filas** recuperadas en una pasada y **149 publicables** en la activación en seco.
 
@@ -141,12 +142,12 @@ Sondeo real (HTTP + estructura de respuesta) de ~35 dominios candidatos para Esp
 
 ### Criterio aplicado (coherente con ADR-008/ADR-009)
 
-Solo entra como conector coste cero lo verificado en vivo con datos reales. Todo lo bloqueado por anti-bot queda en el catálogo Apify opt-in con presupuesto diario; nada se conecta a ciegas. La integración de JobToday y las altas de watchlist (Typeform/Cabify) son el siguiente incremento de cobertura recomendado.
+Solo entra como conector coste cero lo verificado en vivo con datos reales. Todo lo bloqueado por anti-bot queda en el catálogo Apify opt-in con presupuesto diario; nada se conecta a ciegas. La integración de JobToday y las altas de watchlist con volumen (Fever, Cabify) siguen siendo el siguiente incremento de cobertura recomendado.
 
 
 ## Expansión documental US — 2026-09-22
 
-La nueva investigación añade 17 fichas priorizadas en [18_US_HISPANIC_SOURCE_RESEARCH](spec/18_US_HISPANIC_SOURCE_RESEARCH.md). El catálogo ejecutable seguía con 33 entradas y seis conectores públicos **cuando se escribió esta sección (2026-09-22)**; los recuentos vigentes están en «Estado real — medido el 2026-11-13» (41 conectores, 68 entradas). Esta entrega no cambió los recuentos de entonces ni activó scrapers.
+La nueva investigación añade 17 fichas priorizadas en [18_US_HISPANIC_SOURCE_RESEARCH](spec/18_US_HISPANIC_SOURCE_RESEARCH.md). El catálogo ejecutable seguía con 33 entradas y seis conectores públicos **cuando se escribió esta sección (2026-09-22)**; los recuentos vigentes están en «Estado real — medido el 2026-11-13» (36 conectores, 63 entradas). Esta entrega no cambió los recuentos de entonces ni activó scrapers.
 
 Prioridad: ATS por empresa (Greenhouse/Lever/Ashby), recruiters LATAM→US (Remote Latinos/HireLATAM/Near), boards hispanos (Hispanic-Jobs/iHispano/DiversityJobs) y fuentes remotas/ventas/comunidades. Acceso y bloqueos documentados por ficha; sin Actors nuevos declarados operativos.
 

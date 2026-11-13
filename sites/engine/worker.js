@@ -261,19 +261,16 @@ const SOURCES = [
   // 16): fuera greenhouse ×3 y recruitee. Hoy 2026-10-15: fuera también
   // ashby-pennylane — 401 del proveedor TODOS los días (evidencia en funnels 14→15)
   // = 1 subrequest garantido en 0; si WDC reabre su board, se re-añade con el
-  // hallazgo ya documentado aquí. Queda monestcapital (única ATS con closers reales).
-  { code: 'ats-teamtailor-monestcapital', name: 'Monest Capital · Teamtailor', kind: 'teamtailor', slug: 'monestcapital' },
+  // hallazgo ya documentado aquí.
   // Ampliación de ATS gratuitos (2026-11-12), cada uno verificado en vivo ese día y elegido por
   // publicar ventas EN ESPAÑA, no por tamaño. Los agregadores tipo SimplyHired, Adzuna, Jooble,
   // Computrabajo, InfoJobs y Bumeran responden 403/404/405 desde el Worker: no son una opción.
   //   · Fever (Greenhouse): 564 ofertas, 278 en España, con Account Executive y Account
   //     Development en Madrid, varias «Spanish Speaker».
   //   · Qonto (Ashby): 61 ofertas, 10 en Barcelona/Madrid (ventas y crecimiento).
-  //   · Holded (Recruitee): 8 ofertas en Barcelona, con rol comercial.
   //   · RemotoJOB: único board español con RSS abierto (200, 36 KB); los demás lo cierran.
   { code: 'ats-greenhouse-feverup', name: 'Fever · Greenhouse', kind: 'greenhouse', slug: 'feverup' },
   { code: 'ats-ashby-qonto', name: 'Qonto · Ashby', kind: 'ashby', slug: 'qonto' },
-  { code: 'ats-recruitee-holded', name: 'Holded · Recruitee', kind: 'recruitee', slug: 'holded' },
   { code: 'remotojob', name: 'RemotoJOB', kind: 'rss', slug: 'https://remotojob.com/feed/' },
   // Tres gratuitas del catálogo que el panel daba por «fuera del cloud» y sí responden (2026-11-12):
   // We Work Remotely (RSS de ventas, 200), RemoteOK (API por tags, 200) y Arbeitnow (JSON, 200).
@@ -290,12 +287,9 @@ const SOURCES = [
   // daba 401 hasta hoy) — ambas 1 fetch.
   { code: 'ats-greenhouse-stripe', name: 'Stripe · Greenhouse', kind: 'greenhouse', slug: 'stripe' },
   { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
-  // Tres tableros gratuitos del catálogo que se quedaron fuera al migrar al motor cloud y seguían
-  // respondiendo (verificado 2026-11-13: 6, 4 y 2 ofertas). Cuestan una petición cada uno.
-  { code: 'ats-greenhouse-typeform', name: 'Typeform · Greenhouse', kind: 'greenhouse', slug: 'typeform' },
-  { code: 'ats-greenhouse-wallapop', name: 'Wallapop · Greenhouse', kind: 'greenhouse', slug: 'wallapop' },
-  { code: 'ats-recruitee-livestorm', name: 'Livestorm · Recruitee', kind: 'recruitee', slug: 'livestorm' },
-  // Últimos dos tableros gratuitos del catálogo que respondían y seguían fuera (2026-11-13: 50 y 4 ofertas).
+  // Dos tableros gratuitos del catálogo que respondían y seguían fuera (2026-11-13: 50 y 4 ofertas).
+  // Retirados por cero elegibles en dos mediciones: Holded, Monest Capital, Typeform, Wallapop y
+  // Livestorm (23 ofertas entre los cinco, ninguna publicable nunca; ver STATUS sesión 176).
   { code: 'ats-greenhouse-cabify', name: 'Cabify · Greenhouse', kind: 'greenhouse', slug: 'cabify' },
   // Teamtailor no siempre vive en `careers.<slug>.com`: este tablero usa el subdominio del propio ATS.
   { code: 'ats-teamtailor-producthackers', name: 'ProductHackers · Teamtailor', kind: 'teamtailor', slug: 'producthackers', host: 'producthackers.teamtailor.com' },
