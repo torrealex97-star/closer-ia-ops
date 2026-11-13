@@ -72,6 +72,8 @@ node --experimental-strip-types tests/engine/quota-config.mjs
 node --experimental-strip-types tests/engine/export.mjs
 # Presupuesto de subrequests por plan: con el techo de pago caben las 16 fuentes en UNA pasada (antes, 9).
 node --experimental-strip-types tests/engine/subrequests.mjs
+# Catálogo del panel vs motor: ninguna entrada puede pedir configuración para un portal que el motor ya recoge.
+node --experimental-strip-types tests/engine/catalog.mjs
 # Forma de escritura del catálogo (índices incluidos): coste medido por candidato, índices de lectura intactos y migración reanudable.
 node --experimental-strip-types tests/engine/writeshape.mjs
 node --experimental-strip-types tests/engine/latam.mjs

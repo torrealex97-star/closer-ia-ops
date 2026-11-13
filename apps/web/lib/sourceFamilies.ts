@@ -6,9 +6,23 @@ export type CloudRow = { code: string; name: string; run_status: string | null; 
 export type FamilyRow = CloudRow & { connectors: number; connectors_detail: Array<{ code: string; run_status: string | null; fetched: number | null }> };
 
 // Portales con varios conectores: el código del motor empieza por el del catálogo.
-const BASES = ['jobtoday', 'freehire', 'himalayas', 'getonbrd'];
+const BASES = ['jobtoday', 'freehire', 'himalayas'];
+// Conectores cuyo código NO es el del catálogo. Sin esto, un portal recogido se leía como apagado:
+// `getonbrd` frente a `getonbrd-public`, `remotive-sales` frente a `remotive`, etc.
+const ALIAS: Record<string, string> = {
+  getonbrd: 'getonbrd-public',
+  'remotive-sales': 'remotive',
+  'jobicy-marketing': 'jobicy',
+  'freelancer-closer': 'freelancer',
+};
 
-export const catalogCodeFor = (code: string): string => BASES.find(b => code === b || code.startsWith(`${b}-`)) ?? code;
+// Estos slugs de JobToday son entradas PROPIAS del catálogo (cada una es una página del portal), así
+// que no se funden en el agregado `jobtoday`: si el motor los recoge, el panel debe enseñarlos como
+// conectados uno a uno, no sumados al genérico.
+const OWN_ENTRIES = new Set(['jobtoday-telemarketing', 'jobtoday-remoto', 'jobtoday-ventas', 'jobtoday-comercial']);
+
+export const catalogCodeFor = (code: string): string => OWN_ENTRIES.has(code) ? code
+  : ALIAS[code] ?? BASES.find(b => code === b || code.startsWith(`${b}-`)) ?? code;
 
 // Un conector caído no se diluye en un «completada»: el estado del portal es el peor de sus conectores.
 const SEVERITY: Record<string, number> = { failed: 5, deferred: 4, running: 3, queued: 2, completed: 1 };

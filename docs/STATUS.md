@@ -1,5 +1,23 @@
 # Estado
 
+## Catálogo sin duplicados engañosos (sesión 165) — 2026-11-13
+
+- **Petición del operador**: el panel seguía marcando «Requiere configurar» a Get on Board, Freelancer y Jobgether aunque el motor ya los recoge; quitar duplicados o cruzar bien, y comprobar el recuento.
+- **Qué pasaba de verdad** (medido cruzando `sourceCatalog.json` con `/api/status` usando las MISMAS funciones del panel, `catalogCodeFor` + `groupByFamily`): `freelancer` y `jobgether` **sí estaban cruzados** (el alias `freelancer-closer → freelancer` funciona); lo que engañaba era su ficha: «Adaptador específico pendiente · Sin proveedor verificado» en la columna Método, en la captura que envió el operador. El único duplicado real era **`getonbrd`**, una segunda fila del mismo portal que el motor recoge como `getonbrd-public`, y esa no cruzaba nunca: salía «Requiere configurar» para siempre.
+- **Cambios**: eliminada la entrada `getonbrd` (66 → **65 entradas**); `freelancer` y `jobgether` pasan a `requires: none` con método y estado reales («API pública de proyectos» / «Feed público», «Conector operativo»); `freehire`, `jobtoday-ventas` y `jobtoday-comercial` dejan de decir «Adaptador pendiente» ahora que se recogen.
+- **Recuento comprobado**: **65 entradas, 22 conectadas, 43 sin conectar**. De las 43: **36 «Requiere configurar»** (2 con clave o acuerdo, 34 Apify) y **7 libres sin conector** (`remotejobs`, `remotefirstjobs`, `ats-greenhouse-cabify`, `ats-greenhouse-typeform`, `ats-greenhouse-wallapop`, `ats-recruitee-livestorm`, `ats-teamtailor-producthackers`).
+- **Prueba nueva**: `tests/engine/catalog.mjs` (añadida a `tests/admin-auth/run.sh`) falla si hay códigos duplicados, si una entrada pide configuración para un portal que el motor ya recoge, si una entrada recogida sigue anunciando proveedor pendiente, o si el recuento de conectadas deja de ser el medido. **PASS**.
+- **Limitación**: el panel vive detrás del login del operador, así que esta verificación es la del cruce real con `/api/status`, no una captura de la pantalla. El despliegue de la web va con este cambio.
+
+## Fuentes al día: recuentos reales, gratis vs clave vs pago (sesión 163b) — 2026-11-13
+
+- **Petición del operador**: `docs/SOURCES.md` y las referencias del motor seguían diciendo 38 entradas, 15 conectores y 22 fuentes, cuando el motor ya tiene 36 conectores; había que decir además qué es gratis y qué exige clave o pago.
+- **Recuentos medidos** (contra `SOURCES` y `fetchCost`, no copiados): **36 conectores**, coste declarado **79 subrequests** por pasada, **66 entradas** de catálogo, **22 con recogida**, **39 marcadas `requires: input`** (3 de ellas duplicados de portales ya recogidos: `getonbrd`, `freelancer`, `jobgether`), **34 de pago (Apify)** y **2 con clave o acuerdo** (InfoJobs: acuerdo de agregador; Jooble: clave gratuita, y además 403 al Worker).
+- **Gratis fuera del motor, verificado hoy**: Typeform · Greenhouse **6 ofertas**, Wallapop · Greenhouse **4**, Livestorm · Recruitee **2** (los tres responden 200 y cuestan 1 petición); Remote.jobs **301** y Remote First Jobs **404**: sin feed, solo Actor de pago.
+- **`docs/SOURCES.md` reescrito arriba**: sección «Estado real» con tres tablas (gratis conectadas, gratis fuera, clave/acuerdo) más la lista de pago con el bloqueo medido de cada portal; las secciones antiguas quedan marcadas como histórico y ya no se leen como estado actual. Comentario del motor que decía «22 fuentes» corregido a 36.
+- **Medido en seco, sin publicar** (activación `dry_run`, mercado ES): Fever **0 publicables** de 301 consideradas (295 sin perfil comercial, 2 sin señal de España) y Qonto **0 de 61** (56 sin perfil, 3 sin señal, **2 por idioma**). Es decir: la regla nueva desbloquea como máximo **2 filas de Qonto y 0 de Fever**; el cuello de botella de esos dos tableros no es el idioma, es que publican en inglés puestos que no son comerciales.
+- **Limitación**: las cifras de Fever/Qonto son de antes de desplegar la regla; la medición con la regla aplicada queda pendiente de despliegue. Nada de esto está commiteado todavía.
+
 ## Anuncios en inglés que exigen español (sesión 163) — 2026-11-13
 
 - **Anuncios en inglés que exigen español** (decisión del dueño, aplicada en `spanishBodyGate`): entra si el anuncio pide español explícitamente («Spanish speaker/speaking/required», «bilingual Spanish», «fluent in Spanish», «español requerido») con la exigencia a ≤30 caracteres; la tarjeta lo etiqueta «Anuncio en inglés · exige español» y la versión de activación guarda `language_requirements: ['Anuncio en inglés', 'Español exigido']`. No entra por mencionar «Spanish» suelto, ni el portugués, ni se reetiqueta un anuncio que ya está en español.

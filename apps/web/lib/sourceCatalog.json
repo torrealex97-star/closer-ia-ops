@@ -185,8 +185,8 @@
   "name": "JobToday Ventas",
   "category": "España",
   "website": "https://jobtoday.com/es/trabajos-ventas",
-  "acquisition_method": "Adaptador específico pendiente",
-  "validation_status": "Sin proveedor verificado",
+  "acquisition_method": "Listado embebido (NEXT_DATA)",
+  "validation_status": "Conector operativo",
   "requires": "none",
   "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
   "upstream_filters": []
@@ -196,8 +196,8 @@
   "name": "JobToday Comercial",
   "category": "España",
   "website": "https://jobtoday.com/es/trabajos-comercial",
-  "acquisition_method": "Adaptador específico pendiente",
-  "validation_status": "Sin proveedor verificado",
+  "acquisition_method": "Listado embebido (NEXT_DATA)",
+  "validation_status": "Conector operativo",
   "requires": "none",
   "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
   "upstream_filters": []
@@ -220,8 +220,8 @@
   "name": "FreeHire",
   "category": "Internacional",
   "website": "https://freehire.me",
-  "acquisition_method": "Adaptador específico pendiente",
-  "validation_status": "Sin proveedor verificado",
+  "acquisition_method": "API v1 + ruta de datos",
+  "validation_status": "Conector operativo",
   "requires": "none",
   "note": "API/feed público. Cobertura española variable; atribución y enlace original conservados.",
   "upstream_filters": []
@@ -370,17 +370,6 @@
   "upstream_filters": []
  },
  {
-  "code": "getonbrd",
-  "name": "Get on Board",
-  "category": "LATAM",
-  "website": "https://www.getonbrd.com",
-  "acquisition_method": "Adaptador específico pendiente",
-  "validation_status": "Sin proveedor verificado",
-  "requires": "input",
-  "note": "Empleo digital LATAM. Comprobar cobertura comercial del scraper.",
-  "upstream_filters": []
- },
- {
   "code": "linkedin",
   "name": "LinkedIn Jobs",
   "category": "España · LATAM · Europa",
@@ -495,10 +484,10 @@
   "name": "Freelancer",
   "category": "Freelance",
   "website": "https://www.freelancer.es",
-  "acquisition_method": "Adaptador específico pendiente",
-  "validation_status": "Sin proveedor verificado",
-  "requires": "input",
-  "note": "API oficial disponible; importar su salida mediante dataset o adaptar proveedor.",
+  "acquisition_method": "API pública de proyectos",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Encargos, no empleos: presupuesto del proyecto, sin salario. Se recoge por la API pública, sin clave.",
   "upstream_filters": []
  },
  {
@@ -627,10 +616,10 @@
   "name": "Jobgether",
   "category": "Internacional",
   "website": "https://jobgether.com",
-  "acquisition_method": "Adaptador específico pendiente",
-  "validation_status": "Sin proveedor verificado",
-  "requires": "input",
-  "note": "Remoto con filtro por país; HTML tras Cloudflare. Proveedor por validar.",
+  "acquisition_method": "Feed público",
+  "validation_status": "Conector operativo",
+  "requires": "none",
+  "note": "Remoto con filtro por país: se recoge del feed público del motor, sin clave.",
   "upstream_filters": []
  },
  {

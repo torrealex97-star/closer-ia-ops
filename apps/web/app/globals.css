@@ -548,6 +548,13 @@ textarea{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border
 .engine-alert button{border:1px solid var(--line);background:var(--sheet);color:var(--ink);min-height:36px;font-size:11px}
 .engine-alert button:hover:not(:disabled){background:var(--inset)}
 .engine-alert-unknown{margin-bottom:20px}
+/* «Qué falta y cómo se conecta» en la tabla de fuentes: el operador necesita los pasos, no un
+   «Requiere configurar» sin salida. Texto pequeño, sin colores nuevos. */
+.source-setup{margin-top:8px;font-size:11px;color:var(--secondary)}
+.source-setup summary{font-size:11px;color:var(--accent);min-height:28px}
+.source-setup-need{margin:6px 0 8px;color:var(--ink)}
+.source-setup ol{margin:0 0 6px;padding-left:18px;display:grid;gap:4px}
+.source-setup a{font-size:11px}
 /* Insignias de modalidad y frescura de la tarjeta de alumna (2026-11-12): lo que un portal
    enseña de un vistazo. El color nunca es la única señal: cada insignia lleva su palabra. */
 .opp-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px}

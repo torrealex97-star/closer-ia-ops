@@ -269,6 +269,28 @@ const SOURCES = [
   { code: 'ats-ashby-qonto', name: 'Qonto · Ashby', kind: 'ashby', slug: 'qonto' },
   { code: 'ats-recruitee-holded', name: 'Holded · Recruitee', kind: 'recruitee', slug: 'holded' },
   { code: 'remotojob', name: 'RemotoJOB', kind: 'rss', slug: 'https://remotojob.com/feed/' },
+  // Tres gratuitas del catálogo que el panel daba por «fuera del cloud» y sí responden (2026-11-12):
+  // We Work Remotely (RSS de ventas, 200), RemoteOK (API por tags, 200) y Arbeitnow (JSON, 200).
+  // Son en inglés: aportan volumen y algún rol comercial, pero pasan por el mismo gate de idioma.
+  { code: 'weworkremotely', name: 'We Work Remotely · ventas', kind: 'rss', slug: 'https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss' },
+  { code: 'remoteok', name: 'RemoteOK · ventas', kind: 'remoteok' },
+  { code: 'arbeitnow', name: 'Arbeitnow', kind: 'arbeitnow' },
+  // VirtualVocations: RSS público que responde 200, pero solo 10 ofertas por pasada y de perfiles
+  // variados (seguridad, legal, cuentas). Se conecta porque es gratis; su rendimiento se mide igual
+  // que el de las demás, sin prometer cobertura.
+  { code: 'virtualvocations', name: 'Virtual Vocations', kind: 'rss', slug: 'https://www.virtualvocations.com/jobs/rss' },
+  // El catálogo de la app ya listaba estas tres y el panel las enseñaba «fuera del cloud» porque el
+  // motor no las tenía. Verificadas el 2026-11-12: Stripe 784 ofertas, Pennylane 201 (su board volvió:
+  // daba 401 hasta hoy) — ambas 1 fetch.
+  { code: 'ats-greenhouse-stripe', name: 'Stripe · Greenhouse', kind: 'greenhouse', slug: 'stripe' },
+  { code: 'ats-ashby-pennylane', name: 'Pennylane · Ashby', kind: 'ashby', slug: 'pennylane' },
+  // JobToday recupera los cuatro slugs retirados el 2026-10-22 por «0 elegibles». La razón de entonces
+  // ya no se sostiene: el vocabulario de rol ahora reconoce «comercial» a secas y «teleoperador», que
+  // son justo los títulos de estas páginas. Los cinco slugs responden 200 hoy (356–724 KB).
+  { code: 'jobtoday-telemarketing', name: 'JobToday Telemarketing', kind: 'jobtoday', slug: 'telemarketing' },
+  { code: 'jobtoday-remoto', name: 'JobToday Comercial remoto', kind: 'jobtoday', slug: 'ventas-remoto' },
+  { code: 'jobtoday-ventas', name: 'JobToday Ventas', kind: 'jobtoday', slug: 'ventas' },
+  { code: 'jobtoday-comercial', name: 'JobToday Comercial', kind: 'jobtoday', slug: 'comercial' },
   // La entrada estaba DUPLICADA (2026-10-20): el run recorría el mismo board dos veces,
   // la segunda instancia quedaba 'queued' para siempre en /api/status y gastaba un
   // subrequest que necesita la cola ATS.
@@ -692,6 +714,25 @@ async function sourceWorkingNomads(source = {}) {
   return out.slice(0, MAX_ITEMS_PER_SOURCE);
 }
 
+// RemoteOK devuelve un array JSON con un primer elemento que es un aviso legal, no una oferta:
+// se filtra por la presencia de `position`. 655 KB por pasada (una petición, no varias).
+async function sourceRemoteOk() {
+  const data = JSON.parse(await fetchText('https://remoteok.com/api?tags=sales'));
+  return (Array.isArray(data) ? data : []).filter(j => j && typeof j === 'object' && j.position && j.url)
+    .slice(0, MAX_ITEMS_PER_SOURCE).map(j => ({ external_id: String(j.id ?? j.slug ?? j.url), payload: {
+      title: j.position, company: j.company ?? null, location: j.location || null, url: j.url,
+      posted_at: j.date ? new Date(j.date).toISOString() : null, raw: j,
+    } }));
+}
+// Arbeitnow: JSON con { data: [...] }, sin clave. Trae created_at en epoch y un slug propio.
+async function sourceArbeitnow() {
+  const data = JSON.parse(await fetchText('https://www.arbeitnow.com/api/job-board-api'));
+  return (data.data || []).slice(0, MAX_ITEMS_PER_SOURCE).map(j => ({ external_id: String(j.slug ?? j.url), payload: {
+    title: j.title, company: j.company_name ?? null, location: j.location || (j.remote ? 'Remote' : null), url: j.url,
+    posted_at: j.created_at ? new Date(Number(j.created_at) * 1000).toISOString() : null, raw: j,
+  } }));
+}
+
 async function sourceJobspresso(source) {
   // RSS de WordPress con `post_type=job_listing` (2026-11-08: 200, 20 ítems de empleo). Usa el
   // mismo parseo que `sourceRss` pero SÍ filtra por rol: el feed es heterogéneo.
@@ -724,6 +765,7 @@ const EXTRACTORS = {
   getonbrd: sourceGetOnBoard, freehire: sourceFreehire, freelancer: sourceFreelancer,
   jobgether: sourceJobgether, remotive: sourceRemotive, jobicy: sourceJobicy,
   workingnomads: sourceWorkingNomads, jobspresso: sourceJobspresso,
+  remoteok: sourceRemoteOk, arbeitnow: sourceArbeitnow,
 };
 
 // ------ forma de escritura del catálogo (esto es cuota, no estilo) ------

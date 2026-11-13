@@ -12,6 +12,7 @@ import StudentsTab from './StudentsTab';
 import SummaryTab from './SummaryTab';
 import sourceCatalog from '../lib/sourceCatalog.json';
 import { catalogCodeFor, groupByFamily } from '../lib/sourceFamilies';
+import { setupFor } from '../lib/sourceSetup';
 
 // Panel hospedado: mismo marco que el panel local (barra lateral, cabecera, título en serif), con acceso por
 // email + contraseña de Supabase Auth (solo usuarios invitados) y las secciones de gestión de la app.
@@ -122,7 +123,17 @@ function SourceCatalog({ sources, external = [], paused = [], engineDown = false
       <thead><tr><th>Fuente</th><th>Categoría</th><th>Método</th><th>Estado</th><th className="num">Leídas</th><th className="num">Catálogo</th><th className="num">Elegibles</th></tr></thead>
       <tbody>{shown.slice(0, limit).map(r => <tr key={r.code}>
         <td className="primary-cell"><strong>{r.website ? <a href={r.website} target="_blank" rel="noopener noreferrer">{r.name}</a> : r.name}</strong><span>{r.code}</span>
-          {r.cloud?.warning && <span style={{ color: 'var(--warning)' }}>{r.cloud.warning}</span>}{!r.cloud && r.note && <span>{r.note}</span>}</td>
+          {r.cloud?.warning && <span style={{ color: 'var(--warning)' }}>{r.cloud.warning}</span>}{!r.cloud && r.note && <span>{r.note}</span>}
+          {/* «Requiere configurar» sin decir qué falta obligaba a adivinar. Aquí va el requisito y los
+              pasos concretos, con enlace al proveedor cuando existe. */}
+          {!r.cloud && !r.ext && r.requires === 'input' && (() => {
+            const setup = setupFor(r);
+            return <details className="source-setup"><summary>Qué falta y cómo se conecta</summary>
+              <p className="source-setup-need">{setup.requirement}</p>
+              <ol>{setup.steps.map(s => <li key={s}>{s}</li>)}</ol>
+              {setup.link && <a href={setup.link.href} target="_blank" rel="noopener noreferrer">{setup.link.label}</a>}
+            </details>;
+          })()}</td>
         <td>{r.category ?? '—'}</td><td>{r.acquisition_method ?? '—'}{r.validation_status && <span className="sub">{r.validation_status}</span>}</td>
         <td>{cell(r)}</td><td className="num">{r.cloud?.fetched ?? '—'}</td><td className="num">{r.cloud?.catalog ?? '—'}</td><td className="num">{r.cloud?.eligible ?? '—'}</td></tr>)}</tbody></table></div>}
     {shown.length > limit && <p className="card-meta" style={{ marginTop: 12 }}><button onClick={() => setLimit(n => n + 25)}>Mostrar {Math.min(25, shown.length - limit)} más</button> <span aria-live="polite">Mostrando {limit} de {shown.length}</span></p>}
